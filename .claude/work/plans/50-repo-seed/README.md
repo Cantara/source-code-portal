@@ -8,19 +8,12 @@ caches (`~/Library/pnpm`, the Go module and build caches, the golangci-lint cach
 ## Use
 
 ```
-.claude/work/plans/50-repo-seed/bootstrap.sh --commit --install   # from the repository root (git@github.com:Cantara/source-code-portal.git)
-make check
+.claude/work/plans/50-repo-seed/bootstrap.sh [--install]
 ```
 
-`bootstrap.sh [<repo-root>] [--git|--commit] [--install] [--verify]` lays `repo/` into the root of the repository that holds this design
-package at `.claude/work/plans/` (the default root is derived from the script's own location; an explicit root must be that repository). The
-design package is **not** copied or mirrored: planning and design live under `.claude/work/`, and `docs/` is user documentation only (owner
-layout rule, 2026-10-14). Nothing is overwritten: every seed file whose target exists with different content is listed as a conflict and the run
-stops before copying anything. The one exception is a root `.gitignore` or `.gitattributes` whose every rule is already in the seed's version;
-the seed's version then replaces it. A second run finds only identical files and changes nothing. With `--git` it uses the existing repository
-(or runs `git init -b main` if there is none) and stages everything; `--commit` commits `chore: repository seed`. Then follow design 16 section 13
-(tasks B-1 to B-3, and the milestone order of 4.12) and `../40-implementation-plan.md` (milestone M0 first). Read `seed-notes.md` for what
-differs from the design files.
+Copies `repo/` into the repository root (once, at M0); `--install` also runs `pnpm install` in `web/`. Commit the result as
+`chore: repository seed`. Then follow design 16 section 13 (tasks B-1 to B-3, the order of 4.12) and `../40-implementation-plan.md` (M0
+first). `seed-notes.md` lists what differs from the design files.
 
 | Path | What |
 |---|---|

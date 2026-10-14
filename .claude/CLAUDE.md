@@ -8,7 +8,7 @@ This repository (`git@github.com:Cantara/source-code-portal.git`, default branch
 
 Current phase: planning. Do not write product code yet. Work on the plans means editing documents under `.claude/work/plans/`.
 
-Layout rule (owner, 2026-10-14): all project work material (plans, design, notes, roadmap, ...) lives under `.claude/work/`. `docs/` is reserved for user documentation and must never hold planning or design documents. The seed follows it: `bootstrap.sh` lays `50-repo-seed/repo/` into this repository in place (no design mirror, nothing overwritten), the design map and seed notes live in `50-repo-seed/`, new ADRs go to `11-adr/` from ADR-026 (template `ADR-000-template.md`), and every tool skips `.claude/` (seed deviation S-12, superseded).
+Layout rule (owner, 2026-10-14): all project work material (plans, design, notes, roadmap, ...) lives under `.claude/work/`. `docs/` is reserved for user documentation and must never hold planning or design documents. The seed follows it: `bootstrap.sh` copies `50-repo-seed/repo/` into this repository (no design mirror), the design map and seed notes live in `50-repo-seed/`, new ADRs go to `11-adr/` from ADR-026 (template `ADR-000-template.md`), and every tool skips `.claude/` (seed deviation S-12, superseded).
 
 ## Where to start
 
@@ -54,7 +54,7 @@ Rules that hold the design together:
 From the seed's `AGENTS.md` and `Makefile`; they apply after `bootstrap.sh` has laid the seed into this repository:
 
 ```
-.claude/work/plans/50-repo-seed/bootstrap.sh --commit --install   # from the repository root; lists conflicts and copies nothing if a file differs
+.claude/work/plans/50-repo-seed/bootstrap.sh --install   # once, at M0: copies the seed into the root
 make check      # PR gate at bootstrap step 1: gen-check modverify lint arch test lint-web vuln licenses
 make arch       # archtest: closed-world matrix, rank proof, depguard drift, source rules
 make arch-fix   # regenerate the depguard block of .golangci.yml after editing internal/archtest/rules.go
