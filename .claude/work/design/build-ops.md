@@ -3,7 +3,7 @@ Status: v1 design note, 2026-10-14. Binding order: ../plan.md > this note > ../r
 
 ## Scope (v1)
 The repository shape, the `scp` command, configuration, process lifecycle and health, build, CI, container image, release, dependency
-updates and the test strategy for milestones M0 to M5, for one instance serving up to 1,000 repositories.
+updates and the test strategy for milestones M0 to M6, for one instance serving up to 1,000 repositories.
 
 ## Decisions (bullets with one-line reasons)
 - Cobra tree built by `newRootCmd()` in `cmd/scp`; state lives in values passed down: each test builds a fresh tree.
@@ -31,7 +31,7 @@ Root files: `go.mod` (`module github.com/cantara/source-code-portal`, `go 1.27.2
 
 | Dir | Holds |
 |---|---|
-| `.github/workflows/` | `ci.yml` (M0), `release.yml` (M5); `.github/pull_request_template.md` |
+| `.github/workflows/` | `ci.yml` (M0), `release.yml` (M6); `.github/pull_request_template.md` |
 | `api/` | `openapi.yaml`, the OpenAPI 3.1 contract for `/api/v1` |
 | `cmd/scp/` | `main.go`, the Cobra tree, wiring (including the webhook sink that calls `sync.Notify`), the boundary test |
 | `internal/` | the packages of plan section 3, each created with its first code; `testdata/` beside each package's tests |
@@ -56,7 +56,7 @@ Loading (`internal/config.Load(path string, flags *pflag.FlagSet) (Config, error
 5. `UnmarshalExact(&cfg)` with `mapstructure` tags and the duration hook; then each `*_file` secret is read (missing or empty: violation).
 6. `cfg.Validate()` collects every violation with its key path (for example: no `github.sources`; both or neither of `app` and
    `token_file`; an org in two sources; a bad matcher regexp; a duplicate group id; `catalog.reconcile_interval` below 1m) and joins them.
-Each key is added with the code that reads it; `scp config check` output is the reference until the M5 operator guide.
+Each key is added with the code that reads it; `scp config check` output is the reference until the M6 operator guide.
 
 ```yaml
 server: { public_addr: ":9090", admin_addr: ":9091", public_url: "https://scp.example.org", shutdown_grace: 20s }
@@ -124,7 +124,7 @@ static binary with `-tags spa` and runs `scp version` -> `gcr.io/distroless/stat
 volume for SQLite, `EXPOSE 9090 9091`, `ENTRYPOINT ["/scp"]`, `CMD ["serve"]`, OCI labels for source, version, revision and licence.
 It runs with `readOnlyRootFilesystem` and all capabilities dropped; SQLite uses `temp_store=MEMORY`, so `/data` is the only writable mount.
 
-Release (M5, `release.yml` on tags `v*`, `contents: write`, `packages: write`, `id-token: write`): `make web`, then GoReleaser v2:
+Release (M6, `release.yml` on tags `v*`, `contents: write`, `packages: write`, `id-token: write`): `make web`, then GoReleaser v2:
 binaries `linux/amd64`, `linux/arm64`, `darwin/arm64`, tar.gz with `LICENSE` and `README.md`, sha256 checksums; a multi-arch image from
 `deploy/Dockerfile.release` (distroless, copies the GoReleaser binary) pushed to `ghcr.io/cantara/source-code-portal:<version>` and
 `:latest` for full releases, with a BuildKit SBOM; cosign keyless signatures of the image and the checksums file; changelog from

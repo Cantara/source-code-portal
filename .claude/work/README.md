@@ -4,7 +4,7 @@ Everything needed to build Source Code Portal v1 in Go. Binding order: `plan.md`
 
 | File | What it holds |
 |---|---|
-| `plan.md` | What SCP is, scope (v1, v1.1, later), architecture, stack, milestones M0..M5. Read first. |
+| `plan.md` | What SCP is, scope (v1, v1.1, later), architecture, stack, milestones M0..M6. Read first. |
 | `decisions.md` | Every decision, dated, with where it is recorded. |
 | `design/principles.md` | The 18 principles every change keeps, each with its check. |
 | `design/build-ops.md` | Repository layout, Cobra CLI, Viper config, runtime, Makefile, CI, image, release, test strategy. M0. |
@@ -12,7 +12,7 @@ Everything needed to build Source Code Portal v1 in Go. Binding order: `plan.md`
 | `design/sync-snapshot-store.md` | Scheduler, job queue, freshness, the immutable snapshot, SQLite store, readiness, shutdown. M1. |
 | `design/catalog.md` | Sources, repository identity, groups and matchers, the `scp.yaml` descriptor. M1. |
 | `design/http-api.md` | Listeners, routes, OpenAPI contract, middleware, security headers, webhooks receiver, `llms.txt`, metrics. M1..M4. |
-| `design/web.md` | The React SPA: structure, routes, data access, build and embed, tests. M0, M2. |
+| `design/web.md` | The React SPA: technical frame (structure, routes, data access, build and embed, tests); visual design from Claude Design. M0, M5. |
 | `design/content.md` | Docs rendering and sanitising, commits, SVG badges. M2..M3. |
 | `reference/detailed-design/` | The earlier detailed design (archive). Background material, consulted per note's Reference section. |
 

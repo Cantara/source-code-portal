@@ -8,7 +8,7 @@ This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`,
 home of the Go rewrite of Source Code Portal (SCP). M0 (skeleton) is done; the next milestone is M1. Coding instructions for the
 repository itself are in the root `AGENTS.md`.
 
-- **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M5. Read it first.
+- **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M6. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: short v1 design notes per area (GitHub, sync/snapshot/store, catalog, content, HTTP/API, web, build/ops,
   principles). Binding below `plan.md`.

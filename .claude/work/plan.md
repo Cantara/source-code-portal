@@ -104,16 +104,18 @@ Rule: every dependency is current (a release within the last 18 months, supports
 
 ## 5. Milestones
 
-Each milestone ends with working software on `main`, CI green.
+Each milestone ends with working software on `main`, CI green. The web UI is designed in Claude Design first; M1 to M4 build
+the backend and API, and M5 builds the UI from that design.
 
 | M | Delivers | Done when |
 |---|---|---|
 | M0 | Skeleton: `go.mod`, Makefile, CI, Dockerfile, Cobra CLI, Viper config, `/livez`, SPA shell embedded | `make check` and the image build pass in CI |
 | M1 | Catalogue and sync: GitHub App auth, discovery, groups, job queue, SQLite, snapshot | a test org (fake GitHub in tests) shows up in `/api/v1/groups` |
-| M2 | Pages: dashboard, group and repository pages, commits | the SPA shows a real org end to end |
+| M2 | Read API for the pages: dashboard, groups, repositories, commits | the API serves a real org end to end (fake GitHub in tests) |
 | M3 | Docs, badges, webhooks, freshness | a push updates the page within seconds; a GitHub outage serves stale data |
 | M4 | `/llms.txt`, raw Markdown, metrics, readiness, hardening (CSP, limits) | security and load checks pass for 1,000 repositories |
-| M5 | Release v1.0: docs for operators, GoReleaser, image published | `ghcr.io/cantara/source-code-portal:1.0.0` runs from the operator guide |
+| M5 | Web UI built from the Claude Design work: dashboard, group, repository, docs and commit pages | every page renders a real org; Playwright smoke, axe and CSP checks pass |
+| M6 | Release v1.0: docs for operators, GoReleaser, image published | `ghcr.io/cantara/source-code-portal:1.0.0` runs from the operator guide |
 
 v1.1 follows the same pattern, one milestone per bullet of section 2.
 

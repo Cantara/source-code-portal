@@ -1,5 +1,7 @@
 # Web UI
 Status: v1 design note, 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+The visual design (layout, components, page composition) comes from the Claude Design work before M5; this note fixes the
+technical frame the design is built in.
 
 ## Scope (v1)
 A read-only React SPA for the pages of plan.md section 2: dashboard, group, repository (README), docs viewer, commit logs (all, group,
