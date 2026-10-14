@@ -117,7 +117,14 @@ UI from `design/web.md`.
 | M5 | Web UI: dashboard, group, repository, docs and commit pages | every page renders a real org; Playwright smoke, axe and CSP checks pass |
 | M6 | Release 2.0.0: docs for operators, GoReleaser, image published | `ghcr.io/cantara/source-code-portal:2.0.0` runs from the operator guide |
 
-v1.1 follows the same pattern, one milestone per bullet of section 2.
+v1.1, one milestone per bullet of section 2; each starts with its design note:
+
+| M | Delivers | Done when |
+|---|---|---|
+| M7 | Package manifests (`design/manifests.md`): `go.mod`, `package.json` and `pom.xml` per repository, technology and dependency panel, internal dependencies between catalogued repositories | a repository page shows its technologies and dependencies and the catalogued repositories it uses and is used by |
+| M8 | Private repositories behind a trusted authenticating proxy | anonymous requests see public repositories only on every surface (pages, API, badges, Markdown, feeds); a request from the proxy with a permitted group sees the private ones |
+| M9 | Multiple instances with Hazelcast | two instances on one Hazelcast cluster make each GitHub call once, share webhook de-duplication and serve the same data |
+| M10 | Image proxy for external README images; live updates by server-sent events | README images load from the portal under `img-src 'self'`; a push reaches an open page without polling |
 
 ## 6. How we work
 

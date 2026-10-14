@@ -6,11 +6,11 @@ Guidance for Claude Code in this repository.
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`) is the
 home of the Go rewrite of Source Code Portal (SCP). **M0 (skeleton), M1 (catalogue and sync), M2 (read API for the pages), M3 (docs,
-badges, webhooks, freshness), M4 (LLM surface, metrics, hardening), M5 (web UI) and M6 (release `v2.0.0`) are done; next is the v1.1 scope.** Coding instructions for the repository itself are in the root `AGENTS.md`.
+badges, webhooks, freshness), M4 (LLM surface, metrics, hardening), M5 (web UI) and M6 (release `v2.0.0`) are done; next is M7 (package manifests), the first v1.1 milestone.** Coding instructions for the repository itself are in the root `AGENTS.md`.
 
-- **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M6. Read it first.
+- **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M10. Read it first.
 - `.claude/work/README.md`: index of the development package.
-- `.claude/work/design/`: short v1 design notes per area (GitHub, sync/snapshot/store, catalog, content, HTTP/API, web, build/ops,
+- `.claude/work/design/`: short design notes per area (GitHub, sync/snapshot/store, catalog, content, manifests, HTTP/API, web, build/ops,
   principles). Binding below `plan.md`.
 - `.claude/work/decisions.md`: every decision taken, with where it is recorded. The milestone entries (M1..M5) list where the code
   is leaner than the notes and what was deferred.
@@ -70,10 +70,9 @@ only in `cmd/scp`. Untrusted bytes pass through bounded parsers and one sanitise
 
 Test idioms: engine tests run in `testing/synctest` bubbles with a real store in a temp dir; every package with goroutines uses `goleak`.
 
-## Next: v1.1
+## Next: M7
 
-`v2.0.0` is released (GitHub release with signed archives; image `ghcr.io/cantara/source-code-portal:2.0.0` and `:latest`). The next
-stream is the v1.1 scope of `plan.md` section 2: package manifests (Go, npm, Maven), private repositories behind a trusted proxy,
-multiple instances with Hazelcast, the image proxy and server-sent events. Plan it as milestones in `plan.md` section 5 first. The
-version stays 2.0.0 until the greenfield streams are complete. Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the
-global pnpm is older; `make e2e` needs `pnpm -C web exec playwright install chromium`.
+`v2.0.0` is released (GitHub release with signed archives; image `ghcr.io/cantara/source-code-portal:2.0.0` and `:latest`). The v1.1
+stream is M7..M10 in `plan.md` section 5; each milestone starts with its design note. M7 is package manifests: read
+`design/manifests.md`. The version stays 2.0.0 until the greenfield streams are complete. Local web commands: `npx -y pnpm@12.11.2 -C
+web <script>` when the global pnpm is older; `make e2e` needs `pnpm -C web exec playwright install chromium`.
