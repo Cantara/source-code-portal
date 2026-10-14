@@ -117,7 +117,7 @@ export function GroupView({ group }: { group: string }) {
                       <tr key={r.address}>
                         <td className="p-2 font-medium">
                           <span className="inline-flex flex-wrap items-center gap-2">
-                            <ActivityLight repo={r} />
+                            <ActivityLight repo={r} decorative />
                             <Link href={repoPath(r.owner, r.name)} className="hover:underline">
                               {r.owner}/{r.name}
                             </Link>

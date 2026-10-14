@@ -6,12 +6,17 @@ import { cn } from "@/lib/cn"
 
 const label = Object.fromEntries(activities.map((a) => [a.level, a])) as Record<Activity, (typeof activities)[number]>
 
-/** ActivityLight is a repository's activity as a coloured light with its label for screen readers. */
-export function ActivityLight({ repo, className }: { repo: Repo; className?: string }) {
+/** ActivityLight is a repository's activity as a coloured light with its label for screen readers (none when decorative: the
+ * health badges beside it say it). */
+export function ActivityLight({ repo, decorative = false, className }: { repo: Repo; decorative?: boolean; className?: string }) {
   const level = activity(repo, useNow())
   return (
-    <span className={cn(`lvl-${level} led led-live`, className)} title={`${label[level].label}: ${label[level].within}`}>
-      <span className="sr-only">{label[level].label}</span>
+    <span
+      className={cn(`lvl-${level} led led-live`, className)}
+      title={`${label[level].label}: ${label[level].within}`}
+      aria-hidden={decorative || undefined}
+    >
+      {!decorative && <span className="sr-only">{label[level].label}</span>}
     </span>
   )
 }
