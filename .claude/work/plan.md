@@ -120,7 +120,8 @@ Each milestone ends with working software on `main`, CI green, and is done only 
 | M10 | Image proxy for external README images; live updates by server-sent events | README images load from the portal under `img-src 'self'`; a push reaches an open page without polling |
 | M11 | Web UI on Next.js with server-side rendering, replacing the SPA; started only when M10 is done | every page is complete HTML from the server (content readable without JavaScript) with its own title, description and canonical URL, plus a sitemap; Playwright smoke, axe and CSP checks pass |
 
-M7 to M11 each start with their design note. The version stayed 2.0.0 until M11 was done (P-11); the finished streams ship as 2.1.0 (P-16).
+| M12 | Search engines (`design/seo.md`, planned from krantho): JSON-LD per page, sitemap with documents and `lastmod`, Open Graph cards, manifest, version-keyed page cache, IndexNow, SEO gates in CI | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility score 100 on the dashboard, a group and a repository |
+M7 to M12 each start with their design note. The version stayed 2.0.0 until M11 was done (P-11); the finished streams ship as 2.1.0 (P-16).
 
 ## 6. How we work
 

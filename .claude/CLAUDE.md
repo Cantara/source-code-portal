@@ -12,7 +12,7 @@ with server-side rendering) are done: the greenfield streams are complete.** Cod
 - **`.claude/work/plan.md` is the binding plan**: scope (v1, later), architecture, stack, milestones M0..M11. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: short design notes per area (GitHub, sync/snapshot/store, catalog, content, manifests, access, cluster,
-  images and events, HTTP/API, web, build/ops, principles). Binding below `plan.md`.
+  images and events, HTTP/API, web, build/ops, principles; `seo.md` plans M12). Binding below `plan.md`.
 - `.claude/work/decisions.md`: every decision taken, with where it is recorded. The milestone entries (M1..M5) list where the code
   is leaner than the notes and what was deferred.
 - `.claude/work/reference/detailed-design/`: the earlier detailed design package (about 1,900 files). **Reference only**: consult it
