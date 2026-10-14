@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
@@ -94,9 +95,11 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 	sources := map[string]catalog.GitHub{}
 	fetchers := map[string]commits.Fetcher{}
 	trees := map[string]docs.GitHub{}
+	releases := map[string]badges.Releases{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
-		sources[s.ID], fetchers[s.ID], trees[s.ID] = gh.Source(s.ID), gh.Source(s.ID), gh.Source(s.ID)
+		src := gh.Source(s.ID)
+		sources[s.ID], fetchers[s.ID], trees[s.ID], releases[s.ID] = src, src, src, src
 		ids = append(ids, s.ID)
 	}
 
@@ -115,7 +118,8 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 		return nil, err
 	}
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
-	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), docs.New(trees, safehtml.New()).Spec(), cat.DescriptorSpec()} {
+	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), docs.New(trees, safehtml.New()).Spec(), cat.DescriptorSpec(),
+		badges.New(releases).ReleaseSpec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
@@ -123,7 +127,7 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 
 	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
 	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
-		httpapi.SnapshotAPI{Current: s.pub.Current}}), log)
+		httpapi.SnapshotAPI{Current: s.pub.Current}}, httpapi.Route{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)}), log)
 	s.admin = newHTTPServer(httpapi.Admin(ready), log)
 	var lc net.ListenConfig
 	if s.publicLn, err = lc.Listen(ctx, "tcp", cfg.Server.PublicAddr); err != nil {

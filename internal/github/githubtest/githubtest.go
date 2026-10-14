@@ -43,6 +43,7 @@ type Server struct {
 	orgs     map[string][]*gh.Repository
 	commits  map[int64][]Commit          // by repository id, newest first
 	files    map[int64]map[string]string // by repository id: path -> content
+	releases map[int64]*gh.RepositoryRelease
 	nextID   int64
 	used     map[string]int // credential -> requests charged this window
 	reset    time.Time
@@ -65,7 +66,8 @@ func New(t testing.TB) *Server {
 		t.Fatal(err)
 	}
 	s := &Server{AppID: 42, key: key, tokens: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
-		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, files: map[int64]map[string]string{}, nextID: 1000, used: map[string]int{}}
+		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, files: map[int64]map[string]string{},
+		releases: map[int64]*gh.RepositoryRelease{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
 	mux.HandleFunc("POST /app/installations/{id}/access_tokens", s.accessToken)
@@ -74,6 +76,7 @@ func New(t testing.TB) *Server {
 	mux.HandleFunc("GET /repos/{owner}/{name}/commits", s.listCommits)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/trees/{ref}", s.getTree)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/blobs/{sha}", s.getBlob)
+	mux.HandleFunc("GET /repos/{owner}/{name}/releases/latest", s.latestRelease)
 	s.Server = httptest.NewServer(s.wrap(mux))
 	t.Cleanup(s.Close)
 	return s
@@ -450,6 +453,36 @@ func (s *Server) SetFile(id int64, path, content string) {
 		return
 	}
 	s.files[id][path] = content
+}
+
+// SetRelease sets the latest release of the repository with id; an empty tag removes it.
+func (s *Server) SetRelease(id int64, tag, name string, published time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if tag == "" {
+		delete(s.releases, id)
+		return
+	}
+	s.releases[id] = &gh.RepositoryRelease{TagName: tag, Name: new(name), PublishedAt: &gh.Timestamp{Time: published},
+		HTMLURL: fmt.Sprintf("https://github.com/releases/%d/%s", id, tag)}
+}
+
+func (s *Server) latestRelease(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	var rel *gh.RepositoryRelease
+	if r := s.lookup(req.PathValue("owner"), req.PathValue("name")); r != nil {
+		rel = s.releases[r.GetID()]
+	}
+	s.mu.Unlock()
+	if rel == nil {
+		writeError(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	s.respond(w, req, cred, rel)
 }
 
 // lookup returns the repository at owner/name. Callers hold s.mu.

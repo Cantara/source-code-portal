@@ -74,6 +74,14 @@ type Commit struct {
 	CommittedAt time.Time `json:"committedAt"`
 }
 
+// Release is a repository's latest published release.
+type Release struct {
+	Tag       string    `json:"tag"`
+	Name      string    `json:"name"`
+	URL       string    `json:"url"`
+	Published time.Time `json:"published"`
+}
+
 // CommitRef is a commit in a merged feed.
 type CommitRef struct {
 	Repo   RepoKey
@@ -141,6 +149,8 @@ type RepoEntry struct {
 	DescriptorFresh Freshness
 	Docs            []Doc // README first, then by order, then path
 	DocsFresh       Freshness
+	Release         *Release // nil when there is none or it is not known yet (ReleaseFresh.State tells which)
+	ReleaseFresh    Freshness
 }
 
 // Snapshot is the serving state. It is immutable after publish.

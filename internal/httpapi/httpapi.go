@@ -18,10 +18,19 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
+// Route is a handler a feature serves outside the API contract (badges, the webhook).
+type Route struct {
+	Pattern string
+	Handler http.Handler
+}
+
 // Public returns the handler of the public listener. spa holds the web UI build with index.html at its root; api implements the
-// contract in api/openapi.yaml.
-func Public(spa fs.FS, api oapi.StrictServerInterface) http.Handler {
+// contract in api/openapi.yaml; routes are the features' other handlers.
+func Public(spa fs.FS, api oapi.StrictServerInterface, routes ...Route) http.Handler {
 	mux := http.NewServeMux()
+	for _, r := range routes {
+		mux.Handle(r.Pattern, r.Handler)
+	}
 	mux.Handle("GET /", spaHandler(spa))
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, _ *http.Request) {
 		WriteProblem(w, http.StatusNotFound, "not-found", "No such API resource.")

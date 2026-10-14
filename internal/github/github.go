@@ -304,6 +304,22 @@ func (s *Source) Tree(ctx context.Context, owner, name, ref string, recursive bo
 	return out, nil
 }
 
+// LatestRelease returns the latest published, non-prerelease release; nil when the repository has none.
+func (s *Source) LatestRelease(ctx context.Context, owner, name string) (*snapshot.Release, error) {
+	c, err := s.client(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	r, resp, err := c.Repositories.GetLatestRelease(ctx, owner, name)
+	if err != nil {
+		if err := classify(resp, err); !IsNotFound(err) {
+			return nil, err
+		}
+		return nil, nil //nolint:nilnil // no release is not an error
+	}
+	return &snapshot.Release{Tag: r.GetTagName(), Name: r.GetName(), URL: r.GetHTMLURL(), Published: r.GetPublishedAt().UTC()}, nil
+}
+
 // WebURL is the web host of the source with a trailing slash: https://github.com/ for github.com, the GHES host otherwise.
 func (s *Source) WebURL() string {
 	if u, err := url.Parse(s.cfg.BaseURL); err == nil && u.Host != "api.github.com" {

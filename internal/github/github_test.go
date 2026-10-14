@@ -216,6 +216,21 @@ func TestCommitsTreesAndBlobs(t *testing.T) {
 	}
 }
 
+func TestLatestRelease(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("one")})
+	srv.AddRepo("acme", gh.Repository{Name: new("none")})
+	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	srv.SetRelease(id, "v1.2.0", "One two", at)
+	s := tokenSource(t, srv, "acme")
+	if r, err := s.LatestRelease(t.Context(), "acme", "one"); err != nil || r == nil || r.Tag != "v1.2.0" || !r.Published.Equal(at) {
+		t.Errorf("release = %+v, %v", r, err)
+	}
+	if r, err := s.LatestRelease(t.Context(), "acme", "none"); err != nil || r != nil {
+		t.Errorf("no release = %+v, %v", r, err)
+	}
+}
+
 func TestWebURL(t *testing.T) {
 	for base, want := range map[string]string{
 		"https://api.github.com/":         "https://github.com/",

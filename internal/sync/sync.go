@@ -59,6 +59,7 @@ type Event uint8
 const (
 	EventPush          Event = iota + 1 // new commits in a repository
 	EventSourceChanged                  // repositories were added, removed or renamed in a source
+	EventTag                            // a tag was pushed to a repository
 )
 
 // Job is what a Spec's Run receives.

@@ -110,6 +110,7 @@ func TestServeEndToEnd(t *testing.T) {
 	gh.SetCommits(tool, commit('f', 4))
 	gh.SetFile(core, ".github/scp.yaml", "schema: 1\ntitle: Whydah Core\nlifecycle: production\n")
 	gh.SetFile(core, "scp.yaml", "schema: 1\ntitle: loses to .github/\n")
+	gh.SetRelease(core, "v2.0.0", "Two", at(3))
 	gh.SetFile(core, "README.md", "# Whydah Core\n\nIdentity. See [setup](docs/setup.md).\n")
 	gh.SetFile(core, "docs/setup.md", "# Setup\n\n## Install\n\n<script>alert(1)</script>\n")
 	gh.AddRepo("acme", gogh.Repository{Name: new("secret"), Visibility: new("private")})
@@ -169,6 +170,16 @@ catalog:
 		}
 		return resp.StatusCode
 	}
+	read := func(url string) string {
+		t.Helper()
+		resp, err := client.Get(url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b)
+	}
 	waitReady := func(admin string) {
 		t.Helper()
 		for deadline := time.Now().Add(10 * time.Second); fetch(admin+"/readyz", nil) != http.StatusOK; {
@@ -205,6 +216,12 @@ catalog:
 		}
 		if code := fetch(public+"/api/v1/repos/acme/whydah-core/docs/nope.md", nil); code != http.StatusNotFound {
 			t.Errorf("unknown document: %d", code)
+		}
+		waitFor("the release badge", func() bool {
+			return strings.Contains(read(public+"/badges/repos/acme/whydah-core/release.svg"), ">v2.0.0<")
+		})
+		if b := read(public + "/badges/groups/whydah/repos.svg"); !strings.Contains(b, ">2</text>") {
+			t.Errorf("group badge: %s", b)
 		}
 		var groups oapi.GroupList
 		if code := fetch(public+"/api/v1/groups", &groups); code != http.StatusOK || len(groups.Groups) != 2 {
