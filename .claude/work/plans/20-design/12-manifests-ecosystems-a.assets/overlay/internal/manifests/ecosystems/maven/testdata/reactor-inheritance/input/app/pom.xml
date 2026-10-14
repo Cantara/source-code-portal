@@ -1,0 +1,16 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.acme</groupId>
+    <artifactId>acme-parent</artifactId>
+    <version>2.0.0</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+  <artifactId>app</artifactId>
+  <packaging>pom</packaging>
+  <properties><junit.version>5.9.0</junit.version></properties>
+  <modules><module>web</module></modules>
+  <dependencies>
+    <dependency><groupId>com.acme</groupId><artifactId>core</artifactId></dependency>
+  </dependencies>
+</project>

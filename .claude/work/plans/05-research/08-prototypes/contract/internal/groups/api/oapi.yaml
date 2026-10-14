@@ -1,0 +1,8 @@
+package: api
+output: groups.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+import-mapping:
+  ../../httpapi/openapi/common.yaml: example.com/scp/internal/httpapi/openapi

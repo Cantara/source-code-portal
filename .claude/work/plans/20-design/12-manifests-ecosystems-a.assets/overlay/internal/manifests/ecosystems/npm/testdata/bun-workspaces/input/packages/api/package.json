@@ -1,0 +1,1 @@
+{ "name": "api", "version": "0.1.0", "dependencies": { "hono": "^4.6.0", "nested": "^1.0.0", "shared": "workspace:*" } }

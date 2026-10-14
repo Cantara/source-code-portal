@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scp.example.org/schemas/scp/frontmatter-v1.json",
+  "title": "SCP document front matter, schema 1",
+  "description": "Optional YAML front matter of a document under docs.root. Only these five keys are interpreted; every other key is preserved and ignored. README files carry no front matter.",
+  "type": "object",
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "order": { "type": "integer", "minimum": -100000, "maximum": 100000 },
+    "tags": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9:+#]+(-[a-z0-9:+#]+)*$", "maxLength": 63 } },
+    "hidden": { "type": "boolean", "default": false }
+  },
+  "additionalProperties": true
+}

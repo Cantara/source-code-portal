@@ -1,0 +1,17 @@
+# Allow-list build context (design 16 section 4.8): only what the image build reads. A new top-level directory needs a line here
+# on purpose; nothing else (.git, .github, docs, testdata, tools, node_modules, dist, bin, local config, .env files) is sent to the daemon.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!web/
+!LICENSE
+# inside the allowed directories
+web/node_modules
+web/dist
+web/e2e
+web/playwright-report
+**/*_test.go
+**/testdata
+**/.DS_Store

@@ -1,0 +1,1207 @@
+# golangci-lint v2.14.0 (pinned binary; `go tool` and `go install` are not recommended by the project).
+# The depguard rules between the markers are GENERATED from internal/archtest/rules.go (ADR-018); run `make arch-fix`.
+version: "2"
+
+run:
+  timeout: 10m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    # correctness
+    - govet
+    - staticcheck
+    - unused
+    - errcheck
+    - ineffassign
+    - errorlint
+    - nilerr
+    - wastedassign
+    - copyloopvar
+    - asasalint
+    - fatcontext
+    - exhaustive
+    # lifetimes and context (G10, GR-03)
+    - noctx
+    - contextcheck
+    - containedctx
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - spancheck
+    # boundaries and globals (G1-G6, G11)
+    - depguard
+    - forbidigo
+    - gomodguard_v2
+    - gochecknoinits
+    - gochecknoglobals
+    - sloglint
+    # style that carries meaning
+    - errname
+    - revive
+    - predeclared
+    - recvcheck
+    - inamedparam
+    - canonicalheader
+    - usestdlibvars
+    - intrange
+    - modernize
+    - mirror
+    - unconvert
+    - dupword
+    - misspell
+    - gocheckcompilerdirectives
+    - nolintlint
+    # tests (GR-43)
+    - usetesting
+    - thelper
+    # security
+    - gosec
+  settings:
+    depguard:
+      rules:
+        # BEGIN GENERATED depguard rules (internal/archtest/depguard.go; run `make arch-fix` after editing rules.go)
+        arch_cmd_fakegithub:
+          list-mode: lax
+          files: ["**/cmd/fakegithub/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "cmd/fakegithub (rank 6) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/cmd/fakegithub$
+            - github.com/cantara/source-code-portal/internal/github/githubtest$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_cmd_scp_internal_bridge:
+          list-mode: lax
+          files: ["**/cmd/scp/internal/bridge/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "cmd/scp/internal/bridge (rank 5) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/cmd/scp/internal/bridge$
+            - github.com/cantara/source-code-portal/internal/access$
+            - github.com/cantara/source-code-portal/internal/badges$
+            - github.com/cantara/source-code-portal/internal/catalog$
+            - github.com/cantara/source-code-portal/internal/commits$
+            - github.com/cantara/source-code-portal/internal/docs$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/github$
+            - github.com/cantara/source-code-portal/internal/integrations$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/live$
+            - github.com/cantara/source-code-portal/internal/manifests$
+            - github.com/cantara/source-code-portal/internal/media$
+            - github.com/cantara/source-code-portal/internal/ops$
+            - github.com/cantara/source-code-portal/internal/pages$
+            - github.com/cantara/source-code-portal/internal/reactor$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/refresh$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+            - github.com/cantara/source-code-portal/internal/webhook$
+        arch_access:
+          list-mode: lax
+          files: ["**/internal/access/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/access (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/access$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_apispec:
+          list-mode: lax
+          files: ["**/internal/apispec/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/apispec (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/apispec$
+        arch_badges:
+          list-mode: lax
+          files: ["**/internal/badges/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/badges (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/badges$
+            - github.com/cantara/source-code-portal/internal/badges
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_catalog:
+          list-mode: lax
+          files: ["**/internal/catalog/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/catalog (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/catalog$
+            - github.com/cantara/source-code-portal/internal/catalog
+            - github.com/cantara/source-code-portal/internal/catalog/catalogapi$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_catalog_catalogapi:
+          list-mode: lax
+          files: ["**/internal/catalog/catalogapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/catalog/catalogapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/catalog/catalogapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_commits:
+          list-mode: lax
+          files: ["**/internal/commits/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/commits (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/commits$
+            - github.com/cantara/source-code-portal/internal/commits
+            - github.com/cantara/source-code-portal/internal/commits/commitsapi$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_commits_commitsapi:
+          list-mode: lax
+          files: ["**/internal/commits/commitsapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/commits/commitsapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/commits/commitsapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_docs:
+          list-mode: lax
+          files: ["**/internal/docs/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/docs (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/docs$
+            - github.com/cantara/source-code-portal/internal/docs
+            - github.com/cantara/source-code-portal/internal/docs/docsapi$
+            - github.com/cantara/source-code-portal/internal/docs/internal/render$
+            - github.com/cantara/source-code-portal/internal/docs/schema$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/safehtml$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_docs_docsapi:
+          list-mode: lax
+          files: ["**/internal/docs/docsapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/docs/docsapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/docs/docsapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_docs_internal_render:
+          list-mode: lax
+          files: ["**/internal/docs/internal/render/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/docs/internal/render (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/docs/internal/render$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/safehtml$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_docs_schema:
+          list-mode: lax
+          files: ["**/internal/docs/schema/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/docs/schema (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/docs/schema$
+        arch_freshness:
+          list-mode: lax
+          files: ["**/internal/freshness/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/freshness (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/freshness$
+        arch_github:
+          list-mode: lax
+          files: ["**/internal/github/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/github (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/github$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/github
+            - github.com/cantara/source-code-portal/internal/github/auth$
+            - github.com/cantara/source-code-portal/internal/github/githubtest$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/netguard$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_github_auth:
+          list-mode: lax
+          files: ["**/internal/github/auth/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/github/auth (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/github/auth$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_github_githubtest:
+          list-mode: lax
+          files: ["**/internal/github/githubtest/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/github/githubtest (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/github/githubtest$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_gitsource:
+          list-mode: lax
+          files: ["**/internal/gitsource/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/gitsource (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/gitsource$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/github/auth$
+            - github.com/cantara/source-code-portal/internal/github/githubtest$
+            - github.com/cantara/source-code-portal/internal/gitsource
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/netguard$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_httpapi:
+          list-mode: lax
+          files: ["**/internal/httpapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/httpapi (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/routes$
+        arch_httpapi_apitest:
+          list-mode: lax
+          files: ["**/internal/httpapi/apitest/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/httpapi/apitest (rank 3) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/apispec$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_httpapi_authz:
+          list-mode: lax
+          files: ["**/internal/httpapi/authz/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/httpapi/authz (rank 3) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_httpapi_openapi:
+          list-mode: lax
+          files: ["**/internal/httpapi/openapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/httpapi/openapi (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_httpapi_validate:
+          list-mode: lax
+          files: ["**/internal/httpapi/validate/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/httpapi/validate (rank 3) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/httpapi/validate$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/validate
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+        arch_integrations:
+          list-mode: lax
+          files: ["**/internal/integrations/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/integrations (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/integrations$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/integrations
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_integrations_jenkins:
+          list-mode: lax
+          files: ["**/internal/integrations/jenkins/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/integrations/jenkins (rank 5) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/integrations/jenkins$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/integrations$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_integrations_snyk:
+          list-mode: lax
+          files: ["**/internal/integrations/snyk/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/integrations/snyk (rank 5) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/integrations/snyk$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/integrations$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_job:
+          list-mode: lax
+          files: ["**/internal/job/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/job (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/freshness$
+        arch_live:
+          list-mode: lax
+          files: ["**/internal/live/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/live (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/live$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/live
+            - github.com/cantara/source-code-portal/internal/live/liveapi$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+        arch_live_liveapi:
+          list-mode: lax
+          files: ["**/internal/live/liveapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/live/liveapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/live/liveapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_manifests:
+          list-mode: lax
+          files: ["**/internal/manifests/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/manifests (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/manifests$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/manifests
+            - github.com/cantara/source-code-portal/internal/manifests/internal
+            - github.com/cantara/source-code-portal/internal/manifests/manifestsapi$
+            - github.com/cantara/source-code-portal/internal/manifests/parsertest$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_manifests_ecosystems_x:
+          list-mode: lax
+          files: ["**/internal/manifests/ecosystems/*/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/manifests/ecosystems/* (rank 5) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/manifests/ecosystems/*$
+            - github.com/cantara/source-code-portal/internal/manifests$
+            - github.com/cantara/source-code-portal/internal/manifests/ecosystems
+            - github.com/cantara/source-code-portal/internal/manifests/internal
+            - github.com/cantara/source-code-portal/internal/manifests/parsertest$
+        arch_manifests_internal_x:
+          list-mode: lax
+          files: ["**/internal/manifests/internal/*/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/manifests/internal/* (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/manifests/internal/*$
+            - github.com/cantara/source-code-portal/internal/manifests/internal
+        arch_manifests_manifestsapi:
+          list-mode: lax
+          files: ["**/internal/manifests/manifestsapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/manifests/manifestsapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/manifests/manifestsapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_manifests_parsertest:
+          list-mode: lax
+          files: ["**/internal/manifests/parsertest/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/manifests/parsertest (rank 5) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/manifests/parsertest$
+            - github.com/cantara/source-code-portal/internal/manifests$
+            - github.com/cantara/source-code-portal/internal/manifests/internal
+        arch_manifests_providers_x:
+          list-mode: lax
+          files: ["**/internal/manifests/providers/*/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/manifests/providers/* (rank 5) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/manifests/providers/*$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/manifests$
+            - github.com/cantara/source-code-portal/internal/manifests/providers
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_media:
+          list-mode: lax
+          files: ["**/internal/media/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/media (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/media$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/media
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_ops:
+          list-mode: lax
+          files: ["**/internal/ops/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/ops (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/ops$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/ops
+            - github.com/cantara/source-code-portal/internal/ops/opsapi$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+        arch_ops_opsapi:
+          list-mode: lax
+          files: ["**/internal/ops/opsapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/ops/opsapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/ops/opsapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_overview:
+          list-mode: lax
+          files: ["**/internal/overview/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/overview (rank 5) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/overview$
+            - github.com/cantara/source-code-portal/internal/badges$
+            - github.com/cantara/source-code-portal/internal/catalog$
+            - github.com/cantara/source-code-portal/internal/commits$
+            - github.com/cantara/source-code-portal/internal/docs$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/integrations$
+            - github.com/cantara/source-code-portal/internal/manifests$
+            - github.com/cantara/source-code-portal/internal/overview
+            - github.com/cantara/source-code-portal/internal/overview/overviewapi$
+            - github.com/cantara/source-code-portal/internal/pages$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_overview_overviewapi:
+          list-mode: lax
+          files: ["**/internal/overview/overviewapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/overview/overviewapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/overview/overviewapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_pages:
+          list-mode: lax
+          files: ["**/internal/pages/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/pages (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/pages$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/apitest$
+            - github.com/cantara/source-code-portal/internal/httpapi/authz$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/pages
+            - github.com/cantara/source-code-portal/internal/pages/pagesapi$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+            - github.com/cantara/source-code-portal/internal/readmodel$
+            - github.com/cantara/source-code-portal/internal/routes$
+            - github.com/cantara/source-code-portal/internal/safehtml$
+            - github.com/cantara/source-code-portal/internal/scm$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_pages_pagesapi:
+          list-mode: lax
+          files: ["**/internal/pages/pagesapi/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/pages/pagesapi (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/pages/pagesapi$
+            - github.com/cantara/source-code-portal/internal/httpapi/openapi$
+        arch_platform_config:
+          list-mode: lax
+          files: ["**/internal/platform/config/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/platform/config (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/platform/config$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+        arch_platform_httpx:
+          list-mode: lax
+          files: ["**/internal/platform/httpx/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/platform/httpx (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/platform/httpx$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+        arch_platform_lifecycle:
+          list-mode: lax
+          files: ["**/internal/platform/lifecycle/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/platform/lifecycle (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/platform/lifecycle$
+        arch_platform_logx:
+          list-mode: lax
+          files: ["**/internal/platform/logx/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/platform/logx (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+        arch_platform_netguard:
+          list-mode: lax
+          files: ["**/internal/platform/netguard/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/platform/netguard (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/platform/netguard$
+        arch_platform_secret:
+          list-mode: lax
+          files: ["**/internal/platform/secret/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/platform/secret (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/platform/secret$
+        arch_platform_telemetry:
+          list-mode: lax
+          files: ["**/internal/platform/telemetry/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/platform/telemetry (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/platform/telemetry$
+        arch_reactor:
+          list-mode: lax
+          files: ["**/internal/reactor/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/reactor (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/reactor$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_readmodel:
+          list-mode: lax
+          files: ["**/internal/readmodel/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/readmodel (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/readmodel$
+        arch_refresh:
+          list-mode: lax
+          files: ["**/internal/refresh/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/refresh (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/refresh$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+        arch_routes:
+          list-mode: lax
+          files: ["**/internal/routes/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/routes (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/routes$
+        arch_safehtml:
+          list-mode: lax
+          files: ["**/internal/safehtml/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/safehtml (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/safehtml$
+        arch_scm:
+          list-mode: lax
+          files: ["**/internal/scm/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/scm (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_store:
+          list-mode: lax
+          files: ["**/internal/store/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/store (rank 1) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/store$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_store_memory:
+          list-mode: lax
+          files: ["**/internal/store/memory/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/store/memory (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/store/memory$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/store$
+            - github.com/cantara/source-code-portal/internal/store/memory
+            - github.com/cantara/source-code-portal/internal/store/storetest$
+        arch_store_sqlite:
+          list-mode: lax
+          files: ["**/internal/store/sqlite/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/store/sqlite (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/store/sqlite$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/store$
+            - github.com/cantara/source-code-portal/internal/store/sqlite
+            - github.com/cantara/source-code-portal/internal/store/storetest$
+        arch_store_storetest:
+          list-mode: lax
+          files: ["**/internal/store/storetest/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/store/storetest (rank 2) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/store/storetest$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/store$
+        arch_webapp:
+          list-mode: lax
+          files: ["**/internal/webapp/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/webapp (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/webapp$
+        arch_webhook:
+          list-mode: lax
+          files: ["**/internal/webhook/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "internal/webhook (rank 4) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/internal/webhook$
+            - github.com/cantara/source-code-portal/internal/freshness$
+            - github.com/cantara/source-code-portal/internal/httpapi$
+            - github.com/cantara/source-code-portal/internal/job$
+            - github.com/cantara/source-code-portal/internal/platform/logx$
+            - github.com/cantara/source-code-portal/internal/scm$
+        arch_web:
+          list-mode: lax
+          files: ["**/web/*.go"]
+          deny:
+            - pkg: github.com/cantara/source-code-portal
+              desc: "web (rank 0) may import only the packages of its row in internal/archtest/rules.go"
+          allow:
+            - $gostd
+            - github.com/cantara/source-code-portal/web$
+        owned_01:
+          list-mode: lax
+          files: ["$all", "!**/internal/safehtml/*.go"]
+          deny:
+            - pkg: github.com/microcosm-cc/bluemonday
+              desc: "G6: the sanitiser is the only SafeHTML constructor"
+        owned_02:
+          list-mode: lax
+          files: ["$all", "!**/internal/docs/internal/render/*.go"]
+          deny:
+            - pkg: github.com/yuin/goldmark
+              desc: "G6"
+        owned_03:
+          list-mode: lax
+          files: ["$all", "!**/internal/docs/internal/render/*.go"]
+          deny:
+            - pkg: github.com/alecthomas/chroma
+              desc: "G6"
+        owned_04:
+          list-mode: lax
+          files: ["$all", "!**/internal/store/sqlite/*.go"]
+          deny:
+            - pkg: modernc.org/sqlite
+              desc: "G6"
+        owned_05:
+          list-mode: lax
+          files: ["$all", "!**/internal/store/sqlite/*.go"]
+          deny:
+            - pkg: modernc.org/libc
+              desc: "G6"
+        owned_06:
+          list-mode: lax
+          files: ["$all", "!**/internal/platform/telemetry/*.go", "!$test"]
+          deny:
+            - pkg: go.opentelemetry.io/otel/sdk
+              desc: "G6/G11: SDK confined to telemetry (tests may use its in-memory readers: 02 D14)"
+        owned_07:
+          list-mode: lax
+          files: ["$all", "!**/internal/platform/telemetry/*.go"]
+          deny:
+            - pkg: go.opentelemetry.io/otel/exporters
+              desc: "G6/G11"
+        owned_08:
+          list-mode: lax
+          files: ["$all", "!**/cmd/scp/*.go", "!**/internal/platform/telemetry/*.go"]
+          deny:
+            - pkg: go.opentelemetry.io/otel$
+              desc: "G11: the root package carries the global accessors; features use otel/metric, otel/trace, otel/attribute and otel/codes through Deps"
+        owned_09:
+          list-mode: lax
+          files: ["$all", "!**/internal/httpapi/validate/*.go", "!**/internal/httpapi/apitest/*.go"]
+          deny:
+            - pkg: github.com/getkin/kin-openapi
+              desc: "G6"
+        owned_10:
+          list-mode: lax
+          files: ["$all", "!**/internal/httpapi/validate/*.go"]
+          deny:
+            - pkg: github.com/oapi-codegen/nethttp-middleware
+              desc: "G6"
+        owned_11:
+          list-mode: lax
+          files: ["$all", "!**/internal/httpapi/openapi/*.go", "!**/internal/*/*api/*.go"]
+          deny:
+            - pkg: github.com/oapi-codegen/runtime
+              desc: "generated code only"
+        owned_12:
+          list-mode: lax
+          files: ["$all", "!**/internal/platform/netguard/*.go"]
+          deny:
+            - pkg: code.dny.dev/ssrf
+              desc: "G6"
+        owned_13:
+          list-mode: lax
+          files: ["$all", "!**/internal/github/auth/*.go"]
+          deny:
+            - pkg: github.com/golang-jwt/jwt
+              desc: "G6"
+        owned_14:
+          list-mode: lax
+          files: ["$all", "!**/internal/github/*.go"]
+          deny:
+            - pkg: github.com/sony/gobreaker
+              desc: "GR-22: breakers only in adapters"
+        owned_15:
+          list-mode: lax
+          files: ["$all", "!**/internal/platform/config/*.go", "!**/internal/platform/secret/*.go", "!**/internal/docs/*.go", "!**/internal/manifests/ecosystems/*/*.go", "!**/cmd/scp/*.go"]
+          deny:
+            - pkg: go.yaml.in/yaml
+              desc: "G6"
+        owned_16:
+          list-mode: lax
+          files: ["$all", "!**/internal/manifests/ecosystems/*/*.go"]
+          deny:
+            - pkg: github.com/pelletier/go-toml
+              desc: "G6"
+        owned_17:
+          list-mode: lax
+          files: ["$all", "!**/internal/manifests/ecosystems/terraform/*.go"]
+          deny:
+            - pkg: github.com/hashicorp/hcl
+              desc: "G6"
+        owned_18:
+          list-mode: lax
+          files: ["$all", "!**/internal/manifests/*.go"]
+          deny:
+            - pkg: github.com/CycloneDX/cyclonedx-go
+              desc: "G6: export boundary"
+        owned_19:
+          list-mode: lax
+          files: ["$all", "!**/internal/platform/telemetry/*.go", "!**/internal/ops/*.go"]
+          deny:
+            - pkg: github.com/prometheus/client_golang
+              desc: "G6"
+        owned_20:
+          list-mode: lax
+          files: ["$all", "!**/internal/gitsource/*.go", "!**/cmd/scp/*.go", "!**/internal/archtest/*.go"]
+          deny:
+            - pkg: os/exec$
+              desc: "G6/GR-36: no subprocess outside git mode (internal/gitsource) and the token_command runner of cmd/scp"
+        owned_21:
+          list-mode: lax
+          files: ["$all", "!**/internal/ops/*.go"]
+          deny:
+            - pkg: net/http/pprof$
+              desc: "GR-17: pprof only on the admin mux"
+        owned_22:
+          list-mode: lax
+          files: ["$all", "!**/internal/webapp/*.go", "!**/cmd/scp/*.go"]
+          deny:
+            - pkg: html/template$
+              desc: "ADR-008"
+        owned_23:
+          list-mode: lax
+          files: ["$all", "!**/cmd/scp/*.go"]
+          deny:
+            - pkg: time/tzdata$
+              desc: "A-25: zone database embedded once, by the binary"
+        owned_24:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: log$
+              desc: "G2: use log/slog"
+        owned_25:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: math/rand$
+              desc: "G2: math/rand/v2 only"
+        owned_26:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: "G2"
+        owned_27:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: gopkg.in/yaml
+              desc: "A-07: go.yaml.in/yaml/v3 only (archived repository)"
+        owned_28:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: github.com/google/go-github
+              desc: "ADR-004: own thin client"
+        owned_29:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: github.com/go-git/go-git
+              desc: "D-17/8.15: git binary, not go-git"
+        owned_30:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: github.com/go-selenium
+              desc: "GR-13: no browser automation"
+        owned_31:
+          list-mode: lax
+          files: ["$all"]
+          deny:
+            - pkg: github.com/spf13/cobra
+              desc: "CLI is stdlib flag"
+        # END GENERATED depguard rules
+
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # G2: no fmt printing in libraries (cmd/scp may print: see exclusions)
+        - pattern: '^fmt\.(Print|Printf|Println)$'
+          msg: "G2: write through an injected io.Writer or slog; only cmd/scp prints"
+        # G3/G4: no hidden default instances
+        - pattern: '^http\.(Get|Post|Head|PostForm|DefaultClient|DefaultServeMux|DefaultTransport|ListenAndServe|ListenAndServeTLS|Handle|HandleFunc|Serve|ServeTLS)$'
+          msg: "G4: use platform/httpx.NewServer and netguard/adapter clients, never http defaults"
+        - pattern: '^http\.Server$'
+          msg: "G4: construct servers with platform/httpx.NewServer"
+        # G9: process environment belongs to the composition root
+        - pattern: '^os\.(Getenv|LookupEnv|Environ|Setenv|Exit|Args)$'
+          msg: "G9: configuration arrives by constructor; only cmd/scp reads the environment, args and exits"
+        - pattern: '^signal\.(Notify|NotifyContext|Stop|Ignore)$'
+          msg: "G9: only cmd/scp installs signal handlers"
+        - pattern: '^slog\.(SetDefault|Default|SetLogLoggerLevel)$'
+          msg: "G3: no global logger; only cmd/scp may call slog.SetDefault"
+        # G11: telemetry through injected Meter and Tracer (API modules), never the global accessors
+        - pattern: '^otel\.(Meter|Tracer|GetMeterProvider|GetTracerProvider|SetMeterProvider|SetTracerProvider|SetTextMapPropagator|GetTextMapPropagator|SetErrorHandler)$'
+          msg: "G11: take a metric.Meter / trace.Tracer in Deps; globals only in cmd/scp and platform/telemetry"
+        # GR-22: no per-call clients or breakers
+        - pattern: '^gobreaker\.(NewCircuitBreaker|NewTwoStepCircuitBreaker)$'
+          msg: "GR-22: one breaker per upstream, constructed in internal/github"
+        # GR-36: no subprocess
+        - pattern: '^exec\.(Command|CommandContext)$'
+          msg: "GR-36: no subprocess outside internal/gitsource and cmd/scp"
+    sloglint:
+      no-mixed-args: true
+      kv-only: false
+      attr-only: true
+      no-global: all
+      context: all
+      static-msg: true
+      key-naming-case: snake
+    gomodguard_v2:
+      blocked:
+        - module: github.com/pkg/errors
+          recommendations: [errors]
+          reason: "G2: standard library errors only"
+        - module: gopkg.in/yaml.v3
+          recommendations: [go.yaml.in/yaml/v3]
+          reason: "A-07: the gopkg.in/yaml.v3 repository is archived"
+        - module: github.com/google/go-github
+          match-type: prefix
+          reason: "ADR-004: own thin client; no go-github"
+        - module: github.com/go-git/go-git
+          match-type: prefix
+          reason: "D-17/8.15: git mode shells out to the git binary"
+        - module: github.com/tebeka/selenium
+          reason: "GR-13: no browser automation in the module graph"
+        - module: github.com/patrickmn/go-cache
+          reason: "GR-28: one read model, no cache library"
+        - module: github.com/dgraph-io/ristretto
+          match-type: prefix
+          reason: "GR-28: one read model, no cache library"
+        - module: github.com/maypok86/otter
+          match-type: prefix
+          reason: "A-02: not adopted without profiling evidence"
+        - module: github.com/spf13/cobra
+          reason: "the CLI is stdlib flag (design 16, section 4)"
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    revive:
+      rules:
+        - name: package-comments
+        - name: exported
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: import-shadowing
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: var-naming
+          arguments:
+            - []
+            - []
+            - - skip-package-name-checks: false
+        - name: use-any
+    gosec:
+      excludes: [G104]   # errcheck owns unchecked errors
+    exhaustive:
+      default-signifies-exhaustive: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    usetesting:
+      os-temp-dir: true
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    presets: [comments, common-false-positives, legacy, std-error-handling]
+    rules:
+      # cmd/scp is the composition root: it prints, reads the environment and args, exits, handles signals and sets slog default.
+      - path: ^cmd/scp/
+        linters: [forbidigo]
+        text: 'G2|G3|G9|G11'
+      - path: ^cmd/fakegithub/
+        linters: [forbidigo]
+        text: 'G2|G9'
+      # platform/httpx is the only constructor of *http.Server; netguard/github own clients.
+      - path: ^internal/platform/(httpx|netguard)/
+        linters: [forbidigo]
+        text: 'G4'
+      - path: ^internal/platform/telemetry/
+        linters: [forbidigo]
+        text: 'G11'
+      - path: ^internal/github/
+        linters: [forbidigo]
+        text: 'GR-22'
+      # GR-36: the owners of os/exec in archtest.OwnedImports(): git mode, cmd/scp (the token_command runner of 05 2.5) and archtest (go list)
+      - path: ^(internal/gitsource|cmd/scp|internal/archtest)/
+        linters: [forbidigo]
+        text: 'GR-36'
+      # the one allowed mutable-looking package variables: values stamped by -ldflags -X (see cmd/scp/buildinfo.go)
+      - path: ^cmd/scp/buildinfo\.go$
+        linters: [gochecknoglobals]
+      # tests: hand-written fakes, httptest, deliberate globals in helpers
+      - path: _test\.go$
+        linters: [gosec, gochecknoglobals, errcheck, forbidigo]
+        text: 'G104|G304|G306|G301|G302|G303|G9|G2|errcheck|.*'
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false   # two linters on one import line must both report (depguard hides behind revive otherwise)
+
+formatters:
+  enable: [gofmt, goimports]
+  settings:
+    goimports:
+      local-prefixes: [github.com/cantara/source-code-portal]

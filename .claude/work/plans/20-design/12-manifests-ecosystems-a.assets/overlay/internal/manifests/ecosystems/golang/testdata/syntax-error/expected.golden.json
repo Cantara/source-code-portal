@@ -1,0 +1,38 @@
+{
+  "parsed": [
+    {
+      "file": "go.mod",
+      "parser": "golang/mod",
+      "kind": "manifest",
+      "diagnostics": [
+        {
+          "code": "golang.syntax",
+          "severity": "error",
+          "message": "go.mod cannot be parsed: go.mod:5: syntax error (unterminated block started at go.mod:3:1)",
+          "path": "go.mod",
+          "line": 5
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#golang",
+      "ecosystem": "golang",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "go.mod (golang/mod)"
+      ],
+      "diagnostics": [
+        {
+          "code": "golang.syntax",
+          "severity": "error",
+          "message": "go.mod cannot be parsed: go.mod:5: syntax error (unterminated block started at go.mod:3:1)",
+          "path": "go.mod",
+          "line": 5
+        }
+      ]
+    }
+  ]
+}

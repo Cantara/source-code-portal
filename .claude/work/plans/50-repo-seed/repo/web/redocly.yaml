@@ -1,0 +1,3 @@
+# Redocly CLI configuration (design 07 section 12): the recommended ruleset, nothing relaxed. Used by `pnpm api:lint` and `pnpm gen:api`.
+extends:
+  - recommended

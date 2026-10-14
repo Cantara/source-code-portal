@@ -1,0 +1,108 @@
+{
+  "parsed": [
+    {
+      "file": "Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "cargo:tiny",
+          "display": "tiny",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:anyhow",
+          "display": "anyhow",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "cargo:local-helper",
+          "display": "local-helper",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "confidence": "exact",
+          "line": 8
+        }
+      ],
+      "toolchain": {
+        "edition": "2021",
+        "language": "rust",
+        "tool": "cargo"
+      },
+      "diagnostics": [
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 8
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#cargo",
+      "ecosystem": "cargo",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "Cargo.toml (cargo/manifest)"
+      ],
+      "provides": [
+        {
+          "id": "cargo:tiny",
+          "display": "tiny",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:anyhow",
+          "display": "anyhow",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "cargo:local-helper",
+          "display": "local-helper",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "confidence": "exact",
+          "line": 8
+        }
+      ],
+      "toolchain": {
+        "edition": "2021",
+        "language": "rust",
+        "tool": "cargo"
+      },
+      "diagnostics": [
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 8
+        }
+      ]
+    }
+  ]
+}

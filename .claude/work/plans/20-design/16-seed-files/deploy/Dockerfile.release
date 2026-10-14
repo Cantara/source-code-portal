@@ -1,0 +1,28 @@
+# Release image: the final stage of deploy/Dockerfile around a binary GoReleaser already built and tested (design 16 section 4.9).
+# GoReleaser's `dockers_v2` feeds this Dockerfile a build context laid out as <os>/<arch>/scp, so $TARGETPLATFORM selects the
+# binary, and builds one multi-platform image with buildx. Nothing is compiled here: the bytes in the image are the bytes in
+# the signed release archive. Everything below the FROM line is identical to deploy/Dockerfile except the lines that supply
+# the binary (deploy/check-final-stage.sh diffs them in CI).
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+ARG BUILD_ID=dev
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="Source Code Portal" \
+      org.opencontainers.image.description="Dashboard and documentation portal for the repositories of a GitHub organisation" \
+      org.opencontainers.image.source="https://github.com/Cantara/source-code-portal" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${BUILD_ID}"
+ARG TARGETPLATFORM
+COPY --chown=65532:65532 ${TARGETPLATFORM}/scp /scp
+# /data is the only writable path: the SQLite file and its WAL (a local or block volume, never NFS, EFS or SMB). distroless has
+# no shell, so the directory is created by copying a file into it; the --chown applies to the directory too.
+COPY --chown=65532:65532 <<EOF /data/.keep
+EOF
+USER 65532:65532
+WORKDIR /data
+EXPOSE 9090 9091
+VOLUME ["/data"]
+# No HEALTHCHECK instruction: Kubernetes uses httpGet probes on /livez and /readyz. For plain Docker or Compose use
+#   healthcheck: { test: ["CMD", "/scp", "healthcheck"], ... }   (scp healthcheck probes http://127.0.0.1:9090/livez)
+ENTRYPOINT ["/scp"]
+CMD ["serve"]

@@ -1,0 +1,309 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Self-contained: no private preset (GR-19). Design 16 section 4.10. Every PR runs the same required checks as a human PR (ci.yml); nothing automerges in v1.",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests",
+    ":dependencyDashboard",
+    ":semanticCommitTypeAll(chore)"
+  ],
+  "timezone": "Europe/Oslo",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "ignorePaths": [
+    "docs/design/**"
+  ],
+  "prConcurrentLimit": 8,
+  "prHourlyLimit": 4,
+  "rebaseWhen": "conflicted",
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "github-actions": {
+    "description": "The seed keeps the workflows of later bootstrap steps in .github/workflow-stages/ so that their action SHAs are maintained before they are activated.",
+    "managerFilePatterns": [
+      "/^\\.github/(workflows|workflow-stages)/[^/]+\\.ya?ml$/"
+    ]
+  },
+  "vulnerabilityAlerts": {
+    "description": "Fixes for known advisories bypass the weekly schedule and are labelled; they run the same required checks and a person merges them.",
+    "schedule": [
+      "at any time"
+    ],
+    "labels": [
+      "dependencies",
+      "security"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "One Go toolchain: go.mod, tools/go.mod, the build images and setup-go move together.",
+      "matchDatasources": [
+        "golang-version",
+        "docker"
+      ],
+      "matchPackageNames": [
+        "go",
+        "golang"
+      ],
+      "groupName": "go toolchain"
+    },
+    {
+      "description": "One Node line: web/.node-version and the node build image. 24 until 26 becomes LTS (2026-10-28), then this rule is edited to ^26.",
+      "matchDatasources": [
+        "node-version",
+        "docker",
+        "npm"
+      ],
+      "matchPackageNames": [
+        "node",
+        "@types/node"
+      ],
+      "allowedVersions": "/^24\\./",
+      "groupName": "node"
+    },
+    {
+      "description": "pnpm is pinned in four places (web/package.json devEngines, Dockerfile ARG, Makefile, lockfile): one PR moves them together.",
+      "matchPackageNames": [
+        "pnpm"
+      ],
+      "groupName": "pnpm"
+    },
+    {
+      "description": "OpenTelemetry modules move in lock step.",
+      "matchPackageNames": [
+        "go.opentelemetry.io/**"
+      ],
+      "groupName": "opentelemetry-go"
+    },
+    {
+      "description": "modernc.org/sqlite is coupled to modernc.org/libc by exact versions (W6): never bump one alone.",
+      "matchPackageNames": [
+        "modernc.org/**"
+      ],
+      "groupName": "modernc sqlite"
+    },
+    {
+      "description": "golang.org/x/*: one PR.",
+      "matchPackageNames": [
+        "golang.org/x/**"
+      ],
+      "groupName": "golang.org/x"
+    },
+    {
+      "description": "The tools module (oapi-codegen, govulncheck, go-licenses, oasdiff) is dev-time only: grouped, and its major bumps are not blocked.",
+      "matchFileNames": [
+        "tools/go.mod"
+      ],
+      "groupName": "go tools",
+      "semanticCommitType": "build"
+    },
+    {
+      "description": "Frontend groups. React, TanStack, Vite+Vitest, Tailwind, shadcn/Base UI and the lint stack each release as families.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "babel-plugin-react-compiler",
+        "@types/react",
+        "@types/react-dom"
+      ],
+      "groupName": "react"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "@tanstack/**"
+      ],
+      "groupName": "tanstack"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "vite",
+        "vitest",
+        "@vitest/**",
+        "@vitejs/**"
+      ],
+      "groupName": "vite and vitest"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "tailwindcss",
+        "@tailwindcss/**"
+      ],
+      "groupName": "tailwind"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "eslint",
+        "@eslint/**",
+        "eslint-plugin-*",
+        "typescript-eslint",
+        "prettier",
+        "knip"
+      ],
+      "groupName": "lint stack"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "playwright",
+        "@playwright/**",
+        "@axe-core/**"
+      ],
+      "groupName": "playwright"
+    },
+    {
+      "description": "Majors always get their own PR and a human reading the release notes.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": false,
+      "addLabels": [
+        "major"
+      ]
+    },
+    {
+      "description": "GitHub Actions: SHA pins move with their version comment (helpers:pinGitHubActionDigests); one PR for all actions.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions",
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Base images are pinned by tag AND digest; digest-only refreshes of the same tag are their own weekly PR.",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": "base image digests"
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Tool versions that live in Makefile variables and workflow inputs, written as `KEY := 1.2.3` or `version: v1.2.3 # renovate: depName=...`.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Makefile$/"
+      ],
+      "matchStrings": [
+        "GOLANGCI_LINT_VERSION\\s*:=\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "golangci/golangci-lint",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Makefile$/"
+      ],
+      "matchStrings": [
+        "GORELEASER_VERSION\\s*:=\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "goreleaser/goreleaser",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Makefile$/",
+        "/^deploy/Dockerfile$/"
+      ],
+      "matchStrings": [
+        "PNPM_VERSION\\s*:?=\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "npm",
+      "depNameTemplate": "pnpm"
+    },
+    {
+      "description": "golangci-lint, goreleaser and cosign versions given as action inputs in the workflows.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/(workflows|workflow-stages)/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "version:\\s*v(?<currentValue>2\\.\\d+\\.\\d+)\\s*\\n(?:\\s+install-mode:[^\\n]*\\n)?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "golangci/golangci-lint",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/(workflows|workflow-stages)/release\\.yml$/"
+      ],
+      "matchStrings": [
+        "distribution:\\s*goreleaser\\s*\\n\\s*version:\\s*v(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "goreleaser/goreleaser",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/(workflows|workflow-stages)/release\\.yml$/"
+      ],
+      "matchStrings": [
+        "cosign-release:\\s*v(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "sigstore/cosign",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/(workflows|workflow-stages)/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "schemathesis==(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "pypi",
+      "depNameTemplate": "schemathesis"
+    },
+    {
+      "description": "syft version given to the sbom-action in release.yml.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/(workflows|workflow-stages)/release\\.yml$/"
+      ],
+      "matchStrings": [
+        "syft-version:\\s*v(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "anchore/syft",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+# .github/workflows/release.yml (design 16 section 4.9). Triggered by a version tag vMAJOR.MINOR.PATCH[-prerelease] pushed from main.
+#
+#   verify   the whole of ci.yml on the tagged commit (the tag is not trusted to have passed CI)
+#   release  build ONCE with GoReleaser: archives, checksums, CycloneDX SBOMs, keyless cosign signature, multi-platform image pushed
+#            under the immutable version tag only, image signed by digest, provenance attestations; the GitHub release stays a DRAFT
+#   promote  pull the candidate image BY DIGEST, run deploy/smoke.sh against it, verify both signatures, and only then add the moving
+#            tags (latest, X.Y, X) and publish the draft. A failure leaves a draft and an unpromoted version tag, never a "latest".
+#
+# Secrets: none. The GITHUB_TOKEN and the workflow's OIDC identity do everything (cosign is keyless).
+name: release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  verify:
+    name: ci on the tagged commit
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: build, sign, push candidate, draft release
+    needs: [verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write       # create the draft release and upload its assets
+      packages: write       # push the candidate image to ghcr.io
+      id-token: write       # keyless cosign and attestations (OIDC)
+      attestations: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      digest: ${{ steps.digest.outputs.digest }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: the tag is a version, on main, and not moved
+        id: meta
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "not a version tag: $TAG" >&2; exit 1; }
+          # fetch-depth: 0 above already fetched every branch (origin/main) and tag; no credentials are left for a second fetch
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "$TAG is not an ancestor of main" >&2; exit 1; }
+          [ "$(git rev-parse "$TAG^{commit}")" = "$GITHUB_SHA" ] || { echo "the tag does not point at the triggering commit" >&2; exit 1; }
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${REPO,,}" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false          # release builds do not read or write caches another run could have poisoned
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.node-version
+      - name: build the SPA once; every platform embeds this exact bundle
+        run: make web
+        env:
+          BUILD_ID: ${{ github.sha }}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.54.1   # pinned here (the action would otherwise download its own default); Renovate updates it
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: GoReleaser v2.18.3
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.18.3
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_REPO: ${{ steps.meta.outputs.image }}
+      - name: the shipped binaries are the shape CI tested
+        run: |
+          EXPECT_BUILD_ID="$GITHUB_SHA" deploy/check-binary.sh dist/scp_linux_amd64_v1/scp
+      - name: digest of the pushed image index
+        id: digest
+        env:
+          REF: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+        run: |
+          digest=$(docker buildx imagetools inspect "$REF" --format '{{.Manifest.Digest}}')
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "unexpected digest: $digest" >&2; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: provenance of the archives
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/scp_${{ steps.meta.outputs.version }}_checksums.txt
+      - name: provenance of the image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+  promote:
+    name: smoke the candidate, verify signatures, publish
+    needs: [release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write       # publish the draft release
+      packages: write       # add the moving tags
+    env:
+      IMAGE: ${{ needs.release.outputs.image }}
+      DIGEST: ${{ needs.release.outputs.digest }}
+      VERSION: ${{ needs.release.outputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: the image signature verifies for this workflow at this tag
+        run: |
+          cosign verify "$IMAGE@$DIGEST" \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+      - name: the checksum signature verifies and the checksums match the draft's archives
+        run: |
+          mkdir dl && cd dl
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*_checksums.txt*' --pattern '*.tar.gz'
+          cosign verify-blob "scp_${VERSION}_checksums.txt" --bundle "scp_${VERSION}_checksums.txt.sigstore.json" \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          sha256sum --check --ignore-missing "scp_${VERSION}_checksums.txt"
+      - name: smoke the candidate by digest (the same script ci.yml ran on the source-built image)
+        run: |
+          make build-fakegithub
+          deploy/smoke.sh "$IMAGE@$DIGEST"
+        env:
+          FAKEGITHUB_BIN: ${{ github.workspace }}/bin/fakegithub
+          EXPECT_BUILD_ID: ${{ github.sha }}
+      - name: moving tags (stable releases only)
+        if: needs.release.outputs.prerelease == 'false'
+        run: |
+          major=${VERSION%%.*}; minor=${VERSION#*.}; minor=${major}.${minor%%.*}
+          docker buildx imagetools create --tag "$IMAGE:latest" --tag "$IMAGE:$minor" --tag "$IMAGE:$major" "$IMAGE@$DIGEST"
+      - name: publish the release
+        run: |
+          if [ "${{ needs.release.outputs.prerelease }}" = true ]; then latest=false; else latest=true; fi
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest="$latest"

@@ -1,0 +1,1 @@
+{"name":"web","private":true,"type":"module","devDependencies":{"@hey-api/openapi-ts":"0.99.0","@redocly/cli":"^2.63.0","@typescript/native":"npm:typescript@^7.0.2","openapi-fetch":"0.17.0","openapi-typescript":"7.13.0","typescript":"npm:@typescript/typescript6@^6.0.2"}}

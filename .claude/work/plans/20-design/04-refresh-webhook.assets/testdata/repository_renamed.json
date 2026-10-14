@@ -1,0 +1,20 @@
+{
+  "action": "renamed",
+  "repository": {
+    "id": 153410485,
+    "name": "portal-testdata",
+    "full_name": "acme/portal-testdata",
+    "default_branch": "master",
+    "owner": {
+      "login": "acme",
+      "id": 1122494
+    }
+  },
+  "changes": {
+    "repository": {
+      "name": {
+        "from": "old-name"
+      }
+    }
+  }
+}

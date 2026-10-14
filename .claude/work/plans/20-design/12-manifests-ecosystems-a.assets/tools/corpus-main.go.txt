@@ -1,0 +1,125 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/cantara/source-code-portal/internal/manifests"
+	"github.com/cantara/source-code-portal/internal/manifests/ecosystems/cargo"
+	"github.com/cantara/source-code-portal/internal/manifests/ecosystems/golang"
+	"github.com/cantara/source-code-portal/internal/manifests/ecosystems/gradle"
+	"github.com/cantara/source-code-portal/internal/manifests/ecosystems/maven"
+	"github.com/cantara/source-code-portal/internal/manifests/ecosystems/npm"
+	"github.com/cantara/source-code-portal/internal/manifests/ecosystems/python"
+	"github.com/cantara/source-code-portal/internal/manifests/parsertest"
+)
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func load(root string, rename func(string) string) map[string][]byte {
+	out := map[string][]byte{}
+	ents, err := os.ReadDir(root)
+	must(err)
+	for _, e := range ents {
+		if e.IsDir() {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(root, e.Name()))
+		must(err)
+		out[rename(e.Name())] = b
+	}
+	return out
+}
+
+func main() {
+	fx := os.Args[1]
+	reg := manifests.NewRegistry()
+	must(golang.Register(reg))
+	must(cargo.Register(reg))
+	must(npm.Register(reg))
+	must(maven.Register(reg))
+	must(gradle.Register(reg))
+	must(python.Register(reg))
+	reg.Freeze()
+	id := func(s string) string { return s }
+	under := func(s string) string { return strings.Replace(s, "_", "/", 1) }
+	withRoot := func(m map[string][]byte) map[string][]byte {
+		if _, ok := m["package.json"]; !ok {
+			m["package.json"] = []byte(`{"name":"oracle-root","version":"0.0.0"}`)
+		}
+		return m
+	}
+	trees := []struct {
+		name  string
+		files map[string][]byte
+	}{
+		{"npm/vue (package.json, pnpm-lock, pnpm-workspace)", load(fx+"/t/npm/vue", id)},
+		{"npm/ai (pnpm-lock only)", withRoot(load(fx+"/t/npm/ai", id))},
+		{"npm/npm-cli (package-lock v3)", withRoot(load(fx+"/t/npm/npmcli", id))},
+		{"npm/berry (yarn.lock berry)", withRoot(load(fx+"/t/npm/berry", id))},
+		{"npm/bun (bun.lock)", withRoot(load(fx+"/t/npm/bun", id))},
+		{"npm/yarn1 (package.json, yarn.lock v1)", load(fx+"/t/npm/yarn1", id)},
+		{"py/flask (pyproject, uv.lock)", load(fx+"/t/py/flask", id)},
+		{"py/poetry (pyproject, poetry.lock)", load(fx+"/t/py/poetry", id)},
+		{"py/uv (pyproject, uv.lock)", load(fx+"/t/py/uv", id)},
+		{"cargo/ripgrep (Cargo.toml, Cargo.lock)", load(fx+"/t/rg", id)},
+		{"go/k8s (go.mod)", load(fx+"/t/k8s", id)},
+		{"gradle/okhttp", load(fx+"/gradle/okhttp", under)},
+		{"gradle/ktor", load(fx+"/gradle/ktor", under)},
+		{"gradle/nowinandroid", load(fx+"/gradle/nia", under)},
+		{"maven/maven (pom.xml)", map[string][]byte{"pom.xml": mustRead(fx + "/maven_pom.xml")}},
+	}
+	for _, t := range trees {
+		var best time.Duration
+		var res manifests.TreeResult
+		var in int
+		for _, b := range t.files {
+			in += len(b)
+		}
+		for i := 0; i < 5; i++ {
+			t0 := time.Now()
+			res = manifests.RunTree(context.Background(), reg, parsertest.TreeConfig(), t.files)
+			d := time.Since(t0)
+			if i == 0 || d < best {
+				best = d
+			}
+		}
+		deps, locked := 0, 0
+		var codes []string
+		for _, u := range res.Units {
+			deps += len(u.Dependencies)
+			locked += len(u.Locked)
+		}
+		cc := map[string]int{}
+		for _, p := range res.Parsed {
+			for _, d := range p.Diagnostics {
+				cc[d.Code]++
+			}
+		}
+		for _, u := range res.Units {
+			for _, d := range u.Diagnostics {
+				cc[d.Code]++
+			}
+		}
+		for c, n := range cc {
+			codes = append(codes, fmt.Sprintf("%s=%d", c, n))
+		}
+		sort.Strings(codes)
+		fmt.Printf("| %s | %d KiB | %d | %d | %d | %d | %.1f ms | %s |\n", t.name, in/1024, len(res.Parsed), len(res.Units), deps, locked, float64(best.Microseconds())/1000, strings.Join(codes, " "))
+	}
+}
+
+func mustRead(p string) []byte {
+	b, err := os.ReadFile(p)
+	must(err)
+	return b
+}

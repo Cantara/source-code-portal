@@ -1,0 +1,3 @@
+pytest>=8
+black
+-r base.txt

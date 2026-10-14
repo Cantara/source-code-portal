@@ -1,0 +1,46 @@
+# Non-committed oracle corpus of unit 12 (tier 2). Blob ids are git blob ids (sha1 of "blob <n>\0<bytes>"); fetch-oracle.sh downloads each file by blob id
+# with the gh CLI (repository blob API) or, for Maven Central files, by URL, and verifies the id. Verified 2026-10-14 against the GitHub licence API
+# and, where the API answers NOASSERTION, against the repository's LICENSE text. Column "head" says whether the blob was still the default-branch blob on 2026-10-14.
+# local path (under the oracle root)	repository or url	path in repository	git blob id	bytes	licence	head	note
+t/npm/vue/package.json	vuejs/core	package.json	0526786fe1bec386b709c785c698f3bc890d0fd3	5186	MIT	yes	pnpm workspace root
+t/npm/vue/pnpm-lock.yaml	vuejs/core	pnpm-lock.yaml	2533148dd47d692c7f9c90af954188640e9f4ef6	201285	MIT	yes	634 locked components (independent count 634)
+t/npm/vue/pnpm-workspace.yaml	vuejs/core	pnpm-workspace.yaml	c2067f000c2cb8473213a0a502f84b32d56ef0f5	862	MIT	yes	catalog
+t/npm/ai/pnpm-lock.yaml	vercel/ai	pnpm-lock.yaml	83e1681ff332e133606efa51c9c85ac4f9a62648	1976358	Apache-2.0 (LICENSE text; API says NOASSERTION)	yes	largest file of the corpus, 4061 locked, two-document layout
+t/npm/npmcli/package-lock.json	npm/cli	package-lock.json	ec6ec30dd06549a6df33600b41ec1e2babf459af	437416	Artistic-2.0 (LICENSE text; API says NOASSERTION)	yes	993 locked (independent count 993)
+t/npm/berry/yarn.lock	yarnpkg/berry	yarn.lock	87378aa6d8e4dbfe7c1213b653c7d105abb2dd56	810106	BSD-2-Clause	yes	2050 locked (independent count 2050)
+t/npm/bun/bun.lock	oven-sh/bun	bun.lock	ba1138600475341351bcb4fe7482bfc30f0ac4ef	9866	LICENSE.md of oven-sh/bun (MIT with bundled third-party licences; API says NOASSERTION; not re-read in full)	yes	42 locked; the licence of this file is therefore unverified and the file never enters a committed golden
+t/npm/yarn1/package.json	facebook/react	package.json	898638f74ab5a7558d8157b7f7ebd09c4acbe6a5	8566	MIT	yes	yarn v1 workspace root
+t/npm/yarn1/yarn.lock	facebook/react	yarn.lock	8161186e1b8774c06a30564f09ff8a07fdc712e6	811678	MIT	yes	2388 locked (independent count 2388); an earlier 2018 lock of the same repository gave 107 npm.lock-missing-dep, which is the stale-lock detection working
+t/py/flask/pyproject.toml	pallets/flask	pyproject.toml	05a59c47391fcd289e3e3f4d4f011367b73e13a8	6424	BSD-3-Clause	yes	PEP 621 and PEP 735 groups, uv workspace
+t/py/flask/uv.lock	pallets/flask	uv.lock	8ac3a448fdddf666697d6682628a94f27ae165ea	279196	BSD-3-Clause	yes	79 packages in the lock, 78 locked components plus the root as a unit
+t/py/poetry/pyproject.toml	python-poetry/poetry	pyproject.toml	60a3e44edcbada9cbcdd49dbac6b20bc7e98a92c	5640	MIT	yes	Poetry 2 with PEP 621 table
+t/py/poetry/poetry.lock	python-poetry/poetry	poetry.lock	810c949073f767c49ceefa140a7301821151ca2f	250117	MIT	yes	
+t/py/uv/pyproject.toml	astral-sh/uv	pyproject.toml	cc3f7ad6c863a8a27e7bd44e137e8d79563f912d	6845	MIT OR Apache-2.0	yes	large uv workspace
+t/py/uv/uv.lock	astral-sh/uv	uv.lock	3e1778b79c53c4a1b466586f289539a42802cf1d	348960	MIT OR Apache-2.0	yes	
+t/py/django/pyproject.toml	django/django	pyproject.toml	cb9d0e6b8d3113ded349eaf77a12fd2042420739	2232	BSD-3-Clause	yes	setuptools backend, dynamic dependencies
+t/rg/Cargo.toml	BurntSushi/ripgrep	Cargo.toml	9bf95826e625f3be5694a8881511707876851520	3544	Unlicense OR MIT	yes	workspace with package
+t/rg/Cargo.lock	BurntSushi/ripgrep	Cargo.lock	7c44b2924603babb96d2cef02d4b103013008b71	13550	Unlicense OR MIT	yes	
+t/tokio/Cargo.toml	tokio-rs/tokio	Cargo.toml	2238a50d8f43657be4d723c103219e6f62d53971	835	MIT	yes	virtual workspace with [patch]
+t/k8s/go.mod	kubernetes/kubernetes	go.mod	ec5c11d7e9c41b36fbd2910b44d61425c79b4d07	11274	Apache-2.0	yes	114 direct, 198 locked
+t/k8s/go.work	kubernetes/kubernetes	go.work	bff4c210e7809c4145b7eec6ad5e1545ecb12059	1327	Apache-2.0	yes	use and replace
+maven/pom.xml	apache/maven	pom.xml	72c784caafcbdcca7771990579d53cdc90cd40ec	55619	Apache-2.0	yes	committed as golden real-maven (Apache-2.0, headers intact)
+maven/commons-lang/pom.xml	apache/commons-lang	pom.xml	c0252c2dfa5af10c9dc2569fe17ed7884168d6eb	35603	Apache-2.0	yes	committed as golden real-commons-lang
+gradle/okhttp/build.gradle.kts	square/okhttp	build.gradle.kts	1f9643db20f0290ea5842db4b0a920799c166d41	839	Apache-2.0	yes	committed as golden real-okhttp
+gradle/okhttp/settings.gradle.kts	square/okhttp	settings.gradle.kts	0b46154232c1b23ade47a8bcec1925d8df5371aa	2381	Apache-2.0	yes	
+gradle/okhttp/gradle/libs.versions.toml	square/okhttp	gradle/libs.versions.toml	f37be07eb204406f1acb234a64880b0c4cd925b5	11786	Apache-2.0	yes	
+gradle/okhttp/gradle.properties	square/okhttp	gradle.properties	ac6c0db5e490ba565823bc0b2e12eb278cb7fbb3	697	Apache-2.0	yes	
+gradle/ktor/build.gradle.kts	ktorio/ktor	build.gradle.kts	73ff7c394f7bb5f10936ab3f3af7be1d75dda836	286	Apache-2.0	yes	committed as golden real-ktor
+gradle/ktor/settings.gradle.kts	ktorio/ktor	settings.gradle.kts	c2bd44a473db419ceccf080437c7d5e5fcb5d1f1	8957	Apache-2.0	yes	
+gradle/ktor/gradle/libs.versions.toml	ktorio/ktor	gradle/libs.versions.toml	1b451f31d6c70c7a03f84d43bbe41eb2691d7a13	14536	Apache-2.0	yes	
+gradle/ktor/gradle.properties	ktorio/ktor	gradle.properties	613ea69ba6b78a7258ad960fbe6ab009573246eb	4816	Apache-2.0	yes	
+gradle/nowinandroid/build.gradle.kts	android/nowinandroid	build.gradle.kts	3096d6bdad430e1099ef5b1326a99faf18a04a81	1938	Apache-2.0	yes	committed as golden real-nowinandroid
+gradle/nowinandroid/app/build.gradle.kts	android/nowinandroid	app/build.gradle.kts	eee2e7a54746e0a40b8fcd1613304203dd6019c1	6034	Apache-2.0	yes	
+gradle/nowinandroid/settings.gradle.kts	android/nowinandroid	settings.gradle.kts	73a1d9d6a61b669807626c7d3dae48a8fbe723e9	2724	Apache-2.0	yes	
+gradle/nowinandroid/gradle/libs.versions.toml	android/nowinandroid	gradle/libs.versions.toml	21f0de8d4b7bf0f034a3a45c8d2acf1497c3c399	16522	Apache-2.0	yes	
+gradle/nowinandroid/gradle.properties	android/nowinandroid	gradle.properties	ada72d11b3420cadec1a4721fc32f6f6ae35fc10	3403	Apache-2.0	yes	
+central/org.apache_apache_40.pom	https://repo.maven.apache.org/maven2/org/apache/apache/40/apache-40.pom		12221ffce5080f3287e72e3eb4de86b52fa6de42	27116	Apache-2.0	n/a	Maven Central, committed under real-maven/pomsource
+central/org.apache.maven_maven-parent_50.pom	https://repo.maven.apache.org/maven2/org/apache/maven/maven-parent/50/maven-parent-50.pom		e7709d0943202d0e49459df2ade1e5c21312913a	51762	Apache-2.0	n/a	
+central/org.apache.commons_commons-parent_105.pom	https://repo.maven.apache.org/maven2/org/apache/commons/commons-parent/105/commons-parent-105.pom		ab74ae8cb29edaf8a8795103ae75cf34c93b5ad3	80140	Apache-2.0	n/a	
+central/org.springframework.boot_spring-boot-dependencies_3.4.0.pom	https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-dependencies/3.4.0/spring-boot-dependencies-3.4.0.pom		5f549562ae9e130db18b77a739e2ee32bbaeb933	97118	Apache-2.0	n/a	
+central/org.springframework.boot_spring-boot-starter-parent_3.4.0.pom	https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-parent/3.4.0/spring-boot-starter-parent-3.4.0.pom		ccccddff044b6dcdd48190c99b7656bb0bd05c1d	13051	Apache-2.0	n/a	
+central/org.apache_apache_39.pom	https://repo.maven.apache.org/maven2/org/apache/apache/39/apache-39.pom		6cd5c99832485330ad267dcfa3a5f4b85adcaba3	27054	Apache-2.0	n/a	Maven Central, committed under real-commons-lang/pomsource

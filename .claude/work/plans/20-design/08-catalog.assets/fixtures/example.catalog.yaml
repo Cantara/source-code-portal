@@ -1,0 +1,41 @@
+# Example catalogue for the lint demonstration. It contains four deliberate mistakes that Validate and Lint must find:
+# a matcher that selects nothing, a default repository that does not exist, a default repository the group's own
+# matchers do not select, and a group without members.
+catalog:
+  ungrouped: track
+  groups:
+    - id: atlas
+      display_name: Atlas identity platform
+      description: Gateway, administration and client libraries
+      default_repo: Atlas-Gateway
+      match:
+        - prefix: Atlas
+      integrations:
+        jenkins:
+          job_prefix: atlas-
+    - id: billing
+      display_name: Billing
+      description: Invoicing and payment processing
+      default_repo: Billing
+      match:
+        - exact: Billing
+        - exact: Billing-Worker
+        - exact: Invoicing
+    - id: ledger
+      display_name: Ledger
+      description: Double-entry ledger service and its UI
+      default_repo: Ledger-Service
+      match:
+        - prefix: Ledger
+    - id: search
+      display_name: Search
+      description: Search across billing data
+      default_repo: BillingSearch
+      match:
+        - exact: Search
+    - id: everything
+      display_name: All repositories
+      description: Every repository of the organisation
+      default_repo: PathWatcher
+      match:
+        - catch_all: true

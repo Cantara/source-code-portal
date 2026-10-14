@@ -1,0 +1,9 @@
+go 1.25
+
+use (
+	./a
+	./b
+	../outside
+)
+
+replace golang.org/x/text => ./tools/text

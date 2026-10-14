@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "host": { "kind": "ghes", "enterprise_version": "3.18.0" },
+  "limits": { "core_per_hour": 5000, "graphql_per_hour": 5000, "window_seconds": 3600, "conditional_free": true, "etag_auth_bound": true },
+  "apps": [
+    {
+      "id": 4242,
+      "client_id": "Iv1.demo4242",
+      "slug": "scp-demo",
+      "name": "SCP demo",
+      "public_key_file": "app.pub.pem",
+      "permissions": { "metadata": "read", "contents": "read" },
+      "events": ["push", "release", "create", "repository", "installation", "installation_repositories"],
+      "webhook": { "url": "http://127.0.0.1:9090/webhooks/github/acme", "secret": "dev-webhook-secret", "payload_style": "full" }
+    }
+  ],
+  "installations": [
+    { "id": 1001, "app": 4242, "account": "acme", "account_type": "Organization", "account_id": 77, "selection": "all",
+      "permissions": { "metadata": "read", "contents": "read" } }
+  ],
+  "tokens": [
+    { "token": "scp-demo-pat-classic-0001", "login": "demo-user", "kind": "classic" }
+  ],
+  "repos": ["repos/acme/payments-api", "repos/acme/docs-site", "repos/acme/archived-tool"],
+  "faults": []
+}

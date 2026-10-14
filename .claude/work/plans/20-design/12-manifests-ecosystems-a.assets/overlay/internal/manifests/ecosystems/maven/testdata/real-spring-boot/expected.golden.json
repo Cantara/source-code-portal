@@ -1,0 +1,241 @@
+{
+  "parsed": [
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/demo",
+          "display": "demo",
+          "version": "0.0.1-SNAPSHOT",
+          "kind": "library"
+        }
+      ],
+      "parent": {
+        "target": "maven:org.springframework.boot/spring-boot-starter-parent",
+        "requirement": "3.4.0",
+        "resolution": "declared",
+        "scope": "unknown",
+        "group": "parent",
+        "source": "registry",
+        "confidence": "exact",
+        "line": 3
+      },
+      "dependencies": [
+        {
+          "target": "maven:org.springframework.boot/spring-boot-starter-web",
+          "display": "org.springframework.boot:spring-boot-starter-web",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "maven:com.acme/internal-lib",
+          "display": "com.acme:internal-lib",
+          "requirement": "${internal.version}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "properties": {
+        "packaging": "jar",
+        "parent.relativePath": "",
+        "prop:java.version": "21"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/demo",
+          "display": "com.acme:demo",
+          "version": "0.0.1-SNAPSHOT",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.springframework.boot/spring-boot-maven-plugin",
+          "display": "org.springframework.boot:spring-boot-maven-plugin",
+          "requirement": "3.4.0",
+          "version": "3.4.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin-dependency",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pomsource:org.springframework.boot:spring-boot-starter-parent:3.4.0",
+          "line": 215
+        },
+        {
+          "target": "maven:org.junit.platform/junit-platform-launcher",
+          "display": "org.junit.platform:junit-platform-launcher",
+          "resolution": "declared",
+          "scope": "test",
+          "condition": "profile:nativeTest",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pomsource:org.springframework.boot:spring-boot-starter-parent:3.4.0",
+          "line": 308
+        },
+        {
+          "target": "maven:org.springframework.boot/spring-boot-maven-plugin",
+          "display": "org.springframework.boot:spring-boot-maven-plugin",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "condition": "profile:nativeTest",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pomsource:org.springframework.boot:spring-boot-starter-parent:3.4.0",
+          "line": 316
+        },
+        {
+          "target": "maven:org.graalvm.buildtools/native-maven-plugin",
+          "display": "org.graalvm.buildtools:native-maven-plugin",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "condition": "profile:nativeTest",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pomsource:org.springframework.boot:spring-boot-starter-parent:3.4.0",
+          "line": 328
+        },
+        {
+          "target": "maven:org.springframework.boot/spring-boot-starter-web",
+          "display": "org.springframework.boot:spring-boot-starter-web",
+          "requirement": "3.4.0",
+          "version": "3.4.0",
+          "resolution": "managed",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "maven:com.acme/internal-lib",
+          "display": "com.acme:internal-lib",
+          "requirement": "${internal.version}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "toolchain": {
+        "java": "21",
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      },
+      "licenses": [
+        "Apache License, Version 2.0"
+      ],
+      "diagnostics": [
+        {
+          "code": "maven.property-unresolved",
+          "severity": "info",
+          "message": "${internal.version}",
+          "path": "pom.xml",
+          "line": 15
+        },
+        {
+          "code": "maven.parent-fetched",
+          "severity": "info",
+          "message": "org.springframework.boot:spring-boot-dependencies:3.4.0 supplied by the PomSource",
+          "path": "pomsource:org.springframework.boot:spring-boot-starter-parent:3.4.0",
+          "line": 4
+        },
+        {
+          "code": "maven.parent-fetched",
+          "severity": "info",
+          "message": "org.springframework.boot:spring-boot-starter-parent:3.4.0 supplied by the PomSource",
+          "path": "pom.xml",
+          "line": 3
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM org.apache.activemq:activemq-bom:6.1.4 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2128
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM org.apache.activemq:artemis-bom:2.37.0 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2135
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM org.assertj:assertj-bom:3.26.3 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2142
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM io.zipkin.reporter2:zipkin-reporter-bom:3.4.2 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2149
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM io.zipkin.brave:brave-bom:6.0.3 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2156
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM org.apache.cassandra:java-driver-bom:4.18.1 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2163
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM org.glassfish.jaxb:jaxb-bom:4.0.5 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2170
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "BOM org.apache.groovy:groovy-bom:4.0.24 (not found)",
+          "path": "pomsource:org.springframework.boot:spring-boot-dependencies:3.4.0",
+          "line": 2177
+        },
+        {
+          "code": "maven.bom-unresolved",
+          "severity": "info",
+          "message": "34 more maven.bom-unresolved diagnostics suppressed",
+          "path": "pom.xml"
+        }
+      ]
+    }
+  ]
+}

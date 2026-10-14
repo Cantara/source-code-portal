@@ -1,0 +1,219 @@
+{
+  "parsed": [
+    {
+      "file": "poetry.lock",
+      "parser": "pypi/poetry-lock",
+      "kind": "lockfile",
+      "lockedCount": 5,
+      "properties": {
+        "lock.version": "2.1"
+      },
+      "toolchain": {
+        "python": "\u003e=3.9,\u003c4.0"
+      }
+    },
+    {
+      "file": "pyproject.toml",
+      "parser": "pypi/pyproject",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "pypi:poetry-demo",
+          "display": "poetry-demo",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "requirement": "\u003e=2.31.0,\u003c3.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "pypi:numpy",
+          "display": "numpy",
+          "requirement": "\u003e=1.26.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "pypi:internal-lib",
+          "display": "internal-lib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "git",
+          "sourceRef": "https://github.com/acme/internal-lib.git#v1.0.0",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "pypi:black",
+          "display": "black",
+          "requirement": "^24.0",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e=8.0",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 18
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "\u003e=3.9,\u003c4.0",
+        "tool": "poetry"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#pypi",
+      "ecosystem": "pypi",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pyproject.toml (pypi/pyproject)",
+        "poetry.lock (pypi/poetry-lock)"
+      ],
+      "provides": [
+        {
+          "id": "pypi:poetry-demo",
+          "display": "poetry-demo",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "requirement": "\u003e=2.31.0,\u003c3.0.0",
+          "version": "2.32.3",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "pypi:numpy",
+          "display": "numpy",
+          "requirement": "\u003e=1.26.0",
+          "version": "1.26.4",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "pypi:internal-lib",
+          "display": "internal-lib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "git",
+          "sourceRef": "https://github.com/acme/internal-lib.git#v1.0.0",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "pypi:black",
+          "display": "black",
+          "requirement": "^24.0",
+          "version": "24.4.2",
+          "resolution": "locked",
+          "scope": "dev",
+          "group": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e=8.0",
+          "version": "8.2.0",
+          "resolution": "locked",
+          "scope": "test",
+          "group": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 18
+        }
+      ],
+      "locked": [
+        {
+          "id": "pypi:black",
+          "version": "24.4.2",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha256:aaaa",
+          "line": 3
+        },
+        {
+          "id": "pypi:certifi",
+          "version": "2024.6.2",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "line": 14
+        },
+        {
+          "id": "pypi:numpy",
+          "version": "1.26.4",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:bbbb",
+          "line": 22
+        },
+        {
+          "id": "pypi:pytest",
+          "version": "8.2.0",
+          "relationship": "direct",
+          "scope": "test",
+          "line": 32
+        },
+        {
+          "id": "pypi:requests",
+          "version": "2.32.3",
+          "relationship": "direct",
+          "scope": "runtime",
+          "dependsOn": [
+            1
+          ],
+          "line": 43
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "\u003e=3.9,\u003c4.0",
+        "tool": "poetry"
+      }
+    }
+  ]
+}

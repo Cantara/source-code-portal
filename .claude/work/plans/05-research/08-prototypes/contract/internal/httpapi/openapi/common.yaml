@@ -1,0 +1,56 @@
+openapi: 3.1.0
+info: {title: common, version: 1.0.0}
+paths: {}
+components:
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details
+      required: [type, title, status]
+      properties:
+        type: {type: string, format: uri-reference, default: "about:blank"}
+        title: {type: string}
+        status: {type: integer, minimum: 100, maximum: 599}
+        detail: {type: string}
+        instance: {type: string, format: uri-reference}
+        request_id: {type: string}
+        errors:
+          type: array
+          items:
+            type: object
+            required: [pointer, message]
+            properties: {pointer: {type: string}, message: {type: string}}
+    Freshness:
+      type: object
+      required: [state, fetched_at]
+      properties:
+        state: {type: string, enum: [fresh, stale, error, unknown]}
+        fetched_at: {type: [string, "null"], format: date-time}
+        stale_since: {type: [string, "null"], format: date-time}
+        last_error: {type: [string, "null"]}
+    PageInfo:
+      type: object
+      required: [next_cursor]
+      properties:
+        next_cursor: {type: [string, "null"]}
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string}
+  headers:
+    ETag: {description: Strong or weak entity tag, schema: {type: string}}
+  responses:
+    Problem:
+      description: Problem details
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+    NotModified:
+      description: Not modified
+      headers:
+        ETag: {$ref: '#/components/headers/ETag'}

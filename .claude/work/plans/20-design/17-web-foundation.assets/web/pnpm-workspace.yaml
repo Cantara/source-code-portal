@@ -1,0 +1,7 @@
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 129600
+blockExoticSubdeps: true
+strictDepBuilds: true
+allowBuilds:
+  unrs-resolver: false

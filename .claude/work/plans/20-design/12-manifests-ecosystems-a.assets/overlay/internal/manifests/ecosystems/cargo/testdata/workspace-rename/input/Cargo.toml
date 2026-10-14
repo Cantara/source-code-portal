@@ -1,0 +1,8 @@
+[workspace]
+members = ["crates/*"]
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+# inheritance is by the key: the entry is renamed, the member uses the key
+Tokio_Util = { version = "0.7", package = "tokio-util" }
+b = { path = "crates/b", version = "0.5" }

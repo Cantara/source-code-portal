@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"es2023","lib":["ES2023","DOM"],"module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","noEmit":true,"types":["vite/client"],"strict":true,"noUncheckedIndexedAccess":true,"exactOptionalPropertyTypes":true,"verbatimModuleSyntax":true,"skipLibCheck":true},"include":["src","routes.ts","vite.config.ts"]}

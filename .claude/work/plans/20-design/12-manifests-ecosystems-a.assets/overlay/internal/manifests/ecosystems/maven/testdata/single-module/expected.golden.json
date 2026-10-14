@@ -1,0 +1,385 @@
+{
+  "parsed": [
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/widget",
+          "display": "widget",
+          "version": "1.4.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:com.google.guava/guava",
+          "display": "com.google.guava:guava",
+          "requirement": "${guava.version}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 17
+        },
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "[1.7,2.0)",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 22
+        },
+        {
+          "target": "maven:org.apache.commons/commons-lang3",
+          "display": "org.apache.commons:commons-lang3",
+          "requirement": "[3.12.0]",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 27
+        },
+        {
+          "target": "maven:junit/junit",
+          "display": "junit:junit",
+          "requirement": "4.13.2",
+          "resolution": "declared",
+          "scope": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 32
+        },
+        {
+          "target": "maven:javax.servlet/servlet-api",
+          "display": "javax.servlet:servlet-api",
+          "requirement": "2.5",
+          "resolution": "declared",
+          "scope": "provided",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 38
+        },
+        {
+          "target": "maven:com.acme/widget-core",
+          "display": "com.acme:widget-core",
+          "requirement": "${project.version}",
+          "resolution": "declared",
+          "scope": "test",
+          "qualifiers": "classifier=tests\u0026type=test-jar",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 45
+        },
+        {
+          "target": "maven:com.vendor/native-lib",
+          "display": "com.vendor:native-lib",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "provided",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 53
+        },
+        {
+          "target": "maven:org.example/no-version",
+          "display": "org.example:no-version",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 60
+        },
+        {
+          "target": "maven:org.example/env-version",
+          "display": "org.example:env-version",
+          "requirement": "${env.LIB_VERSION}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 64
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-compiler-plugin",
+          "display": "org.apache.maven.plugins:maven-compiler-plugin",
+          "requirement": "3.13.0",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 75
+        },
+        {
+          "target": "maven:org.codehaus.mojo/exec-maven-plugin",
+          "display": "org.codehaus.mojo:exec-maven-plugin",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 79
+        },
+        {
+          "target": "maven:org.ow2.asm/asm",
+          "display": "org.ow2.asm:asm",
+          "requirement": "9.7",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin-dependency",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 83
+        },
+        {
+          "target": "maven:kr.motd.maven/os-maven-plugin",
+          "display": "kr.motd.maven:os-maven-plugin",
+          "requirement": "1.7.1",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "extension",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 88
+        }
+      ],
+      "properties": {
+        "name": "Widget",
+        "packaging": "jar",
+        "prop:guava.version": "33.3.1-jre",
+        "prop:maven.compiler.release": "17"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      },
+      "licenses": [
+        "Apache License, Version 2.0"
+      ],
+      "diagnostics": [
+        {
+          "code": "maven.system-scope",
+          "severity": "info",
+          "message": "system-scoped dependency com.vendor:native-lib",
+          "path": "pom.xml",
+          "line": 53
+        },
+        {
+          "code": "maven.dependency-incomplete",
+          "severity": "warning",
+          "message": "dependency without a valid groupId or artifactId",
+          "path": "pom.xml",
+          "line": 69
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/widget",
+          "display": "com.acme:widget",
+          "version": "1.4.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:com.google.guava/guava",
+          "display": "com.google.guava:guava",
+          "requirement": "33.3.1-jre",
+          "version": "33.3.1-jre",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 17
+        },
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "[1.7,2.0)",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 22
+        },
+        {
+          "target": "maven:org.apache.commons/commons-lang3",
+          "display": "org.apache.commons:commons-lang3",
+          "requirement": "[3.12.0]",
+          "version": "3.12.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 27
+        },
+        {
+          "target": "maven:junit/junit",
+          "display": "junit:junit",
+          "requirement": "4.13.2",
+          "version": "4.13.2",
+          "resolution": "pinned",
+          "scope": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 32
+        },
+        {
+          "target": "maven:javax.servlet/servlet-api",
+          "display": "javax.servlet:servlet-api",
+          "requirement": "2.5",
+          "version": "2.5",
+          "resolution": "pinned",
+          "scope": "provided",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 38
+        },
+        {
+          "target": "maven:com.acme/widget-core",
+          "display": "com.acme:widget-core",
+          "requirement": "1.4.0",
+          "version": "1.4.0",
+          "resolution": "pinned",
+          "scope": "test",
+          "qualifiers": "classifier=tests\u0026type=test-jar",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 45
+        },
+        {
+          "target": "maven:com.vendor/native-lib",
+          "display": "com.vendor:native-lib",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "provided",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 53
+        },
+        {
+          "target": "maven:org.example/no-version",
+          "display": "org.example:no-version",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 60
+        },
+        {
+          "target": "maven:org.example/env-version",
+          "display": "org.example:env-version",
+          "requirement": "${env.LIB_VERSION}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 64
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-compiler-plugin",
+          "display": "org.apache.maven.plugins:maven-compiler-plugin",
+          "requirement": "3.13.0",
+          "version": "3.13.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 75
+        },
+        {
+          "target": "maven:org.codehaus.mojo/exec-maven-plugin",
+          "display": "org.codehaus.mojo:exec-maven-plugin",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 79
+        },
+        {
+          "target": "maven:org.ow2.asm/asm",
+          "display": "org.ow2.asm:asm",
+          "requirement": "9.7",
+          "version": "9.7",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin-dependency",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 83
+        },
+        {
+          "target": "maven:kr.motd.maven/os-maven-plugin",
+          "display": "kr.motd.maven:os-maven-plugin",
+          "requirement": "1.7.1",
+          "version": "1.7.1",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "extension",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 88
+        }
+      ],
+      "toolchain": {
+        "java": "17",
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      },
+      "licenses": [
+        "Apache License, Version 2.0"
+      ],
+      "diagnostics": [
+        {
+          "code": "maven.version-unmanaged",
+          "severity": "warning",
+          "message": "org.example:no-version has no version and no management supplies one",
+          "path": "pom.xml",
+          "line": 60
+        },
+        {
+          "code": "maven.property-unresolved",
+          "severity": "info",
+          "message": "${env.LIB_VERSION}",
+          "path": "pom.xml",
+          "line": 64
+        },
+        {
+          "code": "maven.system-scope",
+          "severity": "info",
+          "message": "system-scoped dependency com.vendor:native-lib",
+          "path": "pom.xml",
+          "line": 53
+        },
+        {
+          "code": "maven.dependency-incomplete",
+          "severity": "warning",
+          "message": "dependency without a valid groupId or artifactId",
+          "path": "pom.xml",
+          "line": 69
+        }
+      ]
+    }
+  ]
+}

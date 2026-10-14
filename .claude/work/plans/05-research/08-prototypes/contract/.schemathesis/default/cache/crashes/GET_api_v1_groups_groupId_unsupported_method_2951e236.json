@@ -1,0 +1,87 @@
+{
+  "operation": "GET /api/v1/groups/{groupId}",
+  "method": "TRACE",
+  "path_template": "/api/v1/groups/{groupId}",
+  "fingerprint": "2951e236",
+  "case_id": "z7Sa3H",
+  "code_sample": "curl -X TRACE http://127.0.0.1:9191/api/v1/groups/0",
+  "sequence": [
+    {
+      "method": "TRACE",
+      "url": "http://127.0.0.1:9191/api/v1/groups/0",
+      "url_template": "http://127.0.0.1:9191/api/v1/groups/{groupId}",
+      "headers": {
+        "User-Agent": "schemathesis/4.31.0",
+        "Accept-Encoding": "gzip, deflate, zstd",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "X-Schemathesis-TestCaseId": "z7Sa3H",
+        "Content-Length": "0"
+      },
+      "response": {
+        "status_code": 405,
+        "headers": {
+          "content-type": "application/problem+json",
+          "date": "Tue, 13 Oct 2026 21:33:42 GMT",
+          "content-length": "106"
+        },
+        "body": "{\"detail\":\"method not allowed\",\"status\":405,\"title\":\"Invalid request\",\"type\":\"/problems/invalid-request\"}\n"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "unsupported_method",
+          "status": "failure",
+          "message": "Unsupported methods\n\nTRACE returned 405 without required `Allow` header\n\nAdd `Allow` header listing supported methods (required by RFC 9110)"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 2.500135451555252e-06,
+          "mode": "negative"
+        },
+        "components": {
+          "PATH": "positive"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "Unspecified HTTP method: TRACE",
+            "location": null,
+            "parameter": null,
+            "parameter_location": null,
+            "scenario": "unspecified_http_method"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [
+          [
+            "path",
+            "groupId"
+          ]
+        ],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {
+          "PATH": {
+            "groupId": "0"
+          }
+        }
+      },
+      "path": "/api/v1/groups/{groupId}",
+      "path_parameters": {
+        "groupId": "0"
+      },
+      "query": {},
+      "case_headers": {},
+      "cookies": {},
+      "case_body": {
+        "encoding": "none"
+      },
+      "media_type": null,
+      "parent_index": null
+    }
+  ]
+}

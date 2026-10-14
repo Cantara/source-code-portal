@@ -1,0 +1,52 @@
+{
+  "ref": "refs/heads/master",
+  "before": "68650185ee3bfd637f4d7e46ce50c7c658e64fc6",
+  "after": "502a67d53394ea3f9c6875b32cc7f367c7737839",
+  "created": false,
+  "deleted": false,
+  "forced": false,
+  "commits": [
+    {
+      "id": "d14f3785323958613b3418017f49ddd00044060f",
+      "tree_id": "082a937a18325e9116df60e4c14b6217ddac3491",
+      "distinct": true,
+      "added": [
+        "module1/internal/foo/foo.go"
+      ],
+      "removed": [],
+      "modified": []
+    },
+    {
+      "id": "502a67d53394ea3f9c6875b32cc7f367c7737839",
+      "tree_id": "88bae3d48f10683339754e40cccf4e492bdd9fea",
+      "distinct": true,
+      "added": [],
+      "removed": [],
+      "modified": [
+        "README.md"
+      ]
+    }
+  ],
+  "head_commit": {
+    "id": "502a67d53394ea3f9c6875b32cc7f367c7737839",
+    "tree_id": "88bae3d48f10683339754e40cccf4e492bdd9fea",
+    "added": [],
+    "removed": [],
+    "modified": [
+      "README.md"
+    ]
+  },
+  "repository": {
+    "id": 153410485,
+    "name": "some-project",
+    "full_name": "acme/some-project",
+    "default_branch": "master",
+    "owner": {
+      "name": "acme",
+      "login": "acme"
+    }
+  },
+  "installation": {
+    "id": 4242
+  }
+}

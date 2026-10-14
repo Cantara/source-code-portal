@@ -1,0 +1,8 @@
+schema: 1
+lifecycle: active
+owners: ["alice"]
+tags: ["Has Space"]
+links: [{ url: "http://insecure.example.org" }]
+docs: { nav: [ "../secret.md" ] }
+integrations: { jenkins: { job: "x", host: "https://evil" } }
+unknown: true

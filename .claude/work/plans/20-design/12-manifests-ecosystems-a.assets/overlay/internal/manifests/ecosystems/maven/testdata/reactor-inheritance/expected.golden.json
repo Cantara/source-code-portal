@@ -1,0 +1,510 @@
+{
+  "parsed": [
+    {
+      "file": "app/pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:app",
+          "display": "app",
+          "kind": "library"
+        }
+      ],
+      "parent": {
+        "target": "maven:com.acme/acme-parent",
+        "requirement": "2.0.0",
+        "resolution": "declared",
+        "scope": "unknown",
+        "group": "parent",
+        "source": "registry",
+        "confidence": "exact",
+        "line": 3
+      },
+      "dependencies": [
+        {
+          "target": "maven:com.acme/core",
+          "display": "com.acme:core",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        }
+      ],
+      "properties": {
+        "packaging": "pom",
+        "parent.relativePath": "../pom.xml",
+        "prop:junit.version": "5.9.0"
+      },
+      "members": [
+        "web"
+      ],
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    },
+    {
+      "file": "app/web/pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:web",
+          "display": "web",
+          "version": "2.0.1",
+          "kind": "library"
+        }
+      ],
+      "parent": {
+        "target": "maven:com.acme/app",
+        "requirement": "2.0.0",
+        "resolution": "declared",
+        "scope": "unknown",
+        "group": "parent",
+        "source": "registry",
+        "confidence": "exact",
+        "line": 3
+      },
+      "dependencies": [
+        {
+          "target": "maven:com.fasterxml.jackson.core/jackson-databind",
+          "display": "com.fasterxml.jackson.core:jackson-databind",
+          "requirement": "2.17.0",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        }
+      ],
+      "properties": {
+        "packaging": "jar",
+        "parent.relativePath": "../pom.xml",
+        "parent.relativePath.default": "true"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    },
+    {
+      "file": "core/pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:core",
+          "display": "core",
+          "kind": "library"
+        }
+      ],
+      "parent": {
+        "target": "maven:com.acme/acme-parent",
+        "requirement": "2.0.0",
+        "resolution": "declared",
+        "scope": "unknown",
+        "group": "parent",
+        "source": "registry",
+        "confidence": "exact",
+        "line": 3
+      },
+      "dependencies": [
+        {
+          "target": "maven:com.fasterxml.jackson.core/jackson-databind",
+          "display": "com.fasterxml.jackson.core:jackson-databind",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        }
+      ],
+      "properties": {
+        "packaging": "jar",
+        "parent.relativePath": "../pom.xml",
+        "parent.relativePath.default": "true"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    },
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/acme-parent",
+          "display": "acme-parent",
+          "version": "2.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 25
+        },
+        {
+          "target": "maven:com.fasterxml.jackson.core/jackson-databind",
+          "display": "com.fasterxml.jackson.core:jackson-databind",
+          "requirement": "${jackson.version}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "managed",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 19
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "${junit.version}",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "managed",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 20
+        },
+        {
+          "target": "maven:com.acme/core",
+          "display": "com.acme:core",
+          "requirement": "${project.version}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "managed",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 21
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-surefire-plugin",
+          "display": "org.apache.maven.plugins:maven-surefire-plugin",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 31
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-surefire-plugin",
+          "display": "org.apache.maven.plugins:maven-surefire-plugin",
+          "requirement": "3.5.2",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin-managed",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 29
+        }
+      ],
+      "properties": {
+        "packaging": "pom",
+        "prop:jackson.version": "2.18.1",
+        "prop:junit.version": "5.11.3"
+      },
+      "members": [
+        "core",
+        "app",
+        "missing-module"
+      ],
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      },
+      "licenses": [
+        "MIT"
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/acme-parent",
+          "display": "com.acme:acme-parent",
+          "version": "2.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.11.3",
+          "version": "5.11.3",
+          "resolution": "managed",
+          "scope": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 25
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-surefire-plugin",
+          "display": "org.apache.maven.plugins:maven-surefire-plugin",
+          "requirement": "3.5.2",
+          "version": "3.5.2",
+          "resolution": "managed",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 31
+        }
+      ],
+      "members": [
+        "app",
+        "core"
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "pom",
+        "tool": "maven"
+      },
+      "licenses": [
+        "MIT"
+      ],
+      "diagnostics": [
+        {
+          "code": "maven.module-missing",
+          "severity": "warning",
+          "message": "module \"missing-module\" has no fetched POM",
+          "path": "pom.xml"
+        }
+      ]
+    },
+    {
+      "id": "app#maven",
+      "ecosystem": "maven",
+      "dir": "app",
+      "role": "primary",
+      "files": [
+        "app/pom.xml (maven/pom)",
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/app",
+          "display": "com.acme:app",
+          "version": "2.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.9.0",
+          "version": "5.9.0",
+          "resolution": "managed",
+          "scope": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pom.xml",
+          "line": 25
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-surefire-plugin",
+          "display": "org.apache.maven.plugins:maven-surefire-plugin",
+          "requirement": "3.5.2",
+          "version": "3.5.2",
+          "resolution": "managed",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pom.xml",
+          "line": 31
+        },
+        {
+          "target": "maven:com.acme/core",
+          "display": "com.acme:core",
+          "requirement": "2.0.0",
+          "version": "2.0.0",
+          "resolution": "managed",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        }
+      ],
+      "members": [
+        "app/web"
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "pom",
+        "tool": "maven"
+      },
+      "licenses": [
+        "MIT"
+      ]
+    },
+    {
+      "id": "app/web#maven",
+      "ecosystem": "maven",
+      "dir": "app/web",
+      "role": "primary",
+      "files": [
+        "app/web/pom.xml (maven/pom)",
+        "pom.xml (maven/pom)",
+        "app/pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/web",
+          "display": "com.acme:web",
+          "version": "2.0.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.9.0",
+          "version": "5.9.0",
+          "resolution": "managed",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-surefire-plugin",
+          "display": "org.apache.maven.plugins:maven-surefire-plugin",
+          "requirement": "3.5.2",
+          "version": "3.5.2",
+          "resolution": "managed",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pom.xml",
+          "line": 31
+        },
+        {
+          "target": "maven:com.acme/core",
+          "display": "com.acme:core",
+          "requirement": "2.0.1",
+          "version": "2.0.1",
+          "resolution": "managed",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "app/pom.xml",
+          "line": 14
+        },
+        {
+          "target": "maven:com.fasterxml.jackson.core/jackson-databind",
+          "display": "com.fasterxml.jackson.core:jackson-databind",
+          "requirement": "2.17.0",
+          "version": "2.17.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        }
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      },
+      "licenses": [
+        "MIT"
+      ]
+    },
+    {
+      "id": "core#maven",
+      "ecosystem": "maven",
+      "dir": "core",
+      "role": "primary",
+      "files": [
+        "core/pom.xml (maven/pom)",
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/core",
+          "display": "com.acme:core",
+          "version": "2.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.11.3",
+          "version": "5.11.3",
+          "resolution": "managed",
+          "scope": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pom.xml",
+          "line": 25
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-surefire-plugin",
+          "display": "org.apache.maven.plugins:maven-surefire-plugin",
+          "requirement": "3.5.2",
+          "version": "3.5.2",
+          "resolution": "managed",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "pom.xml",
+          "line": 31
+        },
+        {
+          "target": "maven:com.fasterxml.jackson.core/jackson-databind",
+          "display": "com.fasterxml.jackson.core:jackson-databind",
+          "requirement": "2.18.1",
+          "version": "2.18.1",
+          "resolution": "managed",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        }
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      },
+      "licenses": [
+        "MIT"
+      ]
+    }
+  ]
+}

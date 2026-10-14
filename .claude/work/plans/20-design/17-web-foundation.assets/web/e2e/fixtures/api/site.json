@@ -1,0 +1,12 @@
+{
+  "title": "Source Code Portal",
+  "description": "Acme repositories",
+  "nav": [{ "label": "About", "kind": "page", "page": "about" }],
+  "displayTimeZone": "Europe/Oslo",
+  "defaultTheme": "system",
+  "lastFullSync": "2026-10-14T09:30:00Z",
+  "repoCount": 42,
+  "groupCount": 2,
+  "features": { "manifests": true, "sse": false, "integrations": [] },
+  "build": { "version": "1.0.0", "commit": "9c4e1f2", "buildId": "abc123def456", "goVersion": "go1.27.2" }
+}

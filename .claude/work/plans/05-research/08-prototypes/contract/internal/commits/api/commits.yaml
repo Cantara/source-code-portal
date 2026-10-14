@@ -1,0 +1,39 @@
+openapi: 3.1.0
+info: {title: commits, version: 1.0.0}
+paths:
+  /api/v1/commits:
+    get:
+      operationId: listCommits
+      tags: [commits]
+      parameters:
+        - {$ref: '../../httpapi/openapi/common.yaml#/components/parameters/Limit'}
+        - {$ref: '../../httpapi/openapi/common.yaml#/components/parameters/Cursor'}
+        - {name: group, in: query, schema: {type: string}}
+        - {name: If-None-Match, in: header, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+          headers: {ETag: {$ref: '../../httpapi/openapi/common.yaml#/components/headers/ETag'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CommitPage'}
+        '304': {$ref: '../../httpapi/openapi/common.yaml#/components/responses/NotModified'}
+        default: {$ref: '../../httpapi/openapi/common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    Commit:
+      type: object
+      required: [sha, repo, message, authored_at]
+      properties:
+        sha: {type: string, pattern: '^[0-9a-f]{40}$'}
+        repo: {type: string}
+        message: {type: string}
+        author_login: {type: [string, "null"]}
+        authored_at: {type: string, format: date-time}
+    CommitPage:
+      type: object
+      required: [items, page, freshness]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Commit'}}
+        page: {$ref: '../../httpapi/openapi/common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: '../../httpapi/openapi/common.yaml#/components/schemas/Freshness'}

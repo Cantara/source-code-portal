@@ -1,0 +1,347 @@
+{
+  "parsed": [
+    {
+      "file": "packages/api/pyproject.toml",
+      "parser": "pypi/pyproject",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "pypi:acme-api",
+          "display": "acme-api",
+          "version": "0.3.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:acme-core",
+          "display": "acme-core",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "project",
+          "sourceRef": "workspace",
+          "confidence": "exact",
+          "line": 4
+        },
+        {
+          "target": "pypi:fastapi",
+          "display": "fastapi",
+          "requirement": "\u003e=0.110",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 4
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "tool": "uv"
+      }
+    },
+    {
+      "file": "packages/core/pyproject.toml",
+      "parser": "pypi/pyproject",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "pypi:acme-core",
+          "display": "acme-core",
+          "version": "0.2.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:pydantic",
+          "display": "pydantic",
+          "requirement": "\u003e=2",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 4
+        }
+      ],
+      "toolchain": {
+        "language": "python"
+      }
+    },
+    {
+      "file": "pyproject.toml",
+      "parser": "pypi/pyproject",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "pypi:platform",
+          "display": "platform",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:acme-api",
+          "display": "acme-api",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "project",
+          "sourceRef": "workspace",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "pypi:httpx",
+          "display": "httpx",
+          "requirement": "\u003e=0.27",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e=8",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "properties": {
+        "exclude:packages/extras": "1"
+      },
+      "members": [
+        "packages/*"
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "\u003e=3.12",
+        "tool": "uv"
+      }
+    },
+    {
+      "file": "uv.lock",
+      "parser": "pypi/uv-lock",
+      "kind": "lockfile",
+      "lockedCount": 8,
+      "properties": {
+        "lock.version": "1",
+        "root:0": "packages/api",
+        "root:1": "packages/core",
+        "root:5": "."
+      },
+      "toolchain": {
+        "python": "\u003e=3.12"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#pypi",
+      "ecosystem": "pypi",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pyproject.toml (pypi/pyproject)",
+        "uv.lock (pypi/uv-lock)"
+      ],
+      "provides": [
+        {
+          "id": "pypi:platform",
+          "display": "platform",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:acme-api",
+          "display": "acme-api",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "sourceRef": "packages/api",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "pypi:httpx",
+          "display": "httpx",
+          "requirement": "\u003e=0.27",
+          "version": "0.27.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e=8",
+          "version": "8.2.0",
+          "resolution": "locked",
+          "scope": "dev",
+          "group": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "locked": [
+        {
+          "id": "pypi:anyio",
+          "version": "4.4.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha256:1111",
+          "line": 25
+        },
+        {
+          "id": "pypi:fastapi",
+          "version": "0.111.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:2222",
+          "dependsOn": [
+            3
+          ],
+          "line": 31
+        },
+        {
+          "id": "pypi:httpx",
+          "version": "0.27.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:3333",
+          "dependsOn": [
+            0
+          ],
+          "line": 40
+        },
+        {
+          "id": "pypi:pydantic",
+          "version": "2.7.1",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:4444",
+          "line": 73
+        },
+        {
+          "id": "pypi:pytest",
+          "version": "8.2.0",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha256:5555",
+          "line": 79
+        }
+      ],
+      "members": [
+        "packages/api",
+        "packages/core"
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "\u003e=3.12",
+        "tool": "uv"
+      }
+    },
+    {
+      "id": "packages/api#pypi",
+      "ecosystem": "pypi",
+      "dir": "packages/api",
+      "role": "primary",
+      "files": [
+        "packages/api/pyproject.toml (pypi/pyproject)",
+        "uv.lock (pypi/uv-lock)"
+      ],
+      "provides": [
+        {
+          "id": "pypi:acme-api",
+          "display": "acme-api",
+          "version": "0.3.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:acme-core",
+          "display": "acme-core",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "sourceRef": "packages/core",
+          "confidence": "exact",
+          "line": 4
+        },
+        {
+          "target": "pypi:fastapi",
+          "display": "fastapi",
+          "requirement": "\u003e=0.110",
+          "version": "0.111.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 4
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "tool": "uv",
+        "workspace": "pyproject.toml"
+      }
+    },
+    {
+      "id": "packages/core#pypi",
+      "ecosystem": "pypi",
+      "dir": "packages/core",
+      "role": "primary",
+      "files": [
+        "packages/core/pyproject.toml (pypi/pyproject)",
+        "uv.lock (pypi/uv-lock)"
+      ],
+      "provides": [
+        {
+          "id": "pypi:acme-core",
+          "display": "acme-core",
+          "version": "0.2.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:pydantic",
+          "display": "pydantic",
+          "requirement": "\u003e=2",
+          "version": "2.7.1",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 4
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "tool": "uv",
+        "workspace": "pyproject.toml"
+      }
+    }
+  ]
+}

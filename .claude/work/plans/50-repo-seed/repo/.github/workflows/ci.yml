@@ -1,0 +1,85 @@
+# .github/workflows/ci.yml (design 16 section 4.7), STAGE 1 of the bootstrap table (section 4.12): the jobs `go` and `gate` only.
+# The complete file is .github/workflow-stages/ci.full.yml; each later step moves its job here in the pull request that adds its subject
+# (gen: first go:generate; api: unit 07; web and build: units 17-18; image and e2e: step 7) and lists it in `gate.needs`.
+# Every pull request, every push to main, merge queue, and release.yml (workflow_call).
+# One required status check protects the branch: "ci / gate". Renovate PRs run exactly the same jobs (GR-44).
+#
+# Rules this file follows (architecture 17 "supply chain"):
+#   - every action is pinned to a full commit SHA with its version in a comment; Renovate updates both together
+#   - the token is read-only by default; no job asks for more than `contents: read`
+#   - no pull_request_target, no secrets, no fork code with write access; checkout never persists credentials
+#   - every tool version comes from one place (go.mod, tools/go.mod, web/package.json devEngines, web/.node-version, the Makefile)
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_call:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOFLAGS: -mod=readonly
+  GOTOOLCHAIN: local   # the toolchain is the one setup-go installed; never download another one silently
+
+jobs:
+  go:
+    name: go (lint, arch, race tests, vuln, licences)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod   # go.mod carries `go 1.27.2`; one pin for the module and the toolchain
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - name: modules are verified and tidy
+        run: make modverify
+      - name: golangci-lint v2.14.0 (generated depguard rules included)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+          install-mode: binary
+      - name: vet (default and spa tags)
+        run: make vet
+      - name: architecture matrix (closed world, rank proof, depguard drift)
+        run: make arch
+      - name: tests with the race detector (cgo on for -race only; the release build is cgo-free)
+        run: make test-go
+      - name: govulncheck v1.9.0 (source)
+        run: make vuln
+      - name: licence allow-list
+        run: make licenses
+      # Added later, in the pull request that creates the subject (steps of ci.full.yml): `make config-lint` when `scp config lint` exists
+      # (unit 02); the development-build steps (`go vet -tags devtools ./cmd/scp` and `go test -tags devtools -run TestDev ./cmd/scp`)
+      # with the devtools build tag of design 16 D-1 (task B-7).
+
+  gate:
+    name: gate
+    if: always()
+    needs: [go]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: every required job succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -E '"result": "(failure|cancelled|skipped)"' >/dev/null; then
+            echo "a required job did not succeed" >&2
+            exit 1
+          fi

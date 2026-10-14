@@ -1,0 +1,208 @@
+{
+  "parsed": [
+    {
+      "file": "pyproject.toml",
+      "parser": "pypi/pyproject",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "pypi:poetry1-app",
+          "display": "poetry1-app",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:flask",
+          "display": "flask",
+          "requirement": "^2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:celery",
+          "display": "celery",
+          "requirement": "^5.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "pypi:pendulum",
+          "display": "pendulum",
+          "requirement": "^2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "condition": "python \u003c3.12",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "pypi:pendulum",
+          "display": "pendulum",
+          "requirement": "^3.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "condition": "python \u003e=3.12",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "pypi:mylib",
+          "display": "mylib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "^7.0",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 17
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "^3.8",
+        "tool": "poetry"
+      },
+      "licenses": [
+        "MIT"
+      ],
+      "diagnostics": [
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 14
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#pypi",
+      "ecosystem": "pypi",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pyproject.toml (pypi/pyproject)"
+      ],
+      "provides": [
+        {
+          "id": "pypi:poetry1-app",
+          "display": "poetry1-app",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:flask",
+          "display": "flask",
+          "requirement": "^2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:celery",
+          "display": "celery",
+          "requirement": "^5.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "pypi:pendulum",
+          "display": "pendulum",
+          "requirement": "^2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "condition": "python \u003c3.12",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "pypi:pendulum",
+          "display": "pendulum",
+          "requirement": "^3.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "condition": "python \u003e=3.12",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "pypi:mylib",
+          "display": "mylib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "^7.0",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 17
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "^3.8",
+        "tool": "poetry"
+      },
+      "licenses": [
+        "MIT"
+      ],
+      "diagnostics": [
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 14
+        }
+      ]
+    }
+  ]
+}

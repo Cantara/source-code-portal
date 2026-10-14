@@ -1,0 +1,417 @@
+openapi: 3.1.0
+info:
+  title: SCP shared components
+  version: 1.0.0
+  description: |
+    Shared wire vocabulary of the Source Code Portal API (design unit 07-openapi-contract).
+
+    This file is the design source of `internal/httpapi/openapi/common.yaml` in the new repository. It declares no
+    paths. A schema lives here if and only if it is referenced from operations of more than one feature tag
+    (generated package `httpapi/openapi`, rank 0, imported by every `<feature>api` package); every other schema
+    lives in the document of the feature that owns it (the rule is enforced by `apicheck`, section 13 of the design).
+
+    Subset rules (ADR-020, oapi-codegen 3.1 support is "initial"): `type: [T, "null"]` only on primitives, never
+    `oneOf: [$ref, null]`; an object is optional (property omitted) instead of nullable; arrays are never null;
+    no multi-type unions other than `[T, "null"]`; `allOf` only to extend one `$ref` with an inline object.
+paths: {}
+components:
+  schemas:
+    # ------------------------------------------------------------------ primitives (type aliases in Go)
+    Timestamp:
+      type: string
+      format: date-time
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$'
+      description: RFC 3339 date-time, always UTC with the literal `Z` (never an offset).
+      examples: ['2026-10-14T09:41:07Z']
+    NullableTimestamp:
+      type: [string, "null"]
+      format: date-time
+      description: A `Timestamp` that is `null` when the event never happened or is unknown.
+      examples: ['2026-10-14T09:41:07Z', null]
+    Slug:
+      type: string
+      minLength: 1
+      maxLength: 100
+      pattern: '^([A-Za-z0-9_-][A-Za-z0-9._-]{0,99}|\.[A-Za-z0-9_-][A-Za-z0-9._-]{0,98})$'
+      description: >-
+        Portal-visible repository identifier: exactly one URL segment, unique in the catalogue, never `.` or `..`.
+        Defaults to the GitHub repository name; the reserved words `ext`, `groups` and `avatars` are refused by the catalogue.
+      examples: [billing-service]
+    GroupId:
+      type: string
+      minLength: 1
+      maxLength: 63
+      pattern: '^[a-z0-9-]+$'
+      description: Group identifier. Lower case only (one canonical spelling per group, GR-07).
+      examples: [platform]
+    DocId:
+      type: string
+      minLength: 1
+      maxLength: 300
+      pattern: '^[A-Za-z0-9._~-]+$'
+      description: >-
+        Identifier of an indexed document inside one repository, a single path segment. `readme` is the README;
+        every other id is the repository-relative path with each `/` replaced by `~` (`docs/install.md` becomes
+        `docs~install.md`). A path that already contains `~` is not indexed (diagnostic `doc.id-collision`).
+      examples: [readme, docs~install.md]
+    PageSlug:
+      type: string
+      minLength: 1
+      maxLength: 63
+      pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      examples: [about]
+    Sha:
+      type: string
+      pattern: '^[0-9a-f]{40,64}$'
+      description: Git object id, lower-case hexadecimal (SHA-1 or SHA-256 repositories).
+      examples: ['3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f']
+    PortalPath:
+      type: string
+      pattern: '^/[^\s]*$'
+      maxLength: 2000
+      description: >-
+        A path on this portal, origin-relative (starts with `/`, no host), built from the route table. Absolute URLs
+        are only produced in text outputs (llms.txt, sitemap) from `server.public_url`.
+      examples: [/repos/billing-service]
+    HttpsUrl:
+      type: string
+      format: uri
+      pattern: '^https://'
+      maxLength: 2000
+      description: An absolute `https` URL to an external system (GitHub, a runbook). Untrusted when repository-authored.
+      examples: ['https://github.com/acme/billing-service']
+    FreshnessStatus:
+      type: string
+      enum: [fresh, stale, error, unknown]
+      description: >-
+        Derived at read time from `freshness.Info.Derive(now)`: `fresh` (within 1.5 x TTL), `stale` (a good value
+        exists but is older, or the last attempt failed), `error` (no good value and the last attempt failed),
+        `unknown` (never fetched). Clients treat the enum as open.
+    Provenance:
+      type: string
+      enum: [descriptor, catalog-info, codeowners, github-topics, github, config, derived, own, github-graph, sbom]
+      description: Where a resolved field came from (precedence in architecture 14.2). Open enum.
+    DocFormat:
+      type: string
+      enum: [markdown, asciidoc, text]
+      description: '`asciidoc` is the AsciiDoc bridge (GitHub-rendered HTML); `text` is any other README format.'
+    DocState:
+      type: string
+      enum: [resident, not_resident, too_large, unsupported, no_content]
+      description: >-
+        `resident`: body available. `not_resident`: indexed but not admitted to memory (docs.resident_budget).
+        `too_large`: over 1 MiB. `unsupported`: format not renderable. `no_content`: empty or missing file.
+    BadgeKind:
+      type: string
+      enum: [issues, last-commit, release, licence, repos, language, build-tool, latest-version, internal-deps, build, security]
+      description: Kinds served by `GET /badges/{repo}/{kind}.svg` (ADR-011). `build` and `security` exist only when an integration is configured.
+    ProviderState:
+      type: string
+      enum: [ok, failing, unstable, unknown, disabled]
+      description: An unconfigured provider is `disabled`, never `ok` (GR-41).
+
+    # ------------------------------------------------------------------ envelopes and errors
+    Problem:
+      type: object
+      description: >-
+        RFC 9457 problem details, `application/problem+json`. Clients key on `code`, never on `detail`. Unknown
+        members must be ignored. `type` is `urn:scp:problem:<code>` (no dereferenceable URL exists or is needed).
+      required: [type, title, status, code]
+      properties:
+        type: {type: string, format: uri-reference, default: 'about:blank', examples: ['urn:scp:problem:not-found']}
+        title: {type: string, examples: [Not found]}
+        status: {type: integer, minimum: 100, maximum: 599, examples: [404]}
+        detail: {type: string, description: 'Occurrence-specific text for humans and logs. Never parse it.'}
+        instance: {type: string, format: uri-reference, description: 'urn:uuid:<request id>, equal to the X-Request-Id response header.', examples: ['urn:uuid:0e6c1d5a-7a3b-4c52-9f31-5d2f0f6a8b11']}
+        code:
+          type: string
+          pattern: '^[a-z][a-z0-9-]*$'
+          description: Stable machine code from the error catalogue (design section 5.3). Open enum.
+          examples: [not-found]
+        errors:
+          type: array
+          description: Field-level violations of a `validation-failed` problem.
+          items: {$ref: '#/components/schemas/FieldError'}
+        retryAfterSeconds: {type: integer, minimum: 0, description: 'Same value as the Retry-After header when present.'}
+    FieldError:
+      type: object
+      required: [pointer, detail]
+      properties:
+        pointer:
+          type: string
+          description: 'JSON Pointer into the request body, or `#/query/<name>`, `#/path/<name>`, `#/header/<name>` for parameters.'
+          examples: ['#/query/limit']
+        detail: {type: string, examples: [must be at most 200]}
+    Freshness:
+      type: object
+      description: >-
+        Age and health of the cached upstream data a response is built from (G-02, G-05). On a list or composite
+        response this is the aggregate of the contributing items: `status` is the worst, `fetchedAt` the oldest.
+      required: [status, fetchedAt]
+      properties:
+        status: {$ref: '#/components/schemas/FreshnessStatus'}
+        kind: {type: string, description: 'Item family the object describes, for example `commits.view`, `docs.repo`, `manifests.repo`.', examples: [commits.view]}
+        asOf: {$ref: '#/components/schemas/NullableTimestamp'}
+        fetchedAt: {$ref: '#/components/schemas/NullableTimestamp'}
+        checkedAt: {$ref: '#/components/schemas/NullableTimestamp'}
+        staleSince: {$ref: '#/components/schemas/NullableTimestamp'}
+        lastErrorCode: {type: [string, "null"], description: 'Stable machine code of the last failed refresh (for example `github.rate_limited`), or null.'}
+    PageInfo:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor: {type: [string, "null"], description: 'Opaque cursor for the next page, `null` on the last page. Also sent as `Link: <...>; rel="next"`.'}
+        limit: {type: integer, minimum: 1, description: The page size that was applied.}
+
+    # ------------------------------------------------------------------ provenance-carrying fields
+    Commit:
+      type: object
+      description: >-
+        One commit. The subject is the first line of the message, capped at 200 characters (a longer
+        text is a size and spoofing risk, not a value). No e-mail address is ever stored or returned (GR-35). A commit
+        whose author is unknown on GitHub has `authorLogin: null`.
+      required: [sha, repo, subject, authorLogin, authorName, committedAt, url]
+      properties:
+        sha: {$ref: '#/components/schemas/Sha'}
+        repo: {$ref: '#/components/schemas/Slug'}
+        subject: {type: string, maxLength: 200}
+        authorLogin: {type: [string, "null"], maxLength: 100}
+        authorName: {type: [string, "null"], maxLength: 200}
+        committedAt: {$ref: '#/components/schemas/Timestamp'}
+        url: {$ref: '#/components/schemas/HttpsUrl'}
+    Badge:
+      type: object
+      description: A badge image served by the portal (`image/svg+xml`, local rendering, ADR-011).
+      required: [kind, url, label]
+      properties:
+        kind: {$ref: '#/components/schemas/BadgeKind'}
+        url: {$ref: '#/components/schemas/PortalPath'}
+        label: {type: string, description: Accessible text for the image (`alt`).}
+    DescriptorProblem:
+      type: object
+      required: [path, message, severity]
+      properties:
+        path: {type: string, description: 'JSON-pointer-like path inside scp.yaml, for example `/docs/nav/2`.'}
+        message: {type: string}
+        severity: {type: string, enum: [warning, error]}
+    DescriptorInfo:
+      type: object
+      description: 'State of the optional `scp.yaml` descriptor. Zero-config repositories have `present: false`.'
+      required: [present, file, schema, problems]
+      properties:
+        present: {type: boolean}
+        file: {type: [string, "null"], description: 'Repository path of the file that was read, `scp.yaml` or `.github/scp.yaml`.'}
+        schema: {type: [integer, "null"], description: Descriptor schema major version.}
+        problems: {type: array, items: {$ref: '#/components/schemas/DescriptorProblem'}}
+    DocIndexEntry:
+      type: object
+      description: One indexed document of a repository (README or a file under `docs.root`). Hidden documents are never listed.
+      required: [id, title, description, path, format, bridged, state, order, tags, section, uiUrl, apiUrl, markdownUrl, sourceUrl, blobSha, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/DocId'}
+        title: {type: string}
+        description: {type: [string, "null"]}
+        path: {type: string, description: Repository-relative path (forward slashes).}
+        format: {$ref: '#/components/schemas/DocFormat'}
+        bridged: {type: boolean, description: 'True for the AsciiDoc bridge (`renderedBy: github`).'}
+        state: {$ref: '#/components/schemas/DocState'}
+        order: {type: [integer, "null"], description: Front-matter or navigation order.}
+        tags: {type: array, items: {type: string}}
+        section: {type: array, items: {type: string}, description: 'Navigation group titles above the document, outermost first; empty at the top level.'}
+        uiUrl: {$ref: '#/components/schemas/PortalPath'}
+        apiUrl: {$ref: '#/components/schemas/PortalPath'}
+        markdownUrl: {type: [string, "null"], description: 'Raw Markdown route (`/repos/{repo}/docs/{path}.md`); null unless state is `resident` and the format is `markdown`.'}
+        sourceUrl: {$ref: '#/components/schemas/HttpsUrl'}
+        blobSha: {$ref: '#/components/schemas/Sha'}
+        updatedAt: {$ref: '#/components/schemas/NullableTimestamp'}
+    BuildInfo:
+      type: object
+      required: [version, commit, buildId]
+      properties:
+        version: {type: string, examples: [1.0.0]}
+        commit: {type: string, examples: [9c4e1f2]}
+        buildId: {type: string, description: Equal to the X-SCP-Build header and to the id compiled into the SPA., examples: [9c4e1f2]}
+        goVersion: {type: string, examples: [go1.27.2]}
+
+    TocEntry:
+      type: object
+      description: One heading of a rendered document.
+      required: [depth, text, id]
+      properties:
+        depth: {type: integer, minimum: 1, maximum: 6}
+        text: {type: string, x-scp-untrusted: true}
+        id: {type: string, pattern: '^doc-[A-Za-z0-9_:.-]{1,100}$', description: 'Heading id inside `html` (always prefixed `doc-`, DOM-clobbering defence).'}
+    LanguageShare:
+      type: object
+      description: Bytes of one language as reported by GitHub (`languages`).
+      required: [name, bytes, share]
+      properties:
+        name: {type: string, maxLength: 100}
+        bytes: {type: integer, format: int64, minimum: 0}
+        share: {type: number, minimum: 0, maximum: 1}
+
+  # ---------------------------------------------------------------------- parameters
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      description: Page size for unbounded collections (commits, dependencies, components).
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+    LimitBounded:
+      name: limit
+      in: query
+      description: Page size for collections bounded by configuration or by the catalogue (groups, repositories, documents, pages). The whole collection fits one page by default.
+      schema: {type: integer, minimum: 1, maximum: 1000, default: 1000}
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from `page.nextCursor`. A malformed or expired cursor is a 400 `invalid-cursor`.
+      schema: {type: string, minLength: 1, maxLength: 512, pattern: '^[A-Za-z0-9_-]+$'}
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      description: Entity tag from an earlier response. A match answers `304` without a body.
+      schema: {type: string, maxLength: 1024}
+    RepoSlug:
+      name: repo
+      in: path
+      required: true
+      description: Repository slug.
+      schema: {$ref: '#/components/schemas/Slug'}
+    GroupIdPath:
+      name: groupId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/GroupId'}
+    Q:
+      name: q
+      in: query
+      description: Case-insensitive substring filter on the name and title fields of the resource.
+      schema: {type: string, minLength: 1, maxLength: 200}
+
+  # ---------------------------------------------------------------------- headers
+  headers:
+    ETag:
+      description: >-
+        Weak validator. Snapshot-derived resources use `W/"g<snapshot version>-<variant>"`, per-repository resources
+        use the repository revision, the snapshot endpoint uses `W/"v<version>"`. Send it back as `If-None-Match`.
+      schema: {type: string, maxLength: 128, examples: ['W/"g1841-0"']}
+    Link:
+      description: 'RFC 8288 `rel="next"` link for the next page (same URL with the new `cursor`); absent on the last page.'
+      schema: {type: string, maxLength: 2100, examples: ['</api/v1/commits?limit=50&cursor=eyJ2IjoxLCJ0IjoxNzYwNDMxMjAwLCJzIjoiM2YyYTljMSJ9>; rel="next"']}
+    RequestId:
+      description: 'Request id; the `instance` member of a problem is `urn:uuid:<this value>`.'
+      schema: {type: string, format: uuid}
+    BuildId:
+      description: 'Build id of the binary (`BuildInfo.buildId`). The SPA compares it with its compiled-in id to detect version skew.'
+      schema: {type: string, maxLength: 64}
+    Location:
+      description: Canonical URL of the same resource (a `308` for a renamed repository).
+      schema: {type: string, maxLength: 2100}
+    RetryAfter:
+      description: Seconds to wait before retrying (delta-seconds form).
+      schema: {type: integer, minimum: 0}
+    Allow:
+      description: Methods the resource supports (on a `405`).
+      schema: {type: string, examples: ['GET, HEAD']}
+
+  # ---------------------------------------------------------------------- shared responses
+  responses:
+    Problem:
+      description: >-
+        Any other failure, as RFC 9457 problem details. Catalogue: `unauthorized` 401, `forbidden` 403,
+        `method-not-allowed` 405 (with `Allow`), `not-acceptable` 406, `payload-too-large` 413,
+        `unsupported-media-type` 415, `internal` 500, `upstream-unavailable` 503. 4xx are the caller's, 5xx ours.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          examples:
+            internal:
+              summary: A bug on our side; no detail is leaked
+              value: {type: 'urn:scp:problem:internal', title: Internal error, status: 500, code: internal, detail: 'The request failed. Quote the request id when reporting it.', instance: 'urn:uuid:0e6c1d5a-7a3b-4c52-9f31-5d2f0f6a8b11'}
+            methodNotAllowed:
+              summary: Wrong method on a known API path
+              value: {type: 'urn:scp:problem:method-not-allowed', title: Method not allowed, status: 405, code: method-not-allowed, detail: 'POST is not allowed here; use GET or HEAD.', instance: 'urn:uuid:5b1f0a3e-2c44-4a8e-b2d1-7a9c3e1f6d20'}
+            forbidden:
+              summary: Cross-origin or untrusted state-changing request
+              value: {type: 'urn:scp:problem:forbidden', title: Forbidden, status: 403, code: forbidden, detail: 'Cross-origin request rejected.', instance: 'urn:uuid:7d3b6a52-09ce-4e1b-8a47-1c5f2e9b0a34'}
+    BadRequest:
+      description: The request failed validation (`validation-failed`) or carries a bad cursor (`invalid-cursor`).
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          examples:
+            validationFailed:
+              summary: A parameter violates the contract
+              value:
+                type: 'urn:scp:problem:validation-failed'
+                title: Validation failed
+                status: 400
+                code: validation-failed
+                detail: The request has 1 invalid parameter.
+                instance: 'urn:uuid:3a8d4c77-6e0b-41f5-9c0d-2b7e5f1a9c68'
+                errors: [{pointer: '#/query/limit', detail: 'must be at most 200'}]
+            invalidCursor:
+              summary: The cursor is malformed or from another sort order
+              value: {type: 'urn:scp:problem:invalid-cursor', title: Invalid cursor, status: 400, code: invalid-cursor, detail: 'The cursor cannot be decoded; restart from the first page.', instance: 'urn:uuid:9e21c0f4-3b5d-4a76-8d12-6f0a4c7b1e55'}
+    NotFound:
+      description: >-
+        The resource does not exist, or exists but is invisible to the caller (invisible repositories are 404, never
+        403, GR-35). `feature-disabled` marks an operation whose feature is switched off in configuration.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          examples:
+            notFound:
+              value: {type: 'urn:scp:problem:not-found', title: Not found, status: 404, code: not-found, detail: 'No repository with slug "billing-svc".', instance: 'urn:uuid:11c0f2a8-5d3e-4b97-a6c1-3e8f7a2d0b49'}
+            featureDisabled:
+              value: {type: 'urn:scp:problem:feature-disabled', title: Feature disabled, status: 404, code: feature-disabled, detail: 'Package manifest intelligence is disabled (manifests.enabled=false).', instance: 'urn:uuid:4f7e9b30-8a1c-4d62-b5e0-9c2a6d1f3e87'}
+    NotReady:
+      description: >-
+        No data exists yet (cold start with an empty store; `not-ready`), the request would need an upstream that is
+        down and no cached value exists (`upstream-unavailable`), or a bounded queue refused work (`queue-full`).
+        Once any snapshot exists the API answers 200 with `freshness.status: stale` instead.
+      headers:
+        Retry-After: {$ref: '#/components/headers/RetryAfter'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          examples:
+            notReady:
+              value: {type: 'urn:scp:problem:not-ready', title: Not ready, status: 503, code: not-ready, detail: 'The portal is warming up; the catalogue has not been loaded yet.', instance: 'urn:uuid:c2d94e10-7b6a-4f38-9e5d-0a1b8c3f7d62', retryAfterSeconds: 15}
+            queueFull:
+              value: {type: 'urn:scp:problem:queue-full', title: Queue full, status: 503, code: queue-full, detail: 'The refresh queue is full; retry shortly.', instance: 'urn:uuid:6a0f1d83-2e9c-4b75-8f14-5d3c7e2a9b01', retryAfterSeconds: 30}
+    RateLimited:
+      description: The per-client rate limit of the route class was exceeded (`rate-limited`). Retry after the delay.
+      headers:
+        Retry-After: {$ref: '#/components/headers/RetryAfter'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          examples:
+            rateLimited:
+              value: {type: 'urn:scp:problem:rate-limited', title: Rate limited, status: 429, code: rate-limited, detail: 'Too many requests for the api class (300 per minute).', instance: 'urn:uuid:8b4e2a17-0d5c-4f93-a1e6-7c9d3b5f2a40', retryAfterSeconds: 12}
+    NotModified:
+      description: The representation identified by `If-None-Match` is current. No body.
+      headers:
+        ETag: {$ref: '#/components/headers/ETag'}
+    RepoRenamed:
+      description: >-
+        The slug is a known alias of a renamed repository. `Location` carries the same request with the current slug
+        (path and query kept); clients follow it. The body is a problem document with code `repo-renamed`.
+      headers:
+        Location: {$ref: '#/components/headers/Location'}
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          examples:
+            renamed:
+              value: {type: 'urn:scp:problem:repo-renamed', title: Repository renamed, status: 308, code: repo-renamed, detail: 'billing-svc is now billing-service.', instance: 'urn:uuid:d5a3f7c9-1b2e-4084-9a6d-8e0c4b2f1a73'}
+    Unauthorized:
+      description: Authentication is required but absent (only when `access.mode` requires an identity). `unauthorized`.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+          examples:
+            unauthorized:
+              value: {type: 'urn:scp:problem:unauthorized', title: Unauthorized, status: 401, code: unauthorized, detail: 'No trusted identity was presented.', instance: 'urn:uuid:f1b8c4d2-3e7a-4965-8c0b-2a5d9e6f7c13'}

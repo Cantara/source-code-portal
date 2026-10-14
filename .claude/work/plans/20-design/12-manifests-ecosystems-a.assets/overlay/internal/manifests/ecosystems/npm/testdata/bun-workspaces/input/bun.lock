@@ -1,0 +1,37 @@
+{
+  // bun lockfile (JSONC)
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "bun-root",
+      "devDependencies": {
+        "typescript": "^5.6.0",
+      },
+    },
+    "packages/api": {
+      "name": "api",
+      "dependencies": {
+        "hono": "^4.6.0",
+        "nested": "^1.0.0",
+        "shared": "workspace:*",
+      },
+    },
+    "packages/shared": {
+      "name": "shared",
+      "dependencies": {
+        "hono": "^4.0.0",
+      },
+    },
+  },
+  "packages": {
+    "api": ["api@workspace:packages/api"],
+
+    "shared": ["shared@workspace:packages/shared"],
+
+    "hono": ["hono@4.6.9", "", { "peerDependencies": { "x-peer": "*" } }, "sha512-honoHash/aaaa=="],
+
+    "typescript": ["typescript@5.6.3", "", { "bin": { "tsc": "bin/tsc" } }, "sha512-tsHash/bbbb=="],
+
+    "api/nested": ["nested@1.0.0", "", { "dependencies": { "hono": "^4" } }, "sha512-nestedHash=="],
+  }
+}

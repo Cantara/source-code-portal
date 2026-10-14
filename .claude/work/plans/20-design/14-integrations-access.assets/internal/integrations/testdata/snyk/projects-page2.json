@@ -1,0 +1,9 @@
+{"jsonapi":{"version":"1.0"},"links":{},
+ "data":[
+  {"id":"44444444-4444-4444-4444-444444444444","type":"project","attributes":{"name":"acme/Beta:go.mod","origin":"github","status":"active"},
+   "meta":{"latest_issue_counts":{"critical":0,"high":0,"medium":0,"low":0}},
+   "relationships":{"target":{"data":{"id":"t3","type":"target","attributes":{"display_name":"acme/Beta"}}}}},
+  {"id":"55555555-5555-5555-5555-555555555555","type":"project","attributes":{"name":"acme/gamma:package.json","origin":"github","status":"active"},
+   "meta":{"latest_issue_counts":{"critical":0,"high":0,"medium":3,"low":0}},
+   "relationships":{"target":{"data":{"id":"t4","type":"target","attributes":{"display_name":"acme/gamma"}}}}}
+ ]}

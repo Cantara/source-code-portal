@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>no.example</groupId>
+  <artifactId>norsk</artifactId>
+  <version>1</version>
+  <name>Blåbærsyltetøy</name>
+  <dependencies><dependency><groupId>g</groupId><artifactId>a</artifactId><version>1</version></dependency></dependencies>
+</project>

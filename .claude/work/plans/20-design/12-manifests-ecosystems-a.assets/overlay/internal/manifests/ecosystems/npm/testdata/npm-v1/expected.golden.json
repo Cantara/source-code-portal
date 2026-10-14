@@ -1,0 +1,182 @@
+{
+  "parsed": [
+    {
+      "file": "package-lock.json",
+      "parser": "npm/package-lock",
+      "kind": "lockfile",
+      "lockedCount": 6,
+      "properties": {
+        "lockfileVersion": "1"
+      }
+    },
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:lockv1-app",
+          "display": "lockv1-app",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:express",
+          "display": "express",
+          "requirement": "^4.17.1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:ms",
+          "display": "ms",
+          "requirement": "^2.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:mocha",
+          "display": "mocha",
+          "requirement": "^5.2.0",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)",
+        "package-lock.json (npm/package-lock)"
+      ],
+      "provides": [
+        {
+          "id": "npm:lockv1-app",
+          "display": "lockv1-app",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:express",
+          "display": "express",
+          "requirement": "^4.17.1",
+          "version": "4.17.1",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:ms",
+          "display": "ms",
+          "requirement": "^2.0.0",
+          "version": "2.1.1",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:mocha",
+          "display": "mocha",
+          "requirement": "^5.2.0",
+          "version": "5.2.0",
+          "resolution": "locked",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "npm:debug",
+          "version": "2.6.9",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha1-XRKFFd8TT/Mn6QpMk/Tgd6U2NB8=",
+          "dependsOn": [
+            4
+          ],
+          "line": 7
+        },
+        {
+          "id": "npm:debug",
+          "version": "3.1.0",
+          "relationship": "transitive",
+          "scope": "dev",
+          "integrity": "sha512-OX8XqP7/1a9cqkxYw2yXss15f26NKWBpDXQd0/uK/KPAAG",
+          "dependsOn": [
+            5
+          ],
+          "line": 29
+        },
+        {
+          "id": "npm:express",
+          "version": "4.17.1",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-mHJ9O79RqluphRrcw2X/GTh3k9tVv8YcoyY4Kkh4WDMUYKRZUq0h1o0w2rrrxBqM7VoeUVqgb27xlEgzwbIi",
+          "dependsOn": [
+            0,
+            5
+          ],
+          "line": 16
+        },
+        {
+          "id": "npm:mocha",
+          "version": "5.2.0",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha512-2IUgKDhc3J2Uuvx7VCNi",
+          "dependsOn": [
+            1
+          ],
+          "line": 22
+        },
+        {
+          "id": "npm:ms",
+          "version": "2.0.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha1-VgiurfwAvmwpAd9fmGF4jeDVl8g=",
+          "line": 13
+        },
+        {
+          "id": "npm:ms",
+          "version": "2.1.1",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-tgp+dl5cGk28utYktBsrFqA7HKgrhgPsg6Z/EfhWI4gl1Hwq8B/GmY/0oXZ6nF8hDVesS/FpnYaD/kkLWg==",
+          "line": 32
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    }
+  ]
+}

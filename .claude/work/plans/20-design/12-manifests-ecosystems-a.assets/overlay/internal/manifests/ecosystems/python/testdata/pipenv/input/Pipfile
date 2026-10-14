@@ -1,0 +1,15 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = "~=4.2"
+requests = "*"
+mypkg = {git = "https://github.com/acme/mypkg.git", ref = "abc123"}
+
+[dev-packages]
+pytest = "==8.2.0"
+
+[requires]
+python_version = "3.11"

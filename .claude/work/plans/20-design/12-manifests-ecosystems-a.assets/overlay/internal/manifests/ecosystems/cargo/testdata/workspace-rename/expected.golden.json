@@ -1,0 +1,255 @@
+{
+  "parsed": [
+    {
+      "file": "Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "workspace",
+      "dependencies": [
+        {
+          "target": "cargo:serde",
+          "display": "serde",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "workspace.dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "cargo:tokio-util",
+          "display": "Tokio_Util",
+          "requirement": "0.7",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "workspace.dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "cargo:b",
+          "display": "b",
+          "requirement": "0.5",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "workspace.dependencies",
+          "source": "path",
+          "sourceRef": "crates/b",
+          "confidence": "exact",
+          "line": 8
+        }
+      ],
+      "properties": {
+        "pool.real:Tokio_Util": "tokio-util"
+      },
+      "members": [
+        "crates/*"
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    },
+    {
+      "file": "crates/a/Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "cargo:a",
+          "display": "a",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:serde",
+          "display": "serde",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "cargo:tokio-util",
+          "display": "Tokio_Util",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "cargo:b",
+          "display": "b",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "cargo:missing",
+          "display": "missing",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        }
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    },
+    {
+      "file": "crates/b/Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "cargo:b",
+          "display": "b",
+          "version": "0.5.0",
+          "kind": "library"
+        }
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#cargo",
+      "ecosystem": "cargo",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "Cargo.toml (cargo/manifest)"
+      ],
+      "members": [
+        "crates/a",
+        "crates/b"
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    },
+    {
+      "id": "crates/a#cargo",
+      "ecosystem": "cargo",
+      "dir": "crates/a",
+      "role": "primary",
+      "files": [
+        "crates/a/Cargo.toml (cargo/manifest)",
+        "Cargo.toml (cargo/manifest)"
+      ],
+      "provides": [
+        {
+          "id": "cargo:a",
+          "display": "a",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:serde",
+          "display": "serde",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "cargo:tokio-util",
+          "display": "tokio-util",
+          "requirement": "0.7",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "cargo:b",
+          "display": "b",
+          "requirement": "0.5",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "sourceRef": "crates/b",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "cargo:missing",
+          "display": "missing",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        }
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      },
+      "diagnostics": [
+        {
+          "code": "cargo.inherit-missing",
+          "severity": "warning",
+          "message": "missing = { workspace = true } but [workspace.dependencies] has no such entry",
+          "path": "crates/a/Cargo.toml",
+          "line": 9
+        }
+      ]
+    },
+    {
+      "id": "crates/b#cargo",
+      "ecosystem": "cargo",
+      "dir": "crates/b",
+      "role": "primary",
+      "files": [
+        "crates/b/Cargo.toml (cargo/manifest)",
+        "Cargo.toml (cargo/manifest)"
+      ],
+      "provides": [
+        {
+          "id": "cargo:b",
+          "display": "b",
+          "version": "0.5.0",
+          "kind": "library"
+        }
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    }
+  ]
+}

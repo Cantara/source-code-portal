@@ -1,0 +1,822 @@
+<div id="readme" class="adoc" data-path="README.adoc"><article class="markdown-body entry-content container-lg" itemprop="text"><div class="markdown-heading" dir="auto"><h1 class="heading-element" dir="auto">Asciidoctor</h1><a id="user-content-asciidoctor" class="anchor" aria-label="Permalink: Asciidoctor" href="#asciidoctor"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div id="user-content-preamble" dir="auto">
+<div dir="auto">
+<div dir="auto">
+<p dir="auto"><a href="https://asciidoctor.org" rel="nofollow">Asciidoctor</a> is a fast, open source, Ruby-based text processor for parsing AsciiDoc® into a document model and converting it to output formats such as HTML 5, DocBook 5, manual pages, PDF, EPUB 3, and other formats.</p>
+</div>
+<div dir="auto">
+<p dir="auto">Asciidoctor also has an ecosystem of extensions, converters, build plugins, and tools to help you author and publish content written in <a href="https://docs.asciidoctor.org/asciidoctor/latest/#relationship-to-asciidoc" rel="nofollow">AsciiDoc</a>.
+You can find the documentation for these projects at <a href="https://docs.asciidoctor.org" rel="nofollow">https://docs.asciidoctor.org</a>.</p>
+</div>
+<div dir="auto">
+<p dir="auto">In addition to running on Ruby, Asciidoctor can be executed on a JVM using <a href="https://github.com/asciidoctor/asciidoctorj">AsciidoctorJ</a> or in any JavaScript environment using <a href="https://github.com/asciidoctor/asciidoctor.js">Asciidoctor.js</a>.</p>
+</div>
+<div dir="auto">
+<p dir="auto">This document is also available in the following languages:<br>
+<a href="README-zh_CN.adoc">简体中文</a>
+|
+<a href="README-de.adoc">Deutsch</a>
+|
+<a href="README-fr.adoc">Français</a>
+|
+<a href="README-jp.adoc">日本語</a></p>
+</div>
+<div dir="auto">
+<div dir="auto">Key documentation</div>
+<ul dir="auto">
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoctor/latest/" rel="nofollow">Asciidoctor Documentation</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoc/latest/" rel="nofollow">AsciiDoc Language Documentation</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/" rel="nofollow">AsciiDoc Syntax Quick Reference</a></p>
+</li>
+</ul>
+</div>
+<div dir="auto">
+<p dir="auto"><span><a href="https://rubygems.org/gems/asciidoctor" rel="nofollow"><img src="https://camo.githubusercontent.com/89bc9846db025f1b9b9f9492820d2afe8cb20cb126d4f2ce9beae63916dcf7d0/68747470733a2f2f696d672e736869656c64732e696f2f67656d2f762f6173636969646f63746f722e737667" alt="Latest Release" data-canonical-src="https://img.shields.io/gem/v/asciidoctor.svg" style="max-width: 100%;"></a></span>
+<span><a href="https://www.rubydoc.info/gems/asciidoctor/2.0.22" rel="nofollow"><img src="https://camo.githubusercontent.com/c57d8c830e7610f5a3fc145d3ca9bfa4d30c87f5d5912e695f8a87d0329f832d/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f72756279646f632e696e666f2d322e302e32322d626c75652e737667" alt="library (API) docs" data-canonical-src="https://img.shields.io/badge/rubydoc.info-2.0.22-blue.svg" style="max-width: 100%;"></a></span>
+<span><a href="https://github.com/asciidoctor/asciidoctor/actions"><img src="https://github.com/asciidoctor/asciidoctor/workflows/CI/badge.svg" alt="Build Status (GitHub Actions)" style="max-width: 100%;"></a></span>
+<span><a href="https://chat.asciidoctor.org" rel="nofollow"><img src="https://camo.githubusercontent.com/da9ebf96b8b5709f07a9001476ca0071d36dc8c5bad3c0513f4b84d6fd2f1413/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f7a756c69702d6a6f696e5f636861742d627269676874677265656e2e737667" alt="Project Chat (Zulip)" data-canonical-src="https://img.shields.io/badge/zulip-join_chat-brightgreen.svg" style="max-width: 100%;"></a></span></p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-sponsors" class="heading-element" dir="auto">Sponsors</h2><a id="user-content-sponsors" class="anchor" aria-label="Permalink: Sponsors" href="#sponsors"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">We want to recognize our <a href="https://asciidoctor.org/supporters" rel="nofollow">sponsors</a> for their commitment to improving the state of technical documentation by supporting this project.
+Thank you sponsors!
+Without your generous support, Asciidoctor would not be possible.</p>
+</div>
+<div dir="auto">
+<p dir="auto">You can support this project by becoming a sponsor through <a href="https://opencollective.com/asciidoctor" rel="nofollow">OpenCollective</a>.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-asciidoc-processing-and-built-in-converters" class="heading-element" dir="auto">AsciiDoc Processing and Built-in Converters</h2><a id="user-content-asciidoc-processing-and-built-in-converters" class="anchor" aria-label="Permalink: AsciiDoc Processing and Built-in Converters" href="#asciidoc-processing-and-built-in-converters"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">AsciiDoc is the language.<br>
+Asciidoctor is the processor.</p>
+</div>
+<div dir="auto">
+<p dir="auto">Asciidoctor reads the AsciiDoc source, as shown in the panel on the left in the image below, and converts it to publishable formats, such as HTML 5, as shown rendered in the panel on the right.</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/242f43d215c30b6f33cc902bbbc0682af62d2d5d727d335060d34d564c3af370/68747470733a2f2f63646e2e6a7364656c6976722e6e65742f67682f6173636969646f63746f722f6173636969646f63746f722f73637265656e73686f742e706e67"><img src="https://camo.githubusercontent.com/242f43d215c30b6f33cc902bbbc0682af62d2d5d727d335060d34d564c3af370/68747470733a2f2f63646e2e6a7364656c6976722e6e65742f67682f6173636969646f63746f722f6173636969646f63746f722f73637265656e73686f742e706e67" alt="Preview of AsciiDoc source and corresponding rendered HTML" data-canonical-src="https://cdn.jsdelivr.net/gh/asciidoctor/asciidoctor/screenshot.png" style="max-width: 100%;"></a>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">Asciidoctor provides built-in <a href="https://docs.asciidoctor.org/asciidoctor/latest/converters/" rel="nofollow">converters</a> for three output formats by default: <a href="https://docs.asciidoctor.org/asciidoctor/latest/html-backend/" rel="nofollow">HTML 5</a>, <a href="https://docs.asciidoctor.org/asciidoctor/latest/docbook-backend/" rel="nofollow">DocBook 5</a>, and <a href="https://docs.asciidoctor.org/asciidoctor/latest/manpage-backend/" rel="nofollow">man page</a> (short for manual page).
+Additional converters, such as PDF and EPUB 3, are provided by separate gems.
+Asciidoctor also provides an out-of-the-box HTML experience complete with a <a href="https://docs.asciidoctor.org/asciidoctor/latest/html-backend/default-stylesheet/" rel="nofollow">default stylesheet</a> and built-in integrations like Font Awesome (for icons), highlight.js, Rouge, and Pygments (for source highlighting), and MathJax (for STEM processing).</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-asciidoctor-ecosystem" class="heading-element" dir="auto">Asciidoctor Ecosystem</h2><a id="user-content-asciidoctor-ecosystem" class="anchor" aria-label="Permalink: Asciidoctor Ecosystem" href="#asciidoctor-ecosystem"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">Although Asciidoctor is written in Ruby, it does not mean you need Ruby to use it.
+Asciidoctor can be executed on a JVM using <a href="https://docs.asciidoctor.org/asciidoctorj/latest/" rel="nofollow">AsciidoctorJ</a> or in any JavaScript environment (including the browser) using <a href="https://docs.asciidoctor.org/asciidoctor.js/latest/" rel="nofollow">Asciidoctor.js</a>.</p>
+</div>
+<div dir="auto">
+<p dir="auto">Installing an Asciidoctor processor is just the beginning of your publishing experience.
+Asciidoctor gives you access to a ecosystem of extensions and tools, ranging from add-on converters, to extended syntax, to build plugins, to integrated writing and preview environments:</p>
+</div>
+<div dir="auto">
+<ul dir="auto">
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/diagram-extension/latest/" rel="nofollow">Asciidoctor Diagram</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/maven-tools/latest/" rel="nofollow">Maven plugin and site module</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://github.com/asciidoctor/asciidoctor-gradle-plugin">Gradle plugin</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoclet/latest/" rel="nofollow">Asciidoclet</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/reveal.js-converter/latest/" rel="nofollow">reveal.js converter</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/epub3-converter/latest/" rel="nofollow">EPUB 3 converter</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://intellij-asciidoc-plugin.ahus1.de/docs" rel="nofollow">IntelliJ plugin</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoctor/latest/tooling/#web-browser-add-ons-preview-only" rel="nofollow">web browser extensions</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://github.com/asciidoctor">and more</a></p>
+</li>
+</ul>
+</div>
+<div dir="auto">
+<p dir="auto">Asciidoctor is the successor to AsciiDoc.py.
+If you’re using AsciiDoc.py, see <a href="https://docs.asciidoctor.org/asciidoctor/latest/migrate/asciidoc-py/" rel="nofollow">Migrate from AsciiDoc.py</a> to learn how to upgrade to Asciidoctor.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-requirements" class="heading-element" dir="auto">Requirements</h2><a id="user-content-requirements" class="anchor" aria-label="Permalink: Requirements" href="#requirements"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">Asciidoctor works on Linux, macOS and Windows and requires one of the following implementations of <a href="https://www.ruby-lang.org" rel="nofollow">Ruby</a>:</p>
+</div>
+<div dir="auto">
+<ul dir="auto">
+<li>
+<p dir="auto">CRuby (aka MRI) 2.7 - 3.4</p>
+</li>
+<li>
+<p dir="auto">JRuby 9.4.0 - 10.0.2</p>
+</li>
+<li>
+<p dir="auto">TruffleRuby (GraalVM)</p>
+</li>
+</ul>
+</div>
+<div dir="auto">
+<markdown-accessiblity-table><table>
+<tbody><tr>
+<td>
+<div dir="auto">🔥</div>
+</td>
+<td>
+<div dir="auto">
+<p dir="auto">If you’re using a non-English Windows environment, you may bump into an <code>Encoding::UndefinedConversionError</code> when invoking Asciidoctor.
+To solve this issue, we recommend overriding the default external and internal character encodings to <code>utf-8</code>.
+You can do so by setting the <code>RUBYOPT</code> environment variable as follows:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>RUBYOPT="-E utf-8:utf-8"</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">Once you make this change, all your Unicode headaches should be behind you.</p>
+</div>
+<div dir="auto">
+<p dir="auto">If you’re using an IDE like Eclipse, make sure you set the encoding to UTF-8 there as well.
+Asciidoctor is optimized to work with UTF-8 as the default encoding.</p>
+</div>
+</td>
+</tr>
+</tbody></table></markdown-accessiblity-table>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-installation" class="heading-element" dir="auto">Installation</h2><a id="user-content-installation" class="anchor" aria-label="Permalink: Installation" href="#installation"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">Asciidoctor is packaged and distributed to RubyGems.org as a RubyGem (aka gem) named <a href="https://rubygems.org/gems/asciidoctor" rel="nofollow">asciidoctor</a>.
+The asciidoctor gem can be installed on all major operating systems using Ruby packaging tools (gem or bundle).
+Asciidoctor is also distributed as a Docker image, as a package for numerous Linux distributions, and as a package for macOS (via Homebrew and MacPorts).</p>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-linux-package-managers" class="heading-element" dir="auto">Linux package managers</h3><a id="user-content-linux-package-managers" class="anchor" aria-label="Permalink: Linux package managers" href="#linux-package-managers"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">The version of Asciidoctor installed by the package manager may not match the latest release of Asciidoctor.
+Consult the package repository for your distribution to find out which version is packaged per distribution release.</p>
+</div>
+<div dir="auto">
+<ul dir="auto">
+<li>
+<p dir="auto"><a href="https://pkgs.alpinelinux.org/packages?name=asciidoctor" rel="nofollow">Alpine Linux (asciidoctor)</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://www.archlinux.org/packages/?name=asciidoctor" rel="nofollow">Arch Linux (asciidoctor)</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://packages.debian.org/sid/asciidoctor" rel="nofollow">Debian (asciidoctor)</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://apps.fedoraproject.org/packages/rubygem-asciidoctor" rel="nofollow">Fedora (asciidoctor)</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://software.opensuse.org/package/rubygem-asciidoctor" rel="nofollow">OpenSUSE (rubygem-asciidoctor)</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://packages.ubuntu.com/search?keywords=asciidoctor" rel="nofollow">Ubuntu (asciidoctor)</a></p>
+</li>
+</ul>
+</div>
+<div dir="auto">
+<p dir="auto">If you want to use a version of Asciidoctor that’s newer than what is installed by the package manager, see the <a href="#gem-install">gem installation instructions</a>.</p>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-apk-alpine-linux" class="heading-element" dir="auto">apk (Alpine Linux)</h4><a id="user-content-apk-alpine-linux" class="anchor" aria-label="Permalink: apk (Alpine Linux)" href="#apk-alpine-linux"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To install the gem on Alpine Linux, open a terminal and type:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo apk add asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-pacman-arch-linux" class="heading-element" dir="auto">pacman (Arch Linux)</h4><a id="user-content-pacman-arch-linux" class="anchor" aria-label="Permalink: pacman (Arch Linux)" href="#pacman-arch-linux"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To install the gem on Arch-based distributions, open a terminal and type:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo pacman -S asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-apt" class="heading-element" dir="auto">APT</h4><a id="user-content-apt" class="anchor" aria-label="Permalink: APT" href="#apt"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">On Debian and Debian-based distributions such as Ubuntu, use APT to install Asciidoctor.
+To install the package, open a terminal and type:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo apt-get install -y asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-dnf" class="heading-element" dir="auto">DNF</h4><a id="user-content-dnf" class="anchor" aria-label="Permalink: DNF" href="#dnf"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">On RPM-based Linux distributions, such as Fedora, CentOS, and RHEL, use the DNF package manager to install Asciidoctor.
+To install the package, open a terminal and type:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo dnf install -y asciidoctor</pre>
+</div>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-macos" class="heading-element" dir="auto">macOS</h3><a id="user-content-macos" class="anchor" aria-label="Permalink: macOS" href="#macos"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-homebrew" class="heading-element" dir="auto">Homebrew</h4><a id="user-content-homebrew" class="anchor" aria-label="Permalink: Homebrew" href="#homebrew"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">You can use <a href="https://brew.sh" rel="nofollow">Homebrew</a>, the macOS package manager, to install Asciidoctor.
+If you don’t have Homebrew on your computer, complete the <a href="https://brew.sh" rel="nofollow">installation instructions</a> first.</p>
+</div>
+<div dir="auto">
+<p dir="auto">Once Homebrew is installed, you’re ready to install the <code>asciidoctor</code> gem.
+Open a terminal and type:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ brew install asciidoctor</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">Homebrew installs the <code>asciidoctor</code> gem into an exclusive prefix that’s independent of system gems.</p>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-macports" class="heading-element" dir="auto">MacPorts</h4><a id="user-content-macports" class="anchor" aria-label="Permalink: MacPorts" href="#macports"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">You can also use <a href="https://www.macports.org" rel="nofollow">MacPorts</a>, another package manager for macOS, to install Asciidoctor.
+If you don’t have MacPorts on your computer, complete the <a href="https://www.macports.org/install.php" rel="nofollow">installation instructions</a> first.</p>
+</div>
+<div dir="auto">
+<p dir="auto">Once MacPorts is installed, you’re ready to install the <code>asciidoctor</code> gem via the <a href="https://ports.macports.org/port/asciidoctor/" rel="nofollow">Asciidoctor port</a>.
+Open a terminal and type:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo port install asciidoctor</pre>
+</div>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-windows" class="heading-element" dir="auto">Windows</h3><a id="user-content-windows" class="anchor" aria-label="Permalink: Windows" href="#windows"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To use Asciidoctor with Windows, you have two options.</p>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-chocolatey" class="heading-element" dir="auto">Chocolatey</h4><a id="user-content-chocolatey" class="anchor" aria-label="Permalink: Chocolatey" href="#chocolatey"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">When you already use <a href="https://chocolatey.org" rel="nofollow">chocolatey</a> on your machine, you can use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>choco install ruby</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">Then follow <a href="#gem-install">gem installation instructions</a>.</p>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h4 id="user-content-rubyinstaller" class="heading-element" dir="auto">Rubyinstaller</h4><a id="user-content-rubyinstaller" class="anchor" aria-label="Permalink: Rubyinstaller" href="#rubyinstaller"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">Or you use the <a href="https://rubyinstaller.org/downloads/" rel="nofollow">Rubyinstaller</a>, download the package for your Windows Version and after the installation go ahead with <a href="#gem-install">gem installation instructions</a>.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-gem-install" class="heading-element" dir="auto">gem install</h3><a id="user-content-gem-install" class="anchor" aria-label="Permalink: gem install" href="#gem-install"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">Before installing Asciidoctor using <code>gem install</code>, you should set up <a href="https://rvm.io" rel="nofollow">RVM</a> (or similar) to install Ruby in your home directory (i.e., user space).
+Then, you can safely use the <code>gem</code> command to install or update the Asciidoctor gem, or any other gem for that matter.
+When using RVM, gems are installed in a location isolated from the system.
+(You should never use the gem command to install system-wide gems).</p>
+</div>
+<div dir="auto">
+<p dir="auto">Once you’ve installed Ruby using RVM, and you have activated it using <code>rvm use 3.0</code>, open a terminal and type:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ gem install asciidoctor</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">If you want to install a pre-release version (e.g., a release candidate), use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ gem install asciidoctor --pre</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-docker" class="heading-element" dir="auto">Docker</h3><a id="user-content-docker" class="anchor" aria-label="Permalink: Docker" href="#docker"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">See <a href="https://github.com/asciidoctor/docker-asciidoctor">Installing Asciidoctor using Docker</a>.</p>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-bundler" class="heading-element" dir="auto">Bundler</h3><a id="user-content-bundler" class="anchor" aria-label="Permalink: Bundler" href="#bundler"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<ol dir="auto">
+<li>
+<p dir="auto">Create a Gemfile in the root folder of your project (or the current directory)</p>
+</li>
+<li>
+<p dir="auto">Add the <code>asciidoctor</code> gem to your Gemfile as follows:</p>
+<div dir="auto">
+<div dir="auto">
+<div class="highlight highlight-source-ruby notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="source 'https://rubygems.org'
+gem 'asciidoctor'
+# or specify the version explicitly
+# gem 'asciidoctor', '2.0.22'"><pre><span class="pl-en">source</span> <span class="pl-s">'https://rubygems.org'</span>
+<span class="pl-en">gem</span> <span class="pl-s">'asciidoctor'</span>
+<span class="pl-c"># or specify the version explicitly</span>
+<span class="pl-c"># gem 'asciidoctor', '2.0.22'</span></pre></div>
+</div>
+</div>
+</li>
+<li>
+<p dir="auto">Save the Gemfile</p>
+</li>
+<li>
+<p dir="auto">Open a terminal and install the gem using:</p>
+<div dir="auto">
+<div dir="auto">
+<pre>$ bundle</pre>
+</div>
+</div>
+</li>
+</ol>
+</div>
+<div dir="auto">
+<p dir="auto">To upgrade the gem, specify the new version in the Gemfile and run <code>bundle</code> again.
+Using <code>bundle update</code> (without specifying a gem) is <strong>not</strong> recommended as it will also update other gems, which may not be the desired result.</p>
+</div>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-upgrade" class="heading-element" dir="auto">Upgrade</h2><a id="user-content-upgrade" class="anchor" aria-label="Permalink: Upgrade" href="#upgrade"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">If you installed Asciidoctor using a package manager, your operating system is probably configured to automatically update packages, in which case you don’t need to update the gem manually.</p>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-apk-alpine-linux-1" class="heading-element" dir="auto">apk (Alpine Linux)</h3><a id="user-content-apk-alpine-linux-1" class="anchor" aria-label="Permalink: apk (Alpine Linux)" href="#apk-alpine-linux-1"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To upgrade the gem, use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo apk add -u asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-apt-1" class="heading-element" dir="auto">APT</h3><a id="user-content-apt-1" class="anchor" aria-label="Permalink: APT" href="#apt-1"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To upgrade the gem, use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo apt-get upgrade -y asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-dnf-1" class="heading-element" dir="auto">DNF</h3><a id="user-content-dnf-1" class="anchor" aria-label="Permalink: DNF" href="#dnf-1"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To upgrade the gem, use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo dnf update -y asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-homebrew-macos" class="heading-element" dir="auto">Homebrew (macOS)</h3><a id="user-content-homebrew-macos" class="anchor" aria-label="Permalink: Homebrew (macOS)" href="#homebrew-macos"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To upgrade the gem, use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ brew update
+$ brew upgrade asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-macports-macos" class="heading-element" dir="auto">MacPorts (macOS)</h3><a id="user-content-macports-macos" class="anchor" aria-label="Permalink: MacPorts (macOS)" href="#macports-macos"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">To upgrade the gem, use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ sudo port selfupdate
+$ sudo port upgrade asciidoctor</pre>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-gem-install-1" class="heading-element" dir="auto">gem install</h3><a id="user-content-gem-install-1" class="anchor" aria-label="Permalink: gem install" href="#gem-install-1"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">If you previously installed Asciidoctor using the <code>gem</code> command, you’ll need to manually upgrade Asciidoctor when a new version is released.
+You can upgrade the gem by typing:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ gem install asciidoctor</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">When you install a new version of the gem using <code>gem install</code>, you end up with multiple versions installed.
+Use the following command to remove the old versions:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ gem cleanup asciidoctor</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-usage" class="heading-element" dir="auto">Usage</h2><a id="user-content-usage" class="anchor" aria-label="Permalink: Usage" href="#usage"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">If the Asciidoctor gem installed successfully, the <code>asciidoctor</code> command line interface (CLI) will be available on your PATH.
+To verify it’s available, run the following in your terminal:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ asciidoctor --version</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">You should see information about the Asciidoctor version and your Ruby environment printed in the terminal.</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>Asciidoctor 2.0.22 [https://asciidoctor.org]
+Runtime Environment (ruby 3.0.1p64 [x86_64-linux]) (lc:UTF-8 fs:UTF-8 in:UTF-8 ex:UTF-8)</pre>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-command-line-interface-cli" class="heading-element" dir="auto">Command line interface (CLI)</h3><a id="user-content-command-line-interface-cli" class="anchor" aria-label="Permalink: Command line interface (CLI)" href="#command-line-interface-cli"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">The <code>asciidoctor</code> command allows you to invoke Asciidoctor from the command line (i.e., a terminal).</p>
+</div>
+<div dir="auto">
+<p dir="auto">The following command converts the file README.adoc to HTML and saves the result to the file README.html in the same directory.
+The name of the generated HTML file is derived from the source file by changing its file extension to <code>.html</code>.</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ asciidoctor README.adoc</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">You can control the Asciidoctor processor by adding various flags and switches, which you can learn about using:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ asciidoctor --help</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">For instance, to write the file to a different directory, use:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<pre>$ asciidoctor -D output README.adoc</pre>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">The <code>asciidoctor</code> <a href="https://asciidoctor.org/man/asciidoctor" rel="nofollow">man page</a> provides a complete reference of the command line interface.</p>
+</div>
+<div dir="auto">
+<p dir="auto">Refer to the following resources to learn more about how to use the <code>asciidoctor</code> command.</p>
+</div>
+<div dir="auto">
+<ul dir="auto">
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoctor/latest/cli/" rel="nofollow">Process AsciiDoc using the CLI</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoctor/latest/cli/options/" rel="nofollow">CLI options</a></p>
+</li>
+</ul>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h3 id="user-content-ruby-api" class="heading-element" dir="auto">Ruby API</h3><a id="user-content-ruby-api" class="anchor" aria-label="Permalink: Ruby API" href="#ruby-api"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<p dir="auto">Asciidoctor also provides an API.
+The API is intended for integration with other Ruby software, such as Rails, GitHub, and GitLab, as well as other languages, such as Java (via AsciidoctorJ) and JavaScript (via Asciidoctor.js).</p>
+</div>
+<div dir="auto">
+<p dir="auto">To use Asciidoctor in your application, you first need to require the gem:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<div class="highlight highlight-source-ruby notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="require 'asciidoctor'"><pre><span class="pl-en">require</span> <span class="pl-s">'asciidoctor'</span></pre></div>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">You can then convert an AsciiDoc source file to an HTML file using:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<div class="highlight highlight-source-ruby notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="Asciidoctor.convert_file 'README.adoc', to_file: true, safe: :safe"><pre><span class="pl-v">Asciidoctor</span><span class="pl-kos">.</span><span class="pl-en">convert_file</span> <span class="pl-s">'README.adoc'</span><span class="pl-kos">,</span> <span class="pl-pds">to_file</span>: <span class="pl-c1">true</span><span class="pl-kos">,</span> <span class="pl-pds">safe</span>: <span class="pl-pds">:safe</span></pre></div>
+</div>
+</div>
+<div dir="auto">
+<markdown-accessiblity-table><table>
+<tbody><tr>
+<td>
+<div dir="auto"><g-emoji class="g-emoji" alias="warning">⚠️</g-emoji></div>
+</td>
+<td>
+When using Asciidoctor via the API, the default safe mode is <code>:secure</code>.
+In secure mode, several core features are disabled, including the <code>include</code> directive.
+If you want to enable these features, you’ll need to explicitly set the safe mode to <code>:server</code> (recommended) or <code>:safe</code>.
+</td>
+</tr>
+</tbody></table></markdown-accessiblity-table>
+</div>
+<div dir="auto">
+<p dir="auto">You can also convert an AsciiDoc string to embeddable HTML (for inserting in an HTML page) using:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<div class="highlight highlight-source-ruby notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="content = '_Zen_ in the art of writing https://asciidoctor.org[AsciiDoc].'
+Asciidoctor.convert content, safe: :safe"><pre><span class="pl-s1">content</span> <span class="pl-c1">=</span> <span class="pl-s">'_Zen_ in the art of writing https://asciidoctor.org[AsciiDoc].'</span>
+<span class="pl-v">Asciidoctor</span><span class="pl-kos">.</span><span class="pl-en">convert</span> <span class="pl-s1">content</span><span class="pl-kos">,</span> <span class="pl-pds">safe</span>: <span class="pl-pds">:safe</span></pre></div>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">If you want the full HTML document, enable the <code>header_footer</code> option as follows:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<div class="highlight highlight-source-ruby notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="content = '_Zen_ in the art of writing https://asciidoctor.org[AsciiDoc].'
+html = Asciidoctor.convert content, header_footer: true, safe: :safe"><pre><span class="pl-s1">content</span> <span class="pl-c1">=</span> <span class="pl-s">'_Zen_ in the art of writing https://asciidoctor.org[AsciiDoc].'</span>
+<span class="pl-s1">html</span> <span class="pl-c1">=</span> <span class="pl-v">Asciidoctor</span><span class="pl-kos">.</span><span class="pl-en">convert</span> <span class="pl-s1">content</span><span class="pl-kos">,</span> <span class="pl-pds">header_footer</span>: <span class="pl-c1">true</span><span class="pl-kos">,</span> <span class="pl-pds">safe</span>: <span class="pl-pds">:safe</span></pre></div>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">If you need access to the parsed document, you can split the conversion into discrete steps:</p>
+</div>
+<div dir="auto">
+<div dir="auto">
+<div class="highlight highlight-source-ruby notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="content = '_Zen_ in the art of writing https://asciidoctor.org[AsciiDoc].'
+document = Asciidoctor.load content, header_footer: true, safe: :safe
+puts document.doctitle
+html = document.convert"><pre><span class="pl-s1">content</span> <span class="pl-c1">=</span> <span class="pl-s">'_Zen_ in the art of writing https://asciidoctor.org[AsciiDoc].'</span>
+<span class="pl-s1">document</span> <span class="pl-c1">=</span> <span class="pl-v">Asciidoctor</span><span class="pl-kos">.</span><span class="pl-en">load</span> <span class="pl-s1">content</span><span class="pl-kos">,</span> <span class="pl-pds">header_footer</span>: <span class="pl-c1">true</span><span class="pl-kos">,</span> <span class="pl-pds">safe</span>: <span class="pl-pds">:safe</span>
+<span class="pl-en">puts</span> <span class="pl-s1">document</span><span class="pl-kos">.</span><span class="pl-en">doctitle</span>
+<span class="pl-s1">html</span> <span class="pl-c1">=</span> <span class="pl-s1">document</span><span class="pl-kos">.</span><span class="pl-en">convert</span></pre></div>
+</div>
+</div>
+<div dir="auto">
+<p dir="auto">Keep in mind that if you don’t like the output Asciidoctor produces, <em>you can change it!</em>
+Asciidoctor supports custom converters that can handle converting from the parsed document to the generated output.</p>
+</div>
+<div dir="auto">
+<p dir="auto">One easy way to customize the output piecemeal is by using the template converter.
+The template converter allows you to supply a <a href="https://github.com/rtomayko/tilt">Tilt</a>-supported template file to handle converting any node in the document.</p>
+</div>
+<div dir="auto">
+<p dir="auto">However you go about it, you <em>can</em> have 100% control over the output.
+For more information about how to use the API or to customize the output, see:</p>
+</div>
+<div dir="auto">
+<ul dir="auto">
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoctor/latest/api/" rel="nofollow">Process AsciiDoc using the API</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoctor/latest/api/options/" rel="nofollow">API options</a></p>
+</li>
+<li>
+<p dir="auto"><a href="https://docs.asciidoctor.org/asciidoctor/latest/safe-modes/" rel="nofollow">Safe modes</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-contributing" class="heading-element" dir="auto">Contributing</h2><a id="user-content-contributing" class="anchor" aria-label="Permalink: Contributing" href="#contributing"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">New contributors are always welcome!
+If you discover errors or omissions in the source code, documentation, or website content, please don’t hesitate to submit an issue or open a pull request with a fix.</p>
+</div>
+<div dir="auto">
+<p dir="auto">Here are some ways <strong>you</strong> can contribute:</p>
+</div>
+<div dir="auto">
+<ul dir="auto">
+<li>
+<p dir="auto">by using prerelease (alpha, beta or preview) versions</p>
+</li>
+<li>
+<p dir="auto">by reporting bugs</p>
+</li>
+<li>
+<p dir="auto">by suggesting new features</p>
+</li>
+<li>
+<p dir="auto">by writing or editing documentation</p>
+</li>
+<li>
+<p dir="auto">by writing code with tests — <em>No patch is too small.</em></p>
+<div dir="auto">
+<ul dir="auto">
+<li>
+<p dir="auto">fix typos</p>
+</li>
+<li>
+<p dir="auto">add comments</p>
+</li>
+<li>
+<p dir="auto">clean up inconsistent whitespace</p>
+</li>
+<li>
+<p dir="auto">write tests!</p>
+</li>
+</ul>
+</div>
+</li>
+<li>
+<p dir="auto">by refactoring code</p>
+</li>
+<li>
+<p dir="auto">by fixing <a href="https://github.com/asciidoctor/asciidoctor/issues">issues</a></p>
+</li>
+<li>
+<p dir="auto">by reviewing patches</p>
+</li>
+</ul>
+</div>
+<div dir="auto">
+<p dir="auto">The <a href="CONTRIBUTING.adoc">Contributing</a> guide provides information on how to create, style, and submit issues, feature requests, code, and documentation to Asciidoctor.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-getting-help" class="heading-element" dir="auto">Getting Help</h2><a id="user-content-getting-help" class="anchor" aria-label="Permalink: Getting Help" href="#getting-help"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">Asciidoctor is developed to help you easily write and publish your content.
+But we can’t do it without your input.
+If you need assistance or want to provide feedback, please follow the links to the resources listed on the <a href="https://docs.asciidoctor.org/about/support/" rel="nofollow">Get Help</a> page in the docs.
+Here’s a quick summary:</p>
+</div>
+<div dir="auto">
+<dl>
+<dt>Project chat (Zulip)</dt>
+<dd>
+<p dir="auto"><a href="https://chat.asciidoctor.org" rel="nofollow">https://chat.asciidoctor.org</a></p>
+</dd>
+<dt>Discussion list (archived)</dt>
+<dd>
+<p dir="auto"><a href="https://discuss.asciidoctor.org" rel="nofollow">https://discuss.asciidoctor.org</a></p>
+</dd>
+<dt>Social media (Twitter)</dt>
+<dd>
+<p dir="auto">Follow <a href="https://twitter.com/asciidoctor" rel="nofollow">@asciidoctor</a> or search the <a href="https://twitter.com/search?f=tweets&amp;q=%23asciidoctor" rel="nofollow">#asciidoctor</a> hashtag</p>
+</dd>
+</dl>
+</div>
+<div dir="auto">
+<p dir="auto">Further information and documentation about Asciidoctor can be found on the project’s website.</p>
+</div>
+<div dir="auto">
+<p dir="auto"><a href="https://asciidoctor.org" rel="nofollow">Home</a> | <a href="https://asciidoctor.org/news" rel="nofollow">News</a> | <a href="https://docs.asciidoctor.org" rel="nofollow">Docs</a></p>
+</div>
+<div dir="auto">
+<p dir="auto">The Asciidoctor organization on GitHub hosts the project’s source code, issue tracker, and sub-projects.</p>
+</div>
+<div dir="auto">
+<dl>
+<dt>Source repository (git)</dt>
+<dd>
+<p dir="auto"><a href="https://github.com/asciidoctor/asciidoctor">https://github.com/asciidoctor/asciidoctor</a></p>
+</dd>
+<dt>Issue tracker</dt>
+<dd>
+<p dir="auto"><a href="https://github.com/asciidoctor/asciidoctor/issues">https://github.com/asciidoctor/asciidoctor/issues</a></p>
+</dd>
+<dt>Asciidoctor organization on GitHub</dt>
+<dd>
+<p dir="auto"><a href="https://github.com/asciidoctor">https://github.com/asciidoctor</a></p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-code-of-conduct" class="heading-element" dir="auto">Code of Conduct</h2><a id="user-content-code-of-conduct" class="anchor" aria-label="Permalink: Code of Conduct" href="#code-of-conduct"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">The core Asciidoctor project is governed by the <a href="https://github.com/asciidoctor/.github/blob/HEAD/CODE-OF-CONDUCT.md">Code of Conduct</a> for the Asciidoctor community of projects.
+By participating, you’re agreeing to honor this code.
+Let’s work together to make this a welcoming, professional, inclusive, and safe environment for everyone.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-versioning-and-release-policy" class="heading-element" dir="auto">Versioning and Release Policy</h2><a id="user-content-versioning-and-release-policy" class="anchor" aria-label="Permalink: Versioning and Release Policy" href="#versioning-and-release-policy"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">This project adheres to semantic versioning (<strong>major.minor.patch</strong>).
+Typically, patch releases are only made for the current minor release.
+However, exceptions are made on a case-by-case basis to address security vulnerabilities and other high-priority issues.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-copyright-and-license" class="heading-element" dir="auto">Copyright and License</h2><a id="user-content-copyright-and-license" class="anchor" aria-label="Permalink: Copyright and License" href="#copyright-and-license"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">Copyright © 2012-present Dan Allen, Sarah White, Ryan Waldron, and the individual contributors to Asciidoctor.
+Use of this software is granted under the terms of the MIT License.</p>
+</div>
+<div dir="auto">
+<p dir="auto">See the <a href="LICENSE">LICENSE</a> for the full license text.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-authors" class="heading-element" dir="auto">Authors</h2><a id="user-content-authors" class="anchor" aria-label="Permalink: Authors" href="#authors"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto"><strong>Asciidoctor</strong> is led by <a href="https://github.com/mojavelinux">Dan Allen</a> and <a href="https://github.com/graphitefriction">Sarah White</a> and has received contributions from <a href="https://github.com/asciidoctor/asciidoctor/graphs/contributors">many individuals</a> in Asciidoctor’s awesome community.
+The project was initiated in 2012 by <a href="https://github.com/erebor">Ryan Waldron</a> based on a prototype written by <a href="https://github.com/nickh">Nick Hengeveld</a> for the Git website.</p>
+</div>
+<div dir="auto">
+<p dir="auto"><strong>AsciiDoc.py</strong> was started and maintained by Stuart Rackham from <a href="https://github.com/asciidoc-py/asciidoc-py2/blob/HEAD/CHANGELOG.txt">2002 to 2013</a> and has received contributions from many individuals in the <a href="https://github.com/asciidoc-py/asciidoc-py2/graphs/contributors">AsciiDoc.py community</a>.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-trademarks" class="heading-element" dir="auto">Trademarks</h2><a id="user-content-trademarks" class="anchor" aria-label="Permalink: Trademarks" href="#trademarks"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">AsciiDoc® and AsciiDoc Language™ are trademarks of the Eclipse Foundation, Inc.</p>
+</div>
+</div>
+</div>
+<div dir="auto">
+<div class="markdown-heading" dir="auto"><h2 id="user-content-changelog" class="heading-element" dir="auto">Changelog</h2><a id="user-content-changelog" class="anchor" aria-label="Permalink: Changelog" href="#changelog"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div dir="auto">
+<div dir="auto">
+<p dir="auto">Refer to the <a href="CHANGELOG.adoc">CHANGELOG</a> for a complete list of changes in older releases.</p>
+</div>
+</div>
+</div></article></div>

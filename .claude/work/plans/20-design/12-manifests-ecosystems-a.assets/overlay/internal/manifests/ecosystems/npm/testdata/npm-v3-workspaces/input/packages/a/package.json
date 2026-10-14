@@ -1,0 +1,6 @@
+{
+  "name": "@mono/a",
+  "version": "1.2.0",
+  "dependencies": { "@mono/b": "^1.0.0", "debug": "^4.3.4" },
+  "optionalDependencies": { "fsevents": "^2.3.3" }
+}

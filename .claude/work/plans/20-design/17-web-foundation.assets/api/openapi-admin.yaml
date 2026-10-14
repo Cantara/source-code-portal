@@ -1,0 +1,356 @@
+openapi: 3.1.0
+info:
+  title: Source Code Portal admin API
+  version: 1.0.0
+  summary: The public API plus the operator operations, served on the admin listener only.
+  description: |
+    The admin document is a **superset** of `openapi-public.yaml` (ADR-020: "admin root: public + ops admin
+    operations"): every public operation is also answered on the admin listener (the same handler objects are
+    mounted on the admin mux; identity-trust logic never runs there, so the caller is always anonymous and sees the
+    public view class), and two operations exist only here.
+
+    | operationId | Method and path | Purpose |
+    |---|---|---|
+    | `getStatus` | `GET /api/v1/status` | readiness gates, store health, snapshot, upstreams, installations, jobs, tasks, item ages, warnings |
+    | `retryJob` | `POST /api/v1/admin/jobs/retry` | force one keyed job to run now (unparks a parked key) |
+
+    The admin listener is reachable only from a restricted network (`:9091`, never routed by the ingress). The
+    SPA is generated from the bundled admin document, so `/status` (served by the same bundle) and the public
+    views share one `schema.d.ts`. The conventions of the public document apply unchanged; in addition:
+    state-changing requests need `Content-Type: application/json`, the header `X-SCP-Request: 1`, and pass
+    `http.CrossOriginProtection` (a cross-origin browser request is `403 forbidden`).
+  license: {name: Apache-2.0, identifier: Apache-2.0}
+servers:
+  - url: /
+    description: Same origin as the admin listener.
+tags:
+  - {name: ops, description: 'Operator view of the running process (admin listener only).'}
+x-scp-contract:
+  document: admin
+  extends: openapi-public.yaml
+  listener: admin
+security: []
+x-scp-fixtures:
+  statusExample: &statusExample
+    generatedAt: '2026-10-14T09:42:00Z'
+    build: {version: 1.0.0, commit: 9c4e1f2, buildId: 9c4e1f2, goVersion: go1.27.2, startedAt: '2026-10-13T22:00:03Z', uptimeSeconds: 42117}
+    readiness:
+      state: ready
+      readySince: '2026-10-13T22:06:41Z'
+      gates:
+        - {name: store, ok: true, detail: 'store opened, schema 1'}
+        - {name: catalogue, ok: true, detail: 'live catalog.reconcile succeeded at 2026-10-14T09:41:07Z'}
+        - {name: coverage, ok: true, detail: 'coverage 0.99 >= 0.90'}
+      coverage: {have: 210, total: 212, ratio: 0.99, coreKinds: [commits]}
+    snapshot: {version: 1841, builtAt: '2026-10-14T09:41:07Z', ageSeconds: 53, repoCount: 212, invalidPublishes: 0}
+    store: {state: ok, reason: null, lastBackupAt: '2026-10-14T09:00:00Z', rebuildsTotal: 0, sizeBytes: 83886080}
+    upstreams:
+      - {name: github, concurrency: 4, pending: 3, running: 1, stuck: 0, pausedUntil: null, pauseReason: null, breaker: closed}
+    installations:
+      - {source: acme, credentialKind: installation, appSlug: acme-scp, keyFingerprint: 'SHA256:q3Z0v1Gk7yJ4m2n8', account: acme, accountType: organization, state: active, repoCount: 212, lastReconcileAt: '2026-10-14T09:41:07Z', tokenExpiresAt: '2026-10-14T10:20:11Z', rate: [{resource: core, limit: 7700, remaining: 7412, resetAt: '2026-10-14T10:11:00Z'}, {resource: graphql, limit: 5000, remaining: 4875, resetAt: '2026-10-14T10:11:00Z'}]}
+    jobs:
+      kinds:
+        - {kind: commits.refresh, upstream: github, items: 212, oldestFetchAgeSeconds: 6120, p95FetchAgeSeconds: 3900, lastSuccessAt: '2026-10-14T09:41:03Z', failing: 0, parked: 0}
+        - {kind: manifests.refresh, upstream: github, items: 212, oldestFetchAgeSeconds: 7260, p95FetchAgeSeconds: 2100, lastSuccessAt: '2026-10-14T09:40:12Z', failing: 2, parked: 1}
+      parked: [{key: manifests.refresh/acme/acme/archived-ledger, since: '2026-10-14T03:12:00Z', retryAt: '2026-10-15T03:12:00Z', reason: 'permanent: 403 repository access blocked'}]
+      parkedTotal: 1
+    tasks:
+      - {name: planner.tick, everySeconds: 15, lastAttemptAt: '2026-10-14T09:41:55Z', lastSuccessAt: '2026-10-14T09:41:55Z', lastError: null, running: false, skipped: 0}
+      - {name: store.optimize, everySeconds: 86400, lastAttemptAt: '2026-10-14T03:00:00Z', lastSuccessAt: '2026-10-14T03:00:00Z', lastError: null, running: false, skipped: 0}
+    docs: {residentBytes: 91234816, budgetBytes: 201326592, notResidentDocs: 0, notResidentBytes: 0}
+    descriptors: {repositoriesWithProblems: 3, problems: 5}
+    manifests: {enabled: true, repositoriesWithDiagnostics: 41, disabledParsers: [], danglingUnits: 0, staleRepos: 2}
+    integrations:
+      - {provider: jenkins, enabled: true, state: ok, lastSweepAt: '2026-10-14T09:40:00Z', targets: 64}
+      - {provider: snyk, enabled: false, state: disabled, lastSweepAt: null, targets: 0}
+    warnings:
+      - {code: manifests.parser-failing, severity: warning, message: '2 repositories failed manifest refresh in the last hour', since: '2026-10-14T08:30:00Z'}
+paths:
+  /api/v1/openapi.yaml: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1openapi.yaml'}
+  /api/v1/site: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1site'}
+  /api/v1/snapshot: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1snapshot'}
+  /api/v1/events: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1events'}
+  /api/v1/groups: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1groups'}
+  /api/v1/groups/{groupId}: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1groups~1{groupId}'}
+  /api/v1/groups/{groupId}/repos: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1groups~1{groupId}~1repos'}
+  /api/v1/repos: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1repos'}
+  /api/v1/repos/{repo}: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1repos~1{repo}'}
+  /api/v1/commits: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1commits'}
+  /api/v1/repos/{repo}/docs: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1repos~1{repo}~1docs'}
+  /api/v1/repos/{repo}/docs/{docId}: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1repos~1{repo}~1docs~1{docId}'}
+  /api/v1/pages: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1pages'}
+  /api/v1/pages/{slug}: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1pages~1{slug}'}
+  /api/v1/repos/{repo}/manifests: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1repos~1{repo}~1manifests'}
+  /api/v1/repos/{repo}/dependencies: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1repos~1{repo}~1dependencies'}
+  /api/v1/repos/{repo}/sbom.cdx.json: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1repos~1{repo}~1sbom.cdx.json'}
+  /api/v1/dependencies/graph: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1dependencies~1graph'}
+  /api/v1/dependencies/versions: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1dependencies~1versions'}
+  /api/v1/dependencies/licenses: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1dependencies~1licenses'}
+  /api/v1/components: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1components'}
+  /api/v1/components/dependents: {$ref: 'openapi-public.yaml#/paths/~1api~1v1~1components~1dependents'}
+
+  /api/v1/status:
+    get:
+      operationId: getStatus
+      summary: Operator status
+      description: >-
+        What `/status` shows: readiness gates, store health, snapshot age, per-upstream pacing and pauses, GitHub App
+        installations with rate-limit state and token expiry, the freshness of each item kind, parked jobs, scheduler
+        tasks, memory budget of documents, descriptor and manifest diagnostics, and ranked warnings. Health is derived
+        from outcomes (item ages, last success), never from "a thread exists" (GR-41). The handler reads in-memory
+        state only and makes no outbound call (GR-41). The ETag is a hash of the body.
+      tags: [ops]
+      x-scp-owner: ops
+      x-scp-route: api.status
+      x-scp-etag: body-hash
+      x-scp-listener: admin
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The status document.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Status'}
+              example: *statusExample
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/admin/jobs/retry:
+    post:
+      operationId: retryJob
+      summary: Force a job to run now
+      description: >-
+        Enqueues the keyed job at `PrioInteractive` with `force`, which also releases a parked key. The key is the
+        engine key shown in `getStatus` (`kind/source/owner/name` for per-repository kinds, `kind/_` for global kinds).
+        Idempotent and coalescing: retrying a job that is already queued or running is accepted and changes nothing.
+        The job still passes the per-upstream pacing and the budget gate. Requires `Content-Type: application/json`
+        and `X-SCP-Request: 1`.
+      tags: [ops]
+      x-scp-owner: ops
+      x-scp-route: api.admin.retry
+      x-scp-conditional: false
+      x-scp-listener: admin
+      parameters:
+        - name: X-SCP-Request
+          in: header
+          required: true
+          description: CSRF guard for state-changing admin calls; must be `1`.
+          schema: {type: string, enum: ['1']}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RetryJobRequest'}
+            example: {key: docs.refresh/acme/acme/billing-service}
+      responses:
+        '202':
+          description: The job was enqueued (or was already pending).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RetryJobResponse'}
+              example: {key: docs.refresh/acme/acme/billing-service, accepted: true}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+components:
+  schemas:
+    RetryJobRequest:
+      type: object
+      required: [key]
+      properties:
+        key: {type: string, minLength: 3, maxLength: 512, pattern: '^[a-z][a-z0-9._-]*/[^\s]+$', description: 'Engine job key, for example `docs.refresh/acme/acme/billing-service` or `catalog.reconcile/_`.'}
+    RetryJobResponse:
+      type: object
+      required: [key, accepted]
+      properties:
+        key: {type: string}
+        accepted: {type: boolean}
+    ReadinessGate:
+      type: object
+      required: [name, ok, detail]
+      properties:
+        name: {type: string, enum: [store, catalogue, coverage, startup_deadline]}
+        ok: {type: boolean}
+        detail: {type: string, description: Human-readable reason; never parsed.}
+    Coverage:
+      type: object
+      required: [have, total, ratio, coreKinds]
+      properties:
+        have: {type: integer, minimum: 0}
+        total: {type: integer, minimum: 0}
+        ratio: {type: number, minimum: 0, maximum: 1}
+        coreKinds: {type: array, items: {type: string}}
+    StatusReadiness:
+      type: object
+      required: [state, readySince, gates, coverage]
+      properties:
+        state: {type: string, enum: [warming, ready, degraded, shutting-down]}
+        readySince: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        gates: {type: array, items: {$ref: '#/components/schemas/ReadinessGate'}}
+        coverage: {$ref: '#/components/schemas/Coverage'}
+    StatusSnapshot:
+      type: object
+      required: [version, builtAt, ageSeconds, repoCount, invalidPublishes]
+      properties:
+        version: {type: integer, format: int64, minimum: 0}
+        builtAt: {$ref: 'common.yaml#/components/schemas/Timestamp'}
+        ageSeconds: {type: integer, minimum: 0}
+        repoCount: {type: integer, minimum: 0}
+        invalidPublishes: {type: integer, minimum: 0, description: 'Candidates rejected by a validator since start (`scp_snapshot_publish_total{result="invalid"}`).'}
+        lastInvalidMessage: {type: string, description: Message of the last validator failure., x-scp-untrusted: true}
+    StatusStore:
+      type: object
+      required: [state, reason, lastBackupAt, rebuildsTotal, sizeBytes]
+      properties:
+        state: {type: string, enum: [ok, degraded]}
+        reason: {type: [string, "null"], x-scp-untrusted: true}
+        lastBackupAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        rebuildsTotal: {type: integer, minimum: 0}
+        sizeBytes: {type: [integer, "null"], format: int64, minimum: 0}
+    StatusUpstream:
+      type: object
+      required: [name, concurrency, pending, running, stuck, pausedUntil, pauseReason, breaker]
+      properties:
+        name: {type: string, examples: [github]}
+        concurrency: {type: integer, minimum: 1}
+        pending: {type: integer, minimum: 0}
+        running: {type: integer, minimum: 0}
+        stuck: {type: integer, minimum: 0, description: 'Jobs past their deadline that ignore cancellation; `/livez` fails when every slot is stuck for 2 minutes.'}
+        pausedUntil: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        pauseReason: {type: [string, "null"], enum: [rate_limit, unauthorized, breaker, null]}
+        breaker: {type: string, enum: [closed, open, half-open, none]}
+    RateInfo:
+      type: object
+      required: [resource, limit, remaining, resetAt]
+      properties:
+        resource: {type: string, examples: [core]}
+        limit: {type: integer, minimum: 0}
+        remaining: {type: integer, minimum: 0}
+        resetAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+    StatusInstallation:
+      type: object
+      description: One GitHub source/installation (D-17). Credential material is never shown; `keyFingerprint` is a safe digest.
+      required: [source, credentialKind, appSlug, keyFingerprint, account, accountType, state, repoCount, lastReconcileAt, tokenExpiresAt, rate]
+      properties:
+        source: {type: string}
+        credentialKind: {type: string, enum: [installation, pat, oauth_user, external, anonymous]}
+        appSlug: {type: [string, "null"]}
+        keyFingerprint: {type: [string, "null"]}
+        account: {type: [string, "null"]}
+        accountType: {type: string, enum: [organization, user, enterprise, unknown]}
+        state: {type: string, enum: [active, suspended, removed, unknown]}
+        repoCount: {type: integer, minimum: 0}
+        lastReconcileAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        tokenExpiresAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        rate: {type: array, items: {$ref: '#/components/schemas/RateInfo'}}
+    StatusJobKind:
+      type: object
+      required: [kind, upstream, items, oldestFetchAgeSeconds, p95FetchAgeSeconds, lastSuccessAt, failing, parked]
+      properties:
+        kind: {type: string, examples: [docs.refresh]}
+        upstream: {type: string}
+        items: {type: integer, minimum: 0}
+        oldestFetchAgeSeconds: {type: [integer, "null"], minimum: 0}
+        p95FetchAgeSeconds: {type: [integer, "null"], minimum: 0}
+        lastSuccessAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        failing: {type: integer, minimum: 0, description: Items whose last attempt failed.}
+        parked: {type: integer, minimum: 0}
+    ParkedJob:
+      type: object
+      required: [key, since, retryAt, reason]
+      properties:
+        key: {type: string}
+        since: {$ref: 'common.yaml#/components/schemas/Timestamp'}
+        retryAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        reason: {type: string, maxLength: 300, x-scp-untrusted: true}
+    StatusJobs:
+      type: object
+      required: [kinds, parked, parkedTotal]
+      properties:
+        kinds: {type: array, items: {$ref: '#/components/schemas/StatusJobKind'}}
+        parked: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/ParkedJob'}}
+        parkedTotal: {type: integer, minimum: 0}
+    StatusTask:
+      type: object
+      required: [name, everySeconds, lastAttemptAt, lastSuccessAt, lastError, running, skipped]
+      properties:
+        name: {type: string, examples: [planner.tick]}
+        everySeconds: {type: integer, minimum: 1}
+        lastAttemptAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        lastSuccessAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        lastError: {type: [string, "null"], x-scp-untrusted: true}
+        running: {type: boolean}
+        skipped: {type: integer, minimum: 0, description: Triggers skipped because the task was still running.}
+    StatusDocs:
+      type: object
+      required: [residentBytes, budgetBytes, notResidentDocs, notResidentBytes]
+      properties:
+        residentBytes: {type: integer, format: int64, minimum: 0}
+        budgetBytes: {type: integer, format: int64, minimum: 0}
+        notResidentDocs: {type: integer, minimum: 0}
+        notResidentBytes: {type: integer, format: int64, minimum: 0}
+    StatusDescriptors:
+      type: object
+      required: [repositoriesWithProblems, problems]
+      properties:
+        repositoriesWithProblems: {type: integer, minimum: 0}
+        problems: {type: integer, minimum: 0}
+    StatusManifests:
+      type: object
+      required: [enabled, repositoriesWithDiagnostics, disabledParsers, danglingUnits, staleRepos]
+      properties:
+        enabled: {type: boolean}
+        repositoriesWithDiagnostics: {type: integer, minimum: 0}
+        disabledParsers: {type: array, items: {type: string}, description: Parsers whose circuit tripped after 3 abandoned parses (disabled until restart).}
+        danglingUnits: {type: integer, minimum: 0}
+        staleRepos: {type: integer, minimum: 0}
+    StatusIntegration:
+      type: object
+      required: [provider, enabled, state, lastSweepAt, targets]
+      properties:
+        provider: {type: string}
+        enabled: {type: boolean}
+        state: {$ref: 'common.yaml#/components/schemas/ProviderState'}
+        lastSweepAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        targets: {type: integer, minimum: 0}
+    StatusWarning:
+      type: object
+      required: [code, severity, message, since]
+      properties:
+        code: {type: string, pattern: '^[a-z0-9]+([._-][a-z0-9]+)*$', examples: [docs.budget-exceeded]}
+        severity: {type: string, enum: [info, warning, critical]}
+        message: {type: string, x-scp-untrusted: true}
+        since: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+    StatusBuild:
+      allOf:
+        - $ref: 'common.yaml#/components/schemas/BuildInfo'
+        - type: object
+          required: [startedAt, uptimeSeconds]
+          properties:
+            startedAt: {$ref: 'common.yaml#/components/schemas/Timestamp'}
+            uptimeSeconds: {type: integer, minimum: 0}
+    Status:
+      type: object
+      required: [generatedAt, build, readiness, snapshot, store, upstreams, installations, jobs, tasks, docs, descriptors, manifests, integrations, warnings]
+      properties:
+        generatedAt: {$ref: 'common.yaml#/components/schemas/Timestamp'}
+        build: {$ref: '#/components/schemas/StatusBuild'}
+        readiness: {$ref: '#/components/schemas/StatusReadiness'}
+        snapshot: {$ref: '#/components/schemas/StatusSnapshot'}
+        store: {$ref: '#/components/schemas/StatusStore'}
+        upstreams: {type: array, items: {$ref: '#/components/schemas/StatusUpstream'}}
+        installations: {type: array, items: {$ref: '#/components/schemas/StatusInstallation'}}
+        jobs: {$ref: '#/components/schemas/StatusJobs'}
+        tasks: {type: array, items: {$ref: '#/components/schemas/StatusTask'}}
+        docs: {$ref: '#/components/schemas/StatusDocs'}
+        descriptors: {$ref: '#/components/schemas/StatusDescriptors'}
+        manifests: {$ref: '#/components/schemas/StatusManifests'}
+        integrations: {type: array, items: {$ref: '#/components/schemas/StatusIntegration'}}
+        warnings: {type: array, items: {$ref: '#/components/schemas/StatusWarning'}, description: 'Ranked, most severe first.'}

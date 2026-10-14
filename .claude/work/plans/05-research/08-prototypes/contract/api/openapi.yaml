@@ -1,0 +1,13 @@
+openapi: 3.1.0
+info:
+  title: Source Code Portal API
+  version: 1.0.0
+  license: {name: Apache-2.0, identifier: Apache-2.0}
+servers: [{url: /}]
+paths:
+  /api/v1/commits:
+    $ref: '../internal/commits/api/commits.yaml#/paths/~1api~1v1~1commits'
+  /api/v1/groups:
+    $ref: '../internal/groups/api/groups.yaml#/paths/~1api~1v1~1groups'
+  /api/v1/groups/{groupId}:
+    $ref: '../internal/groups/api/groups.yaml#/paths/~1api~1v1~1groups~1{groupId}'

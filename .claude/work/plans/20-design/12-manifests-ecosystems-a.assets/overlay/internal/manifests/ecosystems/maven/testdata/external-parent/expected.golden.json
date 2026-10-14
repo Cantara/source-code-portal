@@ -1,0 +1,119 @@
+{
+  "parsed": [
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/demo",
+          "display": "demo",
+          "version": "0.0.1-SNAPSHOT",
+          "kind": "library"
+        }
+      ],
+      "parent": {
+        "target": "maven:org.springframework.boot/spring-boot-starter-parent",
+        "requirement": "3.4.0",
+        "resolution": "declared",
+        "scope": "unknown",
+        "group": "parent",
+        "source": "registry",
+        "confidence": "exact",
+        "line": 3
+      },
+      "dependencies": [
+        {
+          "target": "maven:org.springframework.boot/spring-boot-starter-web",
+          "display": "org.springframework.boot:spring-boot-starter-web",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "maven:com.acme/internal-lib",
+          "display": "com.acme:internal-lib",
+          "requirement": "${internal.version}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "properties": {
+        "packaging": "jar",
+        "parent.relativePath": "",
+        "prop:java.version": "21"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/demo",
+          "display": "com.acme:demo",
+          "version": "0.0.1-SNAPSHOT",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.springframework.boot/spring-boot-starter-web",
+          "display": "org.springframework.boot:spring-boot-starter-web",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "maven:com.acme/internal-lib",
+          "display": "com.acme:internal-lib",
+          "requirement": "${internal.version}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "toolchain": {
+        "java": "21",
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      },
+      "diagnostics": [
+        {
+          "code": "maven.property-unresolved",
+          "severity": "info",
+          "message": "${internal.version}",
+          "path": "pom.xml",
+          "line": 15
+        },
+        {
+          "code": "maven.parent-unresolved",
+          "severity": "info",
+          "message": "parent org.springframework.boot:spring-boot-starter-parent:3.4.0 (no PomSource configured)",
+          "path": "pom.xml",
+          "line": 3
+        }
+      ]
+    }
+  ]
+}

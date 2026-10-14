@@ -1,0 +1,11 @@
+// Package golang is the pure golang Parser (and optional Assembler) of package manifest intelligence. It imports only the
+// manifests root and its internal helpers.
+//
+// Architecture: rank 5 (internal/manifests/ecosystems/golang); the closed-world row is in internal/archtest/rules.go and is the
+// only authority.
+// Allowed internal imports: internal/manifests, internal/manifests/internal/*.
+// Additional imports allowed in _test.go files: internal/manifests/parsertest.
+// Third-party libraries owned here: x/mod.
+//
+// Design: docs/design/20-design/12-manifests-ecosystems-a.md; architecture sections 4 and 5.2.
+package golang

@@ -1,0 +1,1 @@
+{ "name": "lockv1-app", "version": "0.1.0", "dependencies": { "express": "^4.17.1", "ms": "^2.0.0" }, "devDependencies": { "mocha": "^5.2.0" } }

@@ -1,0 +1,222 @@
+openapi: 3.1.0
+info:
+  title: SCP shared API components
+  version: 1.0.0
+  description: >-
+    Shared schemas, parameters, headers and responses referenced by every feature fragment.
+    This file has no paths; it is the single source of truth for Problem, Freshness and PageInfo.
+paths:
+  /api/v1/commits:
+    get:
+      operationId: listCommits
+      tags: [commits]
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: repo
+          in: query
+          schema: { type: string, maxLength: 100, pattern: '^[A-Za-z0-9._-]+$' }
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Link: { $ref: '#/components/headers/Link' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommitList' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        default: { $ref: '#/components/responses/Problem' }
+  /api/v1/repos/{repo}:
+    get:
+      operationId: getRepo
+      tags: [overview]
+      parameters:
+        - $ref: '#/components/parameters/RepoSlug'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Repo' }
+        '304': { $ref: '#/components/responses/NotModified' }
+        default: { $ref: '#/components/responses/Problem' }
+  /api/v1/admin/jobs/retry:
+    post:
+      operationId: retryJob
+      tags: [ops]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RetryRequest' }
+      responses:
+        '202': { description: Accepted }
+        default: { $ref: '#/components/responses/Problem' }
+components:
+  schemas:
+
+    CommitList:
+      type: object
+      required: [items, page, freshness]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Commit' } }
+        page: { $ref: '#/components/schemas/PageInfo' }
+        freshness: { $ref: '#/components/schemas/Freshness' }
+    Commit:
+      type: object
+      required: [sha]
+      properties: { sha: { type: string } }
+    Repo:
+      type: object
+      required: [slug]
+      properties: { slug: { type: string } }
+    RetryRequest:
+      type: object
+      required: [key]
+      additionalProperties: false
+      properties: { key: { type: string, minLength: 1, maxLength: 200 } }
+    Problem:
+      type: object
+      description: RFC 9457 problem details with SCP extension members. Clients key on `code`, never on `detail`.
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: 'Always `urn:scp:problem:<code>`.'
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+          description: 'Request id as a URN: `urn:uuid:<uuid>` (or `urn:scp:request:<id>` for ids that are not UUIDs).'
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+        retryAfterSeconds:
+          type: integer
+          minimum: 0
+    ProblemCode:
+      type: string
+      description: Open enumeration; clients must treat unknown values as `internal`-like.
+      examples: [validation-failed, invalid-cursor, unauthorized, forbidden, not-found, method-not-allowed, not-acceptable, payload-too-large, unsupported-media-type, rate-limited, internal, upstream-unavailable, not-ready]
+    FieldError:
+      type: object
+      required: [pointer, detail]
+      properties:
+        pointer:
+          type: string
+          description: 'RFC 6901 pointer into the request: `/query/<name>`, `/path/<name>`, `/header/<name>`, `/body/...`.'
+        detail:
+          type: string
+    FreshnessStatus:
+      type: string
+      enum: [fresh, stale, error, unknown]
+    Freshness:
+      type: object
+      description: Derived at read time from the stored freshness info.
+      required: [status, fetchedAt]
+      properties:
+        status:
+          $ref: '#/components/schemas/FreshnessStatus'
+        kind:
+          type: string
+        asOf:
+          type: [string, 'null']
+          format: date-time
+          description: Upstream data time (UTC, `Z`).
+        checkedAt:
+          type: [string, 'null']
+          format: date-time
+        fetchedAt:
+          type: [string, 'null']
+          format: date-time
+          description: When SCP last fetched or revalidated the data (UTC, `Z`).
+        staleSince:
+          type: [string, 'null']
+          format: date-time
+        lastErrorCode:
+          type: [string, 'null']
+    PageInfo:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor:
+          type: [string, 'null']
+          maxLength: 512
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+    Source:
+      type: string
+      description: Provenance of a resolved metadata field.
+      enum: [descriptor, catalog-info, codeowners, github-topics, derived, own, github-graph, sbom]
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      description: Page size. Default 50, maximum 200 (collections bounded by configuration accept up to 1000 where the operation says so).
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from `page.nextCursor` of the previous page.
+      schema: { type: string, minLength: 1, maxLength: 512, pattern: '^[A-Za-z0-9_-]+$' }
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      schema: { type: string, maxLength: 2048 }
+    RepoSlug:
+      name: repo
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 100, pattern: '^[A-Za-z0-9._-]+$' }
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 100, pattern: '^[a-z0-9-]+$' }
+  headers:
+    ETag:
+      description: Weak validator derived from the snapshot version and the derived freshness.
+      required: true
+      schema: { type: string }
+    Link:
+      description: 'RFC 8288 `rel="next"` link, present when `page.nextCursor` is not null.'
+      schema: { type: string }
+    RetryAfter:
+      schema: { type: integer, minimum: 0 }
+    Allow:
+      schema: { type: string }
+  responses:
+    NotModified:
+      description: Not modified.
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETag'
+    Problem:
+      description: Problem details (RFC 9457).
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        Allow:
+          $ref: '#/components/headers/Allow'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

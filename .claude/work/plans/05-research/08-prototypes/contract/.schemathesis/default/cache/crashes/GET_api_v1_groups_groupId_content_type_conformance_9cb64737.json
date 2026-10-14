@@ -1,0 +1,94 @@
+{
+  "operation": "GET /api/v1/groups/{groupId}",
+  "method": "GET",
+  "path_template": "/api/v1/groups/{groupId}",
+  "fingerprint": "9cb64737",
+  "case_id": "LZ3XEj",
+  "code_sample": "curl -X GET http://127.0.0.1:9191/api/v1/groups/%F0%9F%98%8D",
+  "sequence": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:9191/api/v1/groups/%F0%9F%98%8D",
+      "url_template": "http://127.0.0.1:9191/api/v1/groups/{groupId}",
+      "headers": {
+        "User-Agent": "schemathesis/4.31.0",
+        "Accept-Encoding": "gzip, deflate, zstd",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "X-Schemathesis-TestCaseId": "LZ3XEj"
+      },
+      "response": {
+        "status_code": 400,
+        "headers": {
+          "content-type": "text/plain; charset=utf-8",
+          "x-content-type-options": "nosniff",
+          "date": "Tue, 13 Oct 2026 21:33:31 GMT",
+          "content-length": "101"
+        },
+        "body": "at '': '%F0%9F%98%8D' does not match pattern '^[a-z0-9-]+$'\nSchema:\n  null\n\nValue:\n  \"%F0%9F%98%8D\"\n\n"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "content_type_conformance",
+          "status": "failure",
+          "message": "Undocumented Content-Type\n\nReceived: text/plain; charset=utf-8\nDocumented: application/problem+json"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 0.0022468750830739737,
+          "mode": "negative"
+        },
+        "components": {
+          "PATH": "negative"
+        },
+        "phase": {
+          "name": "fuzzing",
+          "data": {
+            "type": "FuzzingPhaseData",
+            "description": "violates `pattern` at /properties/groupId",
+            "location": "/properties/groupId",
+            "parameter": "groupId",
+            "parameter_location": "PATH",
+            "mutations": [
+              {
+                "path": [
+                  "groupId"
+                ],
+                "parameter_location": "path",
+                "schema_pointer": "/properties/groupId",
+                "channel": "schema",
+                "operator": "negate_constraints",
+                "keywords": [
+                  "pattern"
+                ],
+                "parameter": "groupId",
+                "original_value": null,
+                "new_value": null
+              }
+            ]
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {}
+      },
+      "path": "/api/v1/groups/{groupId}",
+      "path_parameters": {
+        "groupId": "%F0%9F%98%8D"
+      },
+      "query": {},
+      "case_headers": {},
+      "cookies": {},
+      "case_body": {
+        "encoding": "none"
+      },
+      "media_type": null,
+      "parent_index": null
+    }
+  ]
+}

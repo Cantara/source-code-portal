@@ -1,0 +1,458 @@
+{
+  "parsed": [
+    {
+      "file": "build.gradle.kts",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:org.springframework/spring-core",
+          "display": "org.springframework:spring-core",
+          "requirement": "${property(\"springVersion\")}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 5
+        },
+        {
+          "target": "maven:org.springframework/spring-web",
+          "display": "org.springframework:spring-web",
+          "requirement": "${rootProject.extra[\"springVersion\"]}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 6
+        },
+        {
+          "target": "maven:org.example/cyclic",
+          "display": "org.example:cyclic",
+          "requirement": "$cyc",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 7
+        },
+        {
+          "target": "maven:org.example/dyn",
+          "display": "org.example:dyn",
+          "requirement": "latest.release",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 8
+        },
+        {
+          "target": "maven:org.example/snap",
+          "display": "org.example:snap",
+          "requirement": "1.0-SNAPSHOT",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 9
+        },
+        {
+          "target": "maven:org.example/strict",
+          "display": "org.example:strict",
+          "requirement": "1.0!!",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 10
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-reflect",
+          "display": "org.jetbrains.kotlin:kotlin-reflect",
+          "requirement": "$kotlinVersion",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 11
+        },
+        {
+          "target": "maven:org.example/undefined",
+          "display": "org.example:undefined",
+          "requirement": "$nope",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 12
+        },
+        {
+          "target": "maven:${undefinedVar}",
+          "display": "${undefinedVar}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 13
+        },
+        {
+          "target": "maven:org.example/managed-by-constraint",
+          "display": "org.example:managed-by-constraint",
+          "requirement": "2.5.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "constraint:implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 15
+        },
+        {
+          "target": "maven:org.example/managed-by-constraint",
+          "display": "org.example:managed-by-constraint",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 17
+        },
+        {
+          "target": "maven:org.example/conditional",
+          "display": "org.example:conditional",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 19
+        },
+        {
+          "target": "maven:org.example/via-add",
+          "display": "org.example:via-add",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 21
+        },
+        {
+          "target": "maven:org.example/multiline",
+          "display": "org.example:multiline",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 22
+        },
+        {
+          "target": "maven:org.example/multiline2",
+          "display": "org.example:multiline2",
+          "requirement": "2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 22
+        },
+        {
+          "target": "maven:org.example/a",
+          "display": "org.example:a",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 26
+        },
+        {
+          "target": "maven:org.example/b",
+          "display": "org.example:b",
+          "requirement": "2",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 26
+        }
+      ],
+      "properties": {
+        "var:cyc": "$cyc",
+        "var:kotlinVersion": "1.9.25",
+        "var:springVersion": "6.1.12"
+      },
+      "toolchain": {
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.unresolved-notation",
+          "severity": "info",
+          "message": "dependency argument is not a literal",
+          "path": "build.gradle.kts",
+          "line": 18
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "17 dependencies read lexically from the build script",
+          "path": "build.gradle.kts"
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#gradle",
+      "ecosystem": "gradle",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "build.gradle.kts (gradle/script)"
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.springframework/spring-core",
+          "display": "org.springframework:spring-core",
+          "requirement": "6.1.12",
+          "version": "6.1.12",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 5
+        },
+        {
+          "target": "maven:org.springframework/spring-web",
+          "display": "org.springframework:spring-web",
+          "requirement": "6.1.12",
+          "version": "6.1.12",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 6
+        },
+        {
+          "target": "maven:org.example/cyclic",
+          "display": "org.example:cyclic",
+          "requirement": "${cyc}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 7
+        },
+        {
+          "target": "maven:org.example/dyn",
+          "display": "org.example:dyn",
+          "requirement": "latest.release",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 8
+        },
+        {
+          "target": "maven:org.example/snap",
+          "display": "org.example:snap",
+          "requirement": "1.0-SNAPSHOT",
+          "version": "1.0-SNAPSHOT",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 9
+        },
+        {
+          "target": "maven:org.example/strict",
+          "display": "org.example:strict",
+          "requirement": "1.0!!",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 10
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-reflect",
+          "display": "org.jetbrains.kotlin:kotlin-reflect",
+          "requirement": "1.9.25",
+          "version": "1.9.25",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 11
+        },
+        {
+          "target": "maven:org.example/undefined",
+          "display": "org.example:undefined",
+          "requirement": "${nope}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 12
+        },
+        {
+          "target": "maven:org.example/managed-by-constraint",
+          "display": "org.example:managed-by-constraint",
+          "requirement": "2.5.0",
+          "version": "2.5.0",
+          "resolution": "managed",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 17
+        },
+        {
+          "target": "maven:org.example/conditional",
+          "display": "org.example:conditional",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 19
+        },
+        {
+          "target": "maven:org.example/via-add",
+          "display": "org.example:via-add",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 21
+        },
+        {
+          "target": "maven:org.example/multiline",
+          "display": "org.example:multiline",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 22
+        },
+        {
+          "target": "maven:org.example/multiline2",
+          "display": "org.example:multiline2",
+          "requirement": "2.0",
+          "version": "2.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 22
+        },
+        {
+          "target": "maven:org.example/a",
+          "display": "org.example:a",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 26
+        },
+        {
+          "target": "maven:org.example/b",
+          "display": "org.example:b",
+          "requirement": "2",
+          "version": "2",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 26
+        }
+      ],
+      "toolchain": {
+        "dsl": "kotlin",
+        "kotlin": "1.9.25",
+        "language": "kotlin",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.unresolved-notation",
+          "severity": "info",
+          "message": "dependency argument is not a literal",
+          "path": "build.gradle.kts",
+          "line": 18
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "17 dependencies read lexically from the build script",
+          "path": "build.gradle.kts"
+        },
+        {
+          "code": "gradle.template-unresolved",
+          "severity": "info",
+          "message": "${cyc}",
+          "path": "build.gradle.kts",
+          "line": 7
+        },
+        {
+          "code": "gradle.template-unresolved",
+          "severity": "info",
+          "message": "${nope}",
+          "path": "build.gradle.kts",
+          "line": 12
+        },
+        {
+          "code": "gradle.template-unresolved",
+          "severity": "info",
+          "message": "${undefinedVar}",
+          "path": "build.gradle.kts",
+          "line": 13
+        },
+        {
+          "code": "gradle.variable-unresolved",
+          "severity": "info",
+          "message": "${undefinedVar}",
+          "path": "build.gradle.kts",
+          "line": 13
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+# Free-text members that the portal or its operator authors (apicheck rule A24).
+# Every other free-text string member of a schema (no enum, pattern or format) MUST carry `x-scp-untrusted: true`:
+# it originates in a repository or in a third-party service and is data, never instructions (design 07, 4.8 item 7).
+# A new free-text member fails the build until it is marked or listed here; a listed member that is also marked, or that no
+# longer exists, fails it too. Format: `Schema.member  # who authors it`.
+Announcement.id  # operator configuration (pages.announcement)
+Announcement.text  # operator configuration (pages.announcement)
+ApiRef.sourceUrl  # built by the server from the repository and path
+Badge.label  # server-generated alt text
+BuildInfo.buildId  # compiled into the binary
+BuildInfo.commit  # compiled into the binary
+BuildInfo.goVersion  # compiled into the binary
+BuildInfo.version  # compiled into the binary
+Coverage.coreKinds  # server job-kind names
+DescriptorInfo.file  # one of two fixed file names
+DocIndexEntry.markdownUrl  # built from routes
+DocProblem.code  # stable code of the docs pipeline
+FieldError.detail  # server-generated validation text
+FieldError.pointer  # server-generated validation text
+Freshness.kind  # server vocabulary
+Freshness.lastErrorCode  # server vocabulary
+GroupRef.displayName  # operator configuration (groups)
+GroupSummary.description  # operator configuration (groups)
+GroupSummary.displayName  # operator configuration (groups)
+GroupSummary.integrations  # operator configuration (groups)
+LanguageShare.name  # GitHub linguist language name
+License.name  # GitHub licence metadata (SPDX list)
+License.spdxId  # GitHub licence metadata (SPDX list)
+ManifestFile.parser  # parser id compiled in
+NavItem.label  # operator configuration (site.nav)
+PageInfo.nextCursor  # opaque server cursor
+ParkedJob.key  # job key built from kind and slug
+Problem.detail  # server-generated problem text
+Problem.title  # server-generated problem text
+ProviderStatus.detailUrl  # validated URL on the configured provider host
+ProviderStatus.provider  # operator configuration (integrations)
+RateInfo.resource  # GitHub rate-limit resource name
+ReadinessGate.detail  # server-generated text
+RepoSummary.markdownUrl  # built from routes
+RepoSummary.owner  # GitHub account login of a configured source
+RetryJobResponse.key  # echo of the operator input, admin only
+Site.description  # operator configuration (site)
+Site.displayTimeZone  # operator configuration (site)
+Site.title  # operator configuration (site)
+SiteFeatures.integrations  # operator configuration (integrations)
+Snapshot.buildId  # compiled into the binary
+SseHello.buildId  # compiled into the binary
+StatusInstallation.account  # GitHub App installation metadata of a configured source (admin only)
+StatusInstallation.appSlug  # GitHub App installation metadata of a configured source (admin only)
+StatusInstallation.keyFingerprint  # GitHub App installation metadata of a configured source (admin only)
+StatusInstallation.source  # GitHub App installation metadata of a configured source (admin only)
+StatusIntegration.provider  # operator configuration (integrations)
+StatusJobKind.kind  # job kind names compiled in
+StatusJobKind.upstream  # job kind names compiled in
+StatusManifests.disabledParsers  # parser ids compiled in
+StatusTask.name  # task names compiled in
+StatusUpstream.name  # upstream names compiled in
+TechnologySummary.buildTools  # ecosystem and build-tool ids from parsers compiled in
+TechnologySummary.ecosystems  # ecosystem and build-tool ids from parsers compiled in

@@ -1,0 +1,34 @@
+package main
+
+import (
+	"strings"
+	"testing"
+)
+
+// Union-module only (real catalog.Config): a hand-written catalogue section that uses every one-key matcher form loads through
+// the real strict loader. `config lint` must report no "unknown key" for the matcher keys (cross-unit finding U-2).
+func TestUnionCatalogMatchersLoad(t *testing.T) {
+	file := write(t, "catalog.yaml", `catalog:
+  ungrouped: track
+  groups:
+    - id: atlas
+      display_name: Atlas
+      default_repo: Atlas-Gateway
+      match:
+        - prefix: Atlas
+        - exact: Atlas-Client
+        - glob: "*-atlas-*"
+    - id: everything
+      display_name: All repositories
+      default_repo: Atlas-Gateway
+      match: [{catch_all: true}]
+`)
+	code, out, errOut := exec(t, nil, "config", "lint", "--json", file)
+	t.Logf("exit %d, %d bytes of findings", code, len(out))
+	if strings.Contains(out, "unknown key") {
+		t.Fatalf("the matcher mappings do not load through config.Load:\n%s%s", out, errOut)
+	}
+	if code != exitOK && code != exitWarn {
+		t.Fatalf("exit %d\n%s%s", code, out, errOut)
+	}
+}

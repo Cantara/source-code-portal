@@ -1,0 +1,108 @@
+{
+  "parsed": [
+    {
+      "file": "package-lock.json",
+      "parser": "npm/package-lock",
+      "kind": "lockfile",
+      "lockedCount": 1,
+      "properties": {
+        "lock:.:ms": "2.0.0",
+        "lockfileVersion": "3"
+      }
+    },
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:multi",
+          "display": "multi",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:ms",
+          "display": "ms",
+          "requirement": "2.0.0",
+          "version": "2.0.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript",
+        "tool": "yarn",
+        "toolVersion": "1.22.22"
+      }
+    },
+    {
+      "file": "yarn.lock",
+      "parser": "npm/yarn-lock",
+      "kind": "lockfile",
+      "lockedCount": 1,
+      "properties": {
+        "desc:ms@2.0.0": "2.0.0",
+        "lockfileVersion": "1"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)",
+        "yarn.lock (npm/yarn-lock)"
+      ],
+      "provides": [
+        {
+          "id": "npm:multi",
+          "display": "multi",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:ms",
+          "display": "ms",
+          "requirement": "2.0.0",
+          "version": "2.0.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "npm:ms",
+          "version": "2.0.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 4
+        }
+      ],
+      "toolchain": {
+        "language": "javascript",
+        "tool": "yarn",
+        "toolVersion": "1.22.22"
+      },
+      "diagnostics": [
+        {
+          "code": "npm.multiple-lockfiles",
+          "severity": "info",
+          "message": "2 lockfiles; using yarn.lock",
+          "path": "yarn.lock"
+        }
+      ]
+    }
+  ]
+}

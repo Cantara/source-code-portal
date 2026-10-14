@@ -1,0 +1,476 @@
+{
+  "parsed": [
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:Acme/Widget",
+          "display": "@Acme/Widget",
+          "version": "2.3.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:left-pad",
+          "display": "left-pad",
+          "requirement": "1.3.0",
+          "version": "1.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "npm:react",
+          "display": "react",
+          "requirement": "^18.2.0 || ^19.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "npm:string-width",
+          "display": "string-width",
+          "requirement": "npm:string-width@^4.2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "npm:lodash",
+          "display": "lodash",
+          "requirement": "latest",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "npm:my-fork",
+          "display": "my-fork",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "git",
+          "sourceRef": "github:acme/my-fork#v2",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "npm:short-gh",
+          "display": "short-gh",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "git",
+          "sourceRef": "github:acme/short-gh",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "npm:tarball",
+          "display": "tarball",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "url",
+          "sourceRef": "https://example.com/tarballs/t-1.0.0.tgz",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "npm:private-git",
+          "display": "private-git",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "git",
+          "sourceRef": "git+https://github.com/acme/private.git#main",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "npm:local-lib",
+          "display": "local-lib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "path",
+          "confidence": "exact",
+          "line": 16
+        },
+        {
+          "target": "npm:sibling",
+          "display": "sibling",
+          "requirement": "workspace:^",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "project",
+          "sourceRef": "workspace",
+          "confidence": "exact",
+          "line": 17
+        },
+        {
+          "target": "npm:colors",
+          "display": "colors",
+          "requirement": "catalog:",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 18
+        },
+        {
+          "target": "npm:typescript-eslint",
+          "display": "typescript-eslint",
+          "requirement": "catalog:lint",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 19
+        },
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "~5.6.3",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 22
+        },
+        {
+          "target": "npm:vitest",
+          "display": "vitest",
+          "requirement": "=2.1.8",
+          "version": "2.1.8",
+          "resolution": "pinned",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 22
+        },
+        {
+          "target": "npm:react-dom",
+          "display": "react-dom",
+          "requirement": "\u003e=18",
+          "resolution": "declared",
+          "scope": "peer",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 23
+        },
+        {
+          "target": "npm:optional-peer",
+          "display": "optional-peer",
+          "requirement": "*",
+          "resolution": "declared",
+          "scope": "peer",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 23
+        },
+        {
+          "target": "npm:fsevents",
+          "display": "fsevents",
+          "requirement": "^2.3.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 25
+        }
+      ],
+      "properties": {
+        "alias:npm:string-width@^4.2.0": "string-width-cjs",
+        "override:bar": "2.0.0",
+        "override:bar\u003e.": "2.0.0",
+        "override:bar\u003ebaz": "3.0.0",
+        "override:foo": "1.0.0"
+      },
+      "members": [
+        "packages/*",
+        "!packages/extras"
+      ],
+      "toolchain": {
+        "engines.node": "\u003e=20.11",
+        "engines.pnpm": "\u003e=9",
+        "language": "typescript",
+        "tool": "pnpm",
+        "toolVersion": "9.15.4"
+      },
+      "licenses": [
+        "MIT"
+      ],
+      "diagnostics": [
+        {
+          "code": "npm.type-mismatch",
+          "severity": "warning",
+          "message": "dependencies.cmp has an unexpected type and was skipped",
+          "path": "package.json",
+          "line": 20
+        },
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 16
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)"
+      ],
+      "provides": [
+        {
+          "id": "npm:Acme/Widget",
+          "display": "@Acme/Widget",
+          "version": "2.3.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:left-pad",
+          "display": "left-pad",
+          "requirement": "1.3.0",
+          "version": "1.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "npm:react",
+          "display": "react",
+          "requirement": "^18.2.0 || ^19.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "npm:string-width",
+          "display": "string-width",
+          "requirement": "npm:string-width@^4.2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "npm:lodash",
+          "display": "lodash",
+          "requirement": "latest",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "npm:my-fork",
+          "display": "my-fork",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "git",
+          "sourceRef": "github:acme/my-fork#v2",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "npm:short-gh",
+          "display": "short-gh",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "git",
+          "sourceRef": "github:acme/short-gh",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "npm:tarball",
+          "display": "tarball",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "url",
+          "sourceRef": "https://example.com/tarballs/t-1.0.0.tgz",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "npm:private-git",
+          "display": "private-git",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "git",
+          "sourceRef": "git+https://github.com/acme/private.git#main",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "npm:local-lib",
+          "display": "local-lib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "path",
+          "confidence": "exact",
+          "line": 16
+        },
+        {
+          "target": "npm:sibling",
+          "display": "sibling",
+          "requirement": "workspace:^",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "path",
+          "sourceRef": "workspace",
+          "confidence": "exact",
+          "line": 17
+        },
+        {
+          "target": "npm:colors",
+          "display": "colors",
+          "requirement": "catalog:",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 18
+        },
+        {
+          "target": "npm:typescript-eslint",
+          "display": "typescript-eslint",
+          "requirement": "catalog:lint",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 19
+        },
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "~5.6.3",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 22
+        },
+        {
+          "target": "npm:vitest",
+          "display": "vitest",
+          "requirement": "=2.1.8",
+          "version": "2.1.8",
+          "resolution": "pinned",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 22
+        },
+        {
+          "target": "npm:react-dom",
+          "display": "react-dom",
+          "requirement": "\u003e=18",
+          "resolution": "declared",
+          "scope": "peer",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 23
+        },
+        {
+          "target": "npm:optional-peer",
+          "display": "optional-peer",
+          "requirement": "*",
+          "resolution": "declared",
+          "scope": "peer",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 23
+        },
+        {
+          "target": "npm:fsevents",
+          "display": "fsevents",
+          "requirement": "^2.3.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 25
+        }
+      ],
+      "toolchain": {
+        "engines.node": "\u003e=20.11",
+        "engines.pnpm": "\u003e=9",
+        "language": "typescript",
+        "tool": "pnpm",
+        "toolVersion": "9.15.4"
+      },
+      "licenses": [
+        "MIT"
+      ],
+      "diagnostics": [
+        {
+          "code": "npm.type-mismatch",
+          "severity": "warning",
+          "message": "dependencies.cmp has an unexpected type and was skipped",
+          "path": "package.json",
+          "line": 20
+        },
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 16
+        },
+        {
+          "code": "npm.workspace-glob-unmatched",
+          "severity": "info",
+          "message": "pattern \"packages/*\" matched no package.json",
+          "path": "package.json"
+        },
+        {
+          "code": "npm.workspace-ref-unresolved",
+          "severity": "warning",
+          "message": "no workspace package named sibling",
+          "path": "package.json",
+          "line": 17
+        },
+        {
+          "code": "npm.catalog-unavailable",
+          "severity": "info",
+          "message": "no entry for colors in catalog \"default\"",
+          "path": "package.json",
+          "line": 18
+        },
+        {
+          "code": "npm.catalog-unavailable",
+          "severity": "info",
+          "message": "no entry for typescript-eslint in catalog \"lint\"",
+          "path": "package.json",
+          "line": 19
+        }
+      ]
+    }
+  ]
+}

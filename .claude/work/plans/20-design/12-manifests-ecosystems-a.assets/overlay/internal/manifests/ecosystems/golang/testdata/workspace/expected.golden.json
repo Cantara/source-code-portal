@@ -1,0 +1,251 @@
+{
+  "parsed": [
+    {
+      "file": "a/go.mod",
+      "parser": "golang/mod",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "golang:example.com/mono/a",
+          "display": "example.com/mono/a",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:example.com/mono/b",
+          "display": "example.com/mono/b",
+          "requirement": "v0.3.0",
+          "version": "v0.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "golang:golang.org/x/text",
+          "display": "golang.org/x/text",
+          "requirement": "v0.43.0",
+          "version": "v0.43.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        }
+      ],
+      "lockedCount": 2,
+      "toolchain": {
+        "go": "1.25",
+        "language": "go",
+        "tool": "go"
+      }
+    },
+    {
+      "file": "b/go.mod",
+      "parser": "golang/mod",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "golang:example.com/mono/b",
+          "display": "example.com/mono/b",
+          "kind": "library"
+        }
+      ],
+      "toolchain": {
+        "go": "1.25",
+        "language": "go",
+        "tool": "go"
+      }
+    },
+    {
+      "file": "go.work",
+      "parser": "golang/work",
+      "kind": "workspace",
+      "properties": {
+        "replace:golang.org/x/text": "path:tools/text"
+      },
+      "members": [
+        "a",
+        "b",
+        "../outside"
+      ],
+      "toolchain": {
+        "go": "1.25"
+      }
+    },
+    {
+      "file": "tools/go.mod",
+      "parser": "golang/mod",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "golang:example.com/mono/tools",
+          "display": "example.com/mono/tools",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:example.com/mono/b",
+          "display": "example.com/mono/b",
+          "requirement": "v0.2.0",
+          "version": "v0.2.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 4
+        }
+      ],
+      "lockedCount": 1,
+      "toolchain": {
+        "go": "1.25",
+        "language": "go",
+        "tool": "go"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": "a#golang",
+      "ecosystem": "golang",
+      "dir": "a",
+      "role": "primary",
+      "files": [
+        "a/go.mod (golang/mod)",
+        "go.work (golang/work)"
+      ],
+      "provides": [
+        {
+          "id": "golang:example.com/mono/a",
+          "display": "example.com/mono/a",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:example.com/mono/b",
+          "display": "example.com/mono/b",
+          "requirement": "v0.3.0",
+          "version": "v0.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "path",
+          "sourceRef": "b",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "golang:golang.org/x/text",
+          "display": "golang.org/x/text",
+          "requirement": "v0.43.0",
+          "version": "v0.43.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "path",
+          "sourceRef": "tools/text",
+          "confidence": "exact",
+          "line": 7
+        }
+      ],
+      "locked": [
+        {
+          "id": "golang:example.com/mono/b",
+          "version": "v0.3.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 6
+        },
+        {
+          "id": "golang:golang.org/x/text",
+          "version": "v0.43.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 7
+        }
+      ],
+      "toolchain": {
+        "go": "1.25",
+        "language": "go",
+        "tool": "go",
+        "workspace": "go.work",
+        "workspace.go": "1.25"
+      }
+    },
+    {
+      "id": "b#golang",
+      "ecosystem": "golang",
+      "dir": "b",
+      "role": "primary",
+      "files": [
+        "b/go.mod (golang/mod)",
+        "go.work (golang/work)"
+      ],
+      "provides": [
+        {
+          "id": "golang:example.com/mono/b",
+          "display": "example.com/mono/b",
+          "kind": "library"
+        }
+      ],
+      "toolchain": {
+        "go": "1.25",
+        "language": "go",
+        "tool": "go",
+        "workspace": "go.work",
+        "workspace.go": "1.25"
+      }
+    },
+    {
+      "id": "tools#golang",
+      "ecosystem": "golang",
+      "dir": "tools",
+      "role": "primary",
+      "files": [
+        "tools/go.mod (golang/mod)"
+      ],
+      "provides": [
+        {
+          "id": "golang:example.com/mono/tools",
+          "display": "example.com/mono/tools",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:example.com/mono/b",
+          "display": "example.com/mono/b",
+          "requirement": "v0.2.0",
+          "version": "v0.2.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 4
+        }
+      ],
+      "locked": [
+        {
+          "id": "golang:example.com/mono/b",
+          "version": "v0.2.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 4
+        }
+      ],
+      "toolchain": {
+        "go": "1.25",
+        "language": "go",
+        "tool": "go"
+      }
+    }
+  ]
+}

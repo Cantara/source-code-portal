@@ -1,0 +1,9 @@
+[package]
+name = "a"
+version = "0.1.0"
+
+[dependencies]
+serde = { workspace = true, optional = true }
+Tokio_Util.workspace = true
+b.workspace = true
+missing = { workspace = true }

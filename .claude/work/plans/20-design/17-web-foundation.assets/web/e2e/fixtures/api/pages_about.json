@@ -1,0 +1,20 @@
+{
+  "slug": "about",
+  "title": "About",
+  "summary": null,
+  "order": 1,
+  "updatedAt": "2026-10-01T10:00:00Z",
+  "uiUrl": "/pages/about",
+  "apiUrl": "/api/v1/pages/about",
+  "html": "<h2 id=\"doc-purpose\">Purpose</h2><p>Aggregates GitHub repositories. <a href=\"/repos/core-lib\">core-lib</a></p><table><thead><tr><th scope=\"col\">Name</th><th scope=\"col\">Owner</th></tr></thead><tbody><tr><td>core-lib</td><td>platform</td></tr></tbody></table><pre tabindex=\"0\"><code class=\"language-go\">fmt.Println(\"hi\")</code></pre>",
+  "toc": [{ "depth": 2, "text": "Purpose", "id": "doc-purpose" }],
+  "freshness": {
+    "status": "fresh",
+    "kind": "pages.page",
+    "asOf": "2026-10-14T09:00:00Z",
+    "fetchedAt": "2026-10-14T09:00:00Z",
+    "checkedAt": "2026-10-14T09:40:00Z",
+    "staleSince": null,
+    "lastErrorCode": null
+  }
+}

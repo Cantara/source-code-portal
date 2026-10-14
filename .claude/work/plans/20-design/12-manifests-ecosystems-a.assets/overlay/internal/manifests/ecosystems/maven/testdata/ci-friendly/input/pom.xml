@@ -1,0 +1,9 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.acme</groupId>
+  <artifactId>ci-root</artifactId>
+  <version>${revision}${changelist}</version>
+  <packaging>pom</packaging>
+  <modules><module>lib</module></modules>
+  <properties><revision>0.0.0-SNAPSHOT</revision><changelist>-SNAPSHOT</changelist></properties>
+</project>

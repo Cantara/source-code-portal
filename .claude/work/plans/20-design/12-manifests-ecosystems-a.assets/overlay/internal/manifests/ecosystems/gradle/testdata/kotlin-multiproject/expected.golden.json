@@ -1,0 +1,1153 @@
+{
+  "parsed": [
+    {
+      "file": "app/build.gradle.kts",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:libs/plugins.kotlin.jvm",
+          "display": "libs.plugins.kotlin.jvm",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 4
+        },
+        {
+          "target": "maven:libs/plugins.kapt",
+          "display": "libs.plugins.kapt",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 5
+        },
+        {
+          "target": "maven::lib:core",
+          "display": ":lib:core",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "project",
+          "sourceRef": ":lib:core",
+          "confidence": "heuristic",
+          "line": 17
+        },
+        {
+          "target": "maven::tools",
+          "display": ":tools",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "project",
+          "sourceRef": ":tools",
+          "confidence": "heuristic",
+          "line": 18
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-stdlib",
+          "display": "org.jetbrains.kotlin:kotlin-stdlib",
+          "requirement": "${kotlinPluginVersion}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 19
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-reflect",
+          "display": "org.jetbrains.kotlin:kotlin-reflect",
+          "requirement": "2.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 20
+        },
+        {
+          "target": "maven:libs/bundles.ktor",
+          "display": "libs.bundles.ktor",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 21
+        },
+        {
+          "target": "maven:libs/kotlinx.coroutines.core",
+          "display": "libs.kotlinx.coroutines.core",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 22
+        },
+        {
+          "target": "maven:org.jetbrains.kotlinx/kotlinx-coroutines-test",
+          "display": "org.jetbrains.kotlinx:kotlinx-coroutines-test",
+          "requirement": "$coroutinesVersion",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 23
+        },
+        {
+          "target": "maven:org.jetbrains.kotlinx/kotlinx-datetime",
+          "display": "org.jetbrains.kotlinx:kotlinx-datetime",
+          "requirement": "${libs.versions.coroutines.get()}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 24
+        },
+        {
+          "target": "maven:libs/dagger.compiler",
+          "display": "libs.dagger.compiler",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "kapt",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 25
+        },
+        {
+          "target": "maven:libs/dagger",
+          "display": "libs.dagger",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 26
+        },
+        {
+          "target": "maven:libs/managed.lib",
+          "display": "libs.managed.lib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 27
+        },
+        {
+          "target": "maven:libs/does.not.exist",
+          "display": "libs.does.not.exist",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 28
+        },
+        {
+          "target": "maven:otherCatalog/something",
+          "display": "otherCatalog.something",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 29
+        },
+        {
+          "target": "maven:more/junit5",
+          "display": "more.junit5",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 30
+        },
+        {
+          "target": "maven:libs/junit.jupiter",
+          "display": "libs.junit.jupiter",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 31
+        },
+        {
+          "target": "maven:${myLib}",
+          "display": "${myLib}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 32
+        },
+        {
+          "target": "maven:ch.qos.logback/logback-classic",
+          "display": "ch.qos.logback:logback-classic",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "runtimeOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 34
+        },
+        {
+          "target": "maven:io.ktor/ktor-bom",
+          "display": "io.ktor:ktor-bom",
+          "requirement": "3.0.1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "platform:implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 37
+        },
+        {
+          "target": "maven:androidx.compose.ui/ui-tooling",
+          "display": "androidx.compose.ui:ui-tooling",
+          "requirement": "1.7.0",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "debugImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 38
+        },
+        {
+          "target": "maven:com.quoted/call",
+          "display": "com.quoted:call",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 39
+        }
+      ],
+      "properties": {
+        "java": "21",
+        "var:coroutinesVersion": "1.9.0",
+        "var:myLib": "com.example:my-lib:${property(\"myLibVersion\")}"
+      },
+      "toolchain": {
+        "java": "21",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.local-dependency",
+          "severity": "info",
+          "message": "files(...) has no coordinates",
+          "path": "app/build.gradle.kts",
+          "line": 33
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "22 dependencies read lexically from the build script",
+          "path": "app/build.gradle.kts"
+        }
+      ]
+    },
+    {
+      "file": "build.gradle.kts",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:libs/plugins.kotlin.jvm",
+          "display": "libs.plugins.kotlin.jvm",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 2
+        },
+        {
+          "target": "maven:com.diffplug.spotless/com.diffplug.spotless.gradle.plugin",
+          "display": "com.diffplug.spotless:com.diffplug.spotless.gradle.plugin",
+          "requirement": "6.25.0",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 3
+        },
+        {
+          "target": "maven:libs/junit.jupiter",
+          "display": "libs.junit.jupiter",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testImplementation",
+          "condition": "subprojects",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 8
+        }
+      ],
+      "properties": {
+        "all:group": "com.acme.shop",
+        "all:version": "3.2.1",
+        "plugin:com.diffplug.spotless": "6.25.0"
+      },
+      "toolchain": {
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "3 dependencies read lexically from the build script",
+          "path": "build.gradle.kts"
+        }
+      ]
+    },
+    {
+      "file": "gradle.properties",
+      "parser": "gradle/properties",
+      "kind": "workspace",
+      "properties": {
+        "prop:artifactoryPassword": "\u003credacted\u003e",
+        "prop:kotlin.code.style": "official",
+        "prop:myLibVersion": "9.9.9",
+        "prop:org.gradle.jvmargs": "-Xmx2g",
+        "prop:ossrhToken": "\u003credacted\u003e",
+        "prop:signing.password": "\u003credacted\u003e"
+      }
+    },
+    {
+      "file": "gradle/libs.versions.toml",
+      "parser": "gradle/catalog",
+      "kind": "catalog",
+      "dependencies": [
+        {
+          "target": "maven:org.jetbrains.kotlinx/kotlinx-coroutines-core",
+          "display": "kotlinx-coroutines-core",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "sourceRef": "ref:coroutines",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "maven:io.ktor/ktor-server-core",
+          "display": "ktor-server-core",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "sourceRef": "ref:ktor",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "maven:io.ktor/ktor-server-netty",
+          "display": "ktor-server-netty",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "sourceRef": "ref:ktor",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "junit-jupiter",
+          "requirement": "5.11.3",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "maven:com.google.dagger/dagger-compiler",
+          "display": "dagger-compiler",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "sourceRef": "ref:dagger",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "maven:com.google.dagger/dagger",
+          "display": "dagger",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "sourceRef": "ref:dagger",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "maven:com.example/unused",
+          "display": "unused-lib",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "maven:com.example/managed",
+          "display": "managed-lib",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 16
+        },
+        {
+          "target": "maven:com.example/missing-ref",
+          "display": "missing-ref",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-lib",
+          "source": "registry",
+          "sourceRef": "ref:nope",
+          "confidence": "exact",
+          "line": 18
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin.jvm/org.jetbrains.kotlin.jvm.gradle.plugin",
+          "display": "kotlin-jvm",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "catalog-plugin",
+          "source": "registry",
+          "sourceRef": "ref:kotlin",
+          "confidence": "exact",
+          "line": 24
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin.kapt/org.jetbrains.kotlin.kapt.gradle.plugin",
+          "display": "kapt",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "catalog-plugin",
+          "source": "registry",
+          "sourceRef": "ref:kotlin",
+          "confidence": "exact",
+          "line": 25
+        }
+      ],
+      "properties": {
+        "bundle:ktor": "ktor-server-core\tktor-server-netty",
+        "version:coroutines": "1.9.0",
+        "version:dagger": "2.52",
+        "version:junit": "5.11.3",
+        "version:kotlin": "2.0.21",
+        "version:ktor": "[3.0.1]"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.catalog-invalid",
+          "severity": "warning",
+          "message": "libraries broken: missing module or group and name",
+          "path": "gradle/libs.versions.toml",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "file": "lib/core/build.gradle.kts",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:com.squareup.okio/okio",
+          "display": "com.squareup.okio:okio",
+          "requirement": "3.9.1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "api",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 4
+        },
+        {
+          "target": "maven:libs/dagger",
+          "display": "libs.dagger",
+          "resolution": "declared",
+          "scope": "provided",
+          "group": "compileOnly",
+          "source": "registry",
+          "sourceRef": "catalog",
+          "confidence": "heuristic",
+          "line": 5
+        }
+      ],
+      "properties": {
+        "group": "com.acme.shop"
+      },
+      "toolchain": {
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "2 dependencies read lexically from the build script",
+          "path": "lib/core/build.gradle.kts"
+        }
+      ]
+    },
+    {
+      "file": "settings.gradle.kts",
+      "parser": "gradle/settings",
+      "kind": "workspace",
+      "dependencies": [
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "junit5",
+          "requirement": "5.10.2",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog:more:lib",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 17
+        }
+      ],
+      "properties": {
+        "cat:more:version:mockk": "1.13.12",
+        "catalog-file:libs": "gradle/libs.versions.toml",
+        "includeBuild:build-logic": "",
+        "plugin:org.gradle.toolchains.foojay-resolver-convention": "0.8.0",
+        "rootProject.name": "shop"
+      },
+      "members": [
+        ":app",
+        ":lib:core",
+        ":tools"
+      ],
+      "toolchain": {
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.include-build",
+          "severity": "info",
+          "message": "included build build-logic",
+          "path": "settings.gradle.kts",
+          "line": 10
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "1 plugin declarations read lexically from settings",
+          "path": "settings.gradle.kts"
+        }
+      ]
+    },
+    {
+      "file": "tools/build.gradle.kts",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:com.tools/cli",
+          "display": "com.tools:cli",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "1 dependencies read lexically from the build script",
+          "path": "tools/build.gradle.kts"
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#gradle",
+      "ecosystem": "gradle",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "build.gradle.kts (gradle/script)",
+        "settings.gradle.kts (gradle/settings)",
+        "gradle.properties (gradle/properties)",
+        "gradle/libs.versions.toml (gradle/catalog)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme.shop/shop",
+          "display": "com.acme.shop:shop",
+          "version": "3.2.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.jetbrains.kotlin.jvm/org.jetbrains.kotlin.jvm.gradle.plugin",
+          "display": "org.jetbrains.kotlin.jvm:org.jetbrains.kotlin.jvm.gradle.plugin",
+          "requirement": "2.0.21",
+          "version": "2.0.21",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 2
+        },
+        {
+          "target": "maven:com.diffplug.spotless/com.diffplug.spotless.gradle.plugin",
+          "display": "com.diffplug.spotless:com.diffplug.spotless.gradle.plugin",
+          "requirement": "6.25.0",
+          "version": "6.25.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 3
+        },
+        {
+          "target": "maven:com.example/missing-ref",
+          "display": "com.example:missing-ref",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "catalog-unused",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "gradle/libs.versions.toml",
+          "line": 18
+        },
+        {
+          "target": "maven:com.example/unused",
+          "display": "com.example:unused",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "unknown",
+          "group": "catalog-unused",
+          "source": "registry",
+          "confidence": "exact",
+          "locPath": "gradle/libs.versions.toml",
+          "line": 15
+        }
+      ],
+      "members": [
+        "app",
+        "lib",
+        "lib/core",
+        "tools"
+      ],
+      "toolchain": {
+        "dsl": "kotlin",
+        "kotlin": "2.0.21",
+        "language": "kotlin",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "3 dependencies read lexically from the build script",
+          "path": "build.gradle.kts"
+        },
+        {
+          "code": "gradle.include-build",
+          "severity": "info",
+          "message": "included build build-logic",
+          "path": "settings.gradle.kts",
+          "line": 10
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "1 plugin declarations read lexically from settings",
+          "path": "settings.gradle.kts"
+        },
+        {
+          "code": "gradle.catalog-version-missing",
+          "severity": "warning",
+          "message": "version.ref \"nope\" is not defined",
+          "path": "gradle/libs.versions.toml",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "app#gradle",
+      "ecosystem": "gradle",
+      "dir": "app",
+      "role": "primary",
+      "files": [
+        "app/build.gradle.kts (gradle/script)",
+        "gradle.properties (gradle/properties)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme.shop/app",
+          "display": "com.acme.shop:app",
+          "version": "3.2.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.jetbrains.kotlin.jvm/org.jetbrains.kotlin.jvm.gradle.plugin",
+          "display": "org.jetbrains.kotlin.jvm:org.jetbrains.kotlin.jvm.gradle.plugin",
+          "requirement": "2.0.21",
+          "version": "2.0.21",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 4
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin.kapt/org.jetbrains.kotlin.kapt.gradle.plugin",
+          "display": "org.jetbrains.kotlin.kapt:org.jetbrains.kotlin.kapt.gradle.plugin",
+          "requirement": "2.0.21",
+          "version": "2.0.21",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 5
+        },
+        {
+          "target": "maven:com.acme.shop/core",
+          "display": ":lib:core",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "path",
+          "sourceRef": "lib/core",
+          "confidence": "heuristic",
+          "line": 17
+        },
+        {
+          "target": "maven::tools",
+          "display": ":tools",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "path",
+          "sourceRef": "tools",
+          "confidence": "heuristic",
+          "line": 18
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-stdlib",
+          "display": "org.jetbrains.kotlin:kotlin-stdlib",
+          "requirement": "2.0.21",
+          "version": "2.0.21",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 19
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-reflect",
+          "display": "org.jetbrains.kotlin:kotlin-reflect",
+          "requirement": "2.0.0",
+          "version": "2.0.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 20
+        },
+        {
+          "target": "maven:io.ktor/ktor-server-core",
+          "display": "io.ktor:ktor-server-core",
+          "requirement": "[3.0.1]",
+          "version": "3.0.1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 21
+        },
+        {
+          "target": "maven:io.ktor/ktor-server-netty",
+          "display": "io.ktor:ktor-server-netty",
+          "requirement": "[3.0.1]",
+          "version": "3.0.1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 21
+        },
+        {
+          "target": "maven:org.jetbrains.kotlinx/kotlinx-coroutines-core",
+          "display": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+          "requirement": "1.9.0",
+          "version": "1.9.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 22
+        },
+        {
+          "target": "maven:org.jetbrains.kotlinx/kotlinx-coroutines-test",
+          "display": "org.jetbrains.kotlinx:kotlinx-coroutines-test",
+          "requirement": "1.9.0",
+          "version": "1.9.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 23
+        },
+        {
+          "target": "maven:org.jetbrains.kotlinx/kotlinx-datetime",
+          "display": "org.jetbrains.kotlinx:kotlinx-datetime",
+          "requirement": "1.9.0",
+          "version": "1.9.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 24
+        },
+        {
+          "target": "maven:com.google.dagger/dagger-compiler",
+          "display": "com.google.dagger:dagger-compiler",
+          "requirement": "2.52",
+          "version": "2.52",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "kapt",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 25
+        },
+        {
+          "target": "maven:com.google.dagger/dagger",
+          "display": "com.google.dagger:dagger",
+          "requirement": "2.52",
+          "version": "2.52",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 26
+        },
+        {
+          "target": "maven:com.example/managed",
+          "display": "com.example:managed",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 27
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.10.2",
+          "version": "5.10.2",
+          "resolution": "pinned",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 30
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.11.3",
+          "version": "5.11.3",
+          "resolution": "pinned",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 31
+        },
+        {
+          "target": "maven:com.example/my-lib",
+          "display": "com.example:my-lib",
+          "requirement": "9.9.9",
+          "version": "9.9.9",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 32
+        },
+        {
+          "target": "maven:ch.qos.logback/logback-classic",
+          "display": "ch.qos.logback:logback-classic",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "runtimeOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 34
+        },
+        {
+          "target": "maven:io.ktor/ktor-bom",
+          "display": "io.ktor:ktor-bom",
+          "requirement": "3.0.1",
+          "version": "3.0.1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "platform:implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 37
+        },
+        {
+          "target": "maven:androidx.compose.ui/ui-tooling",
+          "display": "androidx.compose.ui:ui-tooling",
+          "requirement": "1.7.0",
+          "version": "1.7.0",
+          "resolution": "pinned",
+          "scope": "dev",
+          "group": "debugImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 38
+        },
+        {
+          "target": "maven:com.quoted/call",
+          "display": "com.quoted:call",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 39
+        }
+      ],
+      "toolchain": {
+        "dsl": "kotlin",
+        "java": "21",
+        "kotlin": "2.0.21",
+        "language": "kotlin",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.local-dependency",
+          "severity": "info",
+          "message": "files(...) has no coordinates",
+          "path": "app/build.gradle.kts",
+          "line": 33
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "22 dependencies read lexically from the build script",
+          "path": "app/build.gradle.kts"
+        },
+        {
+          "code": "gradle.catalog-missing",
+          "severity": "warning",
+          "message": "alias \"does.not.exist\" is not in catalog libs",
+          "path": "app/build.gradle.kts",
+          "line": 28
+        },
+        {
+          "code": "gradle.catalog-missing",
+          "severity": "warning",
+          "message": "catalog \"otherCatalog\" is not defined",
+          "path": "app/build.gradle.kts",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "id": "lib/core#gradle",
+      "ecosystem": "gradle",
+      "dir": "lib/core",
+      "role": "primary",
+      "files": [
+        "lib/core/build.gradle.kts (gradle/script)",
+        "gradle.properties (gradle/properties)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme.shop/core",
+          "display": "com.acme.shop:core",
+          "version": "3.2.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:com.squareup.okio/okio",
+          "display": "com.squareup.okio:okio",
+          "requirement": "3.9.1",
+          "version": "3.9.1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "api",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 4
+        },
+        {
+          "target": "maven:com.google.dagger/dagger",
+          "display": "com.google.dagger:dagger",
+          "requirement": "2.52",
+          "version": "2.52",
+          "resolution": "pinned",
+          "scope": "provided",
+          "group": "compileOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 5
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.11.3",
+          "version": "5.11.3",
+          "resolution": "pinned",
+          "scope": "test",
+          "group": "testImplementation",
+          "condition": "inherited:subprojects",
+          "source": "registry",
+          "confidence": "heuristic",
+          "locPath": "build.gradle.kts",
+          "line": 8
+        }
+      ],
+      "toolchain": {
+        "dsl": "kotlin",
+        "language": "java",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "2 dependencies read lexically from the build script",
+          "path": "lib/core/build.gradle.kts"
+        }
+      ]
+    },
+    {
+      "id": "tools#gradle",
+      "ecosystem": "gradle",
+      "dir": "tools",
+      "role": "primary",
+      "files": [
+        "tools/build.gradle.kts (gradle/script)",
+        "gradle.properties (gradle/properties)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme.shop/tools",
+          "display": "com.acme.shop:tools",
+          "version": "3.2.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:com.tools/cli",
+          "display": "com.tools:cli",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 1
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.11.3",
+          "version": "5.11.3",
+          "resolution": "pinned",
+          "scope": "test",
+          "group": "testImplementation",
+          "condition": "inherited:subprojects",
+          "source": "registry",
+          "confidence": "heuristic",
+          "locPath": "build.gradle.kts",
+          "line": 8
+        }
+      ],
+      "toolchain": {
+        "dsl": "kotlin",
+        "language": "java",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "1 dependencies read lexically from the build script",
+          "path": "tools/build.gradle.kts"
+        }
+      ]
+    }
+  ]
+}

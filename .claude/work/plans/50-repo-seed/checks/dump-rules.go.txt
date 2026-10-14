@@ -1,0 +1,15 @@
+// Copy to cmd/dump/main.go in a SCRATCH COPY of the repository (never commit it), then:
+//   go run ./cmd/dump > rules.json && python3 matrix-compare.py rules.json
+// matrix-compare.py reads 10-architecture.md section 5.2 of the design package (../../10-architecture.md) and compares it with the rows of internal/archtest/rules.go.
+package main
+
+import (
+	"encoding/json"
+	"os"
+
+	"github.com/cantara/source-code-portal/internal/archtest"
+)
+
+func main() {
+	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"rules": archtest.Rules(), "owned": archtest.OwnedImports()})
+}

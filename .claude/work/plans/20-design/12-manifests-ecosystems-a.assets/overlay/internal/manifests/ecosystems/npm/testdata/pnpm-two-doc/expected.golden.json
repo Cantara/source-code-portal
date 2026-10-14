@@ -1,0 +1,116 @@
+{
+  "parsed": [
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:two-doc",
+          "display": "two-doc",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:left-pad",
+          "display": "left-pad",
+          "requirement": "1.3.0",
+          "version": "1.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "properties": {
+        "private": "true"
+      },
+      "toolchain": {
+        "language": "javascript",
+        "tool": "pnpm",
+        "toolVersion": "12.11.2"
+      }
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "parser": "npm/pnpm-lock",
+      "kind": "lockfile",
+      "lockedCount": 1,
+      "properties": {
+        "lock:.:left-pad": "1.3.0",
+        "lockfileVersion": "9.0"
+      },
+      "toolchain": {
+        "tool": "pnpm",
+        "toolVersion": "12.11.2"
+      },
+      "diagnostics": [
+        {
+          "code": "npm.yaml-multi-document",
+          "severity": "info",
+          "message": "2 documents; using the last",
+          "path": "pnpm-lock.yaml",
+          "line": 25
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)",
+        "pnpm-lock.yaml (npm/pnpm-lock)"
+      ],
+      "provides": [
+        {
+          "id": "npm:two-doc",
+          "display": "two-doc",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:left-pad",
+          "display": "left-pad",
+          "requirement": "1.3.0",
+          "version": "1.3.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "npm:left-pad",
+          "version": "1.3.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==",
+          "line": 43
+        }
+      ],
+      "toolchain": {
+        "language": "javascript",
+        "tool": "pnpm",
+        "toolVersion": "12.11.2"
+      },
+      "diagnostics": [
+        {
+          "code": "npm.yaml-multi-document",
+          "severity": "info",
+          "message": "2 documents; using the last",
+          "path": "pnpm-lock.yaml",
+          "line": 25
+        }
+      ]
+    }
+  ]
+}

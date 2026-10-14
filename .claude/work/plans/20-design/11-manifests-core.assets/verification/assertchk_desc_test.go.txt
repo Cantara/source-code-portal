@@ -1,0 +1,21 @@
+package assertchk
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/cantara/source-code-portal/internal/manifests"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+)
+
+func TestDescribe(t *testing.T) {
+	type root struct {
+		Manifests manifests.Config `yaml:"manifests" jsonschema_description:"x"`
+	}
+	_, err := config.Describe(&root{})
+	if err != nil {
+		s := err.Error()
+		t.Logf("%d violations; first 400 chars: %s", strings.Count(s, ";")+1, s[:min(len(s), 600)])
+		t.Fail()
+	}
+}

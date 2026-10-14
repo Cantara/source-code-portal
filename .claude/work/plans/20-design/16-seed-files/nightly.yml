@@ -1,0 +1,168 @@
+# .github/workflows/nightly.yml (design 16 section 4.7). Long-running and network-touching checks that must not block a pull request.
+# A failure opens no issue by itself: the run is red, the owner of the failing area reads it. Nothing here publishes anything.
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"      # 03:17 UTC, off the hour to stay out of the scheduler's rush
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  GOFLAGS: -mod=readonly
+  GOTOOLCHAIN: local
+
+jobs:
+  fuzz:
+    # make fuzz runs the targets one after the other (go test -fuzz takes one target per invocation), so the list is split over
+    # four shards: 8 minutes x ceil(targets / 4) must stay under the job timeout (14 targets per shard is the limit at 120 minutes;
+    # raise SHARDS in the matrix and below when `make fuzz-list | wc -l` passes 4 x 14).
+    name: fuzz (shard ${{ matrix.shard }} of 4, 8 minutes per target)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make fuzz FUZZTIME=8m SHARDS=4 SHARD=${{ matrix.shard }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: fuzz-failures-${{ matrix.shard }}
+          path: "**/testdata/fuzz/**"   # the minimised failing inputs; commit them as regression seeds
+          retention-days: 30
+          if-no-files-found: ignore
+
+  vuln-binary:
+    name: govulncheck on the shipped shape (binary mode) and on the latest release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.node-version
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: main, built as it would ship
+        run: |
+          make build
+          go tool -modfile=tools/go.mod govulncheck -mode=binary bin/scp
+      - name: the latest published release (a vulnerability disclosed after the release shows up here)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)
+          [ -n "$tag" ] || { echo "no release yet"; exit 0; }
+          mkdir rel && gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir rel --pattern '*_linux_amd64.tar.gz'
+          tar -xzf rel/*_linux_amd64.tar.gz -C rel scp
+          go tool -modfile=tools/go.mod govulncheck -mode=binary rel/scp
+
+  api-extended:
+    name: Schemathesis extended against the image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make dev-keys
+      - name: stack
+        run: docker compose -f deploy/compose.dev.yaml up -d --build --wait --wait-timeout 300
+      - name: Schemathesis, ten minutes of stateful and fuzzing phases with a fresh seed
+        run: |
+          python3 -m venv "$RUNNER_TEMP/st"
+          "$RUNNER_TEMP/st/bin/pip" install --quiet 'schemathesis==4.29.4'
+          "$RUNNER_TEMP/st/bin/schemathesis" run http://127.0.0.1:9090/api/v1/openapi.yaml --url http://127.0.0.1:9090 \
+            --seed "$GITHUB_RUN_ID" -n 500 --max-time 600 --checks all
+      - if: failure()
+        run: docker compose -f deploy/compose.dev.yaml logs --no-color
+      - if: always()
+        run: docker compose -f deploy/compose.dev.yaml down -v
+
+  lighthouse:
+    name: Lighthouse on the built binary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.node-version
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: make dev-keys build-fakegithub build
+      - name: stack on loopback with the devtools build (this binary is a test fixture, never shipped)
+        run: |
+          go build -tags spa,devtools -trimpath -o bin/scp-lh ./cmd/scp
+          bin/fakegithub serve --world testdata/worlds/demo --listen 127.0.0.1:9191 --path-prefix /api/v3 > fake.log 2>&1 &
+          SCP_GITHUB_SOURCES_0_AUTH_PRIVATE_KEY_FILE="$PWD/testdata/worlds/demo/app.pem" \
+          SCP_GITHUB_SOURCES_0_WEBHOOK_SECRET=dev-webhook-secret \
+          SCP_STORE_PATH="$RUNNER_TEMP/lh.db" \
+            bin/scp-lh serve --config deploy/dev.yaml > scp.log 2>&1 &
+          for _ in $(seq 120); do curl -fsS http://127.0.0.1:9090/readyz >/dev/null 2>&1 && break; sleep 1; done
+          curl -fsS http://127.0.0.1:9090/readyz
+      - run: |
+          pnpm -C web install --frozen-lockfile
+          pnpm -C web lighthouse http://127.0.0.1:9090
+      - if: failure()
+        run: tail -n 80 scp.log fake.log
+
+  canary:
+    name: manifests canary on public repositories, and the optional scalibr oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: canary (unauthenticated, small list, tolerant of GitHub being down)
+        run: go test -tags canary -count=1 -run Canary ./internal/manifests/...
+      - name: scalibr oracle (separate module; absent until the manifests unit adds it)
+        run: |
+          if [ -f tools/oracle/go.mod ]; then cd tools/oracle && go test -count=1 ./...; else echo "no oracle module"; fi

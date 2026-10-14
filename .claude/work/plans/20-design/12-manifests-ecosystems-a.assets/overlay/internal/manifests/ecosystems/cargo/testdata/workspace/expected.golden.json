@@ -1,0 +1,563 @@
+{
+  "parsed": [
+    {
+      "file": "Cargo.lock",
+      "parser": "cargo/lock",
+      "kind": "lockfile",
+      "lockedCount": 9,
+      "properties": {
+        "local:1": "1",
+        "local:2": "1",
+        "lock.version": "4"
+      }
+    },
+    {
+      "file": "Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "workspace",
+      "dependencies": [
+        {
+          "target": "cargo:serde",
+          "display": "serde",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "workspace.dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "cargo:tokio",
+          "display": "tokio",
+          "requirement": "1.38",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "workspace.dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "cargo:mylib-core",
+          "display": "mylib-core",
+          "requirement": "0.4.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "workspace.dependencies",
+          "source": "path",
+          "sourceRef": "crates/core",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "cargo:regex",
+          "display": "regex",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "workspace.dependencies",
+          "source": "git",
+          "sourceRef": "https://github.com/rust-lang/regex.git#1.10.3",
+          "confidence": "exact",
+          "line": 16
+        }
+      ],
+      "properties": {
+        "exclude:crates/old": "1",
+        "resolver": "2",
+        "workspace.package.edition": "2021",
+        "workspace.package.license": "MIT OR Apache-2.0",
+        "workspace.package.rust-version": "1.78",
+        "workspace.package.version": "0.4.0"
+      },
+      "members": [
+        "crates/*"
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      },
+      "diagnostics": [
+        {
+          "code": "cargo.patch-ignored",
+          "severity": "info",
+          "message": "[patch] and [replace] are not applied",
+          "path": "Cargo.toml"
+        }
+      ]
+    },
+    {
+      "file": "crates/app/Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "cargo:my-app",
+          "display": "my_app",
+          "version": "1.2.0",
+          "kind": "application"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:mylib-core",
+          "display": "mylib-core",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "cargo:serde-json",
+          "display": "serde_json",
+          "requirement": "=1.0.120",
+          "version": "1.0.120",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "cargo:regex",
+          "display": "regex",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "cargo:some-crate",
+          "display": "Some_Crate",
+          "requirement": "2",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "cargo:cc",
+          "display": "cc",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "build-dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 18
+        },
+        {
+          "target": "cargo:missing-in-lock",
+          "display": "missing-in-lock",
+          "requirement": "0.1",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "build-dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 19
+        }
+      ],
+      "properties": {
+        "publish": "false"
+      },
+      "toolchain": {
+        "edition": "2021",
+        "language": "rust",
+        "tool": "cargo"
+      }
+    },
+    {
+      "file": "crates/core/Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "cargo:mylib-core",
+          "display": "mylib-core",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:serde",
+          "display": "serde",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "cargo:thiserror",
+          "display": "thiserror",
+          "requirement": "1.0.50",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "cargo:tokio",
+          "display": "tokio",
+          "requirement": "workspace=true",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "dev-dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "cargo:winapi",
+          "display": "winapi",
+          "requirement": "0.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "condition": "cfg(windows)",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "properties": {
+        "edition.workspace": "true",
+        "license.workspace": "true",
+        "version.workspace": "true"
+      },
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    },
+    {
+      "file": "crates/old/Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "cargo:old-crate",
+          "display": "old-crate",
+          "version": "0.0.1",
+          "kind": "library"
+        }
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#cargo",
+      "ecosystem": "cargo",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "Cargo.toml (cargo/manifest)",
+        "Cargo.lock (cargo/lock)"
+      ],
+      "locked": [
+        {
+          "id": "cargo:cc",
+          "version": "1.0.99",
+          "relationship": "direct",
+          "scope": "build",
+          "integrity": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "line": 5
+        },
+        {
+          "id": "cargo:serde",
+          "version": "1.0.200",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "dependsOn": [
+            2
+          ],
+          "line": 30
+        },
+        {
+          "id": "cargo:serde-derive",
+          "version": "1.0.200",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "line": 39
+        },
+        {
+          "id": "cargo:serde-json",
+          "version": "1.0.120",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "dependsOn": [
+            1
+          ],
+          "line": 45
+        },
+        {
+          "id": "cargo:some-crate",
+          "version": "2.1.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "line": 54
+        },
+        {
+          "id": "cargo:thiserror",
+          "version": "1.0.61",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "line": 60
+        },
+        {
+          "id": "cargo:tokio",
+          "version": "1.38.0",
+          "relationship": "direct",
+          "scope": "test",
+          "integrity": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "line": 66
+        }
+      ],
+      "members": [
+        "crates/app",
+        "crates/core"
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      },
+      "diagnostics": [
+        {
+          "code": "cargo.patch-ignored",
+          "severity": "info",
+          "message": "[patch] and [replace] are not applied",
+          "path": "Cargo.toml"
+        }
+      ]
+    },
+    {
+      "id": "crates/app#cargo",
+      "ecosystem": "cargo",
+      "dir": "crates/app",
+      "role": "primary",
+      "files": [
+        "crates/app/Cargo.toml (cargo/manifest)",
+        "Cargo.toml (cargo/manifest)",
+        "Cargo.lock (cargo/lock)"
+      ],
+      "provides": [
+        {
+          "id": "cargo:my-app",
+          "display": "my_app",
+          "version": "1.2.0",
+          "kind": "application"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:mylib-core",
+          "display": "mylib-core",
+          "requirement": "0.4.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "path",
+          "sourceRef": "crates/core",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "cargo:serde-json",
+          "display": "serde_json",
+          "requirement": "=1.0.120",
+          "version": "1.0.120",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "cargo:regex",
+          "display": "regex",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "source": "git",
+          "sourceRef": "https://github.com/rust-lang/regex.git#1.10.3",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "cargo:some-crate",
+          "display": "Some_Crate",
+          "requirement": "2",
+          "version": "2.1.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "cargo:cc",
+          "display": "cc",
+          "requirement": "1.0",
+          "version": "1.0.99",
+          "resolution": "locked",
+          "scope": "build",
+          "group": "build-dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 18
+        },
+        {
+          "target": "cargo:missing-in-lock",
+          "display": "missing-in-lock",
+          "requirement": "0.1",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "build-dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 19
+        }
+      ],
+      "toolchain": {
+        "edition": "2021",
+        "language": "rust",
+        "tool": "cargo"
+      },
+      "diagnostics": [
+        {
+          "code": "cargo.lock-stale",
+          "severity": "warning",
+          "message": "missing-in-lock is declared in crates/app/Cargo.toml but missing from the lock",
+          "path": "crates/app/Cargo.toml"
+        }
+      ]
+    },
+    {
+      "id": "crates/core#cargo",
+      "ecosystem": "cargo",
+      "dir": "crates/core",
+      "role": "primary",
+      "files": [
+        "crates/core/Cargo.toml (cargo/manifest)",
+        "Cargo.toml (cargo/manifest)",
+        "Cargo.lock (cargo/lock)"
+      ],
+      "provides": [
+        {
+          "id": "cargo:mylib-core",
+          "display": "mylib-core",
+          "version": "0.4.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "cargo:serde",
+          "display": "serde",
+          "requirement": "1",
+          "version": "1.0.200",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "cargo:thiserror",
+          "display": "thiserror",
+          "requirement": "1.0.50",
+          "version": "1.0.61",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "cargo:tokio",
+          "display": "tokio",
+          "requirement": "1.38",
+          "version": "1.38.0",
+          "resolution": "locked",
+          "scope": "test",
+          "group": "dev-dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "cargo:winapi",
+          "display": "winapi",
+          "requirement": "0.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "dependencies",
+          "optional": true,
+          "condition": "cfg(windows)",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "toolchain": {
+        "edition": "2021",
+        "language": "rust",
+        "tool": "cargo"
+      },
+      "licenses": [
+        "MIT OR Apache-2.0"
+      ]
+    },
+    {
+      "id": "crates/old#cargo",
+      "ecosystem": "cargo",
+      "dir": "crates/old",
+      "role": "primary",
+      "files": [
+        "crates/old/Cargo.toml (cargo/manifest)"
+      ],
+      "provides": [
+        {
+          "id": "cargo:old-crate",
+          "display": "old-crate",
+          "version": "0.0.1",
+          "kind": "library"
+        }
+      ],
+      "toolchain": {
+        "language": "rust",
+        "tool": "cargo"
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "id": 5001, "owner": "acme", "name": "payments-api", "visibility": "public", "default_branch": "main",
+  "description": "Payments service", "topics": ["payments", "java"], "license": "Apache-2.0", "stars": 12,
+  "open_issues": 3, "open_prs": 2, "created_at": "2024-01-10T09:00:00Z",
+  "commits": [
+    { "message": "Initial commit\n\nScaffold", "author": { "name": "Ada Lovelace", "login": "ada", "email": "ada@example.org" },
+      "date": "2024-01-10T09:00:00Z",
+      "files": { "README.md": "@files/README.md", "pom.xml": "@files/pom.xml", "docs/overview.md": "# Overview\n" } },
+    { "message": "Add architecture notes", "author": { "name": "Grace Hopper", "login": "grace", "email": "grace@example.org" },
+      "date": "2024-02-01T12:30:00Z", "files": { "docs/architecture.md": "# Architecture\n" } },
+    { "message": "Dependabot bump", "author": { "name": "dependabot[bot]", "login": "", "email": "" },
+      "date": "2024-03-05T08:00:00Z", "no_author_user": true, "files": { "docs/overview.md": "# Overview\n\nUpdated.\n" } },
+    { "message": "Commit without author block", "author": { "name": "Unknown", "login": "", "email": "" },
+      "date": "2024-03-06T08:00:00Z", "no_commit_author": true, "files": { "CHANGELOG.md": "# Changelog\n" } }
+  ],
+  "releases": [ { "tag": "v1.0.0", "name": "1.0.0", "published_at": "2024-02-02T10:00:00Z" } ]
+}

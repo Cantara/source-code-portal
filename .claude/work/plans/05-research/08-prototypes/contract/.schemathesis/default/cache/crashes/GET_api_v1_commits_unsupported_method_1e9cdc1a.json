@@ -1,0 +1,93 @@
+{
+  "operation": "GET /api/v1/commits",
+  "method": "TRACE",
+  "path_template": "/api/v1/commits",
+  "fingerprint": "1e9cdc1a",
+  "case_id": "A74Nqt",
+  "code_sample": "curl -X TRACE -H 'If-None-Match;' 'http://127.0.0.1:9191/api/v1/commits?limit=50&cursor=&group='",
+  "sequence": [
+    {
+      "method": "TRACE",
+      "url": "http://127.0.0.1:9191/api/v1/commits?limit=50&cursor=&group=",
+      "url_template": "http://127.0.0.1:9191/api/v1/commits",
+      "headers": {
+        "User-Agent": "schemathesis/4.31.0",
+        "Accept-Encoding": "gzip, deflate, zstd",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "If-None-Match": "",
+        "X-Schemathesis-TestCaseId": "A74Nqt",
+        "Content-Length": "0"
+      },
+      "response": {
+        "status_code": 405,
+        "headers": {
+          "content-type": "application/problem+json",
+          "date": "Tue, 13 Oct 2026 21:33:42 GMT",
+          "content-length": "106"
+        },
+        "body": "{\"detail\":\"method not allowed\",\"status\":405,\"title\":\"Invalid request\",\"type\":\"/problems/invalid-request\"}\n"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "unsupported_method",
+          "status": "failure",
+          "message": "Unsupported methods\n\nTRACE returned 405 without required `Allow` header\n\nAdd `Allow` header listing supported methods (required by RFC 9110)"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 4.708999767899513e-06,
+          "mode": "negative"
+        },
+        "components": {
+          "HEADER": "positive",
+          "QUERY": "positive"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "Unspecified HTTP method: TRACE",
+            "location": null,
+            "parameter": null,
+            "parameter_location": null,
+            "scenario": "unspecified_http_method"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {
+          "HEADER": {
+            "If-None-Match": ""
+          },
+          "QUERY": {
+            "limit": 50,
+            "cursor": "",
+            "group": ""
+          }
+        }
+      },
+      "path": "/api/v1/commits",
+      "path_parameters": {},
+      "query": {
+        "limit": "50",
+        "cursor": "",
+        "group": ""
+      },
+      "case_headers": {
+        "If-None-Match": ""
+      },
+      "cookies": {},
+      "case_body": {
+        "encoding": "none"
+      },
+      "media_type": null,
+      "parent_index": null
+    }
+  ]
+}

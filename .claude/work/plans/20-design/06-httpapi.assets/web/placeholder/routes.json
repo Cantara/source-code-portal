@@ -1,0 +1,13 @@
+{"version":1,"buildId":"placeholder","routes":[
+{"pattern":"/dashboard","listeners":["public"]},
+{"pattern":"/groups/{groupId}","listeners":["public"]},
+{"pattern":"/groups/{groupId}/commits","listeners":["public"]},
+{"pattern":"/commits","listeners":["public"]},
+{"pattern":"/repos/{repo}","listeners":["public"]},
+{"pattern":"/repos/{repo}/docs/{path...}","listeners":["public"]},
+{"pattern":"/repos/{repo}/commits","listeners":["public"]},
+{"pattern":"/repos/{repo}/dependencies","listeners":["public"]},
+{"pattern":"/dependencies","listeners":["public"]},
+{"pattern":"/packages","listeners":["public"]},
+{"pattern":"/pages/{slug}","listeners":["public"]},
+{"pattern":"/status","listeners":["admin"]}]}

@@ -1,0 +1,39 @@
+# .github/workflows/nightly.yml (design 16 section 4.7), STUB of bootstrap step 1 (task B-3): one real job that needs nothing but Go.
+# The full file (fuzz shards, Schemathesis extended, Lighthouse, manifests canary) is .github/workflow-stages/nightly.full.yml; its jobs
+# move here as their subjects land. A failure opens no issue by itself: the run is red, the owner of the failing area reads it.
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"      # 03:17 UTC, off the hour to stay out of the scheduler's rush
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  GOFLAGS: -mod=readonly
+  GOTOOLCHAIN: local
+
+jobs:
+  vuln-binary:
+    name: govulncheck on the built binary (the toolchain itself is part of the binary)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - run: make build-go
+      - run: go tool -modfile=tools/go.mod govulncheck -mode=binary bin/scp-placeholder

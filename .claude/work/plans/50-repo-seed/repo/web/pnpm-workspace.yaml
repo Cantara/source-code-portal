@@ -1,0 +1,10 @@
+# pnpm 12 reads its settings from here (it ignores most .npmrc keys). Supply-chain policy of design 16 section 4.6:
+# a version younger than seven days is not installable, a package may not drop to weaker trust evidence than its previous version,
+# transitive dependencies may not come from git or tarball URLs, and install scripts run only for packages listed below.
+minimumReleaseAge: 10080 # minutes = 7 days
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 129600 # minutes = 90 days: older releases are not held to the trust-downgrade check
+blockExoticSubdeps: true
+strictDepBuilds: true
+allowBuilds: # a package gets true here only after its install script was read (review in the PR)
+  unrs-resolver: false # optional native resolver of eslint-import-resolver-typescript; the JS fallback is used

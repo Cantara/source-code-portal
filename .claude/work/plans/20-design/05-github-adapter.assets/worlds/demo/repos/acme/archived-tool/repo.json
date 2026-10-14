@@ -1,0 +1,7 @@
+{
+  "id": 5003, "owner": "acme", "name": "archived-tool", "visibility": "private", "default_branch": "master",
+  "description": "Private tool (must be hidden under public_only)", "archived": true, "created_at": "2019-05-01T09:00:00Z",
+  "commits": [
+    { "message": "Old code", "author": { "name": "Linus", "login": "linus" }, "date": "2019-05-01T09:00:00Z", "files": { "README": "archived\n" } }
+  ]
+}

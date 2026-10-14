@@ -1,0 +1,7 @@
+{
+  "name": "Source Code Portal",
+  "short_name": "SCP",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

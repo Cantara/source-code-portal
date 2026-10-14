@@ -1,0 +1,2 @@
+import {createRoot} from 'react-dom/client'; import React from 'react'; import {IntlProvider,FormattedMessage} from 'react-intl';
+createRoot(document.getElementById('r')).render(<IntlProvider locale="en" messages={{hello:'Hello {name}',n:'{count, plural, one {# repo} other {# repos}}'}}><FormattedMessage id="hello" values={{name:'x'}}/><FormattedMessage id="n" values={{count:2}}/></IntlProvider>);

@@ -1,0 +1,36 @@
+{
+  "name": "scp-web-pages-compilecheck",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen:api": "redocly bundle ../../api/openapi-admin.yaml -o .tmp/openapi.admin.bundled.yaml && openapi-typescript .tmp/openapi.admin.bundled.yaml -o src/lib/api/schema.d.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.104.1",
+    "@tanstack/react-router": "1.170.41",
+    "@tanstack/react-table": "9.2.6",
+    "@types/d3-force": "3.0.10",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "d3-force": "3.0.0",
+    "graphology": "0.26.0",
+    "graphology-types": "^0.24.8",
+    "openapi-fetch": "0.17.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "sigma": "3.0.3",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.59.0",
+    "@types/node": "24.19.1",
+    "@types/trusted-types": "2.0.7",
+    "jsdom": "26.1.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vite": "^8.3.3",
+    "vitest": "5.0.3"
+  }
+}

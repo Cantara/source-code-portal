@@ -1,0 +1,169 @@
+{
+  "parsed": [
+    {
+      "file": ".mvn/maven.config",
+      "parser": "maven/config",
+      "kind": "workspace",
+      "properties": {
+        "profiles": "native,!slow",
+        "prop:build.label": "release candidate",
+        "prop:changelist": "",
+        "prop:revision": "1.4.2"
+      }
+    },
+    {
+      "file": "lib/pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:lib",
+          "display": "lib",
+          "kind": "library"
+        }
+      ],
+      "parent": {
+        "target": "maven:com.acme/ci-root",
+        "requirement": "${revision}${changelist}",
+        "resolution": "declared",
+        "scope": "unknown",
+        "group": "parent",
+        "source": "registry",
+        "confidence": "exact",
+        "line": 3
+      },
+      "dependencies": [
+        {
+          "target": "maven:com.acme/ci-root-api",
+          "display": "com.acme:ci-root-api",
+          "requirement": "${project.parent.version}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "maven:${project.groupId}/sibling",
+          "display": "${project.groupId}:sibling",
+          "requirement": "${revision}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        }
+      ],
+      "properties": {
+        "packaging": "jar",
+        "parent.relativePath": "../pom.xml",
+        "parent.relativePath.default": "true"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    },
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/ci-root",
+          "display": "ci-root",
+          "version": "${revision}${changelist}",
+          "kind": "library"
+        }
+      ],
+      "properties": {
+        "packaging": "pom",
+        "prop:changelist": "-SNAPSHOT",
+        "prop:revision": "0.0.0-SNAPSHOT"
+      },
+      "members": [
+        "lib"
+      ],
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)",
+        ".mvn/maven.config (maven/config)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/ci-root",
+          "display": "com.acme:ci-root",
+          "version": "1.4.2",
+          "kind": "library"
+        }
+      ],
+      "members": [
+        "lib"
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "pom",
+        "tool": "maven"
+      }
+    },
+    {
+      "id": "lib#maven",
+      "ecosystem": "maven",
+      "dir": "lib",
+      "role": "primary",
+      "files": [
+        "lib/pom.xml (maven/pom)",
+        "pom.xml (maven/pom)",
+        ".mvn/maven.config (maven/config)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/lib",
+          "display": "com.acme:lib",
+          "version": "1.4.2",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:com.acme/ci-root-api",
+          "display": "com.acme:ci-root-api",
+          "requirement": "1.4.2",
+          "version": "1.4.2",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "maven:com.acme/sibling",
+          "display": "com.acme:sibling",
+          "requirement": "1.4.2",
+          "version": "1.4.2",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        }
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      }
+    }
+  ]
+}

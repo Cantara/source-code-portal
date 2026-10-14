@@ -1,0 +1,15 @@
+# runtime requirements
+-r requirements/base.txt
+-c requirements/constraints.txt
+--index-url https://user:pw@pypi.example.org/simple
+flask>=2.0 ; python_version >= "3.8"   # web
+SQLAlchemy[asyncio]==2.0.30 \
+    --hash=sha256:aaaa \
+    --hash=sha256:bbbb
+./vendor/localpkg
+-e git+https://token:x@github.com/acme/tools.git@main#egg=acme_tools
+https://example.org/pkgs/wheel_pkg-1.0-py3-none-any.whl
+requests==2.*
+-r ../outside.txt
+-r other.txt
+uvicorn[standard]==${UVICORN_VERSION}

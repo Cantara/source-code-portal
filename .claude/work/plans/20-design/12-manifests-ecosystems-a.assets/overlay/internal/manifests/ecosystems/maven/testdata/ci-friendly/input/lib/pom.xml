@@ -1,0 +1,9 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>com.acme</groupId><artifactId>ci-root</artifactId><version>${revision}${changelist}</version></parent>
+  <artifactId>lib</artifactId>
+  <dependencies>
+    <dependency><groupId>com.acme</groupId><artifactId>ci-root-api</artifactId><version>${project.parent.version}</version></dependency>
+    <dependency><groupId>${project.groupId}</groupId><artifactId>sibling</artifactId><version>${revision}</version></dependency>
+  </dependencies>
+</project>

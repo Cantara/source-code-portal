@@ -1,0 +1,39 @@
+openapi: 3.1.0
+info: { title: commits, version: 1.0.0 }
+paths:
+  /api/v1/commits:
+    get:
+      operationId: listCommits
+      tags: [commits]
+      parameters:
+        - $ref: '../../httpapi/openapi/common.yaml#/components/parameters/Limit'
+        - $ref: '../../httpapi/openapi/common.yaml#/components/parameters/Cursor'
+        - name: repo
+          in: query
+          schema: { type: string, maxLength: 100, pattern: '^[A-Za-z0-9._-]+$' }
+        - $ref: '../../httpapi/openapi/common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag:
+              $ref: '../../httpapi/openapi/common.yaml#/components/headers/ETag'
+            Link:
+              $ref: '../../httpapi/openapi/common.yaml#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, freshness]
+                properties:
+                  items:
+                    type: array
+                    items: { type: object, required: [sha], properties: { sha: { type: string } } }
+                  page:
+                    $ref: '../../httpapi/openapi/common.yaml#/components/schemas/PageInfo'
+                  freshness:
+                    $ref: '../../httpapi/openapi/common.yaml#/components/schemas/Freshness'
+        '304':
+          $ref: '../../httpapi/openapi/common.yaml#/components/responses/NotModified'
+        default:
+          $ref: '../../httpapi/openapi/common.yaml#/components/responses/Problem'

@@ -1,0 +1,482 @@
+{
+  "$id": "https://github.com/Cantara/source-code-portal/schemas/config-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "log": {
+      "additionalProperties": false,
+      "description": "Logging.",
+      "properties": {
+        "add_source": {
+          "default": false,
+          "description": "Add the source file and line to every record.",
+          "type": "boolean",
+          "x-scp-env": "SCP_LOG_ADD_SOURCE"
+        },
+        "format": {
+          "default": "json",
+          "description": "json for production, text for a developer terminal.",
+          "enum": [
+            "json",
+            "text"
+          ],
+          "type": "string",
+          "x-scp-env": "SCP_LOG_FORMAT"
+        },
+        "level": {
+          "default": "info",
+          "description": "Minimum level that is written.",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "type": "string",
+          "x-scp-env": "SCP_LOG_LEVEL"
+        }
+      },
+      "type": "object",
+      "x-scp-owner": "github.com/cantara/source-code-portal/internal/platform/logx"
+    },
+    "ratelimit": {
+      "additionalProperties": false,
+      "description": "Keyed rate limiter.",
+      "properties": {
+        "api": {
+          "default": "300/min burst 100",
+          "description": "Class api: /api/v1/*.",
+          "pattern": "^[0-9]+/(s|min|h)( burst [0-9]+)?$",
+          "type": "string",
+          "x-scp-env": "SCP_RATELIMIT_API"
+        },
+        "badges": {
+          "default": "120/min burst 60",
+          "description": "Class badge: GET /badges/*.",
+          "pattern": "^[0-9]+/(s|min|h)( burst [0-9]+)?$",
+          "type": "string",
+          "x-scp-env": "SCP_RATELIMIT_BADGES"
+        },
+        "csp_reports": {
+          "default": "30/min burst 10",
+          "description": "Class csp: POST /csp-reports.",
+          "pattern": "^[0-9]+/(s|min|h)( burst [0-9]+)?$",
+          "type": "string",
+          "x-scp-env": "SCP_RATELIMIT_CSP_REPORTS"
+        },
+        "idle_ttl": {
+          "default": "10m",
+          "description": "A key idle for this long is evicted by the sweeper.",
+          "examples": [
+            "500ms",
+            "30s",
+            "5m"
+          ],
+          "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "x-scp-env": "SCP_RATELIMIT_IDLE_TTL",
+          "x-scp-max": "24h0m0s",
+          "x-scp-min": "10s"
+        },
+        "max_keys": {
+          "default": 50000,
+          "description": "Upper bound on tracked client keys per limiter class; excess keys share an overflow bucket.",
+          "maximum": 5000000,
+          "minimum": 1000,
+          "type": "integer",
+          "x-scp-env": "SCP_RATELIMIT_MAX_KEYS"
+        },
+        "media_ext": {
+          "default": "60/min burst 20",
+          "description": "Class media_ext: /media/ext/* (external image proxy).",
+          "pattern": "^[0-9]+/(s|min|h)( burst [0-9]+)?$",
+          "type": "string",
+          "x-scp-env": "SCP_RATELIMIT_MEDIA_EXT"
+        },
+        "sse_per_ip": {
+          "default": 4,
+          "description": "Concurrent SSE streams per client IP.",
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer",
+          "x-scp-env": "SCP_RATELIMIT_SSE_PER_IP"
+        },
+        "webhook_invalid": {
+          "default": "10/min burst 10",
+          "description": "Invalid webhook signatures allowed per client IP before 429. Valid HMACs are never limited.",
+          "pattern": "^[0-9]+/(s|min|h)( burst [0-9]+)?$",
+          "type": "string",
+          "x-scp-env": "SCP_RATELIMIT_WEBHOOK_INVALID"
+        }
+      },
+      "type": "object",
+      "x-scp-owner": "github.com/cantara/source-code-portal/internal/platform/httpx"
+    },
+    "server": {
+      "additionalProperties": false,
+      "description": "HTTP listeners.",
+      "properties": {
+        "admin": {
+          "additionalProperties": false,
+          "description": "Admin listener: metrics, pprof and operator endpoints. Bind to a restricted network.",
+          "properties": {
+            "allowed_hosts": {
+              "default": [],
+              "description": "Optional Host header allow-list for the admin listener (host or host:port, case-insensitive); a request with another Host gets 421. A defence against DNS rebinding from an operator's browser. Empty means no check.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-scp-env": "SCP_SERVER_ADMIN_ALLOWED_HOSTS"
+            },
+            "bearer_token": {
+              "additionalProperties": false,
+              "description": "Optional bearer token required on every admin request except the probes (file reference or SCP_SERVER_ADMIN_BEARER_TOKEN[_FILE]). Empty means network restriction only.",
+              "properties": {
+                "file": {
+                  "description": "Absolute path of a file that holds the secret.",
+                  "pattern": "^/",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "file"
+              ],
+              "type": "object",
+              "x-scp-env": "SCP_SERVER_ADMIN_BEARER_TOKEN"
+            },
+            "listen": {
+              "default": ":9091",
+              "description": "Listen address host:port. Never expose publicly.",
+              "type": "string",
+              "x-scp-env": "SCP_SERVER_ADMIN_LISTEN"
+            }
+          },
+          "type": "object"
+        },
+        "public": {
+          "additionalProperties": false,
+          "description": "Public listener: SPA, API, badges, media, webhooks, probes.",
+          "properties": {
+            "hsts": {
+              "default": false,
+              "description": "Send Strict-Transport-Security on HTTPS requests. Leave false when the TLS-terminating proxy owns HSTS.",
+              "type": "boolean",
+              "x-scp-env": "SCP_SERVER_PUBLIC_HSTS"
+            },
+            "listen": {
+              "default": ":9090",
+              "description": "Listen address host:port. An empty host binds every interface.",
+              "type": "string",
+              "x-scp-env": "SCP_SERVER_PUBLIC_LISTEN"
+            },
+            "public_url": {
+              "default": "",
+              "description": "External https URL of the portal, used for absolute links, webhook URLs and the CSRF trusted origin. Empty means relative links only.",
+              "type": "string",
+              "x-scp-env": "SCP_SERVER_PUBLIC_PUBLIC_URL"
+            },
+            "trusted_proxies": {
+              "default": [],
+              "description": "CIDRs or addresses of reverse proxies whose X-Forwarded-For and X-Forwarded-Proto are believed for the client IP. 0.0.0.0/0 and ::/0 are refused. Independent of access.trusted_proxies.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-scp-env": "SCP_SERVER_PUBLIC_TRUSTED_PROXIES"
+            }
+          },
+          "type": "object"
+        },
+        "timeouts": {
+          "additionalProperties": false,
+          "description": "http.Server timeouts shared by both listeners.",
+          "properties": {
+            "idle": {
+              "default": "120s",
+              "description": "Keep-alive idle timeout.",
+              "examples": [
+                "500ms",
+                "30s",
+                "5m"
+              ],
+              "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "x-scp-env": "SCP_SERVER_TIMEOUTS_IDLE",
+              "x-scp-max": "1h0m0s",
+              "x-scp-min": "1s"
+            },
+            "max_header_bytes": {
+              "default": "16KiB",
+              "description": "Maximum request header size.",
+              "pattern": "^[0-9]+(B|KiB|MiB|GiB)?$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "x-scp-env": "SCP_SERVER_TIMEOUTS_MAX_HEADER_BYTES",
+              "x-scp-max": "1048576 bytes",
+              "x-scp-min": "1024 bytes"
+            },
+            "max_header_values": {
+              "default": 100,
+              "description": "Maximum number of header values in one request (Go 1.27 MaxHeaderValueCount).",
+              "maximum": 4096,
+              "minimum": 16,
+              "type": "integer",
+              "x-scp-env": "SCP_SERVER_TIMEOUTS_MAX_HEADER_VALUES"
+            },
+            "read": {
+              "default": "30s",
+              "description": "Time allowed to read the whole request.",
+              "examples": [
+                "500ms",
+                "30s",
+                "5m"
+              ],
+              "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "x-scp-env": "SCP_SERVER_TIMEOUTS_READ",
+              "x-scp-max": "10m0s",
+              "x-scp-min": "1s"
+            },
+            "read_header": {
+              "default": "5s",
+              "description": "Time allowed to read request headers.",
+              "examples": [
+                "500ms",
+                "30s",
+                "5m"
+              ],
+              "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "x-scp-env": "SCP_SERVER_TIMEOUTS_READ_HEADER",
+              "x-scp-max": "1m0s",
+              "x-scp-min": "100ms"
+            },
+            "write": {
+              "default": "60s",
+              "description": "Time allowed to write the response. Streaming handlers extend it per response.",
+              "examples": [
+                "500ms",
+                "30s",
+                "5m"
+              ],
+              "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "x-scp-env": "SCP_SERVER_TIMEOUTS_WRITE",
+              "x-scp-max": "10m0s",
+              "x-scp-min": "1s"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-scp-owner": "github.com/cantara/source-code-portal/internal/platform/httpx"
+    },
+    "shutdown": {
+      "additionalProperties": false,
+      "description": "Graceful shutdown budget.",
+      "properties": {
+        "drain_delay": {
+          "default": "5s",
+          "description": "After SIGTERM, /readyz turns 503 and the process keeps serving for this long so load balancers stop sending traffic.",
+          "examples": [
+            "500ms",
+            "30s",
+            "5m"
+          ],
+          "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "x-scp-env": "SCP_SHUTDOWN_DRAIN_DELAY",
+          "x-scp-max": "2m0s",
+          "x-scp-min": "0s"
+        },
+        "server_timeout": {
+          "default": "15s",
+          "description": "Grace for in-flight HTTP requests; the public and admin listeners stop together within it.",
+          "examples": [
+            "500ms",
+            "30s",
+            "5m"
+          ],
+          "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "x-scp-env": "SCP_SHUTDOWN_SERVER_TIMEOUT",
+          "x-scp-max": "5m0s",
+          "x-scp-min": "1s"
+        },
+        "store_timeout": {
+          "default": "3s",
+          "description": "Grace for the store to flush planner state and close.",
+          "examples": [
+            "500ms",
+            "30s",
+            "5m"
+          ],
+          "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "x-scp-env": "SCP_SHUTDOWN_STORE_TIMEOUT",
+          "x-scp-max": "5m0s",
+          "x-scp-min": "1s"
+        },
+        "telemetry_timeout": {
+          "default": "2s",
+          "description": "Grace for the final metric and trace flush.",
+          "examples": [
+            "500ms",
+            "30s",
+            "5m"
+          ],
+          "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+          "type": "string",
+          "x-scp-env": "SCP_SHUTDOWN_TELEMETRY_TIMEOUT",
+          "x-scp-max": "1m0s",
+          "x-scp-min": "1s"
+        }
+      },
+      "type": "object",
+      "x-scp-owner": "github.com/cantara/source-code-portal/internal/platform/lifecycle"
+    },
+    "telemetry": {
+      "additionalProperties": false,
+      "description": "Metrics, traces and OTLP export.",
+      "properties": {
+        "otlp": {
+          "additionalProperties": false,
+          "description": "Optional OTLP/HTTP export of traces, metrics and logs.",
+          "properties": {
+            "allow_private_cidrs": {
+              "default": [],
+              "description": "CIDRs the collector may live in when it is on a private network (cmd/scp builds the netguard policy). A /0 range is refused.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-scp-env": "SCP_TELEMETRY_OTLP_ALLOW_PRIVATE_CIDRS"
+            },
+            "enabled": {
+              "default": false,
+              "description": "Export over OTLP/HTTP. Off by default.",
+              "type": "boolean",
+              "x-scp-env": "SCP_TELEMETRY_OTLP_ENABLED"
+            },
+            "endpoint": {
+              "default": "",
+              "description": "Collector base URL, for example https://otel.example.com:4318. Required when enabled.",
+              "type": "string",
+              "x-scp-env": "SCP_TELEMETRY_OTLP_ENDPOINT"
+            },
+            "headers_file": {
+              "default": "",
+              "description": "Absolute path of a file with one Name: value header per line (credentials live here, not in the config file).",
+              "type": "string",
+              "x-scp-env": "SCP_TELEMETRY_OTLP_HEADERS_FILE"
+            },
+            "ports": {
+              "default": [],
+              "description": "Extra destination ports besides 80 and 443, for example 4318.",
+              "items": {
+                "type": "integer"
+              },
+              "type": "array",
+              "x-scp-env": "SCP_TELEMETRY_OTLP_PORTS"
+            },
+            "signals": {
+              "additionalProperties": false,
+              "description": "Which signals to export.",
+              "properties": {
+                "logs": {
+                  "default": false,
+                  "description": "Export logs (bridged from slog by cmd/scp).",
+                  "type": "boolean",
+                  "x-scp-env": "SCP_TELEMETRY_OTLP_SIGNALS_LOGS"
+                },
+                "metrics": {
+                  "default": true,
+                  "description": "Export metrics.",
+                  "type": "boolean",
+                  "x-scp-env": "SCP_TELEMETRY_OTLP_SIGNALS_METRICS"
+                },
+                "traces": {
+                  "default": true,
+                  "description": "Export traces.",
+                  "type": "boolean",
+                  "x-scp-env": "SCP_TELEMETRY_OTLP_SIGNALS_TRACES"
+                }
+              },
+              "type": "object"
+            },
+            "timeout": {
+              "default": "10s",
+              "description": "Per-export timeout.",
+              "examples": [
+                "500ms",
+                "30s",
+                "5m"
+              ],
+              "pattern": "^-?([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+              "type": "string",
+              "x-scp-env": "SCP_TELEMETRY_OTLP_TIMEOUT",
+              "x-scp-max": "2m0s",
+              "x-scp-min": "1s"
+            }
+          },
+          "type": "object"
+        },
+        "prometheus": {
+          "default": true,
+          "description": "Serve Prometheus metrics at GET /metrics on the admin listener.",
+          "type": "boolean",
+          "x-scp-env": "SCP_TELEMETRY_PROMETHEUS"
+        },
+        "runtime": {
+          "additionalProperties": false,
+          "description": "Go runtime metrics.",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Emit go.* runtime metrics.",
+              "type": "boolean",
+              "x-scp-env": "SCP_TELEMETRY_RUNTIME_ENABLED"
+            }
+          },
+          "type": "object"
+        },
+        "traces": {
+          "additionalProperties": false,
+          "description": "Trace sampling.",
+          "properties": {
+            "sample_ratio": {
+              "default": 0.1,
+              "description": "Parent-based head sampling ratio for root spans, 0 to 1.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number",
+              "x-scp-env": "SCP_TELEMETRY_TRACES_SAMPLE_RATIO"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-scp-owner": "github.com/cantara/source-code-portal/internal/platform/telemetry"
+    },
+    "version": {
+      "default": 1,
+      "description": "Config schema version. Must be 1.",
+      "enum": [
+        1
+      ],
+      "type": "integer",
+      "x-scp-env": "SCP_VERSION",
+      "x-scp-owner": ""
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "Source Code Portal configuration (version 1)",
+  "type": "object"
+}

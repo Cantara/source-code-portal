@@ -1,0 +1,17 @@
+# The fake GitHub (cmd/fakegithub) as a container, for compose.dev.yaml. Development and tests only: it is never pushed or released.
+FROM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
+WORKDIR /src
+ENV GOFLAGS=-mod=readonly CGO_ENABLED=0
+COPY go.mod go.sum ./
+RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod go mod download
+COPY . .
+RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod --mount=type=cache,id=go-build,target=/root/.cache/go-build \
+    go build -trimpath -o /out/fakegithub ./cmd/fakegithub
+
+# Runtime = the build image itself (alpine: busybox `nc` for the compose healthcheck). Development only, so size does not matter.
+FROM build
+RUN cp /out/fakegithub /fakegithub
+USER 65532:65532
+EXPOSE 9191
+ENTRYPOINT ["/fakegithub"]
+CMD ["serve", "--world", "/world", "--listen", "0.0.0.0:9191", "--allow-remote", "--path-prefix", "/api/v3", "--control"]

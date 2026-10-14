@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scp.example.org/schemas/scp/v1.json",
+  "title": "SCP repository descriptor, schema 1",
+  "description": "Optional per-repository metadata for the Source Code Portal. File name: scp.yaml (or .github/scp.yaml).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema"],
+  "properties": {
+    "schema": { "const": 1, "description": "Major version of this schema. Additive changes keep 1." },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120, "description": "Display name. Default: repository name." },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 300, "description": "One plain-text sentence or two. Used on cards and in llms.txt." },
+    "type": { "enum": ["service", "library", "website", "tool", "documentation", "other"], "description": "Backstage spec.type well-known values (service, website, library) plus tool, documentation, other." },
+    "lifecycle": { "enum": ["experimental", "production", "deprecated"], "description": "Backstage spec.lifecycle well-known values." },
+    "owners": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/owner" }, "description": "CODEOWNERS syntax: @user or @org/team. Default: catch-all owners in CODEOWNERS." },
+    "system": { "$ref": "#/$defs/slug", "description": "Hint for grouping. Backstage spec.system. Portal config stays authoritative for group membership." },
+    "tags": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "$ref": "#/$defs/tag" }, "description": "Backstage tag syntax. Merged with GitHub topics." },
+    "links": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/link" } },
+    "docs": { "$ref": "#/$defs/docs" },
+    "apis": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/api" } },
+    "dependsOn": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/repoRef" }, "description": "Explicit repository dependencies. Merged with dependencies derived from package manifests." },
+    "integrations": { "$ref": "#/$defs/integrations" },
+    "hidden": { "type": "boolean", "default": false, "description": "Omit from lists, navigation, llms.txt and the sitemap. Does not change access control." }
+  },
+  "$defs": {
+    "slug": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 63 },
+    "tag": { "type": "string", "pattern": "^[a-z0-9:+#]+(-[a-z0-9:+#]+)*$", "maxLength": 63 },
+    "owner": { "type": "string", "pattern": "^@[A-Za-z0-9]([A-Za-z0-9-]{0,38})(/[A-Za-z0-9._-]{1,100})?$" },
+    "repoRef": { "type": "string", "pattern": "^([A-Za-z0-9-]{1,39}/)?[A-Za-z0-9._-]{1,100}$" },
+    "docPath": { "type": "string", "maxLength": 300, "pattern": "^[A-Za-z0-9._@+-][A-Za-z0-9._@+ /-]*\\.(md|markdown|adoc|asciidoc)$", "description": "Repository-relative, forward slashes. Loader also rejects '..' segments." },
+    "httpsUrl": { "type": "string", "format": "uri", "maxLength": 2000, "pattern": "^https://" },
+    "link": {
+      "type": "object", "additionalProperties": false, "required": ["url"],
+      "properties": {
+        "url": { "$ref": "#/$defs/httpsUrl" },
+        "title": { "type": "string", "maxLength": 120 },
+        "type": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$", "description": "Well-known: runbook, dashboard, issues, chat, status, api, docs, source, release, contact. Free-form otherwise (Backstage links[].type)." }
+      }
+    },
+    "navItem": {
+      "oneOf": [
+        { "$ref": "#/$defs/docPath" },
+        { "type": "object", "additionalProperties": false, "required": ["path"],
+          "properties": { "path": { "$ref": "#/$defs/docPath" }, "title": { "type": "string", "maxLength": 120 } } },
+        { "type": "object", "additionalProperties": false, "required": ["title", "items"],
+          "properties": { "title": { "type": "string", "maxLength": 120 },
+                          "items": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/navItem" } } } }
+      ]
+    },
+    "docs": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "root": { "type": "string", "maxLength": 200, "pattern": "^[A-Za-z0-9._@+-][A-Za-z0-9._@+ /-]*$", "default": "docs", "description": "Directory scanned for documents. README is always discovered through GitHub's readme endpoint." },
+        "include": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 200 }, "default": ["**/*.md"] },
+        "exclude": { "type": "array", "maxItems": 50, "items": { "type": "string", "maxLength": 200 } },
+        "nav": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/navItem" }, "description": "Explicit order. Documents not listed follow, ordered by front-matter order then path." }
+      }
+    },
+    "api": {
+      "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": {
+        "type": { "enum": ["openapi", "asyncapi", "graphql", "grpc", "other"] },
+        "title": { "type": "string", "maxLength": 120 },
+        "path": { "type": "string", "maxLength": 300, "pattern": "^[A-Za-z0-9._@+-][A-Za-z0-9._@+ /-]*$" },
+        "url": { "$ref": "#/$defs/httpsUrl" }
+      },
+      "oneOf": [ { "required": ["path"] }, { "required": ["url"] } ]
+    },
+    "integrations": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "jenkins": { "type": "object", "additionalProperties": false, "required": ["job"],
+          "properties": { "instance": { "$ref": "#/$defs/slug", "description": "Name of an instance defined in portal config." },
+                          "job": { "type": "string", "maxLength": 300, "pattern": "^[A-Za-z0-9._ /-]+$" } } },
+        "snyk": { "type": "object", "additionalProperties": false, "required": ["project"],
+          "properties": { "project": { "type": "string", "maxLength": 100, "pattern": "^[A-Za-z0-9._-]+$" } } }
+      }
+    }
+  }
+}

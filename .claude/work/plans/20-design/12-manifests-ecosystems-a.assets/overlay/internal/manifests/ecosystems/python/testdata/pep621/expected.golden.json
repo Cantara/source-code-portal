@@ -1,0 +1,359 @@
+{
+  "parsed": [
+    {
+      "file": "pyproject.toml",
+      "parser": "pypi/pyproject",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "pypi:acme-billing-service",
+          "display": "Acme_Billing.Service",
+          "version": "2.3.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:hatchling",
+          "display": "hatchling",
+          "requirement": "\u003e=1.21",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "build-system.requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        },
+        {
+          "target": "pypi:hatch-vcs",
+          "display": "hatch-vcs",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "build-system.requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        },
+        {
+          "target": "pypi:django-foo-bar",
+          "display": "Django_Foo.Bar",
+          "requirement": "\u003e=4.2,\u003c5",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "condition": "python_version \u003e= '3.10'",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "requirement": "\u003e=2.31",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "pypi:pydantic",
+          "display": "pydantic",
+          "requirement": "==2.7.1",
+          "version": "2.7.1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "pypi:acme-core",
+          "display": "acme-core",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "git",
+          "sourceRef": "git+https://github.com/acme/core.git@v1.2",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "pypi:redis",
+          "display": "redis",
+          "requirement": "\u003e=5",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "redis",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 20
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e7",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 23
+        },
+        {
+          "target": "pypi:coverage",
+          "display": "coverage",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 24
+        },
+        {
+          "target": "pypi:coverage",
+          "display": "coverage",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "coverage",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 24
+        },
+        {
+          "target": "pypi:sphinx",
+          "display": "sphinx",
+          "requirement": "\u003c9",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "docs",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 25
+        }
+      ],
+      "toolchain": {
+        "build_backend": "hatchling.build",
+        "language": "python",
+        "python": "\u003e=3.10"
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "diagnostics": [
+        {
+          "code": "python.requirement-invalid",
+          "severity": "warning",
+          "message": "cannot parse requirement \"not a valid requirement !!\"",
+          "path": "pyproject.toml",
+          "line": 16
+        },
+        {
+          "code": "python.group-cycle",
+          "severity": "warning",
+          "message": "include-group cycle at loop-a",
+          "path": "pyproject.toml",
+          "line": 26
+        },
+        {
+          "code": "python.group-cycle",
+          "severity": "warning",
+          "message": "include-group cycle at loop-b",
+          "path": "pyproject.toml",
+          "line": 27
+        },
+        {
+          "code": "python.group-missing",
+          "severity": "warning",
+          "message": "include-group names unknown group nope",
+          "path": "pyproject.toml",
+          "line": 28
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#pypi",
+      "ecosystem": "pypi",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pyproject.toml (pypi/pyproject)"
+      ],
+      "provides": [
+        {
+          "id": "pypi:acme-billing-service",
+          "display": "Acme_Billing.Service",
+          "version": "2.3.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:hatchling",
+          "display": "hatchling",
+          "requirement": "\u003e=1.21",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "build-system.requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        },
+        {
+          "target": "pypi:hatch-vcs",
+          "display": "hatch-vcs",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "build-system.requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        },
+        {
+          "target": "pypi:django-foo-bar",
+          "display": "Django_Foo.Bar",
+          "requirement": "\u003e=4.2,\u003c5",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "condition": "python_version \u003e= '3.10'",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "requirement": "\u003e=2.31",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "pypi:pydantic",
+          "display": "pydantic",
+          "requirement": "==2.7.1",
+          "version": "2.7.1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "pypi:acme-core",
+          "display": "acme-core",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "dependencies",
+          "source": "git",
+          "sourceRef": "git+https://github.com/acme/core.git@v1.2",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "pypi:redis",
+          "display": "redis",
+          "requirement": "\u003e=5",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "redis",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 20
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e7",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 23
+        },
+        {
+          "target": "pypi:coverage",
+          "display": "coverage",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "test",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 24
+        },
+        {
+          "target": "pypi:coverage",
+          "display": "coverage",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "coverage",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 24
+        },
+        {
+          "target": "pypi:sphinx",
+          "display": "sphinx",
+          "requirement": "\u003c9",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "docs",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 25
+        }
+      ],
+      "toolchain": {
+        "build_backend": "hatchling.build",
+        "language": "python",
+        "python": "\u003e=3.10",
+        "tool": "pip"
+      },
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "diagnostics": [
+        {
+          "code": "python.requirement-invalid",
+          "severity": "warning",
+          "message": "cannot parse requirement \"not a valid requirement !!\"",
+          "path": "pyproject.toml",
+          "line": 16
+        },
+        {
+          "code": "python.group-cycle",
+          "severity": "warning",
+          "message": "include-group cycle at loop-a",
+          "path": "pyproject.toml",
+          "line": 26
+        },
+        {
+          "code": "python.group-cycle",
+          "severity": "warning",
+          "message": "include-group cycle at loop-b",
+          "path": "pyproject.toml",
+          "line": 27
+        },
+        {
+          "code": "python.group-missing",
+          "severity": "warning",
+          "message": "include-group names unknown group nope",
+          "path": "pyproject.toml",
+          "line": 28
+        }
+      ]
+    }
+  ]
+}

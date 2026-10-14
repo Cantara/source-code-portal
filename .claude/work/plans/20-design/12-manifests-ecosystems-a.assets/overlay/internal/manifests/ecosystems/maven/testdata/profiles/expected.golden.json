@@ -1,0 +1,220 @@
+{
+  "parsed": [
+    {
+      "file": ".mvn/maven.config",
+      "parser": "maven/config",
+      "kind": "workspace",
+      "properties": {
+        "profiles": "fast",
+        "prop:env.type": "ci"
+      }
+    },
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/prof",
+          "display": "prof",
+          "version": "1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:x/db-${db}",
+          "display": "x:db-${db}",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "maven:x/d1",
+          "display": "x:d1",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "unknown",
+          "condition": "profile:default-on",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "maven:x/fast-dep",
+          "display": "x:fast-dep",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "unknown",
+          "condition": "profile:fast",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "maven:x/ci-dep",
+          "display": "x:ci-dep",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "unknown",
+          "condition": "profile:ci",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "maven:x/local-dep",
+          "display": "x:local-dep",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "unknown",
+          "condition": "profile:not-ci",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "maven:x/jdk21-dep",
+          "display": "x:jdk21-dep",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "unknown",
+          "condition": "profile:jdk21",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 16
+        }
+      ],
+      "properties": {
+        "packaging": "jar",
+        "profile-ids": "default-on\tfast\tci\tnot-ci\tjdk21\twindows",
+        "profile:ci:property": "env.type=ci",
+        "profile:default-on:activeByDefault": "true",
+        "profile:fast:prop:db": "postgres",
+        "profile:jdk21:jdk": "[21,)",
+        "profile:not-ci:property": "!env.type=",
+        "profile:windows:os": "|windows||",
+        "prop:db": "h2"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)",
+        ".mvn/maven.config (maven/config)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/prof",
+          "display": "com.acme:prof",
+          "version": "1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:x/db-postgres",
+          "display": "x:db-postgres",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "maven:x/d1",
+          "display": "x:d1",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "condition": "profile:default-on",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "maven:x/fast-dep",
+          "display": "x:fast-dep",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "condition": "profile:fast=active",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "maven:x/ci-dep",
+          "display": "x:ci-dep",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "condition": "profile:ci=active",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "maven:x/local-dep",
+          "display": "x:local-dep",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "condition": "profile:not-ci",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 14
+        },
+        {
+          "target": "maven:x/jdk21-dep",
+          "display": "x:jdk21-dep",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "condition": "profile:jdk21",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 16
+        }
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      },
+      "diagnostics": [
+        {
+          "code": "maven.profile-unknown",
+          "severity": "info",
+          "message": "profile jdk21 has an activation that is not evaluated",
+          "path": "pom.xml"
+        },
+        {
+          "code": "maven.profile-unknown",
+          "severity": "info",
+          "message": "profile windows has an activation that is not evaluated",
+          "path": "pom.xml"
+        }
+      ]
+    }
+  ]
+}

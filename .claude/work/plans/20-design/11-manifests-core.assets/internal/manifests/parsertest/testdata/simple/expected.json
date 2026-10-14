@@ -1,0 +1,26 @@
+{
+  "parsed": {
+    "Dependencies": [
+      {
+        "e": "npm",
+        "n": "core",
+        "req": "^1"
+      },
+      {
+        "e": "npm",
+        "n": "x",
+        "req": "^1"
+      }
+    ],
+    "Provides": [
+      {
+        "ID": {
+          "Ecosystem": "npm",
+          "Name": "app"
+        },
+        "Kind": "library"
+      }
+    ]
+  },
+  "schema": 1
+}

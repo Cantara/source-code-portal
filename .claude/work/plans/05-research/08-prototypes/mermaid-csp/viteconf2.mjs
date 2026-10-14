@@ -1,0 +1,1 @@
+import {build} from 'vite'; await build({root:'mm2',configFile:false,logLevel:'warn',base:'./',build:{outDir:'../out/mm2',emptyOutDir:true,rollupOptions:{input:{index:'mm2/index.html',frame:'mm2/frame.html'}}}});

@@ -1,0 +1,460 @@
+{
+  "parsed": [
+    {
+      "file": "requirements.txt",
+      "parser": "pypi/requirements",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "pypi:flask",
+          "display": "flask",
+          "requirement": "\u003e=2.0",
+          "resolution": "declared",
+          "scope": "unknown",
+          "condition": "python_version \u003e= \"3.8\"",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "pypi:sqlalchemy",
+          "display": "SQLAlchemy",
+          "requirement": "==2.0.30",
+          "version": "2.0.30",
+          "resolution": "pinned",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "pypi:acme-tools",
+          "display": "acme_tools",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "git",
+          "sourceRef": "git+https://github.com/acme/tools.git@main#egg=acme_tools",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "pypi:wheel-pkg",
+          "display": "wheel_pkg",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "url",
+          "sourceRef": "https://example.org/pkgs/wheel_pkg-1.0-py3-none-any.whl",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "requirement": "==2.*",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "pypi:uvicorn",
+          "display": "uvicorn",
+          "requirement": "==${UVICORN_VERSION}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "properties": {
+        "constraint:requirements/constraints.txt": "c",
+        "include:../outside.txt": "r",
+        "include:other.txt": "r",
+        "include:requirements/base.txt": "r"
+      },
+      "includes": [
+        "requirements/base.txt",
+        "requirements/constraints.txt",
+        "../outside.txt",
+        "other.txt"
+      ],
+      "diagnostics": [
+        {
+          "code": "python.option-ignored",
+          "severity": "info",
+          "message": "option --index-url ignored",
+          "path": "requirements.txt",
+          "line": 4
+        },
+        {
+          "code": "python.unnamed-requirement",
+          "severity": "info",
+          "message": "requirement \"./vendor/localpkg\" has no package name",
+          "path": "requirements.txt",
+          "line": 9
+        },
+        {
+          "code": "python.env-var",
+          "severity": "info",
+          "message": "environment variable reference left unexpanded",
+          "path": "requirements.txt",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "file": "requirements/base.txt",
+      "parser": "pypi/requirements",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "pypi:click",
+          "display": "click",
+          "requirement": "\u003e=8",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "pypi:rich",
+          "display": "rich",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "file": "requirements/constraints.txt",
+      "parser": "pypi/constraints",
+      "kind": "catalog",
+      "dependencies": [
+        {
+          "target": "pypi:click",
+          "display": "click",
+          "requirement": "==8.1.7",
+          "version": "8.1.7",
+          "resolution": "pinned",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "pypi:rich",
+          "display": "rich",
+          "requirement": "==13.7.1",
+          "version": "13.7.1",
+          "resolution": "pinned",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "file": "requirements/dev.txt",
+      "parser": "pypi/requirements",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e=8",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "pypi:black",
+          "display": "black",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        }
+      ],
+      "properties": {
+        "include:base.txt": "r"
+      },
+      "includes": [
+        "base.txt"
+      ]
+    },
+    {
+      "file": "svc/requirements.in",
+      "parser": "pypi/requirements",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "pypi:flask",
+          "display": "flask",
+          "requirement": "\u003e=3",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "pypi:click",
+          "display": "click",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "file": "svc/requirements.txt",
+      "parser": "pypi/requirements",
+      "kind": "lockfile",
+      "lockedCount": 3
+    }
+  ],
+  "units": [
+    {
+      "id": ".#pypi",
+      "ecosystem": "pypi",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "requirements.txt (pypi/requirements)",
+        "requirements/constraints.txt (pypi/constraints)",
+        "requirements/base.txt (pypi/requirements)",
+        "requirements/base.txt (pypi/requirements)",
+        "requirements/dev.txt (pypi/requirements)"
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:flask",
+          "display": "flask",
+          "requirement": "\u003e=2.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "requirements.txt",
+          "condition": "python_version \u003e= \"3.8\"",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "pypi:sqlalchemy",
+          "display": "SQLAlchemy",
+          "requirement": "==2.0.30",
+          "version": "2.0.30",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "requirements.txt",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "pypi:acme-tools",
+          "display": "acme_tools",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "requirements.txt",
+          "source": "git",
+          "sourceRef": "git+https://github.com/acme/tools.git@main#egg=acme_tools",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "pypi:wheel-pkg",
+          "display": "wheel_pkg",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "requirements.txt",
+          "source": "url",
+          "sourceRef": "https://example.org/pkgs/wheel_pkg-1.0-py3-none-any.whl",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "requirement": "==2.*",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "requirements.txt",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "pypi:uvicorn",
+          "display": "uvicorn",
+          "requirement": "==${UVICORN_VERSION}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "requirements.txt",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        },
+        {
+          "target": "pypi:click",
+          "display": "click",
+          "requirement": "\u003e=8",
+          "version": "8.1.7",
+          "resolution": "managed",
+          "scope": "runtime",
+          "group": "base.txt",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "pypi:rich",
+          "display": "rich",
+          "version": "13.7.1",
+          "resolution": "managed",
+          "scope": "runtime",
+          "group": "base.txt",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "\u003e=8",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "dev.txt",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 1
+        },
+        {
+          "target": "pypi:black",
+          "display": "black",
+          "resolution": "declared",
+          "scope": "dev",
+          "group": "dev.txt",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 2
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "tool": "pip"
+      },
+      "diagnostics": [
+        {
+          "code": "python.option-ignored",
+          "severity": "info",
+          "message": "option --index-url ignored",
+          "path": "requirements.txt",
+          "line": 4
+        },
+        {
+          "code": "python.unnamed-requirement",
+          "severity": "info",
+          "message": "requirement \"./vendor/localpkg\" has no package name",
+          "path": "requirements.txt",
+          "line": 9
+        },
+        {
+          "code": "python.env-var",
+          "severity": "info",
+          "message": "environment variable reference left unexpanded",
+          "path": "requirements.txt",
+          "line": 15
+        },
+        {
+          "code": "python.include-outside-repo",
+          "severity": "warning",
+          "message": "../outside.txt escapes the repository",
+          "path": "requirements.txt"
+        },
+        {
+          "code": "python.include-not-candidate",
+          "severity": "warning",
+          "message": "other.txt is not among the parsed files (only requirements*.txt, requirements*.in, constraints*.txt, constraints*.in and requirements/*.txt are read)",
+          "path": "requirements.txt"
+        }
+      ]
+    },
+    {
+      "id": "svc#pypi",
+      "ecosystem": "pypi",
+      "dir": "svc",
+      "role": "primary",
+      "files": [
+        "svc/requirements.in (pypi/requirements)",
+        "svc/requirements.txt (pypi/requirements)"
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:flask",
+          "display": "flask",
+          "requirement": "\u003e=3",
+          "version": "3.0.3",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "requirements.in",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "pypi:click",
+          "display": "click",
+          "version": "8.1.7",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "requirements.in",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 2
+        }
+      ],
+      "locked": [
+        {
+          "id": "pypi:click",
+          "version": "8.1.7",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:cccc",
+          "line": 7
+        },
+        {
+          "id": "pypi:flask",
+          "version": "3.0.3",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:dddd",
+          "line": 12
+        },
+        {
+          "id": "pypi:werkzeug",
+          "version": "3.0.3",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha256:eeee",
+          "line": 15
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "tool": "pip"
+      }
+    }
+  ]
+}

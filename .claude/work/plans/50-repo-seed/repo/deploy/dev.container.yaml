@@ -1,0 +1,45 @@
+# Containerised development, end-to-end tests and the image smoke test (design 16 sections 4.8 and 4.11): the portal image and the
+# fake GitHub share a docker network, the fake answers as `fakegithub:9191` on a private address, which is allowed by the ordinary
+# per-source switch `allow_private_addresses` (no devtools build, the artefact under test is the artefact that ships).
+# The demo App key and webhook secret are mounted at the paths below by compose.dev.yaml and by deploy/smoke.sh.
+version: 1
+
+server:
+  public: { listen: ":9090", public_url: "http://127.0.0.1:9090" }
+  admin:  { listen: ":9091", bearer_token: { file: /run/secrets/scp-admin-token } }
+
+log: { level: info, format: json }
+
+store:
+  path: /data/scp.db
+  backup: { enabled: true }                # hourly and at shutdown; the smoke test checks the shutdown copy (/data/scp.db.bak)
+
+refresh: { grace: 5s }
+
+shutdown: { drain_delay: 1s }
+
+github:
+  sources:
+    - id: acme
+      host: { kind: ghes, web_url: "http://fakegithub:9191", api_url: "http://fakegithub:9191/api/v3" }
+      network: { allow_private_addresses: true, allow_insecure_http: true }
+      auth:
+        kind: github_app
+        app_id: 4242
+        client_id: Iv1.demo4242
+        private_key: { file: /run/secrets/scp-demo-app.pem }
+        installations: { mode: allow_list, accounts: [acme] }
+      webhook:
+        secret: { file: /run/secrets/scp-demo-webhook }
+        public_url: "http://127.0.0.1:9090/webhooks/github/acme"
+      discovery: { mode: installation, visibility: public_only, reconcile_every: 1m }
+      acquisition: { mode: api, graphql: off, webhook_assisted: true }
+
+catalog:
+  groups:
+    - id: demo
+      display_name: Demo
+      description: Every repository of the demo world
+      match: [ { catch_all: true } ]
+
+access: { mode: public }

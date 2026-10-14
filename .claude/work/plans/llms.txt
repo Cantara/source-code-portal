@@ -1,0 +1,79 @@
+# Source Code Portal (SCP): design package
+
+> Complete design for SCP as a single static Go binary with an embedded React + shadcn/ui + TypeScript SPA, GitHub App first, package-by-feature with an enforced dependency rule. Build it in a new repository from these documents. Precedence when documents disagree: 04-decisions.md (including section 7) over 10-architecture.md over 11-adr over 20-design over research. The design guardrails in 02-design-guardrails.md are binding. Do not invent packages, config keys, metrics or routes: add them to the catalogue that owns them.
+
+## Start here
+
+- [README.md](README.md): Index, user guide, reading order for agents, document table, glossary, product behaviour highlights, and the open owner confirmations with defaults.
+- [04-decisions.md](04-decisions.md): Binding decision record: principles, scope, Q-01..Q-25, D-01..D-17, amendments A-01..A-33 in section 7.
+- [02-design-guardrails.md](02-design-guardrails.md): Binding GR-nn principles, each with its structural prevention.
+- [10-architecture.md](10-architecture.md): Binding architecture: package map, rank table and allowed-import matrix (section 5), Go signatures (section 8), data model, runtime, HTTP surface, frontend, risks W1..W22.
+
+## Decisions (ADRs)
+
+- [ADR-001 Layout and dependency rule](11-adr/ADR-001-package-by-feature-layout-and-dependency-rule.md): Package by feature, kernel and ranks, no feature imports a feature.
+- [ADR-024 Cross-feature communication](11-adr/ADR-024-cross-feature-communication.md): Snapshot, consumer interfaces and bridges, job specs, events.
+- [ADR-018 Boundary enforcement](11-adr/ADR-018-boundary-enforcement.md): Closed-world archtest and generated depguard rules.
+- [ADR-002 Read model and store](11-adr/ADR-002-readmodel-snapshot-and-sqlite-store.md): Immutable snapshot, SQLite last-good cache.
+- [ADR-003 Sync engine](11-adr/ADR-003-sync-engine-build-in-house.md): In-house level-triggered engine tested with synctest.
+- [ADR-004 GitHub client and auth](11-adr/ADR-004-github-client-and-auth.md): Own thin client, GitHub App first, REST plus GraphQL.
+- [ADR-005 Markdown pipeline](11-adr/ADR-005-markdown-rendering-and-sanitising-pipeline.md): goldmark to SafeHTML.
+- [ADR-006 Doc format and descriptor](11-adr/ADR-006-documentation-format-and-repository-descriptor.md): CommonMark + GFM and scp.yaml.
+- [ADR-007 LLM surface](11-adr/ADR-007-llm-surface.md): llms.txt family, raw Markdown, JSON.
+- [ADR-019 Frontend](11-adr/ADR-019-frontend-react-shadcn-typescript.md): React, shadcn/ui, TypeScript SPA.
+- [ADR-020 API contract](11-adr/ADR-020-api-contract-openapi-first.md): OpenAPI 3.1 spec-first, generated both sides.
+- [ADR-025 Security model](11-adr/ADR-025-security-model.md): Trust zones, SSRF guard, visibility as a control.
+
+## Unit designs (build one at a time; each has types, behaviour, config, tests, traceability)
+
+- [01 Kernel](20-design/01-kernel.md): scm, freshness, job, reactor, routes, safehtml.
+- [02 Platform](20-design/02-platform.md): secret, logx, config, telemetry, httpx, netguard, lifecycle.
+- [03 Read model and store](20-design/03-readmodel-store.md): Snapshot slots, SQLite store, conformance suite.
+- [04 Refresh and webhook](20-design/04-refresh-webhook.md): Engine, planner, scheduler, gate, webhook receiver.
+- [05 GitHub adapter](20-design/05-github-adapter.md): Client, auth strategies, rate state, fake GitHub.
+- [06 HTTP API foundation](20-design/06-httpapi.md): Problem details, pagination, ETag, authz, validation.
+- [07 OpenAPI contract](20-design/07-openapi-contract.md): Contract sources, bundling, codegen pipeline.
+- [07 Endpoint catalogue](20-design/07-openapi-contract-catalogue.md): Every /api/v1 operation.
+- [08 Catalog](20-design/08-catalog.md): Sources, groups, matchers, reconcile.
+- [09 Commits and badges](20-design/09-commits-badges.md): Commit ingestion and local SVG badges.
+- [10 Docs, pages, media](20-design/10-docs-pages-media.md): Rendering, descriptor, pages, image proxy.
+- [11 Manifests core](20-design/11-manifests-core.md): Model, registry, acquisition, org graph.
+- [12 Manifest parsers A](20-design/12-manifests-ecosystems-a.md): golang, npm, python, maven, gradle, cargo.
+- [13 Manifest parsers B](20-design/13-manifests-ecosystems-b.md): nuget, ruby, php, swift, cocoapods, dart, elixir, docker, actions, terraform, helm, providers.
+- [14 Integrations and access](20-design/14-integrations-access.md): Jenkins, Snyk, trusted-proxy access.
+- [15 Live, ops, overview](20-design/15-live-ops-overview.md): Snapshot polling and SSE, probes, llms.txt composition.
+- [16 cmd/scp, build, CI, release](20-design/16-cmd-build-release.md): Composition root, archtest, bootstrap order, image, release.
+- [17 Web foundation](20-design/17-web-foundation.md): web/ tooling and shared layers.
+- [18 Web pages](20-design/18-web-pages.md): Feature pages and components.
+
+## Single-source catalogues
+
+- [Config keys](20-design/90-config-reference.md): All 370 configuration keys with owner, default, env name.
+- [Metrics](20-design/91-metrics-catalogue.md): All metric instruments, units and labels.
+- [Errors](20-design/92-error-catalogue.md): ErrCode vocabulary and 19 problem codes.
+- [Deviations and open questions](20-design/93-deviations-and-open-questions.md): Consolidated decisions, owner list, index of 549 unit rows.
+- [Routes table](20-design/01-kernel.routes.tsv): Route names, methods, patterns, classes.
+- [OpenAPI public](20-design/api/openapi-public.yaml): Public bundled contract source.
+- [OpenAPI admin](20-design/api/openapi-admin.yaml): Admin bundled contract source.
+- [Repository seed files](20-design/16-seed-files/Makefile): Makefile, CI, GoReleaser, Dockerfiles, k8s example, Renovate; copy verbatim to the new repo root (see the directory 20-design/16-seed-files/).
+
+## Plans
+
+- [Implementation plan](40-implementation-plan.md): Build order and milestones.
+- [Test plan](41-test-plan.md): Test strategy and gates.
+- [Repository seed](50-repo-seed/): Initial repository contents.
+
+## Verification
+
+- [Cross-design consistency review](30-verification/cross-design-consistency.md): The 18 designs compiled and reconciled; 63 findings and remaining risks.
+- [Architecture review (Go)](30-verification/architecture-review-go.md): Independent Go idiom review of the architecture.
+- [Per-unit verification reports](30-verification/design-01-kernel.md): One report per unit, named design-NN-*.md in the same directory.
+
+## Optional
+
+- [Research: documentation format](05-research/01-docs-format-llm.md): Evidence for ADR-005 to ADR-007.
+- [Research: GitHub API](05-research/03-github-api.md): Rate limits, ETags, GraphQL facts.
+- [Research: store and sync engine](05-research/05-store-sync-engine.md): Prototypes and measurements.
+- [Research: manifest parsing](05-research/07-manifest-parsing.md): Evidence for D-15.
+- [Research: frontend stack](05-research/08-frontend-stack.md): Evidence for D-16.
+- [Research: GitHub App integration](05-research/09-github-app-integration.md): Evidence for D-17.

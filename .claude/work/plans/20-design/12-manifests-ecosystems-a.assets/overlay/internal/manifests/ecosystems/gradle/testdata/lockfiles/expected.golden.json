@@ -1,0 +1,311 @@
+{
+  "parsed": [
+    {
+      "file": "app/build.gradle",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:com.google.guava/guava",
+          "display": "com.google.guava:guava",
+          "requirement": "33.2.1-jre",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 2
+        },
+        {
+          "target": "maven:junit/junit",
+          "display": "junit:junit",
+          "requirement": "4.13.2",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 3
+        }
+      ],
+      "toolchain": {
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "2 dependencies read lexically from the build script",
+          "path": "app/build.gradle"
+        }
+      ]
+    },
+    {
+      "file": "app/gradle.lockfile",
+      "parser": "gradle/lockfile",
+      "kind": "lockfile",
+      "lockedCount": 7,
+      "diagnostics": [
+        {
+          "code": "gradle.lockfile-syntax",
+          "severity": "warning",
+          "message": "expected group:name:version=configurations",
+          "path": "app/gradle.lockfile",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "file": "buildscript-gradle.lockfile",
+      "parser": "gradle/lockfile",
+      "kind": "lockfile",
+      "lockedCount": 2
+    },
+    {
+      "file": "oldapi/build.gradle",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "1.7.36",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "1 dependencies read lexically from the build script",
+          "path": "oldapi/build.gradle"
+        }
+      ]
+    },
+    {
+      "file": "oldapi/gradle/dependency-locks/compileClasspath.lockfile",
+      "parser": "gradle/lockfile",
+      "kind": "lockfile",
+      "lockedCount": 1
+    },
+    {
+      "file": "settings-gradle.lockfile",
+      "parser": "gradle/lockfile",
+      "kind": "lockfile",
+      "lockedCount": 1
+    },
+    {
+      "file": "settings.gradle",
+      "parser": "gradle/settings",
+      "kind": "workspace",
+      "properties": {
+        "rootProject.name": "locks"
+      },
+      "members": [
+        ":app",
+        ":oldapi"
+      ],
+      "toolchain": {
+        "tool": "gradle"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#gradle",
+      "ecosystem": "gradle",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "settings.gradle (gradle/settings)",
+        "buildscript-gradle.lockfile (gradle/lockfile)",
+        "settings-gradle.lockfile (gradle/lockfile)"
+      ],
+      "locked": [
+        {
+          "id": "maven:com.android.tools.build/gradle",
+          "version": "8.5.2",
+          "relationship": "unknown",
+          "scope": "build",
+          "line": 5
+        },
+        {
+          "id": "maven:org.jetbrains.kotlin/kotlin-gradle-plugin",
+          "version": "2.0.21",
+          "relationship": "unknown",
+          "scope": "build",
+          "line": 4
+        }
+      ],
+      "members": [
+        "app",
+        "oldapi"
+      ],
+      "toolchain": {
+        "language": "java",
+        "tool": "gradle"
+      }
+    },
+    {
+      "id": "app#gradle",
+      "ecosystem": "gradle",
+      "dir": "app",
+      "role": "primary",
+      "files": [
+        "app/build.gradle (gradle/script)",
+        "app/gradle.lockfile (gradle/lockfile)"
+      ],
+      "dependencies": [
+        {
+          "target": "maven:com.google.guava/guava",
+          "display": "com.google.guava:guava",
+          "requirement": "33.2.1-jre",
+          "version": "33.2.1-jre",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 2
+        },
+        {
+          "target": "maven:junit/junit",
+          "display": "junit:junit",
+          "requirement": "4.13.2",
+          "version": "4.13.2",
+          "resolution": "locked",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 3
+        }
+      ],
+      "locked": [
+        {
+          "id": "maven:com.google.code.findbugs/jsr305",
+          "version": "3.0.2",
+          "relationship": "unknown",
+          "scope": "runtime",
+          "line": 4
+        },
+        {
+          "id": "maven:com.google.guava/failureaccess",
+          "version": "1.0.2",
+          "relationship": "unknown",
+          "scope": "runtime",
+          "line": 5
+        },
+        {
+          "id": "maven:com.google.guava/guava",
+          "version": "33.2.1-jre",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 6
+        },
+        {
+          "id": "maven:junit/junit",
+          "version": "4.13.2",
+          "relationship": "direct",
+          "scope": "test",
+          "line": 7
+        },
+        {
+          "id": "maven:org.apache.tools/ant",
+          "version": "1.10",
+          "relationship": "unknown",
+          "scope": "build",
+          "line": 10
+        },
+        {
+          "id": "maven:org.checkerframework/checker-qual",
+          "version": "3.42.0",
+          "relationship": "unknown",
+          "scope": "provided",
+          "line": 9
+        },
+        {
+          "id": "maven:org.hamcrest/hamcrest-core",
+          "version": "1.3",
+          "relationship": "unknown",
+          "scope": "test",
+          "line": 8
+        }
+      ],
+      "toolchain": {
+        "dsl": "groovy",
+        "language": "java",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "2 dependencies read lexically from the build script",
+          "path": "app/build.gradle"
+        },
+        {
+          "code": "gradle.lockfile-syntax",
+          "severity": "warning",
+          "message": "expected group:name:version=configurations",
+          "path": "app/gradle.lockfile",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "oldapi#gradle",
+      "ecosystem": "gradle",
+      "dir": "oldapi",
+      "role": "primary",
+      "files": [
+        "oldapi/build.gradle (gradle/script)",
+        "oldapi/gradle/dependency-locks/compileClasspath.lockfile (gradle/lockfile)"
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "1.7.36",
+          "version": "1.7.36",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "maven:org.slf4j/slf4j-api",
+          "version": "1.7.36",
+          "relationship": "direct",
+          "scope": "provided",
+          "line": 2
+        }
+      ],
+      "toolchain": {
+        "dsl": "groovy",
+        "language": "java",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "1 dependencies read lexically from the build script",
+          "path": "oldapi/build.gradle"
+        }
+      ]
+    }
+  ]
+}

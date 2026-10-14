@@ -1,0 +1,36 @@
+{
+  "parsed": [
+    {
+      "file": "Cargo.toml",
+      "parser": "cargo/manifest",
+      "kind": "manifest",
+      "diagnostics": [
+        {
+          "code": "cargo.syntax",
+          "severity": "error",
+          "message": "Cargo.toml cannot be parsed: toml: toml: expected ']' to close table name",
+          "path": "Cargo.toml"
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#cargo",
+      "ecosystem": "cargo",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "Cargo.toml (cargo/manifest)"
+      ],
+      "diagnostics": [
+        {
+          "code": "cargo.syntax",
+          "severity": "error",
+          "message": "Cargo.toml cannot be parsed: toml: toml: expected ']' to close table name",
+          "path": "Cargo.toml"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+[
+ {
+  "id": 100001,
+  "name": ".github",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": null
+ },
+ {
+  "id": 100002,
+  "name": "acme.github.io",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100003,
+  "name": "Atlas-Gateway",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [
+   "iam"
+  ],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100004,
+  "name": "Atlas-Admin",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [
+   "iam"
+  ],
+  "license": null
+ },
+ {
+  "id": 100005,
+  "name": "Atlas-Client-SDK",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": true,
+  "disabled": false,
+  "default_branch": "master",
+  "topics": [],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100006,
+  "name": "Atlas-Docs",
+  "private": false,
+  "visibility": "public",
+  "archived": true,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100007,
+  "name": "Billing",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [
+   "payments"
+  ],
+  "license": null
+ },
+ {
+  "id": 100008,
+  "name": "Billing-Worker",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "master",
+  "topics": [
+   "payments"
+  ],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100009,
+  "name": "BillingSearch",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100010,
+  "name": "Ledger-Core",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": null
+ },
+ {
+  "id": 100011,
+  "name": "Ledger-UI",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100012,
+  "name": "_deprecated_ledger-v1",
+  "private": false,
+  "visibility": "public",
+  "archived": true,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "master",
+  "topics": [],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100013,
+  "name": "PathWatcher",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": null
+ },
+ {
+  "id": 100014,
+  "name": "search-indexer",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [
+   "search"
+  ],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100015,
+  "name": "notes.md",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "main",
+  "topics": [],
+  "license": "Apache-2.0"
+ },
+ {
+  "id": 100016,
+  "name": "infra-tools",
+  "private": false,
+  "visibility": "public",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "default_branch": "feature/foundation",
+  "topics": [],
+  "license": null
+ }
+]

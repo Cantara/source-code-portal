@@ -1,0 +1,69 @@
+{
+  "items": [
+    {
+      "id": "platform",
+      "displayName": "Platform",
+      "description": "Shared libraries and infrastructure services.",
+      "repoCount": 18,
+      "defaultRepoState": "ok",
+      "defaultRepo": {
+        "slug": "core-lib",
+        "name": "core-lib",
+        "title": "Core Library",
+        "description": "Shared building blocks",
+        "htmlUrl": "https://github.com/acme/core-lib",
+        "uiUrl": "/repos/core-lib"
+      },
+      "integrations": [],
+      "badges": [
+        { "kind": "repos", "url": "/badges/groups/platform/repos.svg", "label": "18 repositories" },
+        { "kind": "issues", "url": "/badges/core-lib/issues.svg", "label": "3 open issues" }
+      ],
+      "uiUrl": "/groups/platform",
+      "commitsUiUrl": "/groups/platform/commits",
+      "apiUrl": "/api/v1/groups/platform",
+      "llmsUrl": "/groups/platform/llms.txt",
+      "freshness": {
+        "status": "fresh",
+        "kind": "catalog.group",
+        "asOf": "2026-10-14T09:38:00Z",
+        "fetchedAt": "2026-10-14T09:38:10Z",
+        "checkedAt": "2026-10-14T09:40:00Z",
+        "staleSince": null,
+        "lastErrorCode": null
+      }
+    },
+    {
+      "id": "billing",
+      "displayName": "Billing",
+      "description": "Invoices and payments.",
+      "repoCount": 6,
+      "defaultRepoState": "unset",
+      "integrations": [],
+      "badges": [],
+      "uiUrl": "/groups/billing",
+      "commitsUiUrl": "/groups/billing/commits",
+      "apiUrl": "/api/v1/groups/billing",
+      "llmsUrl": "/groups/billing/llms.txt",
+      "freshness": {
+        "status": "stale",
+        "kind": "catalog.group",
+        "asOf": "2026-10-14T08:00:00Z",
+        "fetchedAt": "2026-10-14T08:01:00Z",
+        "checkedAt": "2026-10-14T09:40:00Z",
+        "staleSince": "2026-10-14T09:00:00Z",
+        "lastErrorCode": "rate_limited"
+      }
+    }
+  ],
+  "page": { "nextCursor": null, "limit": 1000 },
+  "freshness": {
+    "status": "stale",
+    "kind": "catalog.groups",
+    "asOf": "2026-10-14T08:00:00Z",
+    "fetchedAt": "2026-10-14T08:01:00Z",
+    "checkedAt": "2026-10-14T09:40:00Z",
+    "staleSince": "2026-10-14T09:00:00Z",
+    "lastErrorCode": "rate_limited"
+  }
+}

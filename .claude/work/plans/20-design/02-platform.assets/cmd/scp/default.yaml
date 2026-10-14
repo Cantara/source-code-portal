@@ -1,0 +1,47 @@
+version: 1
+server:
+  public:
+    listen: ":9090"
+    public_url: ""
+    hsts: false
+    trusted_proxies: []
+  admin:
+    listen: ":9091"
+    allowed_hosts: []
+  timeouts:
+    read_header: 5s
+    read: 30s
+    write: 60s
+    idle: 120s
+    max_header_bytes: 16KiB
+    max_header_values: 100
+log:
+  level: info
+  format: json
+  add_source: false
+telemetry:
+  prometheus: true
+  otlp:
+    enabled: false
+    endpoint: ""
+    headers_file: ""
+    timeout: 10s
+    allow_private_cidrs: []
+    ports: []
+    signals: { traces: true, metrics: true, logs: false }
+  traces: { sample_ratio: 0.1 }
+  runtime: { enabled: true }
+ratelimit:
+  badges: "120/min burst 60"
+  api: "300/min burst 100"
+  media_ext: "60/min burst 20"
+  csp_reports: "30/min burst 10"
+  webhook_invalid: "10/min burst 10"
+  sse_per_ip: 4
+  max_keys: 50000
+  idle_ttl: 10m
+shutdown:
+  drain_delay: 5s
+  server_timeout: 15s
+  store_timeout: 3s
+  telemetry_timeout: 2s

@@ -1,0 +1,300 @@
+{
+  "parsed": [
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:y1-root",
+          "display": "y1-root",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:mocha",
+          "display": "mocha",
+          "requirement": "^5.2.0",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "properties": {
+        "private": "true"
+      },
+      "members": [
+        "pkgs/*"
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    },
+    {
+      "file": "pkgs/app/package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:app",
+          "display": "app",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:debug",
+          "display": "debug",
+          "requirement": "^2.6.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:babel/code-frame",
+          "display": "@babel/code-frame",
+          "requirement": "^7.0.0-beta.35",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:ms",
+          "display": "ms",
+          "requirement": "2.0.0",
+          "version": "2.0.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:fsevents",
+          "display": "fsevents",
+          "requirement": "^1.2.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    },
+    {
+      "file": "yarn.lock",
+      "parser": "npm/yarn-lock",
+      "kind": "lockfile",
+      "lockedCount": 8,
+      "properties": {
+        "desc:@babel/code-frame@^7.0.0-beta.35": "7.0.0-beta.55",
+        "desc:@babel/highlight@7.0.0-beta.55": "7.0.0-beta.55",
+        "desc:chalk@^2.0.0": "2.4.2",
+        "desc:debug@3.1.0": "3.1.0",
+        "desc:debug@^2.6.0": "2.6.9",
+        "desc:fsevents@^1.2.3": "1.2.13",
+        "desc:mocha@^5.2.0": "5.2.0",
+        "desc:ms@2.0.0": "2.0.0",
+        "lockfileVersion": "1"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)",
+        "yarn.lock (npm/yarn-lock)"
+      ],
+      "provides": [
+        {
+          "id": "npm:y1-root",
+          "display": "y1-root",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:mocha",
+          "display": "mocha",
+          "requirement": "^5.2.0",
+          "version": "5.2.0",
+          "resolution": "locked",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "npm:babel/code-frame",
+          "version": "7.0.0-beta.55",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha1-cfUw57AQr163p993UveJId1X6e4=",
+          "dependsOn": [
+            1
+          ],
+          "line": 5
+        },
+        {
+          "id": "npm:babel/highlight",
+          "version": "7.0.0-beta.55",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha1-mIZTZH1inCYdrhVudNXwJSulIMA=",
+          "dependsOn": [
+            2
+          ],
+          "line": 12
+        },
+        {
+          "id": "npm:chalk",
+          "version": "2.4.2",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha512-Mti+f9lpJNcwF4tWV8/OrTTtF1gZi+f8FqlyAdouralcFWFQWF2+NgCHShjkCb+IFBLq9buZwE1xckQU4peSuw==",
+          "line": 19
+        },
+        {
+          "id": "npm:debug",
+          "version": "2.6.9",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha1-XRKFFd8TT/Mn6QpMk/Tgd6U2NB8=",
+          "dependsOn": [
+            7
+          ],
+          "line": 24
+        },
+        {
+          "id": "npm:debug",
+          "version": "3.1.0",
+          "relationship": "transitive",
+          "scope": "dev",
+          "integrity": "sha512-OX8XqP7/1a9cqkxYw2yXss15f26NKWBpDXQd0",
+          "dependsOn": [
+            7
+          ],
+          "line": 43
+        },
+        {
+          "id": "npm:fsevents",
+          "version": "1.2.13",
+          "relationship": "direct",
+          "scope": "optional",
+          "integrity": "sha512-oWb1Z6mkHIskLzEJ/XWX0srkpkTQ7vaopMQkyaEIoq0fmtFVxOthb8cCxeT+p3ynTkk/w==",
+          "line": 31
+        },
+        {
+          "id": "npm:mocha",
+          "version": "5.2.0",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha512-2IUgKDhc3J2Uuvx7VCNi",
+          "dependsOn": [
+            4
+          ],
+          "line": 36
+        },
+        {
+          "id": "npm:ms",
+          "version": "2.0.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha1-VgiurfwAvmwpAd9fmGF4jeDVl8g=",
+          "line": 50
+        }
+      ],
+      "members": [
+        "pkgs/app"
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    },
+    {
+      "id": "pkgs/app#npm",
+      "ecosystem": "npm",
+      "dir": "pkgs/app",
+      "role": "primary",
+      "files": [
+        "pkgs/app/package.json (npm/package-json)"
+      ],
+      "provides": [
+        {
+          "id": "npm:app",
+          "display": "app",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:debug",
+          "display": "debug",
+          "requirement": "^2.6.0",
+          "version": "2.6.9",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:babel/code-frame",
+          "display": "@babel/code-frame",
+          "requirement": "^7.0.0-beta.35",
+          "version": "7.0.0-beta.55",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:ms",
+          "display": "ms",
+          "requirement": "2.0.0",
+          "version": "2.0.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:fsevents",
+          "display": "fsevents",
+          "requirement": "^1.2.3",
+          "version": "1.2.13",
+          "resolution": "locked",
+          "scope": "optional",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    }
+  ]
+}

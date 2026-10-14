@@ -1,0 +1,121 @@
+{
+  "parsed": [
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/kt",
+          "display": "kt",
+          "version": "1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-stdlib",
+          "display": "org.jetbrains.kotlin:kotlin-stdlib",
+          "requirement": "${kotlin.version}",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-maven-plugin",
+          "display": "org.jetbrains.kotlin:kotlin-maven-plugin",
+          "requirement": "${kotlin.version}",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-compiler-plugin",
+          "display": "org.apache.maven.plugins:maven-compiler-plugin",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        }
+      ],
+      "properties": {
+        "packaging": "jar",
+        "prop:kotlin.version": "2.0.21"
+      },
+      "toolchain": {
+        "compiler.release": "11",
+        "kotlin": "true",
+        "language": "kotlin",
+        "tool": "maven"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/kt",
+          "display": "com.acme:kt",
+          "version": "1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-stdlib",
+          "display": "org.jetbrains.kotlin:kotlin-stdlib",
+          "requirement": "2.0.21",
+          "version": "2.0.21",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 5
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-maven-plugin",
+          "display": "org.jetbrains.kotlin:kotlin-maven-plugin",
+          "requirement": "2.0.21",
+          "version": "2.0.21",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 6
+        },
+        {
+          "target": "maven:org.apache.maven.plugins/maven-compiler-plugin",
+          "display": "org.apache.maven.plugins:maven-compiler-plugin",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        }
+      ],
+      "toolchain": {
+        "java": "11",
+        "kotlin": "2.0.21",
+        "language": "kotlin",
+        "packaging": "jar",
+        "tool": "maven"
+      }
+    }
+  ]
+}

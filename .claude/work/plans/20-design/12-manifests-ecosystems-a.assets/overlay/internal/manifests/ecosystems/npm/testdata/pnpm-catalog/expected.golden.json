@@ -1,0 +1,510 @@
+{
+  "parsed": [
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:monorepo",
+          "display": "monorepo",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "catalog:",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "properties": {
+        "private": "true"
+      },
+      "toolchain": {
+        "language": "typescript",
+        "tool": "pnpm",
+        "toolVersion": "10.4.1"
+      }
+    },
+    {
+      "file": "packages/app/package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:acme/app",
+          "display": "@acme/app",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:react",
+          "display": "react",
+          "requirement": "catalog:",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:acme/lib",
+          "display": "@acme/lib",
+          "requirement": "workspace:*",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "project",
+          "sourceRef": "workspace",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:missing",
+          "display": "missing",
+          "requirement": "catalog:",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:string-width",
+          "display": "string-width",
+          "requirement": "npm:string-width@^4.2.3",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:react-dom",
+          "display": "react-dom",
+          "requirement": "^18.3.1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:fsevents",
+          "display": "fsevents",
+          "requirement": "^2.3.3",
+          "resolution": "declared",
+          "scope": "optional",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "properties": {
+        "alias:npm:string-width@^4.2.3": "cjs-width"
+      },
+      "toolchain": {
+        "language": "javascript"
+      }
+    },
+    {
+      "file": "packages/lib/package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:acme/lib",
+          "display": "@acme/lib",
+          "version": "0.3.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:react",
+          "display": "react",
+          "requirement": "catalog:react17",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:vitest",
+          "display": "vitest",
+          "requirement": "^2.1.8",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "parser": "npm/pnpm-lock",
+      "kind": "lockfile",
+      "lockedCount": 12,
+      "properties": {
+        "catalog:default:react": "^18.3.1",
+        "catalog:default:typescript": "^5.6.0",
+        "catalog:react17:react": "^17.0.2",
+        "lock:.:typescript": "5.6.3",
+        "lock:packages/app:cjs-width": "4.2.3",
+        "lock:packages/app:fsevents": "2.3.3",
+        "lock:packages/app:react": "18.3.1",
+        "lock:packages/app:react-dom": "18.3.1",
+        "lock:packages/lib:react": "17.0.2",
+        "lock:packages/lib:vitest": "2.1.8",
+        "lockfileVersion": "9.0"
+      },
+      "members": [
+        "packages/app",
+        "packages/lib"
+      ]
+    },
+    {
+      "file": "pnpm-workspace.yaml",
+      "parser": "npm/pnpm-workspace",
+      "kind": "workspace",
+      "properties": {
+        "catalog:default:react": "^18.3.1",
+        "catalog:default:typescript": "^5.6.0",
+        "catalog:react17:react": "^17.0.2"
+      },
+      "members": [
+        "packages/*",
+        "!packages/ignored"
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)",
+        "pnpm-workspace.yaml (npm/pnpm-workspace)",
+        "pnpm-lock.yaml (npm/pnpm-lock)"
+      ],
+      "provides": [
+        {
+          "id": "npm:monorepo",
+          "display": "monorepo",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "^5.6.0",
+          "version": "5.6.3",
+          "resolution": "locked",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "npm:emoji-regex",
+          "version": "8.0.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==",
+          "line": 115
+        },
+        {
+          "id": "npm:fsevents",
+          "version": "2.3.3",
+          "relationship": "direct",
+          "scope": "optional",
+          "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMzKDOA==",
+          "line": 117
+        },
+        {
+          "id": "npm:is-fullwidth-code-point",
+          "version": "3.0.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==",
+          "line": 120
+        },
+        {
+          "id": "npm:js-tokens",
+          "version": "4.0.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==",
+          "line": 122
+        },
+        {
+          "id": "npm:loose-envify",
+          "version": "1.4.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==",
+          "dependsOn": [
+            3
+          ],
+          "line": 124
+        },
+        {
+          "id": "npm:react",
+          "version": "17.0.2",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-gnhPt75i/dq/z3/6q/0asP78D0u592D5L1pd7M8P+dck6Fu/jJeL6iVVK23fptSUZj8Vjf++7wXA8UNclGQcbA==",
+          "dependsOn": [
+            4
+          ],
+          "line": 134
+        },
+        {
+          "id": "npm:react",
+          "version": "18.3.1",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==",
+          "dependsOn": [
+            4
+          ],
+          "line": 138
+        },
+        {
+          "id": "npm:react-dom",
+          "version": "18.3.1",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==",
+          "dependsOn": [
+            4,
+            6,
+            8
+          ],
+          "line": 128
+        },
+        {
+          "id": "npm:scheduler",
+          "version": "0.23.2",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==",
+          "dependsOn": [
+            4
+          ],
+          "line": 142
+        },
+        {
+          "id": "npm:string-width",
+          "version": "4.2.3",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==",
+          "dependsOn": [
+            0,
+            2
+          ],
+          "line": 146
+        },
+        {
+          "id": "npm:typescript",
+          "version": "5.6.3",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==",
+          "line": 151
+        },
+        {
+          "id": "npm:vitest",
+          "version": "2.1.8",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha512-1vBKTZskHw/aosXqQUlVWWlGUxSJR8YtiyZDJAFeW2kPAeX6S3Sool0mjRO4F2l3E8+UQbvAvqP5rWY9LrH6Ng==",
+          "dependsOn": [
+            3
+          ],
+          "line": 153
+        }
+      ],
+      "members": [
+        "packages/app",
+        "packages/lib"
+      ],
+      "toolchain": {
+        "language": "typescript",
+        "tool": "pnpm",
+        "toolVersion": "10.4.1"
+      }
+    },
+    {
+      "id": "packages/app#npm",
+      "ecosystem": "npm",
+      "dir": "packages/app",
+      "role": "primary",
+      "files": [
+        "packages/app/package.json (npm/package-json)"
+      ],
+      "provides": [
+        {
+          "id": "npm:acme/app",
+          "display": "@acme/app",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:react",
+          "display": "react",
+          "requirement": "^18.3.1",
+          "version": "18.3.1",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:acme/lib",
+          "display": "@acme/lib",
+          "requirement": "workspace:*",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "path",
+          "sourceRef": "packages/lib",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:missing",
+          "display": "missing",
+          "requirement": "catalog:",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:string-width",
+          "display": "string-width",
+          "requirement": "npm:string-width@^4.2.3",
+          "version": "4.2.3",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:react-dom",
+          "display": "react-dom",
+          "requirement": "^18.3.1",
+          "version": "18.3.1",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:fsevents",
+          "display": "fsevents",
+          "requirement": "^2.3.3",
+          "version": "2.3.3",
+          "resolution": "locked",
+          "scope": "optional",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript",
+        "tool": "pnpm",
+        "toolVersion": "10.4.1"
+      },
+      "diagnostics": [
+        {
+          "code": "npm.catalog-missing",
+          "severity": "warning",
+          "message": "no entry for missing in catalog \"default\"",
+          "path": "packages/app/package.json",
+          "line": 1
+        },
+        {
+          "code": "npm.lock-missing-dep",
+          "severity": "warning",
+          "message": "missing is not in pnpm-lock.yaml",
+          "path": "packages/app/package.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "packages/lib#npm",
+      "ecosystem": "npm",
+      "dir": "packages/lib",
+      "role": "primary",
+      "files": [
+        "packages/lib/package.json (npm/package-json)"
+      ],
+      "provides": [
+        {
+          "id": "npm:acme/lib",
+          "display": "@acme/lib",
+          "version": "0.3.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:react",
+          "display": "react",
+          "requirement": "^17.0.2",
+          "version": "17.0.2",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:vitest",
+          "display": "vitest",
+          "requirement": "^2.1.8",
+          "version": "2.1.8",
+          "resolution": "locked",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript",
+        "tool": "pnpm",
+        "toolVersion": "10.4.1"
+      }
+    }
+  ]
+}

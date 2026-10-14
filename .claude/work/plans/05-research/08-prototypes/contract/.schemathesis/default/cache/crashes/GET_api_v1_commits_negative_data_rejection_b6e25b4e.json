@@ -1,0 +1,89 @@
+{
+  "operation": "GET /api/v1/commits",
+  "method": "GET",
+  "path_template": "/api/v1/commits",
+  "fingerprint": "b6e25b4e",
+  "case_id": "kvieq9",
+  "code_sample": "curl -X GET -H 'If-None-Match;' 'http://127.0.0.1:9191/api/v1/commits?limit=201'",
+  "sequence": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:9191/api/v1/commits?limit=201",
+      "url_template": "http://127.0.0.1:9191/api/v1/commits",
+      "headers": {
+        "User-Agent": "schemathesis/4.31.0",
+        "Accept-Encoding": "gzip, deflate, zstd",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "If-None-Match": "",
+        "X-Schemathesis-TestCaseId": "kvieq9"
+      },
+      "response": {
+        "status_code": 200,
+        "headers": {
+          "content-type": "application/json",
+          "etag": "\"commits-v1\"",
+          "date": "Tue, 13 Oct 2026 21:33:07 GMT",
+          "content-length": "264"
+        },
+        "body": "{\"freshness\":{\"fetched_at\":\"2026-10-13T21:33:07.634153Z\",\"state\":\"fresh\"},\"items\":[{\"author_login\":\"octocat\",\"authored_at\":\"2026-10-13T10:00:00Z\",\"message\":\"init\",\"repo\":\"identity-core\",\"sha\":\"0123456789abcdef0123456789abcdef01234567\"}],\"page\":{\"next_cursor\":null}}\n"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "negative_data_rejection",
+          "status": "failure",
+          "message": "API accepted schema-violating request\n\nInvalid data should have been rejected\nExpected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 429, 5xx\nInvalid component: parameter `limit` in query - limit: Value greater than maximum"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 1.0207993909716606e-05,
+          "mode": "negative"
+        },
+        "components": {
+          "HEADER": "positive",
+          "QUERY": "negative"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "limit: Value greater than maximum",
+            "location": null,
+            "parameter": "limit",
+            "parameter_location": "QUERY",
+            "scenario": "value_above_maximum"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {
+          "HEADER": {
+            "If-None-Match": ""
+          },
+          "QUERY": {
+            "limit": 201
+          }
+        }
+      },
+      "path": "/api/v1/commits",
+      "path_parameters": {},
+      "query": {
+        "limit": "201"
+      },
+      "case_headers": {
+        "If-None-Match": ""
+      },
+      "cookies": {},
+      "case_body": {
+        "encoding": "none"
+      },
+      "media_type": null,
+      "parent_index": null
+    }
+  ]
+}

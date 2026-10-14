@@ -1,0 +1,98 @@
+{
+  "parsed": [
+    {
+      "file": "go.mod",
+      "parser": "golang/mod",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "golang:example.com/old",
+          "display": "example.com/old",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:github.com/a/b",
+          "display": "github.com/a/b",
+          "requirement": "v1.0.0",
+          "version": "v1.0.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 3
+        }
+      ],
+      "lockedCount": 1,
+      "toolchain": {
+        "go": "1.16",
+        "language": "go",
+        "tool": "go"
+      },
+      "diagnostics": [
+        {
+          "code": "golang.go-directive-missing",
+          "severity": "info",
+          "message": "no go directive; the go command assumes go 1.16",
+          "path": "go.mod"
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#golang",
+      "ecosystem": "golang",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "go.mod (golang/mod)"
+      ],
+      "provides": [
+        {
+          "id": "golang:example.com/old",
+          "display": "example.com/old",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:github.com/a/b",
+          "display": "github.com/a/b",
+          "requirement": "v1.0.0",
+          "version": "v1.0.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 3
+        }
+      ],
+      "locked": [
+        {
+          "id": "golang:github.com/a/b",
+          "version": "v1.0.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 3
+        }
+      ],
+      "toolchain": {
+        "go": "1.16",
+        "language": "go",
+        "tool": "go"
+      },
+      "diagnostics": [
+        {
+          "code": "golang.go-directive-missing",
+          "severity": "info",
+          "message": "no go directive; the go command assumes go 1.16",
+          "path": "go.mod"
+        }
+      ]
+    }
+  ]
+}

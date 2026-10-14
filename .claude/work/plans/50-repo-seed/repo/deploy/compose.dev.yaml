@@ -1,0 +1,57 @@
+# Containerised development and end-to-end stack (design 16 section 4.11): the portal IMAGE and the fake GitHub on one private
+# network. Used by `docker compose up` locally and by the e2e job of ci.yml (which sets SCP_IMAGE to the image the image job tested).
+#
+#   make dev-keys                                   # once: demo App key into testdata/worlds/demo (git-ignored)
+#   docker compose -f deploy/compose.dev.yaml up --build
+#   open http://127.0.0.1:9090                      # portal;  http://127.0.0.1:9091 admin (bearer token: see the secret below)
+name: scp-dev
+
+services:
+  fakegithub:
+    build: { context: .., dockerfile: deploy/Dockerfile.fakegithub }
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - ../testdata/worlds/demo:/world:ro
+    ports: ["127.0.0.1:9191:9191"]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9191"]      # the fake image is alpine-based (busybox nc); see Dockerfile.fakegithub
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  scp:
+    image: ${SCP_IMAGE:-scp:dev}
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    depends_on:
+      fakegithub: { condition: service_healthy }
+    read_only: true
+    user: "65532:65532"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 512m
+    environment:
+      SCP_CONFIG: /etc/scp/config.yaml
+      GOMEMLIMIT: 400MiB
+    volumes:
+      - scp-data:/data
+      - ./dev.container.yaml:/etc/scp/config.yaml:ro
+    secrets: [scp-demo-app.pem, scp-demo-webhook, scp-admin-token]
+    ports: ["127.0.0.1:9090:9090", "127.0.0.1:9091:9091"]
+    healthcheck:
+      test: ["CMD", "/scp", "healthcheck"]     # GET http://127.0.0.1:9090/livez inside the container
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+    stop_grace_period: 45s
+
+secrets:
+  scp-demo-app.pem: { file: ../testdata/worlds/demo/app.pem }
+  scp-demo-webhook: { file: ../testdata/worlds/demo/webhook-secret }
+  scp-admin-token:  { file: ../testdata/worlds/demo/admin-token }
+
+volumes:
+  scp-data:

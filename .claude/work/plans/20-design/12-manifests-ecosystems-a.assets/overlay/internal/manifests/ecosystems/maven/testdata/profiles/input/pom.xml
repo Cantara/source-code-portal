@@ -1,0 +1,19 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.acme</groupId><artifactId>prof</artifactId><version>1</version>
+  <properties><db>h2</db></properties>
+  <dependencies><dependency><groupId>x</groupId><artifactId>db-${db}</artifactId><version>1</version></dependency></dependencies>
+  <profiles>
+    <profile><id>default-on</id><activation><activeByDefault>true</activeByDefault></activation>
+      <dependencies><dependency><groupId>x</groupId><artifactId>d1</artifactId><version>1</version></dependency></dependencies></profile>
+    <profile><id>fast</id><properties><db>postgres</db></properties>
+      <dependencies><dependency><groupId>x</groupId><artifactId>fast-dep</artifactId><version>1</version></dependency></dependencies></profile>
+    <profile><id>ci</id><activation><property><name>env.type</name><value>ci</value></property></activation>
+      <dependencies><dependency><groupId>x</groupId><artifactId>ci-dep</artifactId><version>1</version></dependency></dependencies></profile>
+    <profile><id>not-ci</id><activation><property><name>!env.type</name></property></activation>
+      <dependencies><dependency><groupId>x</groupId><artifactId>local-dep</artifactId><version>1</version></dependency></dependencies></profile>
+    <profile><id>jdk21</id><activation><jdk>[21,)</jdk></activation>
+      <dependencies><dependency><groupId>x</groupId><artifactId>jdk21-dep</artifactId><version>1</version></dependency></dependencies></profile>
+    <profile><id>windows</id><activation><os><family>windows</family></os></activation></profile>
+  </profiles>
+</project>

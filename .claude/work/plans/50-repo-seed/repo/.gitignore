@@ -1,0 +1,25 @@
+# Build outputs (never committed: ADR-020)
+/bin/
+/dist/
+/web/dist/
+/web/node_modules/
+/web/playwright-report/
+/web/test-results/
+# Local development state (make dev)
+/.dev/
+/testdata/worlds/*/app.pem
+/testdata/worlds/*/app.pub.pem
+/testdata/worlds/*/webhook-secret
+/testdata/worlds/*/admin-token
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+# Local secrets: credentials never live in the tree
+.env
+.env.*
+*.pem
+!testdata/**/*.pub.pem.example
+# Agent-local state
+/.claude/settings.local.json
+/.playwright-mcp/

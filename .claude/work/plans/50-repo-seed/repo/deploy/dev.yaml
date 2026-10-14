@@ -1,0 +1,56 @@
+# Native development configuration (design 16 section 4.11): `make dev` runs
+#   go run -tags devtools ./cmd/scp serve --config deploy/dev.yaml
+# against the fake GitHub on 127.0.0.1:9191 (`make dev-fake`). The `devtools` build tag is what lets the SSRF policy reach a loopback
+# address; a release binary refuses it (netguard denies loopback even with allow_private_addresses). Nothing here is a credential:
+# the demo App key is generated locally by `fakegithub keygen` (git-ignored) and the webhook secret is the fake's published constant.
+#
+# Secrets are `{file: /absolute/path}` references; the make target overrides them from the environment so this file stays
+# machine-independent:
+#   SCP_GITHUB_SOURCES_0_AUTH_PRIVATE_KEY_FILE=$PWD/testdata/worlds/demo/app.pem
+#   SCP_GITHUB_SOURCES_0_WEBHOOK_SECRET=dev-webhook-secret
+version: 1
+
+server:
+  public: { listen: "127.0.0.1:9090", public_url: "http://127.0.0.1:9090" }
+  admin:  { listen: "127.0.0.1:9091" }
+
+log: { level: debug, format: text }
+
+telemetry: { prometheus: true, otlp: { enabled: false } }
+
+store:
+  path: .dev/scp.db          # relative to the working directory: the repository root under `make dev`; .dev/ is git-ignored
+  backup: { enabled: false }
+
+refresh:
+  grace: 2s                  # quick Ctrl-C
+
+shutdown:
+  drain_delay: 0s            # no load balancer in front of a laptop
+  supervisor_grace: 0s
+
+github:
+  sources:
+    - id: acme
+      host: { kind: ghes, web_url: "http://127.0.0.1:9191", api_url: "http://127.0.0.1:9191/api/v3" }
+      network: { allow_insecure_http: true }
+      auth:
+        kind: github_app
+        app_id: 4242
+        client_id: Iv1.demo4242
+        private_key: { file: /run/secrets/scp-demo-app.pem }     # overridden from the environment (see above)
+        installations: { mode: allow_list, accounts: [acme] }
+      webhook:
+        secret: { file: /run/secrets/scp-demo-webhook }          # overridden from the environment (see above)
+        public_url: "http://127.0.0.1:9090/webhooks/github/acme"
+      discovery: { mode: installation, visibility: public_only, reconcile_every: 1m }
+      acquisition: { mode: api, graphql: off, webhook_assisted: true }
+
+catalog:
+  groups:
+    - id: demo
+      display_name: Demo
+      description: Every repository of the demo world
+      match: [ { catch_all: true } ]
+
+access: { mode: public }

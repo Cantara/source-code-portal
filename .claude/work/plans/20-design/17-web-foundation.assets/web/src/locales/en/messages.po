@@ -1,0 +1,230 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-10-14 02:11+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: en\n"
+
+#: src/shared/external-link.tsx
+msgid "(opens in a new tab)"
+msgstr "(opens in a new tab)"
+
+#. placeholder {0}: site.repoCount
+#: src/shared/header-status.tsx
+msgid "{0, plural, one {# repository} other {# repositories}}"
+msgstr "{0, plural, one {# repository} other {# repositories}}"
+
+#. placeholder {0}: g.repoCount
+#: src/features/dashboard/route.tsx
+msgid "{0} repositories"
+msgstr "{0} repositories"
+
+#: src/shared/theme-toggle.tsx
+msgid "{name}. Activate to change theme."
+msgstr "{name}. Activate to change theme."
+
+#: src/shared/connection-banner.tsx
+msgid "A new version of the portal is available."
+msgstr "A new version of the portal is available."
+
+#: src/shared/announcement.tsx
+msgid "Announcement"
+msgstr "Announcement"
+
+#: src/app/root.tsx
+msgid "Back to the dashboard"
+msgstr "Back to the dashboard"
+
+#: src/shared/problem-title.ts
+msgid "Cannot reach the portal"
+msgstr "Cannot reach the portal"
+
+#: src/shared/connection-banner.tsx
+msgid "Cannot refresh right now. Showing the last data that loaded."
+msgstr "Cannot refresh right now. Showing the last data that loaded."
+
+#: src/app/root.tsx
+#: src/features/commits/route.tsx
+msgid "Commits"
+msgstr "Commits"
+
+#: src/shared/theme-toggle.tsx
+msgid "Dark theme"
+msgstr "Dark theme"
+
+#: src/app/root.tsx
+#: src/features/dashboard/route.tsx
+msgid "Dashboard"
+msgstr "Dashboard"
+
+#: src/shared/freshness-badge.tsx
+msgid "Delayed"
+msgstr "Delayed"
+
+#: src/app/root.tsx
+#: src/features/manifests/repo-dependencies.tsx
+msgid "Dependencies"
+msgstr "Dependencies"
+
+#: src/shared/announcement.tsx
+msgid "Dismiss announcement"
+msgstr "Dismiss announcement"
+
+#: src/features/docs/doc.tsx
+msgid "Document"
+msgstr "Document"
+
+#: src/app/root.tsx
+msgid "Error"
+msgstr "Error"
+
+#: src/shared/problem-title.ts
+msgid "GitHub data is temporarily unavailable"
+msgstr "GitHub data is temporarily unavailable"
+
+#: src/features/groups/overview.tsx
+msgid "Group"
+msgstr "Group"
+
+#: src/features/groups/commits.tsx
+msgid "Group commits"
+msgstr "Group commits"
+
+#: src/shared/theme-toggle.tsx
+msgid "Light theme"
+msgstr "Light theme"
+
+#: src/shared/problem-title.ts
+msgid "Not allowed"
+msgstr "Not allowed"
+
+#: src/shared/problem-title.ts
+msgid "Not found"
+msgstr "Not found"
+
+#: src/shared/freshness-badge.tsx
+msgid "Not loaded yet"
+msgstr "Not loaded yet"
+
+#: src/shared/header-status.tsx
+msgid "Not synced yet"
+msgstr "Not synced yet"
+
+#: src/features/manifests/dependencies-route.tsx
+msgid "Org dependencies"
+msgstr "Org dependencies"
+
+#: src/features/manifests/package-route.tsx
+msgid "Package"
+msgstr "Package"
+
+#: src/app/root.tsx
+msgid "Page not found"
+msgstr "Page not found"
+
+#: src/app/root.tsx
+msgid "Primary"
+msgstr "Primary"
+
+#: src/shared/connection-banner.tsx
+msgid "Reload"
+msgstr "Reload"
+
+#: src/features/docs/readme.tsx
+msgid "Repository"
+msgstr "Repository"
+
+#: src/features/commits/repo-commits.tsx
+msgid "Repository commits"
+msgstr "Repository commits"
+
+#: src/shared/problem-title.ts
+msgid "Request cancelled"
+msgstr "Request cancelled"
+
+#. placeholder {0}: p.requestId
+#: src/shared/problem-alert.tsx
+msgid "Request id: <0>{0}</0>"
+msgstr "Request id: <0>{0}</0>"
+
+#: src/shared/problem-alert.tsx
+msgid "Retrying automatically."
+msgstr "Retrying automatically."
+
+#: src/shared/problem-title.ts
+msgid "Sign-in required"
+msgstr "Sign-in required"
+
+#: src/app/root.tsx
+msgid "Skip to content"
+msgstr "Skip to content"
+
+#: src/shared/problem-title.ts
+msgid "Something went wrong on our side"
+msgstr "Something went wrong on our side"
+
+#: src/app/root.tsx
+msgid "Source Code Portal"
+msgstr "Source Code Portal"
+
+#: src/features/status/route.tsx
+msgid "Status"
+msgstr "Status"
+
+#: src/shared/theme-toggle.tsx
+msgid "System theme"
+msgstr "System theme"
+
+#: src/shared/problem-title.ts
+msgid "That request was not valid"
+msgstr "That request was not valid"
+
+#: src/shared/problem-title.ts
+msgid "The portal is busy"
+msgstr "The portal is busy"
+
+#: src/shared/connection-banner.tsx
+msgid "The portal is still loading data from GitHub. Some views may be incomplete."
+msgstr "The portal is still loading data from GitHub. Some views may be incomplete."
+
+#: src/shared/problem-title.ts
+msgid "The portal is still warming up"
+msgstr "The portal is still warming up"
+
+#: src/shared/problem-title.ts
+msgid "The server sent an unexpected response"
+msgstr "The server sent an unexpected response"
+
+#: src/shared/problem-title.ts
+msgid "This feature is switched off"
+msgstr "This feature is switched off"
+
+#: src/shared/problem-title.ts
+msgid "Too many requests"
+msgstr "Too many requests"
+
+#: src/shared/problem-alert.tsx
+msgid "Try again"
+msgstr "Try again"
+
+#: src/shared/problem-title.ts
+msgid "Unexpected problem"
+msgstr "Unexpected problem"
+
+#: src/shared/freshness-badge.tsx
+msgid "Unknown"
+msgstr "Unknown"
+
+#: src/shared/freshness-badge.tsx
+msgid "Up to date"
+msgstr "Up to date"
+
+#: src/shared/freshness-badge.tsx
+msgid "Update failing"
+msgstr "Update failing"
+
+#: src/shared/header-status.tsx
+msgid "Updated <0/>"
+msgstr "Updated <0/>"

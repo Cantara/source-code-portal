@@ -1,0 +1,73 @@
+{
+  "parsed": [
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:com.acme/namespaced",
+          "display": "namespaced",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "2.0.13",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        }
+      ],
+      "properties": {
+        "packaging": "jar"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/namespaced",
+          "display": "com.acme:namespaced",
+          "version": "1.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "2.0.13",
+          "version": "2.0.13",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        }
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      }
+    }
+  ]
+}

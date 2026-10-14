@@ -1,0 +1,5 @@
+{
+  "name": "@mono/b",
+  "version": "1.0.0",
+  "dependencies": { "debug": "^3.2.7" }
+}

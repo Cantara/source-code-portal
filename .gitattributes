@@ -1,0 +1,3 @@
+# Recorded fixtures and golden files are stored byte-exact: no line-ending conversion.
+**/testdata/** -text
+**/fixtures/** -text

@@ -1,0 +1,87 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-10-14 06:25+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: en\n"
+
+#: src/app/root.tsx
+msgid "Back to the dashboard"
+msgstr "Back to the dashboard"
+
+#: src/features/commits/route.tsx
+msgid "Commits"
+msgstr "Commits"
+
+#: src/features/dashboard/route.tsx
+msgid "Dashboard"
+msgstr "Dashboard"
+
+#: src/features/manifests/dependencies-route.tsx
+msgid "Dependencies"
+msgstr "Dependencies"
+
+#: src/features/docs/doc.tsx
+msgid "Document"
+msgstr "Document"
+
+#: src/features/groups/overview.tsx
+msgid "Group"
+msgstr "Group"
+
+#: src/features/groups/commits.tsx
+msgid "Group commits"
+msgstr "Group commits"
+
+#: src/features/commits/repo-commits.tsx
+#: src/features/commits/route.tsx
+#: src/features/dashboard/route.tsx
+#: src/features/docs/doc.tsx
+#: src/features/docs/readme.tsx
+#: src/features/groups/commits.tsx
+#: src/features/groups/overview.tsx
+#: src/features/manifests/dependencies-route.tsx
+#: src/features/manifests/package-route.tsx
+#: src/features/manifests/repo-dependencies.tsx
+#: src/features/pages/route.tsx
+#: src/features/status/route.tsx
+msgid "Not implemented yet."
+msgstr "Not implemented yet."
+
+#: src/features/manifests/package-route.tsx
+msgid "Package"
+msgstr "Package"
+
+#: src/features/pages/route.tsx
+msgid "Page"
+msgstr "Page"
+
+#: src/app/root.tsx
+msgid "Page not found"
+msgstr "Page not found"
+
+#: src/features/docs/readme.tsx
+msgid "Repository"
+msgstr "Repository"
+
+#: src/features/commits/repo-commits.tsx
+msgid "Repository commits"
+msgstr "Repository commits"
+
+#: src/features/manifests/repo-dependencies.tsx
+msgid "Repository dependencies"
+msgstr "Repository dependencies"
+
+#: src/app/root.tsx
+msgid "Skip to content"
+msgstr "Skip to content"
+
+#: src/app/root.tsx
+msgid "Source Code Portal"
+msgstr "Source Code Portal"
+
+#: src/features/status/route.tsx
+msgid "Status"
+msgstr "Status"

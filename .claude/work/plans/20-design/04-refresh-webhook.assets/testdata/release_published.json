@@ -1,0 +1,19 @@
+{
+  "action": "published",
+  "release": {
+    "tag_name": "v0.0.1",
+    "draft": false,
+    "prerelease": false,
+    "target_commitish": "master"
+  },
+  "repository": {
+    "id": 153410485,
+    "name": "portal-testdata",
+    "full_name": "acme/portal-testdata",
+    "default_branch": "master",
+    "owner": {
+      "login": "acme",
+      "id": 1122494
+    }
+  }
+}

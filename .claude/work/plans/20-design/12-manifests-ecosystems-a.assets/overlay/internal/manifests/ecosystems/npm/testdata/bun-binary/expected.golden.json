@@ -1,0 +1,82 @@
+{
+  "parsed": [
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:old-bun",
+          "display": "old-bun",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:left-pad",
+          "display": "left-pad",
+          "requirement": "1.3.0",
+          "version": "1.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)"
+      ],
+      "provides": [
+        {
+          "id": "npm:old-bun",
+          "display": "old-bun",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:left-pad",
+          "display": "left-pad",
+          "requirement": "1.3.0",
+          "version": "1.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      },
+      "diagnostics": [
+        {
+          "code": "npm.bun-binary-lockfile",
+          "severity": "warning",
+          "message": "bun.lockb is a binary lockfile and is not parsed; run bun install --save-text-lockfile to produce bun.lock",
+          "path": "bun.lockb"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "encoding.unsupported",
+      "severity": "warning",
+      "message": "encoding.unsupported: nul",
+      "path": "bun.lockb"
+    }
+  ]
+}

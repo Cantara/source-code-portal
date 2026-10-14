@@ -1,0 +1,282 @@
+{
+  "parsed": [
+    {
+      "file": "go.mod",
+      "parser": "golang/mod",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "golang:github.com/acme/billing/v2",
+          "display": "github.com/Acme/Billing/v2",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:github.com/acme/core-lib",
+          "display": "github.com/Acme/core-lib",
+          "requirement": "v1.4.2",
+          "version": "v1.4.2",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "path",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "golang:golang.org/x/text",
+          "display": "golang.org/x/text",
+          "requirement": "v0.43.0",
+          "version": "v0.43.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "golang:golang.org/x/tools",
+          "display": "golang.org/x/tools",
+          "requirement": "v0.42.0",
+          "version": "v0.42.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "golang:github.com/stretchr/testify",
+          "display": "github.com/stretchr/testify",
+          "requirement": "v1.9.0",
+          "version": "v1.9.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "golang:github.com/old/lib",
+          "display": "github.com/old/lib",
+          "requirement": "v0.0.0-20230102030405-abcdef123456",
+          "version": "v0.0.0-20230102030405-abcdef123456",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "sourceRef": "github.com/acme-fork/lib@v1.0.1",
+          "confidence": "exact",
+          "line": 18
+        },
+        {
+          "target": "golang:golang.org/x/tools",
+          "display": "golang.org/x/tools",
+          "requirement": "v0.42.0",
+          "version": "v0.42.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "tool",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 20
+        }
+      ],
+      "lockedCount": 7,
+      "properties": {
+        "replace:github.com/Acme/core-lib": "../core-lib",
+        "replace:github.com/old/lib@v0.0.0-20230102030405-abcdef123456": "github.com/acme-fork/lib@v1.0.1"
+      },
+      "toolchain": {
+        "go": "1.24.0",
+        "language": "go",
+        "tool": "go",
+        "toolchain": "go1.24.3"
+      },
+      "diagnostics": [
+        {
+          "code": "golang.tool-unresolved",
+          "severity": "info",
+          "message": "tool example.com/missing/cmd/x matches no required module",
+          "path": "go.mod",
+          "line": 22
+        },
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 10
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#golang",
+      "ecosystem": "golang",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "go.mod (golang/mod)"
+      ],
+      "provides": [
+        {
+          "id": "golang:github.com/acme/billing/v2",
+          "display": "github.com/Acme/Billing/v2",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "golang:github.com/acme/core-lib",
+          "display": "github.com/Acme/core-lib",
+          "requirement": "v1.4.2",
+          "version": "v1.4.2",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "path",
+          "confidence": "exact",
+          "line": 10
+        },
+        {
+          "target": "golang:golang.org/x/text",
+          "display": "golang.org/x/text",
+          "requirement": "v0.43.0",
+          "version": "v0.43.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "golang:golang.org/x/tools",
+          "display": "golang.org/x/tools",
+          "requirement": "v0.42.0",
+          "version": "v0.42.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        },
+        {
+          "target": "golang:github.com/stretchr/testify",
+          "display": "github.com/stretchr/testify",
+          "requirement": "v1.9.0",
+          "version": "v1.9.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 13
+        },
+        {
+          "target": "golang:github.com/old/lib",
+          "display": "github.com/old/lib",
+          "requirement": "v0.0.0-20230102030405-abcdef123456",
+          "version": "v0.0.0-20230102030405-abcdef123456",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "require",
+          "source": "registry",
+          "sourceRef": "github.com/acme-fork/lib@v1.0.1",
+          "confidence": "exact",
+          "line": 18
+        },
+        {
+          "target": "golang:golang.org/x/tools",
+          "display": "golang.org/x/tools",
+          "requirement": "v0.42.0",
+          "version": "v0.42.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "tool",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 20
+        }
+      ],
+      "locked": [
+        {
+          "id": "golang:github.com/acme/core-lib",
+          "version": "v1.4.2",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 10
+        },
+        {
+          "id": "golang:golang.org/x/text",
+          "version": "v0.43.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 11
+        },
+        {
+          "id": "golang:golang.org/x/tools",
+          "version": "v0.42.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 12
+        },
+        {
+          "id": "golang:github.com/stretchr/testify",
+          "version": "v1.9.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 13
+        },
+        {
+          "id": "golang:github.com/pkg/errors",
+          "version": "v0.9.1",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "line": 14
+        },
+        {
+          "id": "golang:gopkg.in/yaml.v3",
+          "version": "v3.0.1",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "line": 15
+        },
+        {
+          "id": "golang:github.com/old/lib",
+          "version": "v0.0.0-20230102030405-abcdef123456",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 18
+        }
+      ],
+      "toolchain": {
+        "go": "1.24.0",
+        "language": "go",
+        "tool": "go",
+        "toolchain": "go1.24.3"
+      },
+      "diagnostics": [
+        {
+          "code": "golang.tool-unresolved",
+          "severity": "info",
+          "message": "tool example.com/missing/cmd/x matches no required module",
+          "path": "go.mod",
+          "line": 22
+        },
+        {
+          "code": "assemble.path-escape",
+          "severity": "warning",
+          "message": "path dependency escapes the repository",
+          "line": 10
+        }
+      ]
+    }
+  ]
+}

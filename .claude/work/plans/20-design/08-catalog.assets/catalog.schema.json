@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scp.invalid/schemas/catalog-v1.json",
+  "title": "SCP catalogue configuration: the `catalog:` block and the catalog-owned part of `github.sources[].discovery`",
+  "description": "Hand-written (the matcher is a one-key mapping, which a generator cannot express). cmd/scp grafts `properties` under /properties/catalog of the root schema and `$defs/discovery` next to github's own discovery keys with allOf + unevaluatedProperties:false. Semantic rules (uniqueness, default_repo membership, reserved words) are NOT expressible here: they are the C/W/R rules of Config.Validate and Lint.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ungrouped": { "enum": ["track", "ignore"], "default": "track", "description": "What happens to a repository that no group selects: listed without a group (track) or not tracked at all (ignore)." },
+    "slug_prefix_by_source": {
+      "type": "object",
+      "description": "Slug prefix per source (key `source`) or per source and owner (key `source/owner`). The slug of a repository is prefix + name.",
+      "propertyNames": { "pattern": "^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$" },
+      "additionalProperties": { "type": "string", "pattern": "^[A-Za-z0-9._-]{0,32}$" }
+    },
+    "heads": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "batch_size": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 },
+        "interval": { "$ref": "#/$defs/duration", "default": "5m", "description": "1m..1h. TTL of the head sweep (catalog.heads)." },
+        "archived_interval": { "$ref": "#/$defs/duration", "default": "24h", "description": "1h..168h. TTL of the per-repository catalog.stats job." }
+      }
+    },
+    "groups": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/group" } }
+  },
+  "$defs": {
+    "duration": { "type": "string", "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$" },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "display_name", "default_repo", "match"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 63, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "URL segment of /groups/{id}. Lower case; unique together with the aliases of every group (case-insensitive)." },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500, "description": "Plain text." },
+        "default_repo": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$", "description": "GitHub repository name (case-insensitive) of the repository that represents the group; it must be selected by this group's matchers." },
+        "sources": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" }, "uniqueItems": true, "description": "Restrict the group to these sources; empty or absent = every source." },
+        "match": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/matcher" }, "description": "A repository is a member when ANY matcher selects it. A repository may be a member of any number of groups." },
+        "ref": { "type": "string", "maxLength": 200, "pattern": "^[^\\s~^:?*\\[\\\\]+$", "description": "Track this branch instead of each repository's default branch (not covered by the head sweep)." },
+        "aliases": { "type": "array", "maxItems": 16, "items": { "type": "string", "minLength": 1, "maxLength": 80 }, "description": "Earlier ids of this group; /groups/{alias} redirects (308) to /groups/{id}." },
+        "integrations": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "jenkins": { "type": "object", "additionalProperties": false, "properties": { "job_prefix": { "type": "string", "maxLength": 100 }, "instance": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,63}$", "description": "Name of a configured Jenkins instance (integrations.jenkins.instances[].name); its existence is validated by integrations.ValidateGroupDefaults." } } },
+            "snyk": { "type": "object", "additionalProperties": false, "properties": { "project_prefix": { "type": "string", "maxLength": 100 } } }
+          }
+        }
+      }
+    },
+    "matcher": {
+      "description": "Exactly one key. exact, prefix and glob compare the repository NAME case-insensitively and anchored (whole name); regexp is RE2, case-sensitive unless it says (?i), and must match the WHOLE name; topic compares GitHub topics (lower case); catch_all selects everything.",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "exact": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,256}$" },
+        "prefix": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,256}$" },
+        "glob": { "type": "string", "pattern": "^[A-Za-z0-9._*?-]{1,256}$", "description": "Only * (any run, also empty) and ? (one character) are special." },
+        "regexp": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "topic": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,49}$" },
+        "catch_all": { "const": true }
+      }
+    },
+    "discovery": {
+      "description": "Catalog-owned keys of github.sources[].discovery (github adds mode and org).",
+      "type": "object",
+      "properties": {
+        "visibility": { "enum": ["public_only", "installation_scope"], "default": "public_only" },
+        "include_archived": { "type": "boolean", "default": true },
+        "include_forks": { "type": "boolean", "default": false },
+        "reconcile_every": { "$ref": "#/$defs/duration", "default": "30m", "description": "1m..24h" },
+        "max_removal_ratio": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "default": 0.3 },
+        "removal_confirmations": { "type": "integer", "minimum": 1, "maximum": 10, "default": 2 },
+        "mass_removal_hold": { "$ref": "#/$defs/duration", "default": "6h", "description": "0..168h" },
+        "access_acknowledgement": { "enum": ["", "network_restricted", "oidc_proxy", "trusted_proxy_headers"], "default": "" }
+      }
+    }
+  }
+}

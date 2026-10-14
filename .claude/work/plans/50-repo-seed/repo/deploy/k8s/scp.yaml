@@ -1,0 +1,120 @@
+# Example Kubernetes manifests (design 16 section 4.8): one replica, SQLite on a block volume, the image run exactly as
+# deploy/smoke.sh tests it. Copy, replace the image digest, the hostnames and the secrets, and lint the ConfigMap with
+#   scp config lint --strict config.yaml
+# Single writer: SQLite lives on the volume, so there is ONE pod and the update strategy is Recreate (a second pod would open the
+# same file). The portal keeps serving its last snapshot to clients that reach it; a restart is a warm start from the store.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: scp-config, labels: { app.kubernetes.io/name: scp } }
+data:
+  config.yaml: |
+    version: 1
+    server:
+      public: { listen: ":9090", public_url: "https://scp.example.org", hsts: false, trusted_proxies: ["10.0.0.0/8"] }
+      admin:  { listen: ":9091", bearer_token: { file: /run/secrets/scp/admin-token } }
+    store: { path: /data/scp.db, backup: { enabled: true, interval: 1h } }
+    shutdown: { supervisor_grace: 45s }          # keep equal to terminationGracePeriodSeconds below (the shipped defaults need 44 s worst case)
+    github:
+      sources:
+        - id: acme
+          host: { kind: github.com }
+          auth:
+            kind: github_app
+            app_id: 123456
+            client_id: Iv23liExample
+            private_key: { file: /run/secrets/scp/app.pem }
+            installations: { mode: allow_list, accounts: [acme-org] }
+          webhook:
+            secret: { file: /run/secrets/scp/webhook-secret }
+            public_url: https://scp.example.org/webhooks/github/acme
+          discovery: { mode: installation, visibility: public_only, reconcile_every: 30m }
+    catalog:
+      groups:
+        - { id: all, display_name: All repositories, match: [ { catch_all: true } ] }
+    access: { mode: public }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: scp-data, labels: { app.kubernetes.io/name: scp } }
+spec:
+  accessModes: [ReadWriteOnce]        # block storage; never an NFS, EFS or SMB class (SQLite WAL needs real POSIX locks)
+  resources: { requests: { storage: 2Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: scp, labels: { app.kubernetes.io/name: scp } }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app.kubernetes.io/name: scp } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: scp } }
+    spec:
+      terminationGracePeriodSeconds: 45   # worst case of the shipped shutdown defaults 44 s (02 platform, design 16 section 8.3); a typical stop is under 12 s
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532                    # the volume is writable by the nonroot user
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: scp
+          image: ghcr.io/example/scp@sha256:0000000000000000000000000000000000000000000000000000000000000000   # by digest, never a tag
+          args: ["serve"]
+          env:
+            - { name: SCP_CONFIG, value: /etc/scp/config.yaml }
+            - { name: GOMEMLIMIT, value: 400MiB }     # about 85 percent of the memory limit
+          ports:
+            - { name: http, containerPort: 9090 }
+            - { name: admin, containerPort: 9091 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "2", memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          startupProbe:                    # a cold start fetches the whole organisation: allow 15 minutes
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            failureThreshold: 90
+          livenessProbe:
+            httpGet: { path: /livez, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+            failureThreshold: 2
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: config, mountPath: /etc/scp, readOnly: true }
+            - { name: secrets, mountPath: /run/secrets/scp, readOnly: true }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: scp-data } }
+        - { name: config, configMap: { name: scp-config } }
+        - name: secrets
+          secret:
+            secretName: scp-secrets        # keys: app.pem, webhook-secret, admin-token
+            defaultMode: 0440
+---
+apiVersion: v1
+kind: Service
+metadata: { name: scp, labels: { app.kubernetes.io/name: scp } }
+spec:
+  selector: { app.kubernetes.io/name: scp }
+  ports:
+    - { name: http, port: 80, targetPort: http }   # the ingress routes this port only; the admin port is never published by a Service
+---
+# The admin port (/metrics, /status, pprof) is reachable only from the monitoring namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: scp-admin }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: scp } }
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{ port: 9090 }]
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
+      ports: [{ port: 9091 }]

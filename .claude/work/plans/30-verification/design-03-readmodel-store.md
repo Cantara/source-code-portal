@@ -1,0 +1,52 @@
+# Verification report: design unit 03-readmodel-store (2026-10-14)
+
+Verifier: independent (not the author). Document verified and edited: `20-design/03-readmodel-store.md` (companion `03-readmodel-store.assets/` also corrected). Scratch module: the session scratchpad `verify-03-readmodel-store/` (`proto/` = original prototype, `real/` = prototype on the real kernel packages with the fixes).
+
+## Verdict
+
+**ready_with_caveats.** The design is complete (all 15 sections present and concrete, open questions carry defaults), the `readmodel` kernel and the SQLite schema are sound, and after the fixes the prototype compiles against the **real** kernel (`01-kernel.assets`) and passes `go vet` and `go test -race` (46 conformance subtests on memory, modernc and ncruces). 17 issues found, 15 fixed, 2 only partly closable inside this unit (V-02, V-07), both cross-unit.
+
+## Checks
+
+(a) **Architecture conformance.** Non-test imports of all five packages match the matrix of architecture 5.2 exactly (checked with `go list`: `readmodel` imports nothing of ours; `store` imports `freshness`, `scm`; `store/sqlite` imports `store`, `freshness`; `store/memory` and `storetest` import `store`). Test imports did **not** conform (V-05, fixed). `Store` interface and `readmodel` API equal architecture 8.4/8.5 plus the additions listed as deviations D1-D14; `Gone`/`Permanent` are satisfied structurally by the real `job.IsGone`/`job.IsPermanent` (test added). The `Rev`-as-ETag rule needed a boundary (V-07). Deviation D2/D3/D4 etc. check out against architecture 9.2.
+
+(b) **Completeness.** Sections 1-15 present; section 7 is a justified "not applicable" with the data it contributes. Added: Verification log (16). Gaps closed: cache namespace/key ownership (V-08), plan-kind mapping (V-02), warm-start memory peak (V-12).
+
+(c) **Guardrail traceability.** Missing guardrails added to the trace table (V-10). Guardrails searched for cache, eviction, persistence, restart, sort, iteration and shutdown concerns: GR-04, GR-07, GR-12, GR-26, GR-28, GR-29, GR-30, GR-31, GR-32, GR-35, GR-38.
+
+(d) **Technical correctness.** Compiled and ran: original prototype (green), prototype on real kernel (green, exposed V-01), every hypothesis as a test (V-01, V-03, V-04, V-06, V-13, V-14), a 300-seed `ReplaceCatalogue` differential between memory and SQLite (no divergence; algorithm phases A/B reasoned through for unique-index collisions: sound), YAML strict decode. Versions re-checked live: modernc v1.60.1, ncruces v0.35.6, OTel v1.47.0, libc latest v1.78.0 (pin stays v1.77.1), SQLite WAL-reset window 3.7.0 to 3.51.2, fixed 3.51.3 (sqlite.org/wal.html).
+
+(e) **Testability.** Every defect in the trace table has a named test; the differential test was too weak and the suite lacked equivalence checks between the two implementations (V-04, V-16): 7 conformance subtests and 5 package tests added.
+
+(f) **Security / races / lifecycle.** SQL is fully bound; DSN escaping fuzzed by the author; no injection path found. Found: silent drop by `INSERT OR IGNORE` (V-03), accounting window (V-06, theoretical), key case confusion (V-01). Lifecycle (`Run`/`Close` order, idempotent `Close`, degraded probe) read and found consistent with architecture 10.4; no deadlock found.
+
+(g) **Buildability.** An engineer can implement from the document plus assets; the one question they would have asked is who owns the job-kind/item-kind table (V-02, Q12).
+
+## Findings
+
+| Id | Severity | Finding | Evidence | Resolution |
+|---|---|---|---|---|
+| V-01 | high | `store.KeyOf` copied `Owner`/`Name` unfolded, while the kernel's `RepoRef.Key()` and every job-key tail are ASCII-lower-cased: `KeyOf(Acme/Payments-Core)` = `gh/Acme/Payments-Core` vs `gh/acme/payments-core`; every job write for a mixed-case repository would have returned `NoRepoError` (`Gone`) and been dropped. The prototype stub did not fold, so `TestKeyOfMatchesRepoRefKey` passed vacuously | scratch test against the real kernel failed with `KeyOf "gh/Acme/Payments-Core" != RepoRef.Key "gh/acme/payments-core"` | `KeyOf` uses `KeyParts()`; `RepoKey.Validate` rejects ASCII upper-case; new `TestKeyOfFoldsLikeRepoRefKey`, `Catalogue/MixedCaseKeyRejected`; D15 |
+| V-02 | high (cross-unit) | `ItemKey.Kind` was documented as "the `job.Spec.Kind` whose plan the row carries", but unit 09 stores commits under item kind `commits.ring` for job kind `commits.refresh`, and architecture 8.5 itself lists item kinds that are not job kinds. `SavePlans` matches `item.kind` and skips silently, so commit plans were never persisted (every restart would re-fetch), and `KnownKinds` built from job kinds would delete `commits.ring` at every start | `grep` of `09-commits-badges.md` (`ItemKind = "commits.ring"`, `JobKind = "commits.refresh"`); `SavePlans` code (`RowsAffected` ignored) | plan-kind rule (2.5), `scp_store_plan_rows_skipped_total`, T-IN-8, D16, proposal P1, Q12. **Not closed**: needs units 04/09/bridge to confirm |
+| V-03 | medium | `INSERT OR IGNORE INTO commit_log` swallowed a NOT NULL violation: a commit with a nil payload returned `nil` and was not stored on SQLite but was stored by the memory store | scratch test: `append err=<nil> loaded=0` | `ValidateCommit` (payload required), `ON CONFLICT DO NOTHING`, memory validates before mutating; `Commits/EmptyPayloadRejectedAndCallIsAtomic` |
+| V-04 | medium | The memory store accepted inputs SQLite rejected with raw constraint errors, breaking contract rule 6: `PutCache(nil)` (NOT NULL), `SavePlans` with a negative streak (CHECK), `Repo.Meta` that is not JSON (CHECK) | scratch test printed the SQLite constraint errors and `<nil>` for memory | `ValidatePlan`, `ValidateRepo` JSON-object check, nil cache value normalised; three new conformance subtests |
+| V-05 | medium | Test files broke architecture 5.2: `store/sqlite` tests imported `store/memory` (same rank 2), `readmodel` tests imported `job`; the archtest would have failed on first run | `go list -test` import dump | differential test moved to `cmd/scp`; readmodel test restates the behaviour interfaces; rule added to 2.1 |
+| V-06 | low | `PutCache` updates the byte accounting in a post-commit callback after the single connection is released, so a second put could read stale accounting (lost update, cap enforcement drifts until restart). Not reproduced (16 writers x 300 puts x 3 rounds) but reachable under scheduling delay (`manifests` parses with 4 goroutines) | code reading, stress test | `putMu` serialises `PutCache`; `TestCacheAccountingUnderConcurrentPuts`, `Cache/ConcurrentPutsStayWithinTheCap` |
+| V-07 | medium | `Snapshot.Rev(id)` as the per-repository ETag is stale-prone for composite resources that read a global or another entry (membership, graph, aliases): a `304` with an old body | reasoning over architecture 6.1/9.1 and unit 06 section 3.3 | rule 4.1.4, T-RM-11, Q13. Enforcement belongs to `httpapi`/`overview` (their `ETagCoversBody` test) |
+| V-08 | medium (cross-unit) | `store.cache_caps.depsdev` is required by unit 13 (RR-15 "defined here") and `locked` had no owner (Q6, would fail the documented == consumed test) | `grep` unit 13 | `depsdev` added (16MiB, 1MiB..256MiB), `locked` = `manifests.locked`, Q6 resolved, D17 |
+| V-10 | low | Trace table lacked guardrails that concern this unit: GR-03, GR-04, GR-07, GR-12, GR-24, GR-32, GR-35, GR-38, GR-41, and the documentation, manifest and release features | grep of `02-design-guardrails.md` against the trace table | rows added with mechanism and test |
+| V-11 | low | `store.IsResultState` duplicated the kernel's `State.HasResult()` using a mutable package-level map (G5) and the CHECK list was not tied to `freshness.States()` | kernel `freshness.go` | helper removed (D18), `TestItemStatusCheckMatchesFreshnessStates` |
+| V-12 | medium | The prototype warm-start test (the "executable form" of 4.6) called `LoadCatalogue`/`LoadItems` inside `Apply`'s `fn`, contradicting "`fn` MUST NOT do I/O"; and collecting raw payloads before decoding doubles the start-up memory peak | `warm_test.go` | test reordered; 4.6 requires decoding inside the `LoadItems` callback and sizing `GOMEMLIMIT` for the peak |
+| V-13 | low | `ReplaceCatalogue` erased a known GitHub id when the incoming row had id 0 (rename tracking lost afterwards) | `UPDATE ... github_id=?5` | `coalesce(?5, github_id)` on both implementations; `Catalogue/UnknownIncomingGitHubIDKeepsKnownOne` |
+| V-14 | low | `ByteSize` overflow wrapped (`9999999999GiB` decoded to a negative number, other values could wrap into the valid range) | scratch YAML test | overflow rejected; `TestStoreConfigStrictDecode` |
+| V-15 | low | Missing pin notes: `modernc.org/libc` must stay at the version in modernc's own `go.mod` (v1.77.1; v1.78.0 already published); architecture pins Go 1.27.2, prototype ran 1.27.1 | `proxy.golang.org` | note in 5.1 |
+| V-16 | low | `TestDifferentialAgainstMemory` never exercised `ReplaceCatalogue` after the first call, tasks, parked keys, empty payloads, invalid inputs; its error comparison contained dead code (`&& false`) | code reading | rewritten (8 seeds x 500 operations) |
+| V-17 | low | Wording and notes: the ERROR log carries the configured full path (9.2 said paths are never logged); parked keys of a renamed repository are not rewritten; an empty `ReplaceCatalogue` argument cascades by contract and needs the caller's guard; cache keys longer than 512 bytes | code reading | notes added to 9.2, 4.4, 4.5, 6 |
+| V-18 | info | The prototype used kernel stubs and therefore could not detect V-01 and could not prove signature compatibility | stub `scm.go` | prototype now carries the real kernel packages; README updated |
+
+
+## Unresolved
+
+1. **V-02 (high, cross-unit):** units 04, 09 and the bridge must adopt the plan-kind rule (2.5) or the architecture owner must accept proposal P1 (a `plan` table keyed by job kind). Until then commit plans are not persisted and `KnownKinds` must be built from item kinds. Tracked as Q12 and task T-IN-8.
+2. **V-07 (medium, cross-unit):** `httpapi` and `overview` must use `Snapshot.Version()` (not `Rev`) for any resource that reads a global or a second entry; this unit only documents the rule and tests the `Rev` facts.
+3. Not verifiable here: Q1 (Linux read-only root filesystem with `temp_store=MEMORY`), production-hardware benchmark numbers, the real `platform/config` decoder (unit 02 absent), Prometheus name mapping (Q8).

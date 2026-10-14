@@ -1,0 +1,10 @@
+package: api
+output: commits.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+output-options:
+  skip-prune: false
+import-mapping:
+  ../../httpapi/openapi/common.yaml: example.com/scp/internal/httpapi/openapi

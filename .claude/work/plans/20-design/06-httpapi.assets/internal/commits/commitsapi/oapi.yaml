@@ -1,0 +1,6 @@
+package: commitsapi
+output: commits.gen.go
+generate: { models: true, std-http-server: true, strict-server: true }
+compatibility: { always-prefix-enum-values: true }
+import-mapping:
+  ../../httpapi/openapi/common.yaml: github.com/cantara/source-code-portal/internal/httpapi/openapi

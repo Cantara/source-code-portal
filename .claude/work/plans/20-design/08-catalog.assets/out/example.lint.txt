@@ -1,0 +1,6 @@
+error R205 /catalog/groups/2/default_repo: no repository named "Ledger-Service" exists
+error C031 /catalog/groups/3/default_repo: "BillingSearch" is not selected by any matcher of group "search", so it can never be a member
+warning R201 /catalog/groups/1/match/2/exact: matches no repository (exact: "Invoicing")
+warning R202 /catalog/groups/3/match: group "search" has no members
+warning R201 /catalog/groups/3/match/0/exact: matches no repository (exact: "Search")
+5 findings, errors=true

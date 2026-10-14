@@ -1,0 +1,83 @@
+version = 1
+revision = 3
+requires-python = ">=3.12"
+
+[manifest]
+members = ["acme-api", "acme-core", "platform"]
+
+[[package]]
+name = "acme-api"
+version = "0.3.0"
+source = { editable = "packages/api" }
+dependencies = [
+    { name = "acme-core" },
+    { name = "fastapi" },
+]
+
+[[package]]
+name = "acme-core"
+version = "0.2.0"
+source = { editable = "packages/core" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[[package]]
+name = "anyio"
+version = "4.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:1111", size = 1 }
+
+[[package]]
+name = "fastapi"
+version = "0.111.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:2222", size = 1 }
+
+[[package]]
+name = "httpx"
+version = "0.27.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+]
+sdist = { url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:3333", size = 1 }
+
+[[package]]
+name = "platform"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "acme-api" },
+    { name = "httpx" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "acme-api", editable = "packages/api" },
+    { name = "httpx", specifier = ">=0.27" },
+]
+provides-extras = []
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
+
+[[package]]
+name = "pydantic"
+version = "2.7.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:4444", size = 1 }
+
+[[package]]
+name = "pytest"
+version = "8.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/x.tar.gz", hash = "sha256:5555", size = 1 }

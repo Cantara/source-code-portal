@@ -1,0 +1,44 @@
+package assertchk
+
+import (
+	"strings"
+	"testing"
+
+	"go.yaml.in/yaml/v3"
+
+	"github.com/cantara/source-code-portal/internal/manifests"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+)
+
+type root struct {
+	Manifests manifests.Config `yaml:"manifests" jsonschema_description:"Package manifest intelligence."`
+}
+
+func TestLoadThroughPlatformConfig(t *testing.T) {
+	def, err := yaml.Marshal(map[string]any{"manifests": manifests.DefaultConfig()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("defaults head:\n%s", string(def)[:300])
+	var r root
+	res, err := config.Load(&r, config.Options{Defaults: def, Environ: []string{"SCP_MANIFESTS_ACQUISITION_EXCLUDE_SEGMENTS=a,b", "SCP_MANIFESTS_LIMITS_LOCKFILE_BYTES=16MiB", "SCP_MANIFESTS_REFRESH_TTL=45m"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Manifests.Acquisition.ExcludeSegments; len(got) != 2 || got[0] != "a" || r.Manifests.Limits.LockfileBytes != 16<<20 || r.Manifests.Refresh.TTL.Minutes() != 45 {
+		t.Fatalf("%+v %v", r.Manifests.Acquisition.ExcludeSegments, res.Applied)
+	}
+	// indexed list variables (what the first revision of the design promised) are unknown variables
+	_, err = config.Load(&root{}, config.Options{Defaults: def, Environ: []string{"SCP_MANIFESTS_ACQUISITION_EXCLUDE_SEGMENTS_0=a"}})
+	t.Logf("indexed env: err=%v", err)
+	_, err = config.Load(&root{}, config.Options{Defaults: def, Environ: []string{"SCP_MANIFESTS_REFRESH_TTL=0s", "SCP_MANIFESTS_GRAPH_MAX_EDGES=5"}})
+	if err == nil || !strings.Contains(err.Error(), "refresh.ttl") || !strings.Contains(err.Error(), "max_edges") {
+		t.Fatalf("%v", err)
+	}
+	t.Log(err)
+	_, err = config.Load(&root{}, config.Options{Defaults: def, Environ: []string{"SCP_MANIFESTS_LIMITS_MAX_FACTS_BYTES=32MiB"}})
+	t.Logf("facts bound: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "max_facts_bytes") {
+		t.Fatalf("%v", err)
+	}
+}

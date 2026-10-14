@@ -1,0 +1,89 @@
+{
+  "operation": "GET /api/v1/commits",
+  "method": "GET",
+  "path_template": "/api/v1/commits",
+  "fingerprint": "f8529801",
+  "case_id": "D3863d",
+  "code_sample": "curl -X GET -H 'If-None-Match;' 'http://127.0.0.1:9191/api/v1/commits?limit=201'",
+  "sequence": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:9191/api/v1/commits?limit=201",
+      "url_template": "http://127.0.0.1:9191/api/v1/commits",
+      "headers": {
+        "User-Agent": "schemathesis/4.31.0",
+        "Accept-Encoding": "gzip, deflate, zstd",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "If-None-Match": "",
+        "X-Schemathesis-TestCaseId": "D3863d"
+      },
+      "response": {
+        "status_code": 400,
+        "headers": {
+          "content-type": "text/plain; charset=utf-8",
+          "x-content-type-options": "nosniff",
+          "date": "Tue, 13 Oct 2026 21:33:31 GMT",
+          "content-length": "64"
+        },
+        "body": "at '': maximum: got 201, want 200\nSchema:\n  null\n\nValue:\n  201\n\n"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "content_type_conformance",
+          "status": "failure",
+          "message": "Undocumented Content-Type\n\nReceived: text/plain; charset=utf-8\nDocumented: application/problem+json"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 1.116609200835228e-05,
+          "mode": "negative"
+        },
+        "components": {
+          "HEADER": "positive",
+          "QUERY": "negative"
+        },
+        "phase": {
+          "name": "coverage",
+          "data": {
+            "type": "CoveragePhaseData",
+            "description": "limit: Value greater than maximum",
+            "location": null,
+            "parameter": "limit",
+            "parameter_location": "QUERY",
+            "scenario": "value_above_maximum"
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {
+          "HEADER": {
+            "If-None-Match": ""
+          },
+          "QUERY": {
+            "limit": 201
+          }
+        }
+      },
+      "path": "/api/v1/commits",
+      "path_parameters": {},
+      "query": {
+        "limit": "201"
+      },
+      "case_headers": {
+        "If-None-Match": ""
+      },
+      "cookies": {},
+      "case_body": {
+        "encoding": "none"
+      },
+      "media_type": null,
+      "parent_index": null
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+[project]
+name = "acme-core"
+version = "0.2.0"
+dependencies = ["pydantic>=2"]

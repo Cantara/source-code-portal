@@ -1,0 +1,46 @@
+--- mod/internal/manifests/api_test.go	2026-10-14 03:24:18
++++ real/internal/manifests/api_test.go	2026-10-14 03:28:47
+@@ -1,9 +1,14 @@
+ package manifests
+ 
+ import (
++	"os"
++	"sync"
++
+ 	"bytes"
+ 	"context"
+ 	"encoding/json"
++	"github.com/cantara/source-code-portal/internal/httpapi/apitest"
++	"github.com/getkin/kin-openapi/openapi3"
+ 	"net/http"
+ 	"net/http/httptest"
+ 	"reflect"
+@@ -52,9 +57,28 @@
+ 	}
+ 	rec := httptest.NewRecorder()
+ 	mux.ServeHTTP(rec, req)
++	if strings.HasPrefix(url, "/api/v1/") && !strings.Contains(url, "sbom") {
++		apitest.ValidateResponse(t, specDoc(t), req, rec)
++	}
+ 	return rec
++}
++
++var specOnce struct {
++	sync.Once
++	doc *openapi3.T
+ }
+ 
++func specDoc(t testing.TB) *openapi3.T {
++	specOnce.Do(func() {
++		b, err := os.ReadFile("testdata/openapi.bundled.yaml")
++		if err != nil {
++			t.Fatal(err)
++		}
++		specOnce.doc = apitest.Load(t, b)
++	})
++	return specOnce.doc
++}
++
+ // decode asserts a 200 and decodes the body; unknown fields fail, so the handlers cannot grow members the contract does not have.
+ func decode[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+ 	t.Helper()

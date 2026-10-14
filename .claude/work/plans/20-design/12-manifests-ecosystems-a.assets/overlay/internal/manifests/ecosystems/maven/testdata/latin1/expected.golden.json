@@ -1,0 +1,74 @@
+{
+  "parsed": [
+    {
+      "file": "pom.xml",
+      "parser": "maven/pom",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "maven:no.example/norsk",
+          "display": "norsk",
+          "version": "1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:g/a",
+          "display": "g:a",
+          "requirement": "1",
+          "resolution": "declared",
+          "scope": "unknown",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        }
+      ],
+      "properties": {
+        "name": "Blåbærsyltetøy",
+        "packaging": "jar"
+      },
+      "toolchain": {
+        "language": "java",
+        "tool": "maven"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#maven",
+      "ecosystem": "maven",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "pom.xml (maven/pom)"
+      ],
+      "provides": [
+        {
+          "id": "maven:no.example/norsk",
+          "display": "no.example:norsk",
+          "version": "1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:g/a",
+          "display": "g:a",
+          "requirement": "1",
+          "version": "1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        }
+      ],
+      "toolchain": {
+        "language": "java",
+        "packaging": "jar",
+        "tool": "maven"
+      }
+    }
+  ]
+}

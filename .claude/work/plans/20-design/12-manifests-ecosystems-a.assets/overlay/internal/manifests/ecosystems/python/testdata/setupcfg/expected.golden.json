@@ -1,0 +1,141 @@
+{
+  "parsed": [
+    {
+      "file": "setup.cfg",
+      "parser": "pypi/setup-cfg",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "pypi:sample-tool",
+          "display": "sample_tool",
+          "version": "0.9.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:click",
+          "display": "click",
+          "requirement": "\u003e=7.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "install_requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:attrs",
+          "display": "attrs",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "install_requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "tests_require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "pypi:pyyaml",
+          "display": "PyYAML",
+          "requirement": "\u003e=5",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "yaml",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "\u003e=3.8"
+      },
+      "licenses": [
+        "BSD-3-Clause"
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#pypi",
+      "ecosystem": "pypi",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "setup.cfg (pypi/setup-cfg)"
+      ],
+      "provides": [
+        {
+          "id": "pypi:sample-tool",
+          "display": "sample_tool",
+          "version": "0.9.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:click",
+          "display": "click",
+          "requirement": "\u003e=7.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "install_requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:attrs",
+          "display": "attrs",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "install_requires",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "tests_require",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 11
+        },
+        {
+          "target": "pypi:pyyaml",
+          "display": "PyYAML",
+          "requirement": "\u003e=5",
+          "resolution": "declared",
+          "scope": "optional",
+          "group": "yaml",
+          "optional": true,
+          "source": "registry",
+          "confidence": "exact",
+          "line": 15
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "\u003e=3.8",
+        "tool": "pip"
+      },
+      "licenses": [
+        "BSD-3-Clause"
+      ]
+    }
+  ]
+}

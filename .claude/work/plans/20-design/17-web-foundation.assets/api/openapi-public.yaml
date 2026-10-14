@@ -1,0 +1,2012 @@
+openapi: 3.1.0
+info:
+  title: Source Code Portal API
+  version: 1.0.0
+  summary: Read-only JSON API of the Source Code Portal (SCP), the contract of the SPA, of scripts and of LLM agents.
+  description: |
+    The OpenAPI 3.1 document is the source of truth (04 D-16, ADR-020): handlers are generated as strict servers
+    from it, requests are validated against it in production, the TypeScript client is generated from it.
+    Base path `/api/v1`; the URL carries the major version only.
+
+    ## What this API is
+    Everything the portal shows is available as JSON here: groups and repositories, the commit log, rendered
+    documentation (sanitised HTML plus structured metadata), package-manifest intelligence (technology,
+    dependencies, the organisation-wide internal dependency graph, version spread, licences, CycloneDX export),
+    config-driven pages, the site settings and the snapshot version used for live updates. It is read-only; the
+    only mutation (`POST /api/v1/admin/jobs/retry`) exists on the admin listener only.
+
+    ## Not in this document (server-only routes, never answered by the SPA)
+    `GET /badges/{repo}/{kind}.svg`, `GET /badges/groups/{groupId}/{kind}.svg`, `GET /media/...`,
+    `GET /llms.txt`, `/llms-full.txt`, `/groups/{groupId}/llms.txt`, `/repos/{repo}/llms.txt`,
+    `GET /repos/{repo}/readme.md`, `/repos/{repo}/docs/{path}.md`, `/repos/{repo}/dependencies.md`,
+    `POST /webhooks/github`, `GET /livez`, `GET /readyz`, `/sitemap.xml`, `/robots.txt`, `/schemas/scp/{file}`.
+    They are listed in `x-scp-server-routes` below and in the endpoint catalogue.
+
+    ## Conventions (binding; architecture 11.4)
+    * **Names.** Plural nouns, camelCase JSON members, lower-case hyphenated enum values, unique camelCase `operationId`s,
+      one tag per feature package. Identifiers are strings.
+    * **Time.** RFC 3339 `date-time`, always UTC with `Z`. Durations are integers named `...Seconds`, sizes are bytes.
+    * **Null versus absent.** `null` only where the schema says `type: [T, "null"]` and then means "known to be empty";
+      an optional object is omitted when it does not apply; arrays are `[]`, never null.
+    * **Envelopes.** Collections are `{items, page, freshness}`, never bare arrays. Single resources that come from
+      cached GitHub data carry `freshness`.
+    * **Freshness.** `freshness` is derived at read time. Once any snapshot exists the API answers `200` with
+      `status: stale` rather than failing; only a cold start without data answers `503 not-ready`.
+    * **Pagination.** Cursor (keyset) pagination: `limit` (default 50, max 200) and opaque `cursor`; no total count.
+      Collections bounded by configuration return everything in one page (`limit` default and maximum 1000).
+      The next page is also advertised as `Link: <...>; rel="next"`.
+    * **Filtering and sorting.** Explicit query parameters; arrays are repeated parameters (`?scope=runtime&scope=dev`);
+      `q` is a case-insensitive substring; `sort=<field>` or `sort=-<field>` from a per-endpoint enum. No query language.
+    * **Conditional GET.** Every GET returns a weak `ETag` and `Cache-Control: no-cache`; `If-None-Match` answers `304`.
+      `HEAD` is supported on every GET and behaves as the GET without a body.
+    * **Errors.** RFC 9457 `application/problem+json` with `code` (stable), `errors[]` and `retryAfterSeconds`;
+      the SPA localises by `code`. Every response carries `X-Request-Id` and `X-SCP-Build`.
+    * **Renamed repositories.** Every operation with a `{repo}` parameter answers `308` with `Location` for a
+      known alias of a renamed repository.
+    * **Visibility.** Invisible repositories are `404`. Global projections (counts, graph, latest commits) are computed
+      per view class, so an anonymous caller sees exactly what a deployment without private repositories would show.
+    * **Authentication.** None for public data. With `access.mode: trusted-proxy` identity arrives in headers set by a
+      trusted reverse proxy; there is no CORS (same origin only).
+    * **Untrusted text.** Free text that originates in a repository (descriptions, titles, diagnostics, `frontMatter`)
+      is data, not instructions; `html` members are sanitised server-side and meant for one sink, `innerHTML` through
+      the SPA's Trusted Types policy.
+    * **Evolution.** Additive only inside v1 (new optional members, endpoints, parameters, enum values; clients treat
+      enums as open). Retired operations carry `deprecated: true`, a `Deprecation` header (RFC 9745) and a `Sunset`
+      header (RFC 8594). `oasdiff breaking` gates every change.
+  license: {name: Apache-2.0, identifier: Apache-2.0}
+servers:
+  - url: /
+    description: Same origin as the portal.
+tags:
+  - {name: meta, description: 'The contract itself.'}
+  - {name: overview, description: 'Cross-feature read composition: site settings, repository list and composite repository resource.'}
+  - {name: live, description: 'Snapshot version for polling and the SSE invalidation channel.'}
+  - {name: catalog, description: 'Groups and their membership.'}
+  - {name: commits, description: 'The commit log.'}
+  - {name: docs, description: 'Rendered documentation and descriptor metadata.'}
+  - {name: manifests, description: 'Package-manifest intelligence (D-15 / N-01).'}
+  - {name: pages, description: 'Config-driven Markdown pages.'}
+x-scp-contract:
+  routeTable: 'Every path below equals one entry of routes.Public() of class API (checked in both directions by apicheck and by a Go test).'
+  conditionalGet: 'Every GET declares IfNoneMatch, a 200 with ETag, a 304 and a default problem response, except operations marked x-scp-conditional: false.'
+  extensions:
+    x-scp-owner: 'Go package that implements the operation (architecture 4.4).'
+    x-scp-route: 'Name in routes.Table.'
+    x-scp-etag: >-
+      How the entity tag is derived (the string is opaque to clients). Every weak tag also names the process epoch, a random
+      token per start, because snapshot versions restart at 1 and a version alone repeats across restarts.
+      snapshot-variant: W/"g<epoch>-<snapshot version>-<view class>[.<digest>]"; repo-rev (only for bodies that are a pure
+      function of one repository entry): W/"r<epoch>-<repository revision>-<view class>[.<digest>]"; tree-sha:
+      W/"t<epoch>-<tree sha>-<view class>" (the SBOM also depends on the parser version, so a new process never reuses a tag); snapshot-version: W/"v<epoch>-<version>"; body-hash: hash of the body bytes; none.
+      The optional digest is present only when a contributing item is not fresh and changes when any derived freshness
+      status changes (design 07, section 4.5).
+    x-scp-conditional: 'false when conditional GET does not apply (streams).'
+    x-scp-since: 'Contract version that introduced the operation when later than 1.0.'
+    x-scp-flag: 'Configuration key that switches the operation on.'
+    x-scp-untrusted: 'true on schema members that carry repository-authored text.'
+x-scp-server-routes:
+  - {pattern: 'GET /badges/{repo}/{file}', owner: badges, contentType: image/svg+xml}
+  - {pattern: 'GET /badges/groups/{groupId}/{file}', owner: badges, contentType: image/svg+xml}
+  - {pattern: 'GET /media/{repo}/{ref}/{path...}', owner: media}
+  - {pattern: 'GET /media/ext/{sig}/{id}', owner: media}
+  - {pattern: 'GET /llms.txt', owner: overview, contentType: 'text/plain; charset=utf-8'}
+  - {pattern: 'GET /llms-full.txt', owner: overview, contentType: 'text/plain; charset=utf-8'}
+  - {pattern: 'GET /groups/{groupId}/llms.txt', owner: overview}
+  - {pattern: 'GET /repos/{repo}/llms.txt', owner: overview}
+  - {pattern: 'GET /repos/{repo}/readme.md', owner: docs, contentType: 'text/markdown; charset=utf-8'}
+  - {pattern: 'GET /repos/{repo}/docs/{path...}', owner: docs, contentType: 'text/markdown; charset=utf-8'}
+  - {pattern: 'GET /repos/{repo}/dependencies.md', owner: manifests, contentType: 'text/markdown; charset=utf-8'}
+  - {pattern: 'POST /webhooks/github[/{source}]', owner: webhook}
+  - {pattern: 'GET /livez, GET /readyz', owner: ops}
+  - {pattern: 'GET /sitemap.xml, GET /robots.txt, GET /schemas/scp/{file}', owner: overview}
+security: []
+x-scp-fixtures:
+  description: >-
+    Canonical example values (YAML anchors) shared by the response examples below; one consistent fictional
+    organisation "acme". The same values are the seed of the contract mock server used by Schemathesis and by the MSW handlers of the SPA tests.
+  freshCatalog: &freshCatalog {status: fresh, kind: catalog.stats, asOf: '2026-10-14T09:40:51Z', fetchedAt: '2026-10-14T09:41:07Z', checkedAt: '2026-10-14T09:41:07Z', staleSince: null, lastErrorCode: null}
+  freshCommits: &freshCommits {status: fresh, kind: commits.view, asOf: '2026-10-14T08:12:44Z', fetchedAt: '2026-10-14T08:13:02Z', checkedAt: '2026-10-14T09:38:02Z', staleSince: null, lastErrorCode: null}
+  freshDocs: &freshDocs {status: fresh, kind: docs.repo, asOf: '2026-10-02T14:40:00Z', fetchedAt: '2026-10-14T09:12:30Z', checkedAt: '2026-10-14T09:12:30Z', staleSince: null, lastErrorCode: null}
+  freshManifests: &freshManifests {status: stale, kind: manifests.repo, asOf: '2026-10-14T07:40:11Z', fetchedAt: '2026-10-14T07:41:07Z', checkedAt: '2026-10-14T09:41:07Z', staleSince: '2026-10-14T08:26:07Z', lastErrorCode: rate_limited}
+  freshPages: &freshPages {status: fresh, kind: pages.set, asOf: '2026-10-01T08:00:00Z', fetchedAt: '2026-10-14T06:00:00Z', checkedAt: '2026-10-14T06:00:00Z', staleSince: null, lastErrorCode: null}
+  commitA: &commitA {sha: 3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f, repo: billing-service, subject: Fix rounding of VAT on credit notes, authorLogin: kari-n, authorName: Kari Nordmann, committedAt: '2026-10-14T08:12:44Z', url: 'https://github.com/acme/billing-service/commit/3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f'}
+  commitB: &commitB {sha: 8d1e5b7a2c9f4036a1d8e7b5c2f09a4d6e3b1c87, repo: core-lib, subject: Bump guava to 33.3.1-jre, authorLogin: null, authorName: Dependabot, committedAt: '2026-10-14T07:55:02Z', url: 'https://github.com/acme/core-lib/commit/8d1e5b7a2c9f4036a1d8e7b5c2f09a4d6e3b1c87'}
+  descriptorOk: &descriptorOk {present: true, file: .github/scp.yaml, schema: 1, problems: []}
+  docReadme: &docReadme {id: readme, title: Billing Service, description: null, path: README.md, format: markdown, bridged: false, state: resident, order: null, tags: [], section: [], uiUrl: /repos/billing-service, apiUrl: /api/v1/repos/billing-service/docs/readme, markdownUrl: /repos/billing-service/readme.md, sourceUrl: 'https://github.com/acme/billing-service/blob/3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f/README.md', blobSha: 7a21c4e9d0b35f8a6e1d2c7b9f40a3e5d8c1b6f2, updatedAt: '2026-10-02T14:40:00Z'}
+  docInstall: &docInstall {id: docs~install.md, title: Installation, description: Installing and configuring the service, path: docs/install.md, format: markdown, bridged: false, state: resident, order: 10, tags: [setup], section: [Guides], uiUrl: /repos/billing-service/docs/docs/install, apiUrl: /api/v1/repos/billing-service/docs/docs~install.md, markdownUrl: /repos/billing-service/docs/docs/install.md, sourceUrl: 'https://github.com/acme/billing-service/blob/3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f/docs/install.md', blobSha: b5d09e7c1a3f48620d9e1c7a5b3f8e2d4c6a0917, updatedAt: '2026-10-02T14:40:00Z'}
+  docInstallFull: &docInstallFull
+    id: docs~install.md
+    title: Installation
+    description: Installing and configuring the service
+    path: docs/install.md
+    format: markdown
+    bridged: false
+    state: resident
+    order: 10
+    tags: [setup]
+    section: [Guides]
+    uiUrl: /repos/billing-service/docs/docs/install
+    apiUrl: /api/v1/repos/billing-service/docs/docs~install.md
+    markdownUrl: /repos/billing-service/docs/docs/install.md
+    sourceUrl: 'https://github.com/acme/billing-service/blob/3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f/docs/install.md'
+    blobSha: b5d09e7c1a3f48620d9e1c7a5b3f8e2d4c6a0917
+    updatedAt: '2026-10-02T14:40:00Z'
+    repo: billing-service
+    html: '<h1 id="doc-installation">Installation</h1><p>Run <code>docker compose up</code>. See <a href="/repos/billing-service/docs/docs/config.md">Configuration</a>.</p>'
+    toc: [{depth: 1, text: Installation, id: doc-installation}]
+    frontMatter: {order: 10, tags: [setup]}
+    links: [{text: Configuration, href: /repos/billing-service/docs/docs/config.md, kind: doc}]
+    problems: []
+    renderedBy: scp
+    normalised: []
+    wordCount: 412
+    freshness: *freshDocs
+  repoSummaryCoreLib: &repoSummaryCoreLib
+    slug: core-lib
+    name: core-lib
+    owner: acme
+    title: {value: Core Library, source: descriptor}
+    summary: {value: Shared building blocks for Acme services., source: descriptor}
+    type: {value: library, source: descriptor}
+    lifecycle: {value: production, source: descriptor}
+    archived: false
+    fork: false
+    visibility: public
+    defaultBranch: main
+    htmlUrl: 'https://github.com/acme/core-lib'
+    tags: [{value: java, source: github-topics}, {value: platform, source: descriptor}]
+    groups: [{id: platform, displayName: Platform}]
+    stats:
+      openIssues: 4
+      stars: 12
+      license: {spdxId: Apache-2.0, name: Apache License 2.0}
+      latestRelease: {tag: v2.7.1, name: Core 2.7.1, url: 'https://github.com/acme/core-lib/releases/tag/v2.7.1', prerelease: false, publishedAt: '2026-10-02T12:00:00Z'}
+      pushedAt: '2026-10-14T07:55:02Z'
+      headSha: 8d1e5b7a2c9f4036a1d8e7b5c2f09a4d6e3b1c87
+      lastCommitAt: '2026-10-14T07:55:02Z'
+    badges:
+      - {kind: issues, url: /badges/core-lib/issues.svg, label: open issues}
+      - {kind: last-commit, url: /badges/core-lib/last-commit.svg, label: last commit}
+      - {kind: release, url: /badges/core-lib/release.svg, label: latest release}
+      - {kind: licence, url: /badges/core-lib/licence.svg, label: licence}
+    uiUrl: /repos/core-lib
+    apiUrl: /api/v1/repos/core-lib
+    markdownUrl: /repos/core-lib/readme.md
+    freshness: *freshCatalog
+  repoBillingService: &repoBillingService
+    slug: billing-service
+    name: billing-service
+    owner: acme
+    title: {value: Billing Service, source: descriptor}
+    summary: {value: Creates invoices and credit notes and publishes payment events., source: descriptor}
+    type: {value: service, source: descriptor}
+    lifecycle: {value: production, source: descriptor}
+    archived: false
+    fork: false
+    visibility: public
+    defaultBranch: main
+    htmlUrl: 'https://github.com/acme/billing-service'
+    tags: [{value: java, source: github-topics}, {value: invoicing, source: descriptor}]
+    groups: [{id: billing, displayName: Billing}, {id: platform, displayName: Platform}]
+    stats:
+      openIssues: 9
+      stars: 3
+      license: {spdxId: Apache-2.0, name: Apache License 2.0}
+      latestRelease: {tag: v3.3.0, name: null, url: 'https://github.com/acme/billing-service/releases/tag/v3.3.0', prerelease: false, publishedAt: '2026-09-20T10:00:00Z'}
+      pushedAt: '2026-10-14T08:12:44Z'
+      headSha: 3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f
+      lastCommitAt: '2026-10-14T08:12:44Z'
+    badges:
+      - {kind: issues, url: /badges/billing-service/issues.svg, label: open issues}
+      - {kind: build, url: /badges/billing-service/build.svg, label: build}
+    uiUrl: /repos/billing-service
+    apiUrl: /api/v1/repos/billing-service
+    markdownUrl: /repos/billing-service/readme.md
+    freshness: *freshCatalog
+    description: Invoicing and credit notes for the Acme platform.
+    owners: [{handle: '@acme/billing-core', kind: team, source: descriptor}]
+    links:
+      - {url: 'https://wiki.acme.example/billing/runbook', title: Runbook, type: runbook, source: descriptor}
+    system: billing
+    apis: [{type: openapi, title: REST API, path: api/openapi.yaml, url: null, sourceUrl: 'https://github.com/acme/billing-service/blob/3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f/api/openapi.yaml', source: descriptor}]
+    dependsOn: [{repo: core-lib, slug: core-lib, resolved: true, source: own}, {repo: archived-ledger, resolved: false, source: descriptor}]
+    docs: [*docReadme, *docInstall]
+    descriptor: *descriptorOk
+    statuses:
+      - {provider: jenkins, state: ok, summary: 'Build #482 passed in 3m 12s', detailUrl: 'https://jenkins.acme.example/job/billing-service/482/', observedAt: '2026-10-14T09:30:00Z', counts: {}, freshness: {status: fresh, kind: integrations.jenkins, asOf: '2026-10-14T09:30:00Z', fetchedAt: '2026-10-14T09:30:05Z', checkedAt: '2026-10-14T09:30:05Z', staleSince: null, lastErrorCode: null}}
+    technology:
+      languages: [{name: Java, bytes: 412339, share: 0.952}, {name: Kotlin, bytes: 20881, share: 0.048}]
+      ecosystems: [maven]
+      buildTools: [maven]
+      toolchain: {java: '21'}
+      unitCount: 1
+      directDependencyCount: 18
+      internalDependencyCount: 3
+      diagnosticCount: 1
+      parsedAt: '2026-10-14T07:41:07Z'
+      manifestsUrl: /api/v1/repos/billing-service/manifests
+    latestCommits: [*commitA]
+    sections:
+      commits: *freshCommits
+      docs: *freshDocs
+      manifests: *freshManifests
+  repoManifests: &repoManifests
+    repo: billing-service
+    treeSha: 9fceb02d0ae598e95dc970b74767f19372d61af8
+    commitSha: 3f2a9c1d7b5e4a0f8c6d2b1a9e7f5c3d1b0a8e6f
+    parsedAt: '2026-10-14T07:41:07Z'
+    truncated: false
+    languages: [{name: Java, bytes: 412339, share: 0.952}, {name: Kotlin, bytes: 20881, share: 0.048}]
+    ecosystems: [{ecosystem: maven, units: 1, dependencies: 18}]
+    toolchain: {java: '21'}
+    units:
+      - id: 'billing-service#.'
+        dir: .
+        ecosystem: maven
+        role: primary
+        provides: [{purl: 'pkg:maven/org.acme.billing/billing-service', version: 3.4.0-SNAPSHOT, kind: application}]
+        toolchain: {java: '21'}
+        files: [{path: pom.xml, blobSha: e69de29bb2d1d6434b8b29ae775ad8c2e48c5391, parser: 'maven/pom@3', kind: manifest}]
+        counts: {direct: 18, internal: 3, locked: 0}
+        diagnostics: [{code: maven.unresolved-managed-version, message: 'version for com.google.guava:guava comes from a BOM that was not fetched', severity: warning, loc: {path: pom.xml, line: 71}}]
+    counts: {units: 1, directDependencies: 18, internalDependencies: 3, lockedComponents: 0}
+    diagnostics: []
+    freshness: *freshManifests
+  depCoreLib: &depCoreLib {purl: 'pkg:maven/org.acme.platform/core-lib', ecosystem: maven, namespace: org.acme.platform, name: core-lib, requirement: '${core.version}', version: 2.7.1, resolution: managed, scope: runtime, group: compile, relationship: direct, optional: false, condition: null, source: registry, sourceRef: null, confidence: exact, loc: {path: pom.xml, line: 58}, unit: 'billing-service#.', internal: {repo: core-lib, unit: 'core-lib#.', version: 2.7.1}, provenance: own}
+  depGuava: &depGuava {purl: 'pkg:maven/com.google.guava/guava', ecosystem: maven, namespace: com.google.guava, name: guava, requirement: '', version: 33.3.1-jre, resolution: managed, scope: runtime, group: compile, relationship: direct, optional: false, condition: null, source: registry, sourceRef: null, confidence: exact, loc: {path: pom.xml, line: 71}, unit: 'billing-service#.', provenance: own}
+  dependencyGraph: &dependencyGraph
+    nodes:
+      - {id: 'billing-service#.', repo: billing-service, dir: ., ecosystem: maven, label: billing-service, artifacts: ['pkg:maven/org.acme.billing/billing-service'], inDegree: 0, outDegree: 1, inCycle: false}
+      - {id: 'core-lib#.', repo: core-lib, dir: ., ecosystem: maven, label: core-lib, artifacts: ['pkg:maven/org.acme.platform/core-lib'], inDegree: 1, outDegree: 0, inCycle: false}
+    edges: [{from: 'billing-service#.', to: 'core-lib#.', component: 'pkg:maven/org.acme.platform/core-lib', requirement: '${core.version}', version: 2.7.1, scope: runtime, intra: false, versionStatus: current}]
+    cycles: []
+    summary: {repos: 2, units: 2, edges: 1, cycles: 0, ecosystems: [{ecosystem: maven, units: 2, dependencies: 21}]}
+    truncated: false
+    freshness: *freshManifests
+  spreadGuava: &spreadGuava {purl: 'pkg:maven/com.google.guava/guava', ecosystem: maven, namespace: com.google.guava, name: guava, internal: false, users: 134, repos: 130, distinctVersions: 2, versions: [{version: 33.3.1-jre, units: 120, repos: 118}, {version: 32.1.3-jre, units: 14, repos: 14}], latestKnown: 33.3.1-jre}
+  componentCoreLib: &componentCoreLib {purl: 'pkg:maven/org.acme.platform/core-lib', ecosystem: maven, namespace: org.acme.platform, name: core-lib, internal: true, producers: [{repo: core-lib, unit: 'core-lib#.', version: 2.7.1, kind: library, ambiguous: false}], users: 41, repos: 39, versions: [{version: 2.7.1, units: 30, repos: 29}, {version: 2.5.0, units: 11, repos: 10}], dependentsUrl: '/api/v1/components/dependents?purl=pkg%3Amaven%2Forg.acme.platform%2Fcore-lib', freshness: *freshManifests}
+  dependentBilling: &dependentBilling {repo: billing-service, unit: 'billing-service#.', ecosystem: maven, requirement: '${core.version}', version: 2.7.1, resolution: managed, scope: runtime, direct: true, versionStatus: current, loc: {path: pom.xml, line: 58}}
+paths:
+  /api/v1/openapi.yaml:
+    get:
+      operationId: getOpenApiDocument
+      summary: This contract
+      description: >-
+        The bundled OpenAPI 3.1 document of the listener that answers (the public listener serves the public
+        document, the admin listener the admin document). Embedded in the binary; the strong ETag is the content hash.
+      tags: [meta]
+      x-scp-owner: apispec
+      x-scp-route: api.openapi
+      x-scp-etag: body-hash
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The OpenAPI document.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/yaml:
+              schema: {type: string}
+              example: "openapi: 3.1.0\ninfo:\n  title: Source Code Portal API\n  version: 1.0.0\n"
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/site:
+    get:
+      operationId: getSite
+      summary: Site settings and header status
+      description: >-
+        Branding, navigation, the optional announcement, the display time zone and theme default, the time of the last
+        successful full sync and the number of tracked repositories for the caller's view class (Q-17).
+        Everything comes from the `site:` configuration block; the embedded default is neutral (GR-14).
+      tags: [overview]
+      x-scp-owner: overview
+      x-scp-route: api.site
+      x-scp-etag: snapshot-variant
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Site settings.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Site'}
+              example:
+                title: Acme Source Code Portal
+                description: Repositories, documentation and dependencies of the Acme platform teams.
+                nav:
+                  - {label: Docs, kind: page, page: about}
+                  - {label: Status page, kind: external, url: 'https://status.acme.example'}
+                announcement: {id: 'b7e41c0a', text: 'GitHub maintenance on Saturday 02:00-03:00 UTC; data may be stale.', level: info, dismissible: true}
+                displayTimeZone: Europe/Oslo
+                defaultTheme: system
+                lastFullSync: '2026-10-14T09:41:07Z'
+                repoCount: 212
+                groupCount: 14
+                features: {manifests: true, sse: false, integrations: [jenkins]}
+                build: {version: 1.0.0, commit: 9c4e1f2, buildId: 9c4e1f2, goVersion: go1.27.2}
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/snapshot:
+    get:
+      operationId: getSnapshot
+      summary: Snapshot version for live updates
+      description: >-
+        The version of the immutable read model that answers requests. The SPA polls this endpoint (visibility-aware,
+        15-30 s; the browser revalidates with the weak ETag, which names the process as well as the version, so an unchanged
+        snapshot costs one 304) and invalidates its cached queries when the version **differs** from the last one it saw
+        (never when it is merely greater: versions restart at 1 whenever the process restarts). Unlike every other
+        operation it never answers `503 not-ready`: a cold start is `readiness: warming` with version 0 (ADR-009).
+      tags: [live]
+      x-scp-owner: live
+      x-scp-route: api.snapshot
+      x-scp-etag: snapshot-version
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Current snapshot.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snapshot'}
+              example: {version: 1841, builtAt: '2026-10-14T09:41:07Z', readiness: ready, buildId: 9c4e1f2}
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/events:
+    get:
+      operationId: streamEvents
+      summary: Invalidation event stream (Server-Sent Events)
+      description: |-
+        `text/event-stream`. An **invalidation channel only**: payloads carry no resource data, so a lost or replayed
+        event is harmless and the contract of every other operation is unchanged (ADR-009). The client invalidates the
+        named query topics and the ordinary conditional GETs transfer the data.
+
+        Wire format: `retry: 3000` is sent first; every event has `id: <snapshot version>`, an `event:` name and one
+        `data:` line of JSON; a comment line `: hb` is sent every 15 s. Events:
+
+        | event | data schema | meaning |
+        |---|---|---|
+        | `hello` | `SseHello` | first event of every connection: current generation and build id |
+        | `invalidate` | `SseInvalidate` | the named topics changed in the new generation (debounced 250-500 ms) |
+        | `resync` | `SseResync` | the client is further behind than the 256-entry ring, or its `Last-Event-ID` is ahead of this process (a restart): invalidate everything |
+
+        A build id different from the SPA's means a new deployment: reload. Per-IP limit: 4 concurrent streams. On
+        shutdown the server sends `retry: 30000` and closes. The stream is never compressed and is excluded from the
+        write timeout (`http.ResponseController`). Available when `live.sse.enabled` is true; otherwise `404 feature-disabled`.
+      tags: [live]
+      x-scp-owner: live
+      x-scp-route: api.events
+      x-scp-conditional: false
+      x-scp-since: '1.1'
+      x-scp-flag: live.sse.enabled
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          description: >-
+            Snapshot version of the last event the client saw (sent automatically by `EventSource`). A value ahead of the
+            current version (the server restarted; versions restart at 1) or older than the change ring is answered with a
+            `resync` event right after `hello`.
+          schema: {type: string, pattern: '^[0-9]{1,20}$'}
+      responses:
+        '200':
+          description: The event stream.
+          content:
+            text/event-stream:
+              schema: {$ref: '#/components/schemas/SseEvent'}
+              examples:
+                hello: {summary: 'event: hello', value: {generation: 1841, buildId: 9c4e1f2}}
+                invalidate: {summary: 'event: invalidate', value: {topics: [commits, catalog], generation: 1842}}
+                resync: {summary: 'event: resync', value: {generation: 1900}}
+              x-scp-wire-example: "retry: 3000\n\nid: 1841\nevent: hello\ndata: {\"generation\":1841,\"buildId\":\"9c4e1f2\"}\n\nid: 1842\nevent: invalidate\ndata: {\"topics\":[\"commits\",\"catalog\"],\"generation\":1842}\n\n: hb\n\n"
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/groups:
+    get:
+      operationId: listGroups
+      summary: Groups (dashboard cards)
+      description: >-
+        One entry per configured group in **configuration order**, so operators control the layout (pass
+        `sort=name` for alphabetical order). The card carries the group's description from configuration (GR-14), the
+        default repository's GitHub description, the repository count and the badges of the group's default repository.
+        A group whose default repository is missing degrades (`defaultRepoState: missing`) instead of disappearing (GR-29).
+      tags: [catalog]
+      x-scp-owner: catalog
+      x-scp-route: api.groups
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: sort
+          in: query
+          description: '`config` (default) keeps configuration order; `name` sorts by display name.'
+          schema: {type: string, enum: [config, name], default: config}
+        - $ref: 'common.yaml#/components/parameters/Q'
+        - $ref: 'common.yaml#/components/parameters/LimitBounded'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Groups.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GroupList'}
+              example:
+                items:
+                  - id: platform
+                    displayName: Platform
+                    description: Shared libraries and infrastructure services.
+                    repoCount: 18
+                    defaultRepoState: ok
+                    defaultRepo: {slug: core-lib, name: core-lib, title: Core Library, description: Shared building blocks for Acme services., htmlUrl: 'https://github.com/acme/core-lib', uiUrl: /repos/core-lib}
+                    integrations: [jenkins]
+                    badges:
+                      - {kind: repos, url: /badges/groups/platform/repos.svg, label: repositories}
+                      - {kind: issues, url: /badges/core-lib/issues.svg, label: open issues}
+                      - {kind: last-commit, url: /badges/core-lib/last-commit.svg, label: last commit}
+                      - {kind: release, url: /badges/core-lib/release.svg, label: latest release}
+                      - {kind: build, url: /badges/core-lib/build.svg, label: build}
+                    uiUrl: /groups/platform
+                    commitsUiUrl: /groups/platform/commits
+                    apiUrl: /api/v1/groups/platform
+                    llmsUrl: /groups/platform/llms.txt
+                    freshness: *freshCatalog
+                  - id: billing
+                    displayName: Billing
+                    description: Invoicing and payments.
+                    repoCount: 7
+                    defaultRepoState: missing
+                    integrations: []
+                    badges: [{kind: repos, url: /badges/groups/billing/repos.svg, label: repositories}]
+                    uiUrl: /groups/billing
+                    commitsUiUrl: /groups/billing/commits
+                    apiUrl: /api/v1/groups/billing
+                    llmsUrl: /groups/billing/llms.txt
+                    freshness: *freshCatalog
+                page: {nextCursor: null, limit: 1000}
+                freshness: *freshCatalog
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/groups/{groupId}:
+    get:
+      operationId: getGroup
+      summary: One group
+      description: >-
+        Group metadata, the default repository and the member slugs in configuration order. The group page loads the
+        member table with `listGroupRepos` and the group commit log with `listCommits?group=`.
+        A repository may belong to several groups (Q-07); membership is an explicit index, not a cache key (GR-07).
+      tags: [catalog]
+      x-scp-owner: catalog
+      x-scp-route: api.group
+      x-scp-etag: snapshot-variant
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/GroupIdPath'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The group.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GroupDetail'}
+              example:
+                id: platform
+                displayName: Platform
+                description: Shared libraries and infrastructure services.
+                repoCount: 3
+                defaultRepoState: ok
+                defaultRepo: {slug: core-lib, name: core-lib, title: Core Library, description: Shared building blocks for Acme services., htmlUrl: 'https://github.com/acme/core-lib', uiUrl: /repos/core-lib}
+                integrations: [jenkins]
+                badges:
+                  - {kind: repos, url: /badges/groups/platform/repos.svg, label: repositories}
+                  - {kind: issues, url: /badges/core-lib/issues.svg, label: open issues}
+                uiUrl: /groups/platform
+                commitsUiUrl: /groups/platform/commits
+                apiUrl: /api/v1/groups/platform
+                llmsUrl: /groups/platform/llms.txt
+                repos: [core-lib, auth-client, billing-service]
+                freshness: *freshCatalog
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/groups/{groupId}/repos:
+    get:
+      operationId: listGroupRepos
+      summary: Repositories of a group
+      description: >-
+        The repository table of a group page: every member, with metadata resolved from the descriptor, GitHub and the
+        catalogue, the repository statistics and the badge URLs. Same item shape and filters as `listRepos`, restricted
+        to the group (a `group` filter is not accepted here).
+      tags: [overview]
+      x-scp-owner: overview
+      x-scp-route: api.group.repos
+      x-scp-etag: snapshot-variant
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/GroupIdPath'
+        - $ref: '#/components/parameters/RepoFilterQ'
+        - $ref: '#/components/parameters/RepoFilterLifecycle'
+        - $ref: '#/components/parameters/RepoFilterType'
+        - $ref: '#/components/parameters/RepoFilterTag'
+        - $ref: '#/components/parameters/RepoFilterArchived'
+        - $ref: '#/components/parameters/RepoSort'
+        - $ref: 'common.yaml#/components/parameters/LimitBounded'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Member repositories.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RepoList'}
+              example:
+                items:
+                  - *repoSummaryCoreLib
+                page: {nextCursor: null, limit: 1000}
+                freshness: *freshCatalog
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/repos:
+    get:
+      operationId: listRepos
+      summary: Repositories
+      description: >-
+        All tracked repositories visible to the caller, with the filters of the group and search views. Hidden
+        repositories (`hidden: true` in the descriptor) are omitted. Config-bounded: the whole catalogue (at most 1,000)
+        is one page by default.
+      tags: [overview]
+      x-scp-owner: overview
+      x-scp-route: api.repos
+      x-scp-etag: snapshot-variant
+      parameters:
+        - $ref: '#/components/parameters/RepoFilterQ'
+        - name: group
+          in: query
+          description: Only members of these groups (repeat to union).
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 50, items: {$ref: 'common.yaml#/components/schemas/GroupId'}}
+        - $ref: '#/components/parameters/RepoFilterLifecycle'
+        - $ref: '#/components/parameters/RepoFilterType'
+        - $ref: '#/components/parameters/RepoFilterTag'
+        - $ref: '#/components/parameters/RepoFilterArchived'
+        - $ref: '#/components/parameters/RepoSort'
+        - $ref: 'common.yaml#/components/parameters/LimitBounded'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Repositories.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RepoList'}
+              example:
+                items:
+                  - *repoSummaryCoreLib
+                page: {nextCursor: null, limit: 1000}
+                freshness: *freshCatalog
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/repos/{repo}:
+    get:
+      operationId: getRepo
+      summary: Repository (composite resource)
+      description: >-
+        Everything the repository page needs in one call: resolved metadata with provenance, groups, the documentation
+        index, declared APIs, dependencies on other repositories, integration statuses, a technology summary and the
+        newest commits. Each section carries its own freshness in `sections`, so one failed upstream degrades one
+        section, not the page. This is the structured counterpart of `/repos/{repo}.md` for agents.
+      tags: [overview]
+      x-scp-owner: overview
+      x-scp-route: api.repo
+      x-scp-etag: snapshot-variant
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/RepoSlug'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The repository.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Repo'}
+              example: *repoBillingService
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '308': {$ref: 'common.yaml#/components/responses/RepoRenamed'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/commits:
+    get:
+      operationId: listCommits
+      summary: Commit log
+      description: |-
+        Commits of the default branch (Q-18), newest first, across every visible repository or restricted by `repo`
+        and/or `group` (both given: the repository must be a member of the group, otherwise the page is empty). The SPA
+        groups the rows by calendar day in the viewer's zone itself; timestamps are UTC.
+
+        Served by a k-way merge of the per-repository lists held in the snapshot; a page never scans the history and an
+        arbitrary cursor is cheap (architecture 9.5). The dashboard's "latest commits" panel is the first page with a
+        small `limit`. At most 30 commits per repository are retained (`commits.keep`), so the log is bounded by
+        30 x repositories. An unknown or invisible `repo` or `group` is 404, and so is a `repo` that is only the old
+        slug of a renamed repository: the `308` redirect applies to path parameters, never to query values, so a client
+        that holds an old slug re-reads it from `listRepos` (design 07, section 4.7).
+      tags: [commits]
+      x-scp-owner: commits
+      x-scp-route: api.commits
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: repo
+          in: query
+          description: Restrict to one repository (slug).
+          schema: {$ref: 'common.yaml#/components/schemas/Slug'}
+        - name: group
+          in: query
+          description: Restrict to the member repositories of one group.
+          schema: {$ref: 'common.yaml#/components/schemas/GroupId'}
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: A page of commits.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CommitPage'}
+              example:
+                items: [*commitA, *commitB]
+                page: {nextCursor: eyJ2IjoxLCJ0IjoxNzYwNDMxMjAwLCJzIjoiM2YyYTljMSIsImYiOiJhMWIyYzNkNCJ9, limit: 2}
+                freshness: *freshCommits
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/repos/{repo}/docs:
+    get:
+      operationId: listRepoDocs
+      summary: Documentation index of a repository
+      description: >-
+        The README (always present: `state: no_content` with a GitHub link when the repository has none) and every
+        document under the descriptor's `docs.root`, in navigation order: explicit `docs.nav` first, then front-matter
+        `order`, then path. Hidden documents are never listed. Documents beyond the residency budget are listed with
+        `state: not_resident` and no body (architecture 9.4). Also reports the state of the `scp.yaml` descriptor.
+      tags: [docs]
+      x-scp-owner: docs
+      x-scp-route: api.docs.list
+      x-scp-etag: repo-rev
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/RepoSlug'
+        - $ref: 'common.yaml#/components/parameters/Q'
+        - $ref: 'common.yaml#/components/parameters/LimitBounded'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The document index.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocIndex'}
+              example:
+                repo: billing-service
+                items: [*docReadme, *docInstall]
+                counts: {total: 2, resident: 2, notResident: 0}
+                descriptor: *descriptorOk
+                page: {nextCursor: null, limit: 1000}
+                freshness: *freshDocs
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '308': {$ref: 'common.yaml#/components/responses/RepoRenamed'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/repos/{repo}/docs/{docId}:
+    get:
+      operationId: getRepoDoc
+      summary: One rendered document
+      description: |-
+        The document as sanitised HTML plus structured metadata. `html` is produced by the single server-side
+        pipeline (goldmark, rewrite, chroma, sanitiser; ADR-005) and is the only member that may be inserted as HTML;
+        the SPA does so through one component and a Trusted Types policy. It is `null` unless `state` is `resident`
+        (a README that does not exist, a document beyond the residency budget, an unsupported or oversized file).
+        Relative links and images are already rewritten to portal routes, GitHub blob URLs or `/media/...`; heading ids
+        are prefixed `doc-`. `markdownUrl` serves the same content as raw Markdown with `scp:` front matter.
+        A `docId` is `readme` or the repository path with `/` replaced by `~` (see `DocId`).
+      tags: [docs]
+      x-scp-owner: docs
+      x-scp-route: api.docs.get
+      x-scp-etag: repo-rev
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/RepoSlug'
+        - name: docId
+          in: path
+          required: true
+          description: >-
+            The `DocIndexEntry.id` of the document (schema `DocId`). The parameter schema is the *wire form*: the id with
+            every `%` percent-encoded once more (`docs~Release%2520Notes.md` for the id `docs~Release%20Notes.md`), which is
+            what kin-openapi validates; the handler receives the decoded id.
+          schema: {type: string, minLength: 1, maxLength: 3100, pattern: '^[A-Za-z0-9._~%-]+$'}
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The document.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Doc'}
+              example: *docInstallFull
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '308': {$ref: 'common.yaml#/components/responses/RepoRenamed'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/pages:
+    get:
+      operationId: listPages
+      summary: Config-driven pages
+      description: >-
+        The Markdown pages configured under `pages.dir` (operator-authored content, Q-04), ordered by
+        front-matter `order` then slug. Pages named by `site.nav` appear in the navigation; the others are reachable by link.
+      tags: [pages]
+      x-scp-owner: pages
+      x-scp-route: api.pages
+      x-scp-etag: snapshot-variant
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/LimitBounded'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Pages.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PageList'}
+              example:
+                items:
+                  - {slug: about, title: About the portal, summary: What the portal shows and where the data comes from., order: 10, updatedAt: '2026-10-01T08:00:00Z', uiUrl: /pages/about, apiUrl: /api/v1/pages/about}
+                page: {nextCursor: null, limit: 1000}
+                freshness: *freshPages
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/pages/{slug}:
+    get:
+      operationId: getPage
+      summary: One page
+      description: A configured page rendered by the same pipeline as repository documents; `html` is sanitised.
+      tags: [pages]
+      x-scp-owner: pages
+      x-scp-route: api.page
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: {$ref: 'common.yaml#/components/schemas/PageSlug'}
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The page.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Page'}
+              example:
+                slug: about
+                title: About the portal
+                summary: What the portal shows and where the data comes from.
+                order: 10
+                updatedAt: '2026-10-01T08:00:00Z'
+                uiUrl: /pages/about
+                apiUrl: /api/v1/pages/about
+                html: '<h1 id="doc-about-the-portal">About the portal</h1><p>The portal aggregates GitHub repositories.</p>'
+                toc: [{depth: 1, text: About the portal, id: doc-about-the-portal}]
+                freshness: *freshPages
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/repos/{repo}/manifests:
+    get:
+      operationId: getRepoManifests
+      summary: Technology and package manifests of a repository
+      description: >-
+        Summary of what the static parsers found: languages, ecosystems, toolchain facts, the manifest units (a Maven
+        module, an npm package, a Go module, a crate) with the files they came from, counts and diagnostics. Parsing is
+        static (no build tool is ever executed); facts from heuristic parsers (Gradle scripts, `Package.swift`, `Gemfile`)
+        say so in `confidence` and in diagnostics. Every response names the exact tree and blobs it was derived from.
+        Disabled with `manifests.enabled: false` (then `404 feature-disabled`). Facts arrive late after a cold start and
+        are marked stale until then; they never gate readiness.
+      tags: [manifests]
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.repo
+      x-scp-etag: repo-rev
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/RepoSlug'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Manifest summary.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RepoManifests'}
+              example: *repoManifests
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '308': {$ref: 'common.yaml#/components/responses/RepoRenamed'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/repos/{repo}/dependencies:
+    get:
+      operationId: listRepoDependencies
+      summary: Dependencies of a repository
+      description: >-
+        Declared dependencies (and, with `relationship=transitive|all`, the lockfile-resolved components) of all units of
+        the repository, cursor-paged. Internal dependencies (on an artifact produced by another tracked repository) are
+        marked with `internal`. The default order is ecosystem, name, unit; `sort` changes the primary key and the
+        cursor is only valid for the sort it was issued with.
+      tags: [manifests]
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.deps
+      x-scp-etag: snapshot-variant
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/RepoSlug'
+        - name: scope
+          in: query
+          description: Only these scopes (repeat to union).
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 8, items: {$ref: '#/components/schemas/DependencyScope'}}
+        - name: relationship
+          in: query
+          description: '`direct` (default) lists declared dependencies, `transitive` the locked components that are not declared, `all` both.'
+          schema: {type: string, enum: [direct, transitive, all], default: direct}
+        - name: internal
+          in: query
+          description: '`true` keeps only dependencies on other tracked repositories, `false` only external ones.'
+          schema: {type: boolean}
+        - name: ecosystem
+          in: query
+          description: Only these ecosystems (repeat to union).
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 20, items: {$ref: '#/components/schemas/EcosystemId'}}
+        - name: unit
+          in: query
+          description: Only one unit of the repository.
+          schema: {$ref: '#/components/schemas/UnitId'}
+        - $ref: 'common.yaml#/components/parameters/Q'
+        - name: sort
+          in: query
+          schema: {type: string, enum: [name, -name, ecosystem, -ecosystem, scope, -scope], default: ecosystem}
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: A page of dependencies.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DependencyList'}
+              example:
+                repo: billing-service
+                treeSha: 9fceb02d0ae598e95dc970b74767f19372d61af8
+                items: [*depCoreLib, *depGuava]
+                page: {nextCursor: null, limit: 50}
+                freshness: *freshManifests
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '308': {$ref: 'common.yaml#/components/responses/RepoRenamed'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/repos/{repo}/sbom.cdx.json:
+    get:
+      operationId: getRepoSbom
+      summary: CycloneDX SBOM of a repository
+      description: >-
+        The repository's components and dependency edges as a CycloneDX 1.7 JSON document (boundary format; the internal
+        model is richer). Generated from the parsed facts; locked transitive components are included when a lockfile
+        exists. SPDX export is deferred. The body follows the CycloneDX schema, which this document does not restate.
+        The ETag is the weak tree-sha tag (process epoch, tree sha, view class).
+      tags: [manifests]
+      externalDocs: {url: 'https://cyclonedx.org/docs/1.7/json/', description: CycloneDX 1.7 JSON schema}
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.sbom
+      x-scp-etag: tree-sha
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/RepoSlug'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: A CycloneDX document.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/vnd.cyclonedx+json:
+              schema: {type: object, additionalProperties: true, required: [bomFormat, specVersion], properties: {bomFormat: {type: string, const: CycloneDX}, specVersion: {type: string, examples: ['1.7']}}}
+              example:
+                bomFormat: CycloneDX
+                specVersion: '1.7'
+                version: 1
+                metadata: {timestamp: '2026-10-14T09:41:07Z', component: {type: application, name: billing-service, 'bom-ref': 'pkg:maven/org.acme.billing/billing-service@3.4.0-SNAPSHOT'}}
+                components: [{type: library, name: core-lib, group: org.acme.platform, version: 2.7.1, purl: 'pkg:maven/org.acme.platform/core-lib@2.7.1', 'bom-ref': 'pkg:maven/org.acme.platform/core-lib@2.7.1'}]
+                dependencies: [{ref: 'pkg:maven/org.acme.billing/billing-service@3.4.0-SNAPSHOT', dependsOn: ['pkg:maven/org.acme.platform/core-lib@2.7.1']}]
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '308': {$ref: 'common.yaml#/components/responses/RepoRenamed'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/dependencies/graph:
+    get:
+      operationId: getDependencyGraph
+      summary: Organisation-wide internal dependency graph
+      description: |-
+        Nodes are manifest units, edges are declared dependencies on artifacts produced by another tracked unit
+        (matched by published name or by source URL, architecture 13.3). Intra-repository edges (a Maven reactor, a
+        workspace) are hidden unless `intra=true`. `focus` restricts the graph to the neighbourhood of a repository or
+        unit within `depth` hops (both directions). Cycles are the strongly connected components of size > 1.
+
+        The result is capped at 2,000 nodes and 20,000 edges; beyond that the nodes of highest degree are kept and
+        `truncated` is true. `format=mermaid` returns the same graph as Mermaid flowchart text (`text/plain`) for
+        embedding in Markdown; it is capped at 300 nodes. The graph is computed per view class: an anonymous caller
+        sees only public repositories.
+      tags: [manifests]
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.graph
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: group
+          in: query
+          description: Only units of the member repositories of this group.
+          schema: {$ref: 'common.yaml#/components/schemas/GroupId'}
+        - name: scope
+          in: query
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 8, items: {$ref: '#/components/schemas/DependencyScope'}}
+        - name: ecosystem
+          in: query
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 20, items: {$ref: '#/components/schemas/EcosystemId'}}
+        - name: intra
+          in: query
+          description: Include edges inside one repository.
+          schema: {type: boolean, default: false}
+        - name: internal
+          in: query
+          description: Restrict edges to internal dependencies (the only kind the graph has in v1; reserved for external-component nodes).
+          schema: {type: boolean, default: true}
+        - name: focus
+          in: query
+          description: A repository slug or a unit id; the graph is cut to its neighbourhood.
+          schema: {type: string, minLength: 1, maxLength: 420}
+        - name: depth
+          in: query
+          description: Hops from `focus` in either direction.
+          schema: {type: integer, minimum: 1, maximum: 3, default: 1}
+        - name: format
+          in: query
+          schema: {type: string, enum: [json, mermaid], default: json}
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The graph as JSON, or as Mermaid text when `format=mermaid`.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DependencyGraph'}
+              example: *dependencyGraph
+            text/plain:
+              schema: {type: string}
+              example: "flowchart LR\n  billing_service[\"billing-service#.\"] --> core_lib[\"core-lib#.\"]\n"
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/dependencies/versions:
+    get:
+      operationId: getDependencyVersions
+      summary: Version spread of components across the organisation
+      description: >-
+        For every component used by at least one unit, the histogram of versions in use (the locked version when known,
+        else the requirement) with the number of units and repositories. Sorted by number of using units, then purl.
+        Internal artifacts additionally report each consumer's position against the producer's current version
+        (`current`, `behind`, `ahead`, `unknown`) in `getComponent` / `listComponentDependents`. No external data source is
+        involved: "outdated against the registry" is a post-v1 provider.
+      tags: [manifests]
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.versions
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: group
+          in: query
+          schema: {$ref: 'common.yaml#/components/schemas/GroupId'}
+        - name: ecosystem
+          in: query
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 20, items: {$ref: '#/components/schemas/EcosystemId'}}
+        - name: internal
+          in: query
+          description: '`true` only components produced by tracked repositories, `false` only external ones.'
+          schema: {type: boolean}
+        - name: minVersions
+          in: query
+          description: Only components used in at least this many distinct versions (2 shows drift).
+          schema: {type: integer, minimum: 1, maximum: 100, default: 1}
+        - $ref: 'common.yaml#/components/parameters/Q'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: A page of component version spreads.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VersionSpreadList'}
+              example:
+                items: [*spreadGuava]
+                page: {nextCursor: null, limit: 50}
+                freshness: *freshManifests
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/dependencies/licenses:
+    get:
+      operationId: getDependencyLicenses
+      summary: Licence summary of dependencies
+      description: >-
+        Licences are **declared-only** in v1: a dependency has a licence only where its manifest or lockfile carries one;
+        otherwise it falls into the `unknown` bucket, labelled "not declared in the manifest" by the UI and reported
+        together with `coverage` so it is not read as a defect (traceability m4).
+      tags: [manifests]
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.licenses
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: group
+          in: query
+          schema: {$ref: 'common.yaml#/components/schemas/GroupId'}
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Licence buckets and coverage.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LicenseSummary'}
+              example:
+                buckets:
+                  - {license: Apache-2.0, components: 412, dependencies: 1980, repos: 171}
+                  - {license: MIT, components: 633, dependencies: 2411, repos: 190}
+                  - {license: unknown, components: 289, dependencies: 905, repos: 140}
+                coverage: {declared: 1045, total: 1334, ratio: 0.783}
+                freshness: *freshManifests
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/components:
+    get:
+      operationId: getComponent
+      summary: One component by package URL
+      description: >-
+        Identity, producers (tracked units that publish it), number of using units and repositories, and the version
+        histogram of a component. The `purl` is a **query parameter**, never a path segment (a purl contains `/`, `:`,
+        `@`, `%`). A version in the purl is ignored for identity; the response `purl` is the normalised, versionless
+        identity. 404 when no tracked unit uses or provides the component.
+      tags: [manifests]
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.component
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: purl
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/Purl'}
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: The component.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Component'}
+              example: *componentCoreLib
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+  /api/v1/components/dependents:
+    get:
+      operationId: listComponentDependents
+      summary: Reverse dependencies of a component ("used by")
+      description: >-
+        The units that depend on the component, with the requirement, the resolved version and, for internal artifacts,
+        how far behind the producer each consumer is. Works for internal artifacts and for any external component
+        ("who uses log4j-core"). Ordered by repository slug, then unit.
+      tags: [manifests]
+      x-scp-owner: manifests
+      x-scp-route: api.manifests.dependents
+      x-scp-etag: snapshot-variant
+      parameters:
+        - name: purl
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/Purl'}
+        - name: scope
+          in: query
+          style: form
+          explode: true
+          schema: {type: array, maxItems: 8, items: {$ref: '#/components/schemas/DependencyScope'}}
+        - name: group
+          in: query
+          schema: {$ref: 'common.yaml#/components/schemas/GroupId'}
+        - $ref: 'common.yaml#/components/parameters/Limit'
+        - $ref: 'common.yaml#/components/parameters/Cursor'
+        - $ref: 'common.yaml#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: A page of dependents.
+          headers:
+            ETag: {$ref: 'common.yaml#/components/headers/ETag'}
+            Link: {$ref: 'common.yaml#/components/headers/Link'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DependentList'}
+              example:
+                purl: 'pkg:maven/org.acme.platform/core-lib'
+                items: [*dependentBilling]
+                page: {nextCursor: null, limit: 50}
+                freshness: *freshManifests
+        '304': {$ref: 'common.yaml#/components/responses/NotModified'}
+        '400': {$ref: 'common.yaml#/components/responses/BadRequest'}
+        '404': {$ref: 'common.yaml#/components/responses/NotFound'}
+        '429': {$ref: 'common.yaml#/components/responses/RateLimited'}
+        '503': {$ref: 'common.yaml#/components/responses/NotReady'}
+        default: {$ref: 'common.yaml#/components/responses/Problem'}
+
+components:
+  parameters:
+    RepoFilterQ:
+      name: q
+      in: query
+      description: Case-insensitive substring of the slug, title or summary.
+      schema: {type: string, minLength: 1, maxLength: 200}
+    RepoFilterLifecycle:
+      name: lifecycle
+      in: query
+      description: Only repositories with this lifecycle (repeat to union). Repositories without a lifecycle never match.
+      style: form
+      explode: true
+      schema: {type: array, maxItems: 3, items: {$ref: '#/components/schemas/Lifecycle'}}
+    RepoFilterType:
+      name: type
+      in: query
+      description: Only repositories of this type (repeat to union).
+      style: form
+      explode: true
+      schema: {type: array, maxItems: 6, items: {$ref: '#/components/schemas/RepoType'}}
+    RepoFilterTag:
+      name: tag
+      in: query
+      description: Only repositories carrying all of these tags (repeat to intersect).
+      style: form
+      explode: true
+      schema: {type: array, maxItems: 10, items: {type: string, minLength: 1, maxLength: 63}}
+    RepoFilterArchived:
+      name: archived
+      in: query
+      description: '`include` (default), `exclude` or `only` archived repositories.'
+      schema: {type: string, enum: [include, exclude, only], default: include}
+    RepoSort:
+      name: sort
+      in: query
+      description: 'Sort key; a leading `-` reverses. Ties are broken by slug. Missing values sort last.'
+      schema: {type: string, enum: [name, -name, pushedAt, -pushedAt, lastCommit, -lastCommit, openIssues, -openIssues, lifecycle, -lifecycle], default: name}
+  schemas:
+    # ================================================================= overview
+    Site:
+      type: object
+      description: Site settings. `repoCount` and `lastFullSync` are the header status.
+      required: [title, description, nav, displayTimeZone, defaultTheme, lastFullSync, repoCount, groupCount, features, build]
+      properties:
+        title: {type: string, maxLength: 120}
+        description: {type: string, maxLength: 500}
+        nav: {type: array, maxItems: 20, items: {$ref: '#/components/schemas/NavItem'}}
+        announcement: {$ref: '#/components/schemas/Announcement'}
+        displayTimeZone: {type: string, description: IANA zone name used to render times; stored data is UTC., examples: [Europe/Oslo]}
+        defaultTheme: {type: string, enum: [system, light, dark]}
+        lastFullSync: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        repoCount: {type: integer, minimum: 0, description: Tracked repositories visible to the caller's view class.}
+        groupCount: {type: integer, minimum: 0}
+        features: {$ref: '#/components/schemas/SiteFeatures'}
+        build: {$ref: 'common.yaml#/components/schemas/BuildInfo'}
+    NavItem:
+      type: object
+      description: 'A navigation entry: `kind: page` names a configured page (`page`), `kind: external` carries an https `url`.'
+      required: [label, kind]
+      properties:
+        label: {type: string, maxLength: 60}
+        kind: {type: string, enum: [page, external]}
+        page: {$ref: 'common.yaml#/components/schemas/PageSlug'}
+        url: {$ref: 'common.yaml#/components/schemas/HttpsUrl'}
+    Announcement:
+      type: object
+      description: Plain text plus a level; no HTML. `id` is a content hash so a dismissal is remembered only until the text changes.
+      required: [id, text, level, dismissible]
+      properties:
+        id: {type: string, minLength: 1, maxLength: 64}
+        text: {type: string, minLength: 1, maxLength: 500}
+        level: {type: string, enum: [info, warning, critical]}
+        dismissible: {type: boolean}
+    SiteFeatures:
+      type: object
+      description: Switches the SPA needs to hide views of disabled features.
+      required: [manifests, sse, integrations]
+      properties:
+        manifests: {type: boolean}
+        sse: {type: boolean}
+        integrations: {type: array, items: {type: string}, description: 'Enabled provider names, for example `jenkins`.'}
+    RepoStats:
+      type: object
+      required: [openIssues, stars, pushedAt, headSha, lastCommitAt]
+      properties:
+        openIssues: {type: [integer, "null"], minimum: 0}
+        stars: {type: integer, minimum: 0}
+        license: {$ref: '#/components/schemas/License'}
+        latestRelease: {$ref: '#/components/schemas/Release'}
+        pushedAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        headSha: {type: [string, "null"], pattern: '^[0-9a-f]{40,64}$'}
+        lastCommitAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+    RepoSummary:
+      type: object
+      description: >-
+        One repository as listed. `title`, `summary`, `type`, `lifecycle` and `tags` are resolved with provenance
+        (descriptor, catalog-info, CODEOWNERS, GitHub topics, derived; architecture 14.2); a zero-config repository
+        has `title` derived from its name and no `summary`, `type` or `lifecycle`.
+      required: [slug, name, owner, title, archived, fork, visibility, defaultBranch, htmlUrl, tags, groups, stats, badges, uiUrl, apiUrl, markdownUrl, freshness]
+      properties:
+        slug: {$ref: 'common.yaml#/components/schemas/Slug'}
+        name: {type: string, description: GitHub repository name., x-scp-untrusted: true}
+        owner: {type: string, description: GitHub account that owns the repository.}
+        title: {$ref: '#/components/schemas/SourcedString'}
+        summary: {$ref: '#/components/schemas/SourcedString'}
+        type: {$ref: '#/components/schemas/SourcedRepoType'}
+        lifecycle: {$ref: '#/components/schemas/SourcedLifecycle'}
+        archived: {type: boolean}
+        fork: {type: boolean}
+        visibility: {$ref: '#/components/schemas/Visibility'}
+        defaultBranch: {type: string, x-scp-untrusted: true}
+        htmlUrl: {$ref: 'common.yaml#/components/schemas/HttpsUrl'}
+        tags: {type: array, items: {$ref: '#/components/schemas/Tag'}}
+        groups: {type: array, items: {$ref: '#/components/schemas/GroupRef'}}
+        stats: {$ref: '#/components/schemas/RepoStats'}
+        badges: {type: array, items: {$ref: 'common.yaml#/components/schemas/Badge'}}
+        uiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        apiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        markdownUrl: {type: [string, "null"], description: 'Raw README route, null when the repository has no README.'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    RepoList:
+      type: object
+      required: [items, page, freshness]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/RepoSummary'}}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    ApiRef:
+      type: object
+      description: An API the repository declares in `scp.yaml` (`apis`) or exposes by convention. SCP links to it; it does not serve the file.
+      required: [type, title, path, url, sourceUrl, source]
+      properties:
+        type: {type: string, enum: [openapi, asyncapi, graphql, grpc, other]}
+        title: {type: string, x-scp-untrusted: true}
+        path: {type: [string, "null"], x-scp-untrusted: true}
+        url: {type: [string, "null"], description: 'https URL declared by the descriptor.', x-scp-untrusted: true}
+        sourceUrl: {type: [string, "null"], description: 'GitHub blob URL of `path`.'}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    DependsOn:
+      type: object
+      description: A declared or derived dependency of this repository on another repository.
+      required: [repo, resolved, source]
+      properties:
+        repo: {type: string, maxLength: 140, description: The reference as authored (`name` or `owner/name`)., x-scp-untrusted: true}
+        slug: {$ref: 'common.yaml#/components/schemas/Slug'}
+        resolved: {type: boolean, description: False when the reference names no tracked repository (`slug` is then absent).}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    TechnologySummary:
+      type: object
+      description: Digest of the manifest facts for the repository header. Absent when manifests are disabled or no facts exist yet.
+      required: [languages, ecosystems, buildTools, toolchain, unitCount, directDependencyCount, internalDependencyCount, diagnosticCount, parsedAt, manifestsUrl]
+      properties:
+        languages: {type: array, items: {$ref: 'common.yaml#/components/schemas/LanguageShare'}}
+        ecosystems: {type: array, items: {type: string}}
+        buildTools: {type: array, items: {type: string}}
+        toolchain: {type: object, additionalProperties: {type: string}, description: 'For example `java: "21"`, `go: "1.27"`.'}
+        unitCount: {type: integer, minimum: 0}
+        directDependencyCount: {type: integer, minimum: 0}
+        internalDependencyCount: {type: integer, minimum: 0}
+        diagnosticCount: {type: integer, minimum: 0}
+        parsedAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        manifestsUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+    RepoSections:
+      type: object
+      description: Freshness of each upstream-backed section of the composite resource.
+      properties:
+        commits: {$ref: 'common.yaml#/components/schemas/Freshness'}
+        docs: {$ref: 'common.yaml#/components/schemas/Freshness'}
+        manifests: {$ref: 'common.yaml#/components/schemas/Freshness'}
+        integrations: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    Repo:
+      description: The composite repository resource (a `RepoSummary` plus every section of the repository page).
+      allOf:
+        - $ref: '#/components/schemas/RepoSummary'
+        - type: object
+          required: [description, owners, links, system, apis, dependsOn, docs, descriptor, statuses, latestCommits, sections]
+          properties:
+            description: {type: [string, "null"], description: GitHub repository description (plain text)., x-scp-untrusted: true}
+            owners: {type: array, items: {$ref: '#/components/schemas/Owner'}}
+            links: {type: array, items: {$ref: '#/components/schemas/Link'}}
+            system: {type: [string, "null"], description: 'Descriptor `system` hint; group membership stays authoritative in configuration.'}
+            apis: {type: array, items: {$ref: '#/components/schemas/ApiRef'}}
+            dependsOn: {type: array, items: {$ref: '#/components/schemas/DependsOn'}}
+            docs: {type: array, items: {$ref: 'common.yaml#/components/schemas/DocIndexEntry'}}
+            descriptor: {$ref: 'common.yaml#/components/schemas/DescriptorInfo'}
+            statuses: {type: array, items: {$ref: '#/components/schemas/ProviderStatus'}, description: 'One entry per enabled provider that has a target for this repository.'}
+            technology: {$ref: '#/components/schemas/TechnologySummary'}
+            latestCommits: {type: array, maxItems: 5, items: {$ref: 'common.yaml#/components/schemas/Commit'}}
+            sections: {$ref: '#/components/schemas/RepoSections'}
+
+    # ================================================================= live
+    Snapshot:
+      type: object
+      required: [version, builtAt, readiness, buildId]
+      properties:
+        version: {type: integer, format: int64, minimum: 0, description: 'Snapshot version of this process: 0 before the first snapshot, otherwise increasing from 1 at every process start. Compare for inequality only, never for order.'}
+        builtAt: {$ref: 'common.yaml#/components/schemas/Timestamp'}
+        readiness: {type: string, enum: [warming, ready, degraded], description: '`warming` until the readiness gates are met, `degraded` when ready by deadline with incomplete coverage.'}
+        buildId: {type: string}
+    InvalidationTopic:
+      type: string
+      enum: [site, catalog, commits, docs, manifests, pages, status]
+      description: Query families a client should refetch. Open enum.
+    SseHello:
+      type: object
+      required: [generation, buildId]
+      properties:
+        generation: {type: integer, format: int64, minimum: 0}
+        buildId: {type: string}
+    SseInvalidate:
+      type: object
+      description: No repository names are carried (the stream must not enumerate invisible repositories).
+      required: [topics, generation]
+      properties:
+        topics: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/InvalidationTopic'}}
+        generation: {type: integer, format: int64, minimum: 0}
+    SseResync:
+      type: object
+      required: [generation]
+      properties:
+        generation: {type: integer, format: int64, minimum: 0}
+    SseEvent:
+      description: 'Union of the `data:` payloads of the stream; the SSE `event:` name (`hello`, `invalidate`, `resync`) selects the member.'
+      anyOf:
+        - $ref: '#/components/schemas/SseHello'
+        - $ref: '#/components/schemas/SseInvalidate'
+        - $ref: '#/components/schemas/SseResync'
+
+    # ================================================================= catalog
+    GroupSummary:
+      type: object
+      description: A dashboard card. The badges are those of the group's default repository plus the group repository-count badge.
+      required: [id, displayName, description, repoCount, defaultRepoState, integrations, badges, uiUrl, commitsUiUrl, apiUrl, llmsUrl, freshness]
+      properties:
+        id: {$ref: 'common.yaml#/components/schemas/GroupId'}
+        displayName: {type: string}
+        description: {type: [string, "null"], description: From configuration.}
+        repoCount: {type: integer, minimum: 0, description: Members visible to the caller.}
+        defaultRepoState: {type: string, enum: [ok, missing, unset], description: '`missing`: configured but not tracked; `unset`: the group has none.'}
+        defaultRepo: {$ref: '#/components/schemas/RepoLink'}
+        integrations: {type: array, items: {type: string}, description: Providers configured for the group.}
+        badges: {type: array, items: {$ref: 'common.yaml#/components/schemas/Badge'}}
+        uiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        commitsUiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        apiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        llmsUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    GroupDetail:
+      allOf:
+        - $ref: '#/components/schemas/GroupSummary'
+        - type: object
+          required: [repos]
+          properties:
+            repos: {type: array, items: {$ref: 'common.yaml#/components/schemas/Slug'}, description: 'Member slugs visible to the caller, in configuration order.'}
+    GroupList:
+      type: object
+      required: [items, page, freshness]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/GroupSummary'}}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+
+    # ================================================================= commits
+    CommitPage:
+      type: object
+      required: [items, page, freshness]
+      properties:
+        items: {type: array, items: {$ref: 'common.yaml#/components/schemas/Commit'}}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+
+    # ================================================================= docs
+    DocIndex:
+      type: object
+      required: [repo, items, counts, descriptor, page, freshness]
+      properties:
+        repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+        items: {type: array, items: {$ref: 'common.yaml#/components/schemas/DocIndexEntry'}}
+        counts:
+          type: object
+          required: [total, resident, notResident]
+          properties:
+            total: {type: integer, minimum: 0}
+            resident: {type: integer, minimum: 0}
+            notResident: {type: integer, minimum: 0}
+        descriptor: {$ref: 'common.yaml#/components/schemas/DescriptorInfo'}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    DocLink:
+      type: object
+      description: An outgoing link of the document after rewriting.
+      required: [text, href, kind]
+      properties:
+        text: {type: string, x-scp-untrusted: true}
+        href: {type: string, maxLength: 2000, x-scp-untrusted: true}
+        kind: {type: string, enum: [doc, repo-file, external, anchor, media]}
+    DocProblem:
+      type: object
+      description: A non-fatal front-matter or rendering problem.
+      required: [code, message]
+      properties:
+        code: {type: string}
+        message: {type: string, x-scp-untrusted: true}
+    Doc:
+      description: A rendered document (a `DocIndexEntry` plus its content).
+      allOf:
+        - $ref: 'common.yaml#/components/schemas/DocIndexEntry'
+        - type: object
+          required: [repo, html, toc, frontMatter, links, problems, renderedBy, normalised, wordCount, freshness]
+          properties:
+            repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+            html: {type: [string, "null"], description: 'Sanitised HTML (`SafeHTML`), null unless `state` is `resident`.', x-scp-safe-html: true}
+            toc: {type: array, items: {$ref: 'common.yaml#/components/schemas/TocEntry'}}
+            frontMatter: {type: object, additionalProperties: true, description: 'Original front matter keys; only `title`, `description`, `order`, `tags`, `hidden` are interpreted.', x-scp-untrusted: true}
+            links: {type: array, items: {$ref: '#/components/schemas/DocLink'}}
+            problems: {type: array, items: {$ref: '#/components/schemas/DocProblem'}}
+            renderedBy: {type: string, enum: [scp, github], description: '`github` for the AsciiDoc bridge.'}
+            normalised: {type: array, items: {type: string}, description: 'Markers for transformations applied to the LLM Markdown variant (for example `hidden-comments-stripped`).'}
+            wordCount: {type: integer, minimum: 0}
+            freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+
+    # ================================================================= pages
+    PageSummary:
+      type: object
+      required: [slug, title, summary, order, updatedAt, uiUrl, apiUrl]
+      properties:
+        slug: {$ref: 'common.yaml#/components/schemas/PageSlug'}
+        title: {type: string, x-scp-untrusted: true}
+        summary: {type: [string, "null"], x-scp-untrusted: true}
+        order: {type: integer}
+        updatedAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        uiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        apiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+    PageList:
+      type: object
+      required: [items, page, freshness]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/PageSummary'}}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    Page:
+      allOf:
+        - $ref: '#/components/schemas/PageSummary'
+        - type: object
+          required: [html, toc, freshness]
+          properties:
+            html: {type: string, description: Sanitised HTML (`SafeHTML`)., x-scp-safe-html: true}
+            toc: {type: array, items: {$ref: 'common.yaml#/components/schemas/TocEntry'}}
+            freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    # ---- moved from common: used by one feature only
+    Lifecycle:
+      type: string
+      enum: [experimental, production, deprecated]
+      description: Backstage vocabulary (ADR-006). The UI may label `production` as "Active".
+    RepoType:
+      type: string
+      enum: [service, library, website, tool, documentation, other]
+    Visibility:
+      type: string
+      enum: [public, internal, private]
+      description: Repository visibility on GitHub. Anonymous callers only ever see `public`.
+    SourcedString:
+      type: object
+      required: [value, source]
+      properties:
+        value: {type: string, x-scp-untrusted: true}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    SourcedLifecycle:
+      type: object
+      required: [value, source]
+      properties:
+        value: {$ref: '#/components/schemas/Lifecycle'}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    SourcedRepoType:
+      type: object
+      required: [value, source]
+      properties:
+        value: {$ref: '#/components/schemas/RepoType'}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    Tag:
+      type: object
+      required: [value, source]
+      properties:
+        value: {type: string, pattern: '^[a-z0-9:+#]+(-[a-z0-9:+#]+)*$', maxLength: 63}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    Owner:
+      type: object
+      description: An ownership claim. A claim, not an authorisation (ADR-006).
+      required: [handle, kind, source]
+      properties:
+        handle: {type: string, maxLength: 140, description: 'CODEOWNERS handle (`@user`, `@org/team`) or an unresolved reference such as `group:default/team-a`.', examples: ['@acme/billing-core'], x-scp-untrusted: true}
+        kind: {type: string, enum: [user, team, group, unresolved]}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    Link:
+      type: object
+      required: [url, source]
+      properties:
+        url: {$ref: 'common.yaml#/components/schemas/HttpsUrl'}
+        title: {type: string, maxLength: 120, x-scp-untrusted: true}
+        type: {type: string, pattern: '^[a-z][a-z0-9-]{0,31}$', description: 'Well known: runbook, dashboard, issues, chat, status, api, docs, source, release, contact. Open.'}
+        source: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    Release:
+      type: object
+      required: [tag, name, url, prerelease, publishedAt]
+      properties:
+        tag: {type: string, maxLength: 200, x-scp-untrusted: true}
+        name: {type: [string, "null"], x-scp-untrusted: true}
+        url: {$ref: 'common.yaml#/components/schemas/HttpsUrl'}
+        prerelease: {type: boolean}
+        publishedAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+    License:
+      type: object
+      required: [spdxId, name]
+      properties:
+        spdxId: {type: string, maxLength: 100, examples: [Apache-2.0]}
+        name: {type: [string, "null"]}
+    GroupRef:
+      type: object
+      required: [id, displayName]
+      properties:
+        id: {$ref: 'common.yaml#/components/schemas/GroupId'}
+        displayName: {type: string}
+    ProviderStatus:
+      type: object
+      description: Status of one optional integration (Jenkins, Snyk) for a repository. Structured provider data, never scraped SVG.
+      required: [provider, state, summary, detailUrl, observedAt, counts, freshness]
+      properties:
+        provider: {type: string, description: 'Open set: `jenkins`, `snyk`.', examples: [jenkins]}
+        state: {$ref: 'common.yaml#/components/schemas/ProviderState'}
+        summary: {type: string, maxLength: 300, x-scp-untrusted: true}
+        detailUrl: {type: [string, "null"], description: 'https URL on the configured provider host, or null.'}
+        observedAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        counts: {type: object, additionalProperties: {type: integer, minimum: 0}, description: 'For example Snyk `critical`, `high`, `medium`, `low`.'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    RepoLink:
+      type: object
+      description: Minimal reference to a repository.
+      required: [slug, name, description, htmlUrl, uiUrl]
+      properties:
+        slug: {$ref: 'common.yaml#/components/schemas/Slug'}
+        name: {type: string, description: GitHub repository name., x-scp-untrusted: true}
+        title: {type: string, description: Display title when known., x-scp-untrusted: true}
+        description: {type: [string, "null"], description: GitHub repository description (plain text)., x-scp-untrusted: true}
+        htmlUrl: {$ref: 'common.yaml#/components/schemas/HttpsUrl'}
+        uiUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+    # ================================================================= manifests
+    EcosystemId:
+      type: string
+      pattern: '^[a-z][a-z0-9-]*$'
+      maxLength: 32
+      description: >-
+        Stable lower-case ecosystem id; equals the purl type where one exists. Known in v1: maven, npm, pypi, golang,
+        cargo, nuget, gem, composer, swift, pub, hex, cocoapods, docker, github (Actions), terraform, helm. Open set
+        (a new ecosystem is added without a contract change).
+      examples: [maven]
+    DependencyScope:
+      type: string
+      enum: [runtime, dev, test, build, optional, peer, provided, unknown]
+    Resolution:
+      type: string
+      enum: [declared, pinned, locked, managed]
+      description: 'How trustworthy `version` is: `declared` only a requirement was found, `pinned` exact in the manifest, `locked` from a lockfile, `managed` filled from a BOM, catalog or workspace table.'
+    Confidence:
+      type: string
+      enum: [exact, heuristic]
+      description: '`heuristic` marks facts from lexical parsers of programs (Gradle scripts, `Package.swift`, `Gemfile`, `Podfile`, `mix.exs`).'
+    VersionStatus:
+      type: string
+      enum: [current, behind, ahead, unknown]
+      description: Position of a consumer against the producer's current version, for internal artifacts only.
+    Diagnostic:
+      type: object
+      description: A non-fatal observation of a parser. Nothing is dropped silently; limits and dynamic constructs show up here.
+      required: [code, message, severity, loc]
+      properties:
+        code: {type: string, pattern: '^[a-z0-9]+([.-][a-z0-9]+)*$', description: 'Stable code, for example `gradle.dynamic-dependency`, `limit.depth`, `encoding.unsupported`.', examples: [maven.unresolved-managed-version]}
+        message: {type: string, maxLength: 500, x-scp-untrusted: true}
+        severity: {type: string, enum: [info, warning, error]}
+        loc: {$ref: '#/components/schemas/Location'}
+    ManifestFile:
+      type: object
+      description: The exact bytes a unit was derived from.
+      required: [path, blobSha, parser, kind]
+      properties:
+        path: {type: string, x-scp-untrusted: true}
+        blobSha: {$ref: 'common.yaml#/components/schemas/Sha'}
+        parser: {type: string, description: 'Parser id and version, `maven/pom@3`.', examples: ['maven/pom@3']}
+        kind: {type: string, enum: [manifest, lockfile, catalog, workspace]}
+    Artifact:
+      type: object
+      description: Something a unit publishes.
+      required: [purl, version, kind]
+      properties:
+        purl: {$ref: '#/components/schemas/Purl'}
+        version: {type: [string, "null"], description: 'May be a placeholder or null for dynamic versions.', x-scp-untrusted: true}
+        kind: {type: string, enum: [library, application, plugin, bom, image, other]}
+    UnitCounts:
+      type: object
+      required: [direct, internal, locked]
+      properties:
+        direct: {type: integer, minimum: 0, description: Declared dependencies.}
+        internal: {type: integer, minimum: 0, description: Declared dependencies on other tracked repositories.}
+        locked: {type: integer, minimum: 0, description: Components resolved by a lockfile (transitive included).}
+    ManifestUnit:
+      type: object
+      description: One logical project (a Maven module, an npm package, a Go module, a crate, a csproj).
+      required: [id, dir, ecosystem, role, provides, toolchain, files, counts, diagnostics]
+      properties:
+        id: {$ref: '#/components/schemas/UnitId'}
+        dir: {type: string, description: 'Repository-relative directory of the primary file; `.` for the root.', x-scp-untrusted: true}
+        ecosystem: {$ref: '#/components/schemas/EcosystemId'}
+        role: {type: string, enum: [primary, fixture, example], description: '`fixture` and `example` units (test data, `examples/*`) are hidden by the UI by default.'}
+        provides: {type: array, items: {$ref: '#/components/schemas/Artifact'}}
+        toolchain: {type: object, additionalProperties: {type: string}}
+        files: {type: array, items: {$ref: '#/components/schemas/ManifestFile'}}
+        counts: {$ref: '#/components/schemas/UnitCounts'}
+        diagnostics: {type: array, items: {$ref: '#/components/schemas/Diagnostic'}}
+    EcosystemCount:
+      type: object
+      required: [ecosystem, units, dependencies]
+      properties:
+        ecosystem: {$ref: '#/components/schemas/EcosystemId'}
+        units: {type: integer, minimum: 0}
+        dependencies: {type: integer, minimum: 0}
+    RepoManifests:
+      type: object
+      required: [repo, treeSha, commitSha, parsedAt, truncated, languages, ecosystems, toolchain, units, counts, diagnostics, freshness]
+      properties:
+        repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+        treeSha: {$ref: 'common.yaml#/components/schemas/Sha'}
+        commitSha: {type: [string, "null"], pattern: '^[0-9a-f]{40,64}$'}
+        parsedAt: {$ref: 'common.yaml#/components/schemas/NullableTimestamp'}
+        truncated: {type: boolean, description: 'Tree discovery was truncated or capped (200 files, depth 12, 200 tree calls); some manifests may be missing.'}
+        languages: {type: array, items: {$ref: 'common.yaml#/components/schemas/LanguageShare'}}
+        ecosystems: {type: array, items: {$ref: '#/components/schemas/EcosystemCount'}}
+        toolchain: {type: object, additionalProperties: {type: string}, description: Union over the primary units; a conflicting key is reported per unit only.}
+        units: {type: array, items: {$ref: '#/components/schemas/ManifestUnit'}}
+        counts:
+          type: object
+          required: [units, directDependencies, internalDependencies, lockedComponents]
+          properties:
+            units: {type: integer, minimum: 0}
+            directDependencies: {type: integer, minimum: 0}
+            internalDependencies: {type: integer, minimum: 0}
+            lockedComponents: {type: integer, minimum: 0}
+        diagnostics: {type: array, items: {$ref: '#/components/schemas/Diagnostic'}, description: 'Repository-level diagnostics (tree truncation, parser circuit open).'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    InternalRef:
+      type: object
+      description: The tracked repository and unit that produce the depended-on artifact.
+      required: [repo, unit, version]
+      properties:
+        repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+        unit: {$ref: '#/components/schemas/UnitId'}
+        version: {type: [string, "null"], description: Producer's current version., x-scp-untrusted: true}
+    Dependency:
+      type: object
+      required: [purl, ecosystem, namespace, name, requirement, version, resolution, scope, group, relationship, optional, condition, source, sourceRef, confidence, loc, unit, provenance]
+      properties:
+        purl: {$ref: '#/components/schemas/Purl'}
+        ecosystem: {$ref: '#/components/schemas/EcosystemId'}
+        namespace: {type: [string, "null"], x-scp-untrusted: true}
+        name: {type: string, x-scp-untrusted: true}
+        displayName: {type: string, description: Original-case name when `name` was case-folded., x-scp-untrusted: true}
+        requirement: {type: string, description: 'Raw requirement in the ecosystem syntax (`^1.2`, `[1.0,2.0)`, `${core.version}`), empty when the file gives none.', x-scp-untrusted: true}
+        version: {type: [string, "null"], description: Exact version when known., x-scp-untrusted: true}
+        resolution: {$ref: '#/components/schemas/Resolution'}
+        scope: {$ref: '#/components/schemas/DependencyScope'}
+        group: {type: string, description: 'Original group or configuration name (`devDependencies`, `testImplementation`).', x-scp-untrusted: true}
+        relationship: {type: string, enum: [direct, transitive, unknown]}
+        optional: {type: boolean}
+        condition: {type: [string, "null"], description: Raw environment marker or target-framework condition; not evaluated., x-scp-untrusted: true}
+        source: {type: string, enum: [registry, git, path, url]}
+        sourceRef: {type: [string, "null"], x-scp-untrusted: true}
+        confidence: {$ref: '#/components/schemas/Confidence'}
+        loc: {$ref: '#/components/schemas/Location'}
+        unit: {$ref: '#/components/schemas/UnitId'}
+        internal: {$ref: '#/components/schemas/InternalRef'}
+        provenance: {$ref: 'common.yaml#/components/schemas/Provenance'}
+    DependencyList:
+      type: object
+      required: [repo, treeSha, items, page, freshness]
+      properties:
+        repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+        treeSha: {$ref: 'common.yaml#/components/schemas/Sha'}
+        items: {type: array, items: {$ref: '#/components/schemas/Dependency'}}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    GraphNode:
+      type: object
+      required: [id, repo, dir, ecosystem, label, artifacts, inDegree, outDegree, inCycle]
+      properties:
+        id: {$ref: '#/components/schemas/UnitId'}
+        repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+        dir: {type: string, x-scp-untrusted: true}
+        ecosystem: {$ref: '#/components/schemas/EcosystemId'}
+        label: {type: string, maxLength: 200, x-scp-untrusted: true}
+        artifacts: {type: array, items: {$ref: '#/components/schemas/Purl'}}
+        inDegree: {type: integer, minimum: 0, description: Units that depend on this one.}
+        outDegree: {type: integer, minimum: 0, description: Units this one depends on.}
+        inCycle: {type: boolean}
+    GraphEdge:
+      type: object
+      required: [from, to, component, requirement, version, scope, intra, versionStatus]
+      properties:
+        from: {$ref: '#/components/schemas/UnitId'}
+        to: {$ref: '#/components/schemas/UnitId'}
+        component: {$ref: '#/components/schemas/Purl'}
+        requirement: {type: string, x-scp-untrusted: true}
+        version: {type: [string, "null"], x-scp-untrusted: true}
+        scope: {$ref: '#/components/schemas/DependencyScope'}
+        intra: {type: boolean, description: Both units are in the same repository.}
+        versionStatus: {$ref: '#/components/schemas/VersionStatus'}
+    GraphSummary:
+      type: object
+      required: [repos, units, edges, cycles, ecosystems]
+      properties:
+        repos: {type: integer, minimum: 0}
+        units: {type: integer, minimum: 0}
+        edges: {type: integer, minimum: 0}
+        cycles: {type: integer, minimum: 0}
+        ecosystems: {type: array, items: {$ref: '#/components/schemas/EcosystemCount'}}
+    DependencyGraph:
+      type: object
+      required: [nodes, edges, cycles, summary, truncated, freshness]
+      properties:
+        nodes: {type: array, maxItems: 2000, items: {$ref: '#/components/schemas/GraphNode'}}
+        edges: {type: array, maxItems: 20000, items: {$ref: '#/components/schemas/GraphEdge'}}
+        cycles: {type: array, description: 'Each cycle is the list of unit ids of one strongly connected component (size > 1), diagnostic `graph.cycle`.', items: {type: array, minItems: 2, items: {$ref: '#/components/schemas/UnitId'}}}
+        summary: {$ref: '#/components/schemas/GraphSummary'}
+        truncated: {type: boolean, description: 'Nodes or edges were dropped to respect the caps.'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    VersionCount:
+      type: object
+      required: [version, units, repos]
+      properties:
+        version: {type: string, x-scp-untrusted: true}
+        units: {type: integer, minimum: 0}
+        repos: {type: integer, minimum: 0}
+    ComponentSpread:
+      type: object
+      required: [purl, ecosystem, namespace, name, internal, users, repos, distinctVersions, versions, latestKnown]
+      properties:
+        purl: {$ref: '#/components/schemas/Purl'}
+        ecosystem: {$ref: '#/components/schemas/EcosystemId'}
+        namespace: {type: [string, "null"], x-scp-untrusted: true}
+        name: {type: string, x-scp-untrusted: true}
+        internal: {type: boolean, description: Produced by a tracked repository.}
+        users: {type: integer, minimum: 0, description: Using units.}
+        repos: {type: integer, minimum: 0}
+        distinctVersions: {type: integer, minimum: 0}
+        versions: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/VersionCount'}, description: Most used first; at most 50 entries.}
+        latestKnown: {type: [string, "null"], description: 'Producer version for internal artifacts, otherwise the highest version in use by the ecosystem order, or null when unordered.', x-scp-untrusted: true}
+    VersionSpreadList:
+      type: object
+      required: [items, page, freshness]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/ComponentSpread'}}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    LicenseBucket:
+      type: object
+      required: [license, components, dependencies, repos]
+      properties:
+        license: {type: string, description: 'SPDX expression, or `unknown` for "not declared in the manifest".', x-scp-untrusted: true}
+        components: {type: integer, minimum: 0}
+        dependencies: {type: integer, minimum: 0}
+        repos: {type: integer, minimum: 0}
+    LicenseCoverage:
+      type: object
+      required: [declared, total, ratio]
+      properties:
+        declared: {type: integer, minimum: 0, description: Components with a declared licence.}
+        total: {type: integer, minimum: 0}
+        ratio: {type: number, minimum: 0, maximum: 1}
+    LicenseSummary:
+      type: object
+      required: [buckets, coverage, freshness]
+      properties:
+        buckets: {type: array, items: {$ref: '#/components/schemas/LicenseBucket'}}
+        coverage: {$ref: '#/components/schemas/LicenseCoverage'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    Producer:
+      type: object
+      required: [repo, unit, version, kind, ambiguous]
+      properties:
+        repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+        unit: {$ref: '#/components/schemas/UnitId'}
+        version: {type: [string, "null"], x-scp-untrusted: true}
+        kind: {type: string, enum: [library, application, plugin, bom, image, other]}
+        ambiguous: {type: boolean, description: 'Another unit publishes the same identity (`graph.ambiguous-producer`).'}
+    Component:
+      type: object
+      required: [purl, ecosystem, namespace, name, internal, producers, users, repos, versions, dependentsUrl, freshness]
+      properties:
+        purl: {$ref: '#/components/schemas/Purl'}
+        ecosystem: {$ref: '#/components/schemas/EcosystemId'}
+        namespace: {type: [string, "null"], x-scp-untrusted: true}
+        name: {type: string, x-scp-untrusted: true}
+        internal: {type: boolean}
+        producers: {type: array, items: {$ref: '#/components/schemas/Producer'}}
+        users: {type: integer, minimum: 0}
+        repos: {type: integer, minimum: 0}
+        versions: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/VersionCount'}}
+        dependentsUrl: {$ref: 'common.yaml#/components/schemas/PortalPath'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    Dependent:
+      type: object
+      required: [repo, unit, ecosystem, requirement, version, resolution, scope, direct, versionStatus, loc]
+      properties:
+        repo: {$ref: 'common.yaml#/components/schemas/Slug'}
+        unit: {$ref: '#/components/schemas/UnitId'}
+        ecosystem: {$ref: '#/components/schemas/EcosystemId'}
+        requirement: {type: string, x-scp-untrusted: true}
+        version: {type: [string, "null"], x-scp-untrusted: true}
+        resolution: {$ref: '#/components/schemas/Resolution'}
+        scope: {$ref: '#/components/schemas/DependencyScope'}
+        direct: {type: boolean}
+        versionStatus: {$ref: '#/components/schemas/VersionStatus'}
+        loc: {$ref: '#/components/schemas/Location'}
+    DependentList:
+      type: object
+      required: [purl, items, page, freshness]
+      properties:
+        purl: {$ref: '#/components/schemas/Purl'}
+        items: {type: array, items: {$ref: '#/components/schemas/Dependent'}}
+        page: {$ref: 'common.yaml#/components/schemas/PageInfo'}
+        freshness: {$ref: 'common.yaml#/components/schemas/Freshness'}
+    # ---- moved from common: used by one feature only
+    Location:
+      type: object
+      description: Position inside a repository file (1-based line; 0 when unknown).
+      required: [path, line]
+      properties:
+        path: {type: string, maxLength: 500, x-scp-untrusted: true}
+        line: {type: integer, minimum: 0}
+
+    # ------------------------------------------------------------------ cross-feature resources
+    Purl:
+      type: string
+      pattern: '^pkg:[a-z][a-z0-9.+-]*/[^\s]+$'
+      maxLength: 1024
+      description: Package URL (ECMA-427). Always passed as a query parameter, never as a path segment.
+      examples: ['pkg:maven/org.acme.platform/core-lib']
+    UnitId:
+      type: string
+      pattern: '^[^#\s]{1,100}#[^\s]{1,300}$'
+      description: 'Identifier of a manifest unit: `<repo slug>#<repo-relative directory>` (`.` is the root).'
+      examples: ['billing-service#.', 'monorepo#services/api']
+
+    # ------------------------------------------------------------------ vocabulary enums

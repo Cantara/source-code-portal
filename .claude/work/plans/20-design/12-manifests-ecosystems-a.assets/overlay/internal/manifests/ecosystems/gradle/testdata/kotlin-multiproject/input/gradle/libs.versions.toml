@@ -1,0 +1,25 @@
+[versions]
+kotlin = "2.0.21"
+coroutines = "1.9.0"
+ktor = { strictly = "3.0.1" }
+junit = { require = "5.11.3", prefer = "5.11.3" }
+dagger = "2.52"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+junit-jupiter = "org.junit.jupiter:junit-jupiter:5.11.3"
+dagger-compiler = { module = "com.google.dagger:dagger-compiler", version.ref = "dagger" }
+dagger = { module = "com.google.dagger:dagger", version.ref = "dagger" }
+unused-lib = { module = "com.example:unused", version = "1.0" }
+managed-lib = { module = "com.example:managed" }
+broken = { name = "only-name" }
+missing-ref = { module = "com.example:missing-ref", version.ref = "nope" }
+
+[bundles]
+ktor = ["ktor-server-core", "ktor-server-netty"]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }

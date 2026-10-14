@@ -1,0 +1,287 @@
+{
+  "parsed": [
+    {
+      "file": "bun.lock",
+      "parser": "npm/bun-lock",
+      "kind": "lockfile",
+      "lockedCount": 3,
+      "properties": {
+        "lock:.:typescript": "5.6.3",
+        "lock:packages/api:hono": "4.6.9",
+        "lock:packages/api:nested": "1.0.0",
+        "lock:packages/shared:hono": "4.6.9",
+        "lockfileVersion": "1"
+      },
+      "members": [
+        "packages/api",
+        "packages/shared"
+      ]
+    },
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:bun-root",
+          "display": "bun-root",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "^5.6.0",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "properties": {
+        "private": "true"
+      },
+      "members": [
+        "packages/*"
+      ],
+      "toolchain": {
+        "language": "typescript"
+      }
+    },
+    {
+      "file": "packages/api/package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:api",
+          "display": "api",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:hono",
+          "display": "hono",
+          "requirement": "^4.6.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:nested",
+          "display": "nested",
+          "requirement": "^1.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:shared",
+          "display": "shared",
+          "requirement": "workspace:*",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "project",
+          "sourceRef": "workspace",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    },
+    {
+      "file": "packages/shared/package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:shared",
+          "display": "shared",
+          "version": "0.0.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:hono",
+          "display": "hono",
+          "requirement": "^4.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)",
+        "bun.lock (npm/bun-lock)"
+      ],
+      "provides": [
+        {
+          "id": "npm:bun-root",
+          "display": "bun-root",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "^5.6.0",
+          "version": "5.6.3",
+          "resolution": "locked",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "npm:hono",
+          "version": "4.6.9",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-honoHash/aaaa==",
+          "line": 31
+        },
+        {
+          "id": "npm:nested",
+          "version": "1.0.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha512-nestedHash==",
+          "dependsOn": [
+            0
+          ],
+          "line": 35
+        },
+        {
+          "id": "npm:typescript",
+          "version": "5.6.3",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha512-tsHash/bbbb==",
+          "line": 33
+        }
+      ],
+      "members": [
+        "packages/api",
+        "packages/shared"
+      ],
+      "toolchain": {
+        "language": "typescript"
+      }
+    },
+    {
+      "id": "packages/api#npm",
+      "ecosystem": "npm",
+      "dir": "packages/api",
+      "role": "primary",
+      "files": [
+        "packages/api/package.json (npm/package-json)"
+      ],
+      "provides": [
+        {
+          "id": "npm:api",
+          "display": "api",
+          "version": "0.1.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:hono",
+          "display": "hono",
+          "requirement": "^4.6.0",
+          "version": "4.6.9",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:nested",
+          "display": "nested",
+          "requirement": "^1.0.0",
+          "version": "1.0.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:shared",
+          "display": "shared",
+          "requirement": "workspace:*",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "path",
+          "sourceRef": "packages/shared",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    },
+    {
+      "id": "packages/shared#npm",
+      "ecosystem": "npm",
+      "dir": "packages/shared",
+      "role": "primary",
+      "files": [
+        "packages/shared/package.json (npm/package-json)"
+      ],
+      "provides": [
+        {
+          "id": "npm:shared",
+          "display": "shared",
+          "version": "0.0.1",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:hono",
+          "display": "hono",
+          "requirement": "^4.0.0",
+          "version": "4.6.9",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "toolchain": {
+        "language": "javascript"
+      }
+    }
+  ]
+}

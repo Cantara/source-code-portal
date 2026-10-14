@@ -1,0 +1,18 @@
+{
+  "action": "added",
+  "installation": {
+    "id": 4242,
+    "account": {
+      "login": "acme"
+    }
+  },
+  "repository_selection": "selected",
+  "repositories_added": [
+    {
+      "id": 1,
+      "name": "a",
+      "full_name": "acme/a"
+    }
+  ],
+  "repositories_removed": []
+}

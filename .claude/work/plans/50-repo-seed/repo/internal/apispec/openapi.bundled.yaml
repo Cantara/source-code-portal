@@ -1,0 +1,12 @@
+openapi: 3.1.0
+info:
+  title: Source Code Portal API
+  version: 0.0.0
+  summary: Placeholder until design 07 task T-1 lands.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: /
+paths: {}
+components: {}

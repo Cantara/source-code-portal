@@ -1,0 +1,119 @@
+--- a/internal/manifests/model.go
++++ b/internal/manifests/model.go
+@@ -215,6 +215,16 @@
+ 	}
+ }
+ 
++// Clone returns d with a private copy of Extra (ADDED by unit 12, RR-A5). Assemblers that change a dependency they received in a Parsed must
++// clone it first: Parsed values are cached and shared, and the setters write through the Extra pointer.
++func (d Dependency) Clone() Dependency {
++	if d.Extra != nil {
++		x := *d.Extra
++		d.Extra = &x
++	}
++	return d
++}
++
+ // Artifact is something a unit publishes; the org graph matches Dependency.Target against it.
+ type Artifact struct {
+ 	ID      ComponentID
+@@ -226,6 +236,7 @@
+ // LockedComponent is one resolved package from a lockfile (kept per unit in the cache, not in the snapshot).
+ type LockedComponent struct {
+ 	ID           ComponentID
++	Display      string // ADDED by unit 12 (RR-A6): original-case name when ID was case-folded (Go module path, Cargo crate), "" when equal
+ 	Version      string
+ 	Relationship Relationship
+ 	Scope        Scope
+@@ -364,6 +375,15 @@
+ 	VersionSystem string                                        // key understood by internal/version
+ 	Language      string                                        // default language fact, "" for tooling ecosystems
+ 	FormatPURL    PURLFormatter                                 // optional; nil = the default formatter (purl.Format with PURLType)
++	Diagnostics   []DiagnosticDoc                               // ADDED by unit 12 (RR-A1): the diagnostic codes the ecosystem's parsers and assembler may emit
++}
++
++// DiagnosticDoc documents one diagnostic code (ADDED by unit 12, RR-A1). The generated reference page and the fuzz invariant "declared
++// diagnostics only" read it.
++type DiagnosticDoc struct {
++	Code     string
++	Severity Severity
++	Summary  string
+ }
+ 
+ // PURL renders the version-less purl of c ("" when the name is empty).
+--- a/internal/manifests/sanitize.go
++++ b/internal/manifests/sanitize.go
+@@ -4,6 +4,7 @@
+ 	"fmt"
+ 
+ 	"github.com/cantara/source-code-portal/internal/manifests/internal/limits"
++	"github.com/cantara/source-code-portal/internal/manifests/internal/purl"
+ )
+ 
+ // Field length caps applied to every parsed string (bytes, rune-boundary safe).
+@@ -30,8 +31,19 @@
+ // lists capped, lines in range. nlines is the line count of the source file (0 = unknown, lines are kept when >= 0).
+ func sanitizeParsed(p *Parsed, spec EcosystemSpec, lim LimitsConfig, nlines int) {
+ 	norm := func(c ComponentID) ComponentID {
+-		ns, n := spec.Normalize(CleanText(c.Namespace, maxName), CleanText(c.Name, maxName))
+-		return ComponentID{Ecosystem: spec.ID, Namespace: intern(ns), Name: intern(n)}
++		// RR-A3 (ADDED by unit 12): a component keeps its own ecosystem when a registered one is named (Gradle emits maven targets, Actions
++		// emits docker targets); only an empty ecosystem defaults to the parser's. Identity rules are those of the component's ecosystem.
++		eco := c.Ecosystem
++		if eco == "" {
++			eco = spec.ID
++		}
++		ns, n := CleanText(c.Namespace, maxName), CleanText(c.Name, maxName)
++		if eco == spec.ID {
++			ns, n = spec.Normalize(ns, n)
++		} else {
++			ns, n = purl.Normalize(string(eco), ns, n)
++		}
++		return ComponentID{Ecosystem: eco, Namespace: intern(ns), Name: intern(n)}
+ 	}
+ 	line := func(l int32) int32 {
+ 		if l < 0 || (nlines > 0 && int(l) > nlines) {
+@@ -86,6 +98,7 @@
+ 		l := &p.Locked[i]
+ 		l.ID = norm(l.ID)
+ 		l.Version, l.Integrity = intern(CleanText(l.Version, maxVersion)), CleanText(l.Integrity, 256)
++		l.Display = CleanText(l.Display, maxName) // ADDED by unit 12 (RR-A6)
+ 		for j := range l.Licenses {
+ 			l.Licenses[j] = intern(CleanText(l.Licenses[j], 128))
+ 		}
+--- a/internal/manifests/refresh.go
++++ b/internal/manifests/refresh.go
+@@ -541,6 +541,7 @@
+ 			p.Kind = k.Kind()
+ 		}
+ 		p.File.Kind = p.Kind
++		stampPaths(&p) // RR-A7 (ADDED by unit 12)
+ 		rebasePaths(&p)
+ 		byEco[w.parser.Ecosystem()] = append(byEco[w.parser.Ecosystem()], p)
+ 	}
+@@ -701,4 +702,25 @@
+ 		return "permanent"
+ 	}
+ 	return "internal"
++}
++
++// stampPaths fills the empty Location.Path of parser diagnostics and locked components with the path of the file they were parsed from
++// (ADDED by unit 12, RR-A7). Parsers cannot know their path (output is cached by blob SHA), and assemblers merge diagnostics of several files into
++// one unit, so only the runner knows which file a value came from. The slices are copied first: Parsed values come from a shared cache.
++func stampPaths(p *Parsed) {
++	if p.File.Path == "" {
++		return
++	}
++	p.Diagnostics = slices.Clone(p.Diagnostics)
++	for i := range p.Diagnostics {
++		if p.Diagnostics[i].Loc.Path == "" {
++			p.Diagnostics[i].Loc.Path = p.File.Path
++		}
++	}
++	p.Locked = slices.Clone(p.Locked)
++	for i := range p.Locked {
++		if p.Locked[i].Loc.Path == "" {
++			p.Locked[i].Loc.Path = p.File.Path
++		}
++	}
+ }

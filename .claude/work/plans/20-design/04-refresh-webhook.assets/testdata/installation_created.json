@@ -1,0 +1,16 @@
+{
+  "action": "created",
+  "installation": {
+    "id": 4242,
+    "account": {
+      "login": "acme"
+    }
+  },
+  "repositories": [
+    {
+      "id": 1,
+      "name": "a",
+      "full_name": "acme/a"
+    }
+  ]
+}

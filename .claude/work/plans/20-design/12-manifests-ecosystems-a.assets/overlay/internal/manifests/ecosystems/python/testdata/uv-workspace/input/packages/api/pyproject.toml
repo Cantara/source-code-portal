@@ -1,0 +1,7 @@
+[project]
+name = "acme-api"
+version = "0.3.0"
+dependencies = ["acme-core", "fastapi>=0.110"]
+
+[tool.uv.sources]
+acme-core = { workspace = true }

@@ -1,0 +1,637 @@
+{
+  "parsed": [
+    {
+      "file": "build.gradle",
+      "parser": "gradle/script",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "maven:com.android.tools.build/gradle",
+          "display": "com.android.tools.build:gradle",
+          "requirement": "8.1.0",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "buildscript.classpath",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 4
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-gradle-plugin",
+          "display": "org.jetbrains.kotlin:kotlin-gradle-plugin",
+          "requirement": "1.9.24",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "buildscript.classpath",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 5
+        },
+        {
+          "target": "maven:org.springframework.boot/org.springframework.boot.gradle.plugin",
+          "display": "org.springframework.boot:org.springframework.boot.gradle.plugin",
+          "requirement": "3.3.0",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 11
+        },
+        {
+          "target": "maven:io.spring.dependency-management/io.spring.dependency-management.gradle.plugin",
+          "display": "io.spring.dependency-management:io.spring.dependency-management.gradle.plugin",
+          "requirement": "1.1.6",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 12
+        },
+        {
+          "target": "maven:com.github.ben-manes.versions/com.github.ben-manes.versions.gradle.plugin",
+          "display": "com.github.ben-manes.versions:com.github.ben-manes.versions.gradle.plugin",
+          "requirement": "0.51.0",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 13
+        },
+        {
+          "target": "maven:com.google.guava/guava",
+          "display": "com.google.guava:guava",
+          "requirement": "${guavaVersion}",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 32
+        },
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "$slf4j",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 33
+        },
+        {
+          "target": "maven:org.apache.commons/commons-lang3",
+          "display": "org.apache.commons:commons-lang3",
+          "requirement": "3.14.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 34
+        },
+        {
+          "target": "maven:com.fasterxml.jackson.core/jackson-databind",
+          "display": "com.fasterxml.jackson.core:jackson-databind",
+          "requirement": "2.17.1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "api",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 35
+        },
+        {
+          "target": "maven:org.projectlombok/lombok",
+          "display": "org.projectlombok:lombok",
+          "requirement": "1.18.32",
+          "resolution": "declared",
+          "scope": "provided",
+          "group": "compileOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 38
+        },
+        {
+          "target": "maven:org.projectlombok/lombok",
+          "display": "org.projectlombok:lombok",
+          "requirement": "1.18.32",
+          "resolution": "declared",
+          "scope": "build",
+          "group": "annotationProcessor",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 39
+        },
+        {
+          "target": "maven:org.postgresql/postgresql",
+          "display": "org.postgresql:postgresql",
+          "requirement": "42.7.3",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "runtimeOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 40
+        },
+        {
+          "target": "maven:org.springframework.boot/spring-boot-dependencies",
+          "display": "org.springframework.boot:spring-boot-dependencies",
+          "requirement": "3.3.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "platform:implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 41
+        },
+        {
+          "target": "maven:org.springframework.boot/spring-boot-starter-web",
+          "display": "org.springframework.boot:spring-boot-starter-web",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 42
+        },
+        {
+          "target": "maven::lib",
+          "display": ":lib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "project",
+          "sourceRef": ":lib",
+          "confidence": "heuristic",
+          "line": 43
+        },
+        {
+          "target": "maven:io.netty/netty-all",
+          "display": "io.netty:netty-all",
+          "requirement": "4.1.+",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 45
+        },
+        {
+          "target": "maven:com.example/ranged",
+          "display": "com.example:ranged",
+          "requirement": "[1.0,2.0)",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 46
+        },
+        {
+          "target": "maven:org.example/with-classifier",
+          "display": "org.example:with-classifier",
+          "requirement": "1.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "qualifiers": "classifier=tests",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 47
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "${junitVersion}",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 48
+        },
+        {
+          "target": "maven:org.junit.platform/junit-platform-launcher",
+          "display": "org.junit.platform:junit-platform-launcher",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testRuntimeOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 49
+        },
+        {
+          "target": "maven:org.testcontainers/testcontainers",
+          "display": "org.testcontainers:testcontainers",
+          "requirement": "1.19.8",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "integrationTestImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 51
+        },
+        {
+          "target": "maven:org.apache.logging.log4j/log4j-core",
+          "display": "org.apache.logging.log4j:log4j-core",
+          "requirement": "2.23.1",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "constraint:implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 53
+        },
+        {
+          "target": "maven:org.springframework.cloud/spring-cloud-dependencies",
+          "display": "org.springframework.cloud:spring-cloud-dependencies",
+          "requirement": "2023.0.2",
+          "resolution": "declared",
+          "scope": "unknown",
+          "group": "bom",
+          "qualifiers": "type=pom",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 59
+        },
+        {
+          "target": "maven:org.mockito/mockito-core",
+          "display": "org.mockito:mockito-core",
+          "requirement": "5.12.0",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testImplementation",
+          "condition": "subprojects",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 65
+        }
+      ],
+      "properties": {
+        "group": "com.acme",
+        "java": "17",
+        "plugin:com.github.ben-manes.versions": "0.51.0",
+        "plugin:io.spring.dependency-management": "1.1.6",
+        "plugin:java-library": "",
+        "plugin:maven-publish": "",
+        "plugin:org.springframework.boot": "3.3.0",
+        "var:guavaVersion": "33.2.1-jre",
+        "var:junitVersion": "5.10.2",
+        "var:slf4j": "2.0.13",
+        "version": "2.1.0"
+      },
+      "toolchain": {
+        "java": "17",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.apply-from",
+          "severity": "info",
+          "message": "apply from is not followed",
+          "path": "build.gradle",
+          "line": 17
+        },
+        {
+          "code": "gradle.local-dependency",
+          "severity": "info",
+          "message": "fileTree(...) has no coordinates",
+          "path": "build.gradle",
+          "line": 44
+        },
+        {
+          "code": "gradle.unresolved-notation",
+          "severity": "info",
+          "message": "dependency argument is not a literal",
+          "path": "build.gradle",
+          "line": 50
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "24 dependencies read lexically from the build script",
+          "path": "build.gradle"
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": ".#gradle",
+      "ecosystem": "gradle",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "build.gradle (gradle/script)"
+      ],
+      "provides": [
+        {
+          "id": "maven:com.acme/root",
+          "display": "com.acme:root",
+          "version": "2.1.0",
+          "kind": "application"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "maven:com.android.tools.build/gradle",
+          "display": "com.android.tools.build:gradle",
+          "requirement": "8.1.0",
+          "version": "8.1.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "buildscript.classpath",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 4
+        },
+        {
+          "target": "maven:org.jetbrains.kotlin/kotlin-gradle-plugin",
+          "display": "org.jetbrains.kotlin:kotlin-gradle-plugin",
+          "requirement": "1.9.24",
+          "version": "1.9.24",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "buildscript.classpath",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 5
+        },
+        {
+          "target": "maven:org.springframework.boot/org.springframework.boot.gradle.plugin",
+          "display": "org.springframework.boot:org.springframework.boot.gradle.plugin",
+          "requirement": "3.3.0",
+          "version": "3.3.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 11
+        },
+        {
+          "target": "maven:io.spring.dependency-management/io.spring.dependency-management.gradle.plugin",
+          "display": "io.spring.dependency-management:io.spring.dependency-management.gradle.plugin",
+          "requirement": "1.1.6",
+          "version": "1.1.6",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 12
+        },
+        {
+          "target": "maven:com.github.ben-manes.versions/com.github.ben-manes.versions.gradle.plugin",
+          "display": "com.github.ben-manes.versions:com.github.ben-manes.versions.gradle.plugin",
+          "requirement": "0.51.0",
+          "version": "0.51.0",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "plugin",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 13
+        },
+        {
+          "target": "maven:com.google.guava/guava",
+          "display": "com.google.guava:guava",
+          "requirement": "33.2.1-jre",
+          "version": "33.2.1-jre",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 32
+        },
+        {
+          "target": "maven:org.slf4j/slf4j-api",
+          "display": "org.slf4j:slf4j-api",
+          "requirement": "2.0.13",
+          "version": "2.0.13",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 33
+        },
+        {
+          "target": "maven:org.apache.commons/commons-lang3",
+          "display": "org.apache.commons:commons-lang3",
+          "requirement": "3.14.0",
+          "version": "3.14.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 34
+        },
+        {
+          "target": "maven:com.fasterxml.jackson.core/jackson-databind",
+          "display": "com.fasterxml.jackson.core:jackson-databind",
+          "requirement": "2.17.1",
+          "version": "2.17.1",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "api",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 35
+        },
+        {
+          "target": "maven:org.projectlombok/lombok",
+          "display": "org.projectlombok:lombok",
+          "requirement": "1.18.32",
+          "version": "1.18.32",
+          "resolution": "pinned",
+          "scope": "provided",
+          "group": "compileOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 38
+        },
+        {
+          "target": "maven:org.projectlombok/lombok",
+          "display": "org.projectlombok:lombok",
+          "requirement": "1.18.32",
+          "version": "1.18.32",
+          "resolution": "pinned",
+          "scope": "build",
+          "group": "annotationProcessor",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 39
+        },
+        {
+          "target": "maven:org.postgresql/postgresql",
+          "display": "org.postgresql:postgresql",
+          "requirement": "42.7.3",
+          "version": "42.7.3",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "runtimeOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 40
+        },
+        {
+          "target": "maven:org.springframework.boot/spring-boot-dependencies",
+          "display": "org.springframework.boot:spring-boot-dependencies",
+          "requirement": "3.3.0",
+          "version": "3.3.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "platform:implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 41
+        },
+        {
+          "target": "maven:org.springframework.boot/spring-boot-starter-web",
+          "display": "org.springframework.boot:spring-boot-starter-web",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 42
+        },
+        {
+          "target": "maven::lib",
+          "display": ":lib",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "path",
+          "sourceRef": "lib",
+          "confidence": "heuristic",
+          "line": 43
+        },
+        {
+          "target": "maven:io.netty/netty-all",
+          "display": "io.netty:netty-all",
+          "requirement": "4.1.+",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 45
+        },
+        {
+          "target": "maven:com.example/ranged",
+          "display": "com.example:ranged",
+          "requirement": "[1.0,2.0)",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "implementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 46
+        },
+        {
+          "target": "maven:org.example/with-classifier",
+          "display": "org.example:with-classifier",
+          "requirement": "1.0",
+          "version": "1.0",
+          "resolution": "pinned",
+          "scope": "runtime",
+          "group": "implementation",
+          "qualifiers": "classifier=tests",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 47
+        },
+        {
+          "target": "maven:org.junit.jupiter/junit-jupiter",
+          "display": "org.junit.jupiter:junit-jupiter",
+          "requirement": "5.10.2",
+          "version": "5.10.2",
+          "resolution": "pinned",
+          "scope": "test",
+          "group": "testImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 48
+        },
+        {
+          "target": "maven:org.junit.platform/junit-platform-launcher",
+          "display": "org.junit.platform:junit-platform-launcher",
+          "resolution": "declared",
+          "scope": "test",
+          "group": "testRuntimeOnly",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 49
+        },
+        {
+          "target": "maven:org.testcontainers/testcontainers",
+          "display": "org.testcontainers:testcontainers",
+          "requirement": "1.19.8",
+          "version": "1.19.8",
+          "resolution": "pinned",
+          "scope": "test",
+          "group": "integrationTestImplementation",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 51
+        },
+        {
+          "target": "maven:org.springframework.cloud/spring-cloud-dependencies",
+          "display": "org.springframework.cloud:spring-cloud-dependencies",
+          "requirement": "2023.0.2",
+          "version": "2023.0.2",
+          "resolution": "pinned",
+          "scope": "unknown",
+          "group": "bom",
+          "qualifiers": "type=pom",
+          "source": "registry",
+          "confidence": "heuristic",
+          "line": 59
+        }
+      ],
+      "toolchain": {
+        "dsl": "groovy",
+        "java": "17",
+        "language": "java",
+        "tool": "gradle"
+      },
+      "diagnostics": [
+        {
+          "code": "gradle.apply-from",
+          "severity": "info",
+          "message": "apply from is not followed",
+          "path": "build.gradle",
+          "line": 17
+        },
+        {
+          "code": "gradle.local-dependency",
+          "severity": "info",
+          "message": "fileTree(...) has no coordinates",
+          "path": "build.gradle",
+          "line": 44
+        },
+        {
+          "code": "gradle.unresolved-notation",
+          "severity": "info",
+          "message": "dependency argument is not a literal",
+          "path": "build.gradle",
+          "line": 50
+        },
+        {
+          "code": "gradle.script-heuristic",
+          "severity": "info",
+          "message": "24 dependencies read lexically from the build script",
+          "path": "build.gradle"
+        }
+      ]
+    }
+  ]
+}

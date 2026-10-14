@@ -1,0 +1,10 @@
+dist
+.build
+node_modules
+pnpm-lock.yaml
+src/lib/api/schema.d.ts
+src/app/routeTree.gen.ts
+src/locales
+test-results
+playwright-report
+public/theme-init.js

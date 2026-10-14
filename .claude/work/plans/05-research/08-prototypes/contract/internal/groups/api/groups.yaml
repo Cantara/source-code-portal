@@ -1,0 +1,42 @@
+openapi: 3.1.0
+info: {title: groups, version: 1.0.0}
+paths:
+  /api/v1/groups:
+    get:
+      operationId: listGroups
+      tags: [groups]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GroupList'}
+        default: {$ref: '../../httpapi/openapi/common.yaml#/components/responses/Problem'}
+  /api/v1/groups/{groupId}:
+    get:
+      operationId: getGroup
+      tags: [groups]
+      parameters:
+        - {name: groupId, in: path, required: true, schema: {type: string, pattern: '^[a-z0-9-]+$'}}
+      responses:
+        '200':
+          description: OK
+          content: {application/json: {schema: {$ref: '#/components/schemas/Group'}}}
+        '404': {$ref: '../../httpapi/openapi/common.yaml#/components/responses/Problem'}
+        default: {$ref: '../../httpapi/openapi/common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    Group:
+      type: object
+      required: [id, display_name, repo_count]
+      properties:
+        id: {type: string}
+        display_name: {type: string}
+        description: {type: [string, "null"]}
+        repo_count: {type: integer, minimum: 0}
+    GroupList:
+      type: object
+      required: [items, freshness]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/Group'}}
+        freshness: {$ref: '../../httpapi/openapi/common.yaml#/components/schemas/Freshness'}

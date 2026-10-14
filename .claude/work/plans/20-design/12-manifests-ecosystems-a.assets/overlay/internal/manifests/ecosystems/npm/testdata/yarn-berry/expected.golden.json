@@ -1,0 +1,220 @@
+{
+  "parsed": [
+    {
+      "file": "package.json",
+      "parser": "npm/package-json",
+      "kind": "manifest",
+      "provides": [
+        {
+          "id": "npm:berry-root",
+          "display": "berry-root",
+          "version": "0.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "^5.6.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:lodash",
+          "display": "lodash",
+          "requirement": "^4.17.21",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:wrap-ansi",
+          "display": "wrap-ansi",
+          "requirement": "npm:wrap-ansi@^7.0.0",
+          "resolution": "declared",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:vitest",
+          "display": "vitest",
+          "requirement": "^2.1.8",
+          "resolution": "declared",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "properties": {
+        "alias:npm:wrap-ansi@^7.0.0": "wrap"
+      },
+      "toolchain": {
+        "language": "typescript",
+        "tool": "yarn",
+        "toolVersion": "4.5.1"
+      }
+    },
+    {
+      "file": "yarn.lock",
+      "parser": "npm/yarn-lock",
+      "kind": "lockfile",
+      "lockedCount": 7,
+      "properties": {
+        "desc:ansi-styles@npm:^4.0.0": "4.3.0",
+        "desc:berry-root@workspace:.": "workspace",
+        "desc:color-convert@npm:^2.0.1": "2.0.1",
+        "desc:color-name@npm:~1.1.4": "1.1.4",
+        "desc:lodash@npm:^4.17.21": "4.17.21",
+        "desc:typescript@npm:^5.6.0": "5.6.3",
+        "desc:typescript@patch:typescript@npm%3A^5.6.0#optional!builtin\u003ccompat/typescript\u003e": "5.6.3",
+        "desc:vitest@npm:^2.1.8": "2.1.8",
+        "desc:wrap-ansi@npm:^7.0.0": "7.0.0",
+        "desc:wrap@npm:wrap-ansi@^7.0.0": "wrap-ansi@7.0.0",
+        "lockfileVersion": "8"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#npm",
+      "ecosystem": "npm",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "package.json (npm/package-json)",
+        "yarn.lock (npm/yarn-lock)"
+      ],
+      "provides": [
+        {
+          "id": "npm:berry-root",
+          "display": "berry-root",
+          "version": "0.0.0",
+          "kind": "library"
+        }
+      ],
+      "dependencies": [
+        {
+          "target": "npm:typescript",
+          "display": "typescript",
+          "requirement": "^5.6.0",
+          "version": "5.6.3",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:lodash",
+          "display": "lodash",
+          "requirement": "^4.17.21",
+          "version": "4.17.21",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:wrap-ansi",
+          "display": "wrap-ansi",
+          "requirement": "npm:wrap-ansi@^7.0.0",
+          "version": "7.0.0",
+          "resolution": "locked",
+          "scope": "runtime",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        },
+        {
+          "target": "npm:vitest",
+          "display": "vitest",
+          "requirement": "^2.1.8",
+          "version": "2.1.8",
+          "resolution": "locked",
+          "scope": "dev",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 1
+        }
+      ],
+      "locked": [
+        {
+          "id": "npm:ansi-styles",
+          "version": "4.3.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "dependsOn": [
+            1
+          ],
+          "line": 8
+        },
+        {
+          "id": "npm:color-convert",
+          "version": "2.0.1",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "dependsOn": [
+            2
+          ],
+          "line": 28
+        },
+        {
+          "id": "npm:color-name",
+          "version": "1.1.4",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "line": 37
+        },
+        {
+          "id": "npm:lodash",
+          "version": "4.17.21",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 44
+        },
+        {
+          "id": "npm:typescript",
+          "version": "5.6.3",
+          "relationship": "direct",
+          "scope": "runtime",
+          "line": 51
+        },
+        {
+          "id": "npm:vitest",
+          "version": "2.1.8",
+          "relationship": "direct",
+          "scope": "dev",
+          "dependsOn": [
+            3
+          ],
+          "line": 69
+        },
+        {
+          "id": "npm:wrap-ansi",
+          "version": "7.0.0",
+          "relationship": "direct",
+          "scope": "runtime",
+          "dependsOn": [
+            0
+          ],
+          "line": 85
+        }
+      ],
+      "toolchain": {
+        "language": "typescript",
+        "tool": "yarn",
+        "toolVersion": "4.5.1"
+      }
+    }
+  ]
+}

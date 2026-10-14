@@ -1,0 +1,171 @@
+{
+  "parsed": [
+    {
+      "file": "Pipfile",
+      "parser": "pypi/pipfile",
+      "kind": "manifest",
+      "dependencies": [
+        {
+          "target": "pypi:django",
+          "display": "django",
+          "requirement": "~=4.2",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "packages",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "packages",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:mypkg",
+          "display": "mypkg",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "packages",
+          "source": "git",
+          "sourceRef": "https://github.com/acme/mypkg.git#abc123",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "==8.2.0",
+          "version": "8.2.0",
+          "resolution": "pinned",
+          "scope": "dev",
+          "group": "dev-packages",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "==3.11.*",
+        "tool": "pipenv"
+      }
+    },
+    {
+      "file": "Pipfile.lock",
+      "parser": "pypi/pipfile-lock",
+      "kind": "lockfile",
+      "lockedCount": 5,
+      "toolchain": {
+        "python": "==3.11.*"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": ".#pypi",
+      "ecosystem": "pypi",
+      "dir": ".",
+      "role": "primary",
+      "files": [
+        "Pipfile (pypi/pipfile)",
+        "Pipfile.lock (pypi/pipfile-lock)"
+      ],
+      "dependencies": [
+        {
+          "target": "pypi:django",
+          "display": "django",
+          "requirement": "~=4.2",
+          "version": "4.2.13",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "packages",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 7
+        },
+        {
+          "target": "pypi:requests",
+          "display": "requests",
+          "version": "2.32.3",
+          "resolution": "locked",
+          "scope": "runtime",
+          "group": "packages",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 8
+        },
+        {
+          "target": "pypi:mypkg",
+          "display": "mypkg",
+          "resolution": "declared",
+          "scope": "runtime",
+          "group": "packages",
+          "source": "git",
+          "sourceRef": "https://github.com/acme/mypkg.git#abc123",
+          "confidence": "exact",
+          "line": 9
+        },
+        {
+          "target": "pypi:pytest",
+          "display": "pytest",
+          "requirement": "==8.2.0",
+          "version": "8.2.0",
+          "resolution": "locked",
+          "scope": "dev",
+          "group": "dev-packages",
+          "source": "registry",
+          "confidence": "exact",
+          "line": 12
+        }
+      ],
+      "locked": [
+        {
+          "id": "pypi:django",
+          "version": "4.2.13",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:1234"
+        },
+        {
+          "id": "pypi:mypkg",
+          "version": "",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "git:abc123"
+        },
+        {
+          "id": "pypi:requests",
+          "version": "2.32.3",
+          "relationship": "direct",
+          "scope": "runtime",
+          "integrity": "sha256:5678"
+        },
+        {
+          "id": "pypi:sqlparse",
+          "version": "0.5.0",
+          "relationship": "transitive",
+          "scope": "runtime",
+          "integrity": "sha256:9999"
+        },
+        {
+          "id": "pypi:pytest",
+          "version": "8.2.0",
+          "relationship": "direct",
+          "scope": "dev",
+          "integrity": "sha256:abcd"
+        }
+      ],
+      "toolchain": {
+        "language": "python",
+        "python": "==3.11.*",
+        "tool": "pipenv"
+      }
+    }
+  ]
+}

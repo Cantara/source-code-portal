@@ -1,0 +1,9 @@
+{"date":"2026-10-13","browser":"Chrome 155 (Playwright, Apple silicon, 120 Hz display => 8.3 ms frame = vsync bound)","graph":"1000 nodes, 2500 edges, 20 clusters, precomputed positions (d3-force 300 ticks)","method":"median of 5 page loads; mount = construct + 2 rAF; frames = 90 programmatic camera/viewport/pan steps awaiting rAF","results":{
+"sigma 3.0.3":{"1x":{"mountMs":24,"frameAvgMs":8.3},"6x":{"mountMs":79,"frameAvgMs":8.2,"p95":9.7}},
+"sigma 4.0.1":{"1x":{"mountMs":76,"frameAvgMs":8.3},"6x":{"mountMs":237,"frameAvgMs":8.3,"p95":9.9}},
+"cytoscape 3.34.3 (haystack edges, no labels)":{"1x":{"mountMs":85,"frameAvgMs":8.3},"6x":{"mountMs":555,"frameAvgMs":19.1,"p95":45.9}},
+"@xyflow/react 12.12.0 (all nodes, DOM)":{"1x":{"mountMs":150,"frameAvgMs":8.7},"6x":{"mountMs":1006,"frameAvgMs":50.2,"p95":62.4}},
+"@xyflow/react (onlyRenderVisibleElements)":{"1x":{"mountMs":72,"frameAvgMs":8.9},"6x":{"mountMs":447,"frameAvgMs":28.0,"p95":44.8}},
+"canvas2d hand-rolled (d3-zoom style transform, full redraw per frame)":{"1x":{"mountMs":12,"frameAvgMs":8.3},"6x":{"mountMs":9,"frameAvgMs":8.3}},
+"plain SVG DOM (3500 elements, one group transform)":{"1x":{"mountMs":13,"frameAvgMs":8.3},"6x":{"mountMs":56,"frameAvgMs":8.3}}},
+"caveats":"xyflow nodes are real React DOM nodes with labels (functional UI); cytoscape/sigma/canvas draw no per-node labels in this test; panning only (no hover/selection); single machine."}

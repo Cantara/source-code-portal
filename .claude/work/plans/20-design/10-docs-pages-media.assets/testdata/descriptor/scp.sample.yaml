@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://scp.example.org/schemas/scp/v1.json
+schema: 1
+title: Billing Service
+summary: Invoicing and payment-collection service for the Acme commerce platform.
+type: service
+lifecycle: production
+owners:
+  - "@acme/billing-core"
+system: billing
+tags: [billing, payments, go]
+links:
+  - { title: Runbook, url: "https://wiki.example.org/billing/runbook", type: runbook }
+  - { title: Grafana, url: "https://grafana.example.org/d/billing", type: dashboard }
+docs:
+  root: docs
+  exclude: ["docs/internal/**"]
+  nav:
+    - path: README.md
+      title: Overview
+    - title: Guides
+      items:
+        - docs/install.md
+        - { path: docs/config.md, title: Configuration }
+apis:
+  - { type: openapi, title: REST API, path: api/openapi.yaml }
+dependsOn: [ledger-service, customer-service]
+integrations:
+  jenkins: { instance: main, job: "billing/billing-service" }
+  snyk: { project: billing-service }

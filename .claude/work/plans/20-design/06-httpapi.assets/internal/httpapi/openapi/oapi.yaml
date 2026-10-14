@@ -1,0 +1,10 @@
+package: openapi
+output: common.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+compatibility:
+  always-prefix-enum-values: true
+output-options:
+  skip-prune: true
