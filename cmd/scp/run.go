@@ -120,6 +120,7 @@ func newConfigCmd(opts *options) *cobra.Command {
 			return failure{enc.Close()}.orNil()
 		},
 	})
+	cmd.AddCommand(newGroupsCmd(opts))
 	return cmd
 }
 

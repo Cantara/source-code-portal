@@ -47,6 +47,9 @@ Root files: `go.mod` (`module github.com/cantara/source-code-portal`, `go 1.27.2
 - `scp serve [--public-addr :9090] [--admin-addr :9091]`: runs the portal until SIGINT or SIGTERM.
 - `scp config check`: loads and validates exactly like `serve`, prints the effective settings as YAML (secret file paths, never their
   contents); group warnings go to stderr; exit 0, 1 or 2.
+- `scp config groups --repos <file|->`: the configuration's groups applied to a repository listing (GitHub's JSON, one array or one
+  per page as `gh api --paginate` prints them, or one name per line) through the catalogue's own `Plan` and `Resolve`: each group with
+  its members and default, the repositories in no group and those the source filters leave out. No GitHub call (`groups_test.go`).
 - `scp version [--json]`: version and build (`-X main.version`, `-X main.build`), a modified flag, Go version, platform.
 Cobra settings: `SilenceUsage`, `SilenceErrors`; `main` calls `run(ctx, args, stdout, stderr) int`, which prints an error once to stderr
 as `scp: <error>`.

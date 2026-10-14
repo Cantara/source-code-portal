@@ -116,6 +116,14 @@ Matchers (each has exactly one field) see the repository name, except `topic`:
 
 A repository can be in several groups. Repositories in no group are counted on the dashboard and listed by the API.
 
+Try the groups before you deploy them: `scp config groups` shows which group each repository lands in, the repositories no group
+selects and those the source filters leave out, from a listing of the organisation (it does not call GitHub itself):
+
+```sh
+gh api --paginate "orgs/Cantara/repos?per_page=100" > repos.json   # or one repository name per line
+scp config groups -c scp.yaml --repos repos.json
+```
+
 ### 2.1 Private repositories
 
 The portal can show private and internal repositories to people your authenticating proxy (oauth2-proxy, an OIDC ingress, an SSO
