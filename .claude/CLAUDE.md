@@ -4,36 +4,35 @@ Guidance for Claude Code in this repository.
 
 ## State
 
-This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`) is the
-home of the Go rewrite of Source Code Portal (SCP). **M0 (skeleton), M1 (catalogue and sync), M2 (read API for the pages), M3 (docs,
-badges, webhooks, freshness), M4 (LLM surface, metrics, hardening), M5 (web UI), M6 (release `v2.0.0`), M7 (package manifests), M8 (private repositories), M9 (several instances on Hazelcast), M10 (image proxy and live updates) and M11 (the web UI on Next.js
-with server-side rendering) are done: the greenfield streams are complete.** Coding instructions for the repository itself are in the root `AGENTS.md`.
+This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`, public)
+is Source Code Portal (SCP) in Go with a server-rendered Next.js web UI. `v2.0.0` is published; the next release is `v2.1.0`, tagged when
+**M12 (feature modules, in progress)** is done; **M13 (search engines)** is queued. Coding instructions for the repository itself are in
+the root `AGENTS.md`.
 
-- **`.claude/work/plan.md` is the binding plan**: scope (v1, later), architecture, stack, milestones M0..M11. Read it first.
+- **`.claude/work/plan.md` is the binding plan**: what SCP is, architecture and rules, stack, the work in progress. Read it first.
 - `.claude/work/README.md`: index of the development package.
-- `.claude/work/design/`: short design notes per area (GitHub, sync/snapshot/store, catalog, content, manifests, access, cluster,
-  images and events, HTTP/API, web, build/ops, principles; `seo.md` plans M12). Binding below `plan.md`.
-- `.claude/work/decisions.md`: every decision taken, with where it is recorded. The milestone entries (M1..M5) list where the code
-  is leaner than the notes and what was deferred.
-- `.claude/work/reference/detailed-design/`: the earlier detailed design package (about 1,900 files). **Reference only**: consult it
-  when building a part, copy what helps. It is not kept in sync; `plan.md` and `design/` win.
+- `.claude/work/design/`: one note per area, as built (GitHub, sync/snapshot/store, catalog, content, manifests, access, cluster,
+  images and events, HTTP/API, web, build/ops, principles), plus `feature-modules.md` (M12) and `seo.md` (M13). Binding below `plan.md`.
+- `.claude/work/decisions.md`: the decisions in force.
+- `.claude/work/history/`: finished work (the M0..M11 plan and decision log, the earlier detailed design, the UI brief). Not kept in
+  sync; consult only for background.
 
 The Java product (`Cantara/SourceCodePortal`, checked out at `/Users/overanheim/Code/descoped/SourceCodePortal`) is read-only reference;
 never modify it, push to it or open issues or pull requests on it.
 
 ## Working rules
 
-- **Greenfield**: nothing is released and no data needs keeping. Change code, contract, config keys, the store schema
+- **Greenfield**: no data needs keeping. Change code, contract, config keys, the store schema
   (`internal/store/migrations/0001_init.sql`) and documents in place; no compatibility layers, shims, deprecations or extra migrations.
   Commit directly to `main` (small Conventional Commits, CI green) and push.
 - **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
   for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
   `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
-- **Version**: semantic versioning from `v2.1.0` (P-16), the release of the completed greenfield streams; published tags are never moved.
+- **Version**: semantic versioning (P-16); published tags are never moved. `v2.1.0` is next.
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
 - Dependencies are the latest releases of the best-in-class choice (owner P-17), pure Go on the server; `bluemonday` is the one exception
-  (`plan.md` section 4). Web: TypeScript 7 is `tsc` (`@typescript/native`); the `typescript` name holds the 6.0 API for typescript-eslint and Next.js.
-- Planning and design live under `.claude/work/`; `docs/` is user documentation only. Documents describe what is built, not what is not.
+  (`plan.md` section 3). Web: TypeScript 7 is `tsc` (`@typescript/native`); the `typescript` name holds the 6.0 API for typescript-eslint and Next.js.
+- Planning and design live under `.claude/work/` and hold only what is built and in progress; finished work moves to `.claude/work/history/`; `docs/` is user documentation only.
 - Commits: Conventional Commits, no AI attribution lines. Generated files are never edited by hand (`make gen`).
 - No test touches the network: loopback only, `internal/github/githubtest` and recorded fixtures.
 - Keep this file current: update it in the same commit when the state, layout or rules change.
@@ -80,9 +79,8 @@ Test idioms: engine tests run in `testing/synctest` bubbles with a real store in
 
 ## Next
 
-`v2.1.0` is the current release (GitHub release with signed archives and the web bundle; image `ghcr.io/cantara/source-code-portal:2.1.0`
-and `:latest`). Everything is v1 (P-14) and M0..M11 of `plan.md` section 5 are done. The repository is public. New work starts with its design note and a
-milestone row in `plan.md`. Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs
+M12 (`design/feature-modules.md`), then M13 (`design/seo.md`). New work starts with its design note and a row in `plan.md` section 4.
+Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs
 `pnpm -C web exec playwright install chromium`; `rm -rf web/.next` after a `next dev` run before `pnpm build` (stale dev route types);
 the Hazelcast tests: `docker run -d -p 127.0.0.1:5701:5701 -e HZ_NETWORK_PUBLICADDRESS=127.0.0.1:5701 hazelcast/hazelcast:5.7` and
 `TEST_HAZELCAST=127.0.0.1:5701`.

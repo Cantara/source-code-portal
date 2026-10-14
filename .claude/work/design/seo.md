@@ -1,14 +1,14 @@
-# Search engines (M12)
-Status: planning note for M12, 2026-10-15; nothing here is built yet. Binding order: ../plan.md > this note > ../reference/.
+# Search engines
+Status: M13, queued (plan.md section 4); nothing here is built yet. Binding order: ../plan.md > this note.
 Learned from krantho (`/Users/overanheim/Code/descoped/krantho`, its `krantho-site` and `packages/seo*`), adapted to SCP's model:
 Go owns the data and every response header, the Next.js server renders pages from the snapshot.
 
-## What M11 already gives
+## What the web UI already gives
 Server-rendered HTML for every page, readable without JavaScript; per-page title, description and canonical from `X-Scp-Origin`;
 `/sitemap.xml` (dashboard, commit log, groups, repositories) and `/robots.txt`; `noindex` for a private viewer; `/llms.txt`,
 `/llms-full.txt` and Markdown answers; a 404 status for unknown pages.
 
-## Scope (M12)
+## Scope
 1. One route of truth. `web/src/lib/paths.ts` is the only builder of page paths; canonical URLs, the sitemap, JSON-LD `@id`s and
    breadcrumbs all use it, and a test compares its output with the addresses Go's `llms` writes, so the two never drift.
 2. Structured data: one JSON-LD `@graph` per page from a server component, serialised with `<` escaped and the page's CSP nonce
