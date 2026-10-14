@@ -11,7 +11,7 @@ caches (`~/Library/pnpm`, the Go module and build caches, the golangci-lint cach
 .claude/work/plans/50-repo-seed/bootstrap.sh [--install]
 ```
 
-Copies `repo/` into the repository root (once, at M0); `--install` also runs `pnpm install` in `web/`. Commit the result as
+Copies `repo/` into the repository root (once, at M0); it stops without copying if a seed file would replace a different existing file (a root `.gitignore`/`.gitattributes` is replaced). `--install` also runs `pnpm install` in `web/`. Commit the result as
 `chore: repository seed`. Then follow design 16 section 13 (tasks B-1 to B-3, the order of 4.12) and `../40-implementation-plan.md` (M0
 first). `seed-notes.md` lists what differs from the design files.
 
@@ -71,7 +71,7 @@ shellcheck, Docker 29.8.2.
 
 ### Re-validation of the in-place bootstrap (2026-10-14, macOS arm64)
 
-Method: a scratch copy of this repository (with the design package at `.claude/work/plans/`, git on `main`), then `bootstrap.sh --git`.
+Method: a scratch copy of this repository (with the design package at `.claude/work/plans/`, git on `main`), then `bootstrap.sh` (the first, longer version of the script; reduced the same day to the copy plus the overwrite check).
 
 | Check | Result |
 |---|---|
