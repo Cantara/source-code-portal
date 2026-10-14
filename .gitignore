@@ -13,3 +13,4 @@ node_modules/
 .idea/
 # Agent-local state
 /.claude/settings.local.json
+/scp

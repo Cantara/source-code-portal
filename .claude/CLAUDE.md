@@ -29,7 +29,7 @@ never modify it, push to it or open issues or pull requests on it.
 - **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
   for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
   `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
-- **Version**: releases are `v2.0.0` and stay at 2.0.0 until the greenfield streams are complete (owner decision P-11).
+- **Version**: semantic versioning from `v2.1.0` (P-16), the release of the completed greenfield streams; published tags are never moved.
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
 - Dependencies must be current (release within 18 months), widely used and pure Go; `bluemonday` is the one exception (`plan.md` section 4).
 - Planning and design live under `.claude/work/`; `docs/` is user documentation only. Documents describe what is built, not what is not.
@@ -79,8 +79,8 @@ Test idioms: engine tests run in `testing/synctest` bubbles with a real store in
 
 ## Next
 
-`v2.0.0` is released (GitHub release with signed archives; image `ghcr.io/cantara/source-code-portal:2.0.0` and `:latest`). Everything is v1
-(P-14) and M0..M11 of `plan.md` section 5 are done; the version stays 2.0.0 (P-11). New work starts with its design note and a
+`v2.1.0` is the current release (GitHub release with signed archives and the web bundle; image `ghcr.io/cantara/source-code-portal:2.1.0`
+and `:latest`). Everything is v1 (P-14) and M0..M11 of `plan.md` section 5 are done. The repository is public. New work starts with its design note and a
 milestone row in `plan.md`. Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs
 `pnpm -C web exec playwright install chromium`; `rm -rf web/.next` after a `next dev` run before `pnpm build` (stale dev route types);
 the Hazelcast tests: `docker run -d -p 127.0.0.1:5701:5701 -e HZ_NETWORK_PUBLICADDRESS=127.0.0.1:5701 hazelcast/hazelcast:5.7` and

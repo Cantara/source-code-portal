@@ -120,7 +120,7 @@ Each milestone ends with working software on `main`, CI green, and is done only 
 | M10 | Image proxy for external README images; live updates by server-sent events | README images load from the portal under `img-src 'self'`; a push reaches an open page without polling |
 | M11 | Web UI on Next.js with server-side rendering, replacing the SPA; started only when M10 is done | every page is complete HTML from the server (content readable without JavaScript) with its own title, description and canonical URL, plus a sitemap; Playwright smoke, axe and CSP checks pass |
 
-M7 to M11 each start with their design note. The version stays 2.0.0 until M11 is done (P-11).
+M7 to M11 each start with their design note. The version stayed 2.0.0 until M11 was done (P-11); the finished streams ship as 2.1.0 (P-16).
 
 ## 6. How we work
 

@@ -146,12 +146,12 @@ Images in private READMEs load from GitHub and show for users signed in there.
 
 ## 3. Run
 
-**Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.0.0.tar.gz`, the same for every platform) from
+**Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.1.0.tar.gz`, the same for every platform) from
 the GitHub release, check them and run them with Node.js 24 on the `PATH` (or `web.node`):
 
 ```sh
-sha256sum -c scp_2.0.0_checksums.txt --ignore-missing
-tar xzf scp_2.0.0_linux_amd64.tar.gz && tar xzf scp-web_2.0.0.tar.gz   # the bundle unpacks into bundle/
+sha256sum -c scp_2.1.0_checksums.txt --ignore-missing
+tar xzf scp_2.1.0_linux_amd64.tar.gz && tar xzf scp-web_2.1.0.tar.gz   # the bundle unpacks into bundle/
 ./scp config check -c scp.yaml && SCP_WEB_DIR=bundle ./scp serve -c scp.yaml
 ```
 
@@ -166,14 +166,14 @@ so the public listener stays the one address to expose.
 docker run -d --name scp --read-only --cap-drop=ALL \
   -p 9090:9090 -p 127.0.0.1:9091:9091 \
   -v scp-data:/data -v "$PWD/scp.yaml:/etc/scp/scp.yaml:ro" -v "$PWD/secrets:/run/secrets:ro" \
-  ghcr.io/cantara/source-code-portal:2.0.0 serve --config /etc/scp/scp.yaml
+  ghcr.io/cantara/source-code-portal:2.1.0 serve --config /etc/scp/scp.yaml
 ```
 
 Images and checksum files are signed keyless by the release workflow. Verify an image with cosign:
 
 ```sh
-cosign verify ghcr.io/cantara/source-code-portal:2.0.0 \
-  --certificate-identity https://github.com/Cantara/source-code-portal/.github/workflows/release.yml@refs/tags/v2.0.0 \
+cosign verify ghcr.io/cantara/source-code-portal:2.1.0 \
+  --certificate-identity https://github.com/Cantara/source-code-portal/.github/workflows/release.yml@refs/tags/v2.1.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -193,7 +193,7 @@ spec:
       securityContext: { runAsNonRoot: true, fsGroup: 65532, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: scp
-          image: ghcr.io/cantara/source-code-portal:2.0.0
+          image: ghcr.io/cantara/source-code-portal:2.1.0
           args: [serve, --config, /etc/scp/scp.yaml]
           ports: [{ name: public, containerPort: 9090 }, { name: admin, containerPort: 9091 }]
           securityContext: { readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }

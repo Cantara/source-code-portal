@@ -3,7 +3,9 @@
 Notable changes, newest first. Versions follow [Semantic Versioning](https://semver.org/); the GitHub release of each tag lists every
 change from its Conventional Commit subjects.
 
-## Unreleased
+## 2.1.0
+
+The completed rewrite: package manifests, private repositories, several instances, live updates and the server-rendered web UI.
 
 - Package manifests: `go.mod`, `package.json` and `pom.xml` are read per repository; the repository page shows the technology and
   dependencies they declare and the catalogued repositories it uses and is used by (`/api/v1/repos/{owner}/{name}/manifests`, and in the
