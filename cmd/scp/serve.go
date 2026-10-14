@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
+	"github.com/cantara/source-code-portal/internal/webhook"
 	"github.com/cantara/source-code-portal/web"
 )
 
@@ -125,9 +127,14 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 		}
 	}
 
+	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)}}
+	if cfg.Webhook.Secret.IsSet() {
+		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, Handler: webhook.New(cfg.Webhook.Secret.Reveal(),
+			cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.engine, cfg.GitHub.Sources), log)})
+	}
 	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
 	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
-		httpapi.SnapshotAPI{Current: s.pub.Current}}, httpapi.Route{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)}), log)
+		httpapi.SnapshotAPI{Current: s.pub.Current}}, routes...), log)
 	s.admin = newHTTPServer(httpapi.Admin(ready), log)
 	var lc net.ListenConfig
 	if s.publicLn, err = lc.Listen(ctx, "tcp", cfg.Server.PublicAddr); err != nil {
@@ -138,6 +145,27 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 		return nil, err
 	}
 	return s, nil
+}
+
+// webhookSink hands webhook events to the engine: repository events to the repository's jobs, owner-wide events to the listing of
+// the source that has the owner among its organisations. Owners no source lists are ignored.
+func webhookSink(e *sync.Engine, sources []config.Source) webhook.Sink {
+	sourceOf := map[string]string{}
+	for _, s := range sources {
+		for _, org := range s.Orgs {
+			sourceOf[strings.ToLower(org)] = s.ID
+		}
+	}
+	return func(ev sync.Event, owner, name string) {
+		id, ok := sourceOf[strings.ToLower(owner)]
+		switch {
+		case !ok:
+		case name == "" || ev == sync.EventSourceChanged:
+			e.NotifySource(ev, id)
+		default:
+			e.Notify(ev, snapshot.KeyOf(owner, name))
+		}
+	}
 }
 
 func newHTTPServer(h http.Handler, log *slog.Logger) *http.Server {

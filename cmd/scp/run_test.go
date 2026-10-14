@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -308,4 +311,60 @@ catalog:
 	if got := gh.Count("GET /repos/acme/whydah-core/commits"); got != coreFetches {
 		t.Errorf("an untouched repository's commits were fetched again: %d", got-coreFetches)
 	}
+
+	// A GitHub outage serves the last good data, marked stale; once GitHub is back a signed push lands within seconds.
+	secret := filepath.Join(dir, "webhook-secret")
+	if err := os.WriteFile(secret, []byte("hooks"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body+"webhook: {secret_file: "+secret+"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, _, err = config.Load(path, nil); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Server.PublicAddr, cfg.Server.AdminAddr = "127.0.0.1:0", "127.0.0.1:0"
+	push := func(public, delivery, name string) {
+		t.Helper()
+		body := `{"ref":"refs/heads/main","repository":{"name":"` + name + `","default_branch":"main","owner":{"login":"acme"}}}`
+		m := hmac.New(sha256.New, []byte("hooks"))
+		m.Write([]byte(body))
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, public+"/webhooks/github", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-GitHub-Event", "push")
+		req.Header.Set("X-GitHub-Delivery", delivery)
+		req.Header.Set("X-Hub-Signature-256", "sha256="+hex.EncodeToString(m.Sum(nil)))
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("webhook: %d", resp.StatusCode)
+		}
+	}
+	gh.Fail("GET /", http.StatusBadGateway, 1<<20, 0)
+	stop, public, admin = serve()
+	waitReady(admin)
+	push(public, "outage-1", "Whydah-Core")
+	waitFor("stale commits during the outage", func() bool {
+		var r oapi.RepoDetail
+		return fetch(public+"/api/v1/repos/acme/whydah-core", &r) == http.StatusOK && len(r.Commits) == 3 &&
+			r.CommitsFreshness.Status == "stale"
+	})
+	if code := fetch(admin+"/readyz", nil); code != http.StatusOK {
+		t.Errorf("readiness during the outage: %d", code)
+	}
+	gh.Heal()
+	gh.SetCommits(sso, commit('7', 11), commit('d', 8), commit('e', 6))
+	start := time.Now()
+	push(public, "after-1", "whydah-sso")
+	waitFor("the pushed commit", func() bool {
+		var r oapi.RepoDetail
+		return fetch(public+"/api/v1/repos/acme/whydah-sso", &r) == http.StatusOK && len(r.Commits) == 3
+	})
+	if d := time.Since(start); d > 5*time.Second {
+		t.Errorf("the push took %v to show", d)
+	}
+	stop()
 }

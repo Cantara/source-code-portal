@@ -37,3 +37,9 @@ catalog:
       default_repo: whydah
       match:
         - catch_all: true
+# GitHub webhook (content type application/json; events push, release, repository, installation, installation_repositories) at
+# POST /webhooks/github. The receiver is registered only when secret_file is set; previous_secret_file keeps deliveries signed with
+# the old secret valid during a rotation.
+webhook:
+  secret_file: /run/secrets/webhook-secret
+  # previous_secret_file: /run/secrets/webhook-secret-old

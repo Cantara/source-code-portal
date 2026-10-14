@@ -161,6 +161,13 @@ func (s *Server) Fail(pattern string, status, times int, retryAfter time.Duratio
 	s.faults = append(s.faults, &fault{pattern: pattern, status: status, retryAfter: retryAfter, times: times})
 }
 
+// Heal drops every injected fault.
+func (s *Server) Heal() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.faults = nil
+}
+
 // Exhaust uses up the rate limit of credential (a token, or an installation's account login).
 func (s *Server) Exhaust(credential string) {
 	s.mu.Lock()

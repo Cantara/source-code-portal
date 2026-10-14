@@ -12,12 +12,14 @@ Status: under development towards v1.0. The plan is in [`.claude/work/plan.md`](
 make build                     # web UI and bin/scp (needs Go 1.27, Node 24, pnpm 12)
 cp deploy/config.example.yaml scp.yaml   # then set your organisations and the App key or token file
 bin/scp config check -c scp.yaml
-bin/scp serve -c scp.yaml      # public :9090 (UI, /api/v1), admin :9091 (/livez, /readyz)
+bin/scp serve -c scp.yaml      # public :9090 (UI, /api/v1, /badges, /webhooks/github), admin :9091 (/livez, /readyz)
 make image                     # container image scp:dev
 ```
 
 Configuration is one YAML file (`--config`) with `SCP_*` environment overrides; at least one GitHub source (`github.sources`, a GitHub
 App or a token file) is required. `deploy/config.example.yaml` shows every key; `scp config check` prints the effective settings.
+Point an organisation webhook (content type `application/json`, the secret in `webhook.secret_file`) at `/webhooks/github` for
+updates within seconds; without it the portal still refreshes on its schedule.
 
 ## Develop
 
