@@ -80,10 +80,19 @@ func TestHazelcastBackend(t *testing.T) {
 	if first, err := b.Once(ctx, "d1", time.Minute); first || err != nil {
 		t.Errorf("Once again: %v %v", first, err)
 	}
+	// Hazelcast orders the events of one key; keys in different partitions arrive in any order.
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
-		return strings.Join(watched, ",") == "k1=v1,k2=v2,k1=v3" && len(messages) == 1
+		var k1, k2 []string
+		for _, w := range watched {
+			if strings.HasPrefix(w, "k1=") {
+				k1 = append(k1, w)
+			} else {
+				k2 = append(k2, w)
+			}
+		}
+		return strings.Join(k1, ",") == "k1=v1,k1=v3" && strings.Join(k2, ",") == "k2=v2" && len(messages) == 1
 	})
 
 	start := time.Now()
