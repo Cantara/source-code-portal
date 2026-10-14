@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"regexp"
@@ -109,6 +110,12 @@ var (
 )
 
 func (c *Config) normalise() {
+	c.Server.PublicURL = strings.TrimRight(c.Server.PublicURL, "/")
+	for _, cidr := range c.Server.RawTrustedProxies {
+		if pfx, err := netip.ParsePrefix(cidr); err == nil {
+			c.Server.TrustedProxies = append(c.Server.TrustedProxies, pfx.Masked())
+		}
+	}
 	for i := range c.GitHub.Sources {
 		s := &c.GitHub.Sources[i]
 		if s.BaseURL == "" {

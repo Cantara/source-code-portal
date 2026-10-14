@@ -91,7 +91,7 @@ func TestDuplicateAndOversize(t *testing.T) {
 	if calls != 1 {
 		t.Errorf("sink called %d times", calls)
 	}
-	big := `{"x":"` + strings.Repeat("a", maxBody) + `"}`
+	big := `{"x":"` + strings.Repeat("a", MaxBody) + `"}`
 	if code, _ := deliver(t, rc, "push", "big", sign("s", big), big, nil); code != http.StatusRequestEntityTooLarge {
 		t.Errorf("oversized: %d", code)
 	}

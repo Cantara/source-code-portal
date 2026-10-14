@@ -37,7 +37,7 @@ func TestDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Config{
-		Server: Server{PublicAddr: ":9090", AdminAddr: ":9091", ShutdownGrace: 20 * time.Second},
+		Server: Server{PublicAddr: ":9090", AdminAddr: ":9091", ShutdownGrace: 20 * time.Second, RawTrustedProxies: []string{}},
 		Log:    Log{Level: "info", Format: "json"},
 		Store:  Store{Path: "/data/scp.db"},
 		Sync:   Sync{Concurrency: 4},
@@ -108,6 +108,9 @@ func TestRefused(t *testing.T) {
 		"unknown matcher":        {file: group("[{suffix: a}]"), want: "suffix"},
 		"bare matcher":           {file: group("[prefix]"), want: "match"},
 		"bad group id":           {file: "catalog:\n  groups:\n    - {id: Core, name: Core, default_repo: x, match: [{catch_all: true}]}\n", want: "must match"},
+		"relative public url":    {env: map[string]string{"SCP_SERVER_PUBLIC_URL": "/portal"}, want: "server.public_url"},
+		"public url with query":  {env: map[string]string{"SCP_SERVER_PUBLIC_URL": "https://scp.example/?a=1"}, want: "server.public_url"},
+		"bad proxy":              {file: "server:\n  trusted_proxies: [10.0.0.0/33]\n", want: "trusted_proxies"},
 		"previous secret alone":  {file: "webhook:\n  previous_secret_file: /x\n", want: "needs webhook.secret_file"},
 		"missing secret file":    {file: "webhook:\n  secret_file: /does/not/exist\n", want: "webhook.secret_file"},
 		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},

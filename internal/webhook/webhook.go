@@ -26,7 +26,7 @@ import (
 const Pattern = "POST /webhooks/github"
 
 const (
-	maxBody     = 25 << 20 // GitHub caps payloads at 25 MiB
+	MaxBody     = 25 << 20 // GitHub caps payloads at 25 MiB; the route must allow at least this
 	readTimeout = 8 * time.Second
 	dedupeTTL   = 15 * time.Minute
 	dedupeMax   = 10_000
@@ -70,12 +70,12 @@ func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, http.StatusUnauthorized, "bad-signature", "The signature is missing or invalid.")
 		return
 	}
-	if r.ContentLength > maxBody {
+	if r.ContentLength > MaxBody {
 		httpapi.WriteProblem(w, http.StatusRequestEntityTooLarge, "too-large", "The payload is too large.")
 		return
 	}
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(readTimeout))
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBody))
 	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {

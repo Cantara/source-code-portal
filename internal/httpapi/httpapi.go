@@ -9,8 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io/fs"
+	"log/slog"
+	"mime"
 	"net/http"
-	"path"
 	"strings"
 	"time"
 
@@ -18,22 +19,32 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
-// Route is a handler a feature serves outside the API contract (badges, the webhook).
+// Route is a handler a feature serves outside the API contract (badges, the webhook). MaxBody caps the request body
+// (0: DefaultMaxBody).
 type Route struct {
 	Pattern string
 	Handler http.Handler
+	MaxBody int64
 }
 
-// Public returns the handler of the public listener. spa holds the web UI build with index.html at its root; api implements the
-// contract in api/openapi.yaml; routes are the features' other handlers.
-func Public(spa fs.FS, api oapi.StrictServerInterface, routes ...Route) http.Handler {
+// Public returns the handler of the public listener. spa holds the web UI build with index.html at its root; contract is
+// api/openapi.yaml, served at /api/v1/openapi.yaml; api implements it; routes are the features' other handlers.
+func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterface, routes ...Route) http.Handler {
 	mux := http.NewServeMux()
 	for _, r := range routes {
-		mux.Handle(r.Pattern, r.Handler)
+		n := r.MaxBody
+		if n == 0 {
+			n = DefaultMaxBody
+		}
+		mux.Handle(r.Pattern, limit(n, r.Handler))
 	}
-	mux.Handle("GET /", spaHandler(spa))
+	mux.Handle("GET /", limit(DefaultMaxBody, spaHandler(spa)))
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, _ *http.Request) {
 		WriteProblem(w, http.StatusNotFound, "not-found", "No such API resource.")
+	})
+	mux.HandleFunc("GET /api/v1/openapi.yaml", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		_, _ = w.Write(contract)
 	})
 	strict := oapi.NewStrictHandlerWithOptions(api, nil, oapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
@@ -47,11 +58,12 @@ func Public(spa fs.FS, api oapi.StrictServerInterface, routes ...Route) http.Han
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
 			WriteProblem(w, http.StatusBadRequest, "validation-failed", "The request parameters are not valid.")
 		}})
-	return headers(mux)
+	return o.wrap("public", apiGuard(mux))
 }
 
-// Admin returns the handler of the admin listener. ready reports whether the portal serves a catalogue.
-func Admin(ready func() bool) http.Handler {
+// Admin returns the handler of the admin listener. ready reports whether the portal serves a catalogue, alive whether the sync
+// dispatcher is running; routes are the operator handlers (metrics, status, profiling).
+func Admin(o Options, alive, ready func() bool, routes ...Route) http.Handler {
 	mux := http.NewServeMux()
 	probe := func(ok func() bool) http.HandlerFunc {
 		return func(w http.ResponseWriter, _ *http.Request) {
@@ -65,9 +77,25 @@ func Admin(ready func() bool) http.Handler {
 			_, _ = w.Write([]byte("ok\n"))
 		}
 	}
-	mux.HandleFunc("GET /livez", probe(func() bool { return true }))
+	mux.HandleFunc("GET /livez", probe(alive))
 	mux.HandleFunc("GET /readyz", probe(ready))
-	return headers(mux)
+	for _, r := range routes {
+		mux.Handle(r.Pattern, limit(DefaultMaxBody, r.Handler))
+	}
+	return o.wrap("admin", mux)
+}
+
+// Server returns an http.Server with the fixed timeouts both listeners use.
+func Server(h http.Handler, log *slog.Logger) *http.Server {
+	return &http.Server{
+		Handler:           h,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    16 << 10,
+		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
+	}
 }
 
 // SnapshotAPI implements getSnapshot.
@@ -85,36 +113,95 @@ func (a SnapshotAPI) GetSnapshot(context.Context, oapi.GetSnapshotRequestObject)
 	return oapi.GetSnapshot200JSONResponse{Body: out}, nil
 }
 
-// WriteProblem writes an RFC 9457 problem with fixed text.
+// WriteProblem writes an RFC 9457 problem with fixed text; the instance is the request id the middleware set.
 func WriteProblem(w http.ResponseWriter, status int, code, detail string) {
 	h := w.Header()
 	h.Del("ETag")
+	h.Del("Content-Encoding")
+	h.Del("Content-Length")
 	h.Set("Content-Type", "application/problem+json")
 	h.Set("Cache-Control", "no-store")
+	p := oapi.Problem{Type: "urn:scp:problem:" + code, Title: http.StatusText(status), Status: status, Code: code, Detail: &detail}
+	if id := h.Get("X-Request-Id"); id != "" {
+		inst := "urn:scp:request:" + id
+		p.Instance = &inst
+	}
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(oapi.Problem{Type: "urn:scp:problem:" + code, Title: http.StatusText(status), Status: status,
-		Code: code, Detail: &detail})
+	_ = json.NewEncoder(w).Encode(p)
 }
 
-// headers sets the headers every response carries and adds validators to API responses.
-func headers(next http.Handler) http.Handler {
+// apiGuard applies the API conventions under /api/: 406 for an Accept without JSON or YAML, the mux's plain 405 rewritten to a
+// problem, validators on GET.
+func apiGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		if strings.HasPrefix(r.URL.Path, "/api/") && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !acceptsAPI(r.Header.Values("Accept")) {
+			WriteProblem(w, http.StatusNotAcceptable, "not-acceptable", "The API answers application/json.")
+			return
+		}
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
 			conditional(w, r, next)
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(&problem405{ResponseWriter: w}, r)
 	})
 }
+
+// acceptsAPI reports whether the Accept header admits a JSON, problem or YAML answer. No header admits everything.
+func acceptsAPI(values []string) bool {
+	if len(values) == 0 {
+		return true
+	}
+	for v := range strings.SplitSeq(strings.Join(values, ","), ",") {
+		mt, params, err := mime.ParseMediaType(strings.TrimSpace(v))
+		if err != nil {
+			continue
+		}
+		if q, ok := params["q"]; ok && strings.Trim(q, "0.") == "" {
+			continue // q=0
+		}
+		switch mt {
+		case "*/*", "application/*", "application/json", "application/problem+json", "application/yaml":
+			return true
+		}
+	}
+	return false
+}
+
+// problem405 turns the mux's plain-text 405 into a problem.
+type problem405 struct {
+	http.ResponseWriter
+	swallow bool
+}
+
+func (w *problem405) WriteHeader(status int) {
+	if status == http.StatusMethodNotAllowed && strings.HasPrefix(w.Header().Get("Content-Type"), "text/plain") {
+		w.swallow = true
+		WriteProblem(w.ResponseWriter, status, "method-not-allowed", "The method is not allowed on this resource.")
+		return
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *problem405) Write(p []byte) (int, error) {
+	if w.swallow {
+		return len(p), nil
+	}
+	return w.ResponseWriter.Write(p)
+}
+
+func (w *problem405) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 // conditional buffers a 200 response, gives it a weak ETag over its body and answers 304 when If-None-Match carries that ETag.
 // The body includes every derived freshness status, so a change from fresh to stale changes the ETag.
 func conditional(w http.ResponseWriter, r *http.Request, next http.Handler) {
-	buf := &buffered{header: http.Header{}, status: http.StatusOK}
+	buf := &buffered{header: w.Header().Clone(), status: http.StatusOK}
 	next.ServeHTTP(buf, r)
 	h := w.Header()
+	clear(h)
 	for k, v := range buf.header {
 		h[k] = v
 	}
@@ -164,26 +251,4 @@ func (b *buffered) WriteHeader(status int) {
 func (b *buffered) Write(p []byte) (int, error) {
 	b.wrote = true
 	return b.body.Write(p)
-}
-
-// spaHandler serves the files of the web UI build. Files under assets/ carry a content hash in their name and are cached for a
-// year; everything else is revalidated on each use. The root serves index.html.
-func spaHandler(spa fs.FS) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-		if name == "" {
-			name = "index.html"
-		}
-		info, err := fs.Stat(spa, name)
-		if err != nil || info.IsDir() {
-			http.NotFound(w, r)
-			return
-		}
-		if strings.HasPrefix(name, "assets/") {
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		} else {
-			w.Header().Set("Cache-Control", "no-cache")
-		}
-		http.ServeFileFS(w, r, spa, name) //nolint:gosec // G703: fs.FS rejects names that leave its root (fs.ValidPath)
-	})
 }

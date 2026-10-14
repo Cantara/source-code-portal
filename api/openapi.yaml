@@ -388,4 +388,5 @@ components:
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
+        instance: { type: string, description: "urn:scp:request:<request id>" }
         code: { type: string }

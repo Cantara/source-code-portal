@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -24,6 +26,7 @@ type Config struct {
 	GitHub  GitHub  `mapstructure:"github"`
 	Catalog Catalog `mapstructure:"catalog"`
 	Webhook Webhook `mapstructure:"webhook"`
+	Ops     Ops     `mapstructure:"ops"`
 }
 
 // Server configures the two listeners.
@@ -31,6 +34,16 @@ type Server struct {
 	PublicAddr    string        `mapstructure:"public_addr"`    // SPA, API, badges, llms, webhook
 	AdminAddr     string        `mapstructure:"admin_addr"`     // probes, metrics, pprof, status
 	ShutdownGrace time.Duration `mapstructure:"shutdown_grace"` // time in-flight work gets after the first signal
+	// PublicURL is the absolute base of the public listener (no trailing slash): absolute links in llms and Markdown, HSTS when https.
+	PublicURL string `mapstructure:"public_url"`
+	// RawTrustedProxies are CIDRs allowed to set X-Forwarded-For; TrustedProxies holds them parsed.
+	RawTrustedProxies []string       `mapstructure:"trusted_proxies"`
+	TrustedProxies    []netip.Prefix `mapstructure:"-"`
+}
+
+// Ops configures operator tooling on the admin listener.
+type Ops struct {
+	Pprof bool `mapstructure:"pprof"` // serve /debug/pprof/
 }
 
 // Log configures the process logger.
@@ -45,6 +58,9 @@ func defaults() map[string]any {
 		"server.public_addr":           ":9090",
 		"server.admin_addr":            ":9091",
 		"server.shutdown_grace":        "20s",
+		"server.public_url":            "",
+		"server.trusted_proxies":       []string{},
+		"ops.pprof":                    false,
 		"log.level":                    "info",
 		"log.format":                   "json",
 		"store.path":                   "/data/scp.db",
@@ -148,6 +164,17 @@ func (c Config) validate() []string {
 	}
 	if c.Server.PublicAddr == c.Server.AdminAddr {
 		p = append(p, "server.admin_addr: must differ from server.public_addr")
+	}
+	if c.Server.PublicURL != "" {
+		if u, err := url.Parse(c.Server.PublicURL); err != nil || u.Scheme != "https" && u.Scheme != "http" || u.Host == "" ||
+			u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+			p = append(p, fmt.Sprintf("server.public_url: %q is not an absolute http(s) URL without query", c.Server.PublicURL))
+		}
+	}
+	for _, cidr := range c.Server.RawTrustedProxies {
+		if _, err := netip.ParsePrefix(cidr); err != nil {
+			p = append(p, fmt.Sprintf("server.trusted_proxies: %q is not a CIDR", cidr))
+		}
 	}
 	if c.Server.ShutdownGrace <= 0 {
 		p = append(p, "server.shutdown_grace: must be positive")

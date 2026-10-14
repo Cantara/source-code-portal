@@ -391,9 +391,12 @@ type Page struct {
 type Problem struct {
 	Code   string  `json:"code"`
 	Detail *string `json:"detail,omitempty"`
-	Status int     `json:"status"`
-	Title  string  `json:"title"`
-	Type   string  `json:"type"`
+
+	// Instance urn:scp:request:<request id>
+	Instance *string `json:"instance,omitempty"`
+	Status   int     `json:"status"`
+	Title    string  `json:"title"`
+	Type     string  `json:"type"`
 }
 
 // Repo defines model for Repo.

@@ -1,10 +1,14 @@
 package httpapi
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -29,7 +33,21 @@ func public(cur *snapshot.Snapshot) http.Handler {
 		"index.html":           {Data: []byte("<!doctype html>")},
 		"assets/app-1a2b3c.js": {Data: []byte("console.log(1)")},
 	}
-	return Public(spa, stub{SnapshotAPI: SnapshotAPI{Current: func() *snapshot.Snapshot { return cur }}})
+	return Public(testOptions(), spa, []byte("openapi: 3.1.0\n"), stub{SnapshotAPI: SnapshotAPI{Current: func() *snapshot.Snapshot { return cur }}},
+		Route{Pattern: "POST /upload", MaxBody: 8, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, err := io.ReadAll(r.Body); err != nil {
+				http.Error(w, "too large", http.StatusRequestEntityTooLarge)
+			}
+		})},
+		Route{Pattern: "GET /panic", Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") })},
+		Route{Pattern: "GET /big", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte(strings.Repeat("x", 4096)))
+		})})
+}
+
+func testOptions() Options {
+	return Options{Log: slog.New(slog.DiscardHandler), HSTS: true, TrustedProxies: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}}
 }
 
 func get(h http.Handler, path string, hdr ...string) *httptest.ResponseRecorder {
@@ -105,7 +123,7 @@ func TestAPINotFoundIsProblem(t *testing.T) {
 
 func TestProbes(t *testing.T) {
 	ready := false
-	h := Admin(func() bool { return ready })
+	h := Admin(testOptions(), func() bool { return true }, func() bool { return ready })
 	if rec := get(h, "/livez"); rec.Code != http.StatusOK || rec.Body.String() != "ok\n" {
 		t.Errorf("livez: %d %q", rec.Code, rec.Body.String())
 	}
@@ -115,5 +133,148 @@ func TestProbes(t *testing.T) {
 	ready = true
 	if rec := get(h, "/readyz"); rec.Code != http.StatusOK {
 		t.Errorf("readyz when ready: %d", rec.Code)
+	}
+}
+
+func TestFallback(t *testing.T) {
+	h := public(&snapshot.Snapshot{})
+	for _, tc := range []struct {
+		path   string
+		status int
+		shell  bool
+	}{
+		{"/commits", 200, true},
+		{"/groups/core", 200, true},
+		{"/groups/core/commits", 200, true},
+		{"/repos/acme/core", 200, true},
+		{"/repos/vercel/next.js", 200, true},
+		{"/repos/acme/core/commits", 200, true},
+		{"/repos/acme/core/docs/docs/setup", 200, true},
+		{"/nope/deeper", 404, true},
+		{"/groups/core/extra", 404, true},
+		{"/favicon.ico", 404, false},
+		{"/badges/x", 404, false},
+		{"/webhooks/github", 404, false},
+		{"/.well-known/security.txt", 404, false},
+		{"/assets", 404, false},
+	} {
+		rec := get(h, tc.path)
+		isShell := rec.Body.String() == "<!doctype html>"
+		if rec.Code != tc.status || isShell != tc.shell {
+			t.Errorf("%s: %d shell %v, want %d shell %v", tc.path, rec.Code, isShell, tc.status, tc.shell)
+		}
+		if isShell && rec.Header().Get("Content-Security-Policy") != cspShell {
+			t.Errorf("%s: shell CSP %q", tc.path, rec.Header().Get("Content-Security-Policy"))
+		}
+	}
+}
+
+func TestHeaders(t *testing.T) {
+	h := public(&snapshot.Snapshot{})
+	for _, tc := range []struct{ path, csp string }{
+		{"/", cspShell},
+		{"/repos/a/b", cspShell},
+		{"/api/v1/snapshot", cspDefault},
+		{"/api/v1/nope", cspDefault},
+		{"/api/v1/openapi.yaml", cspDefault},
+		{"/favicon.ico", cspDefault},
+	} {
+		rec := get(h, tc.path, "X-Request-Id", "req-1")
+		hd := rec.Header()
+		if hd.Get("Content-Security-Policy") != tc.csp || hd.Get("X-Content-Type-Options") != "nosniff" ||
+			hd.Get("Referrer-Policy") != "strict-origin-when-cross-origin" || hd.Get("Strict-Transport-Security") == "" ||
+			hd.Get("X-Request-Id") != "req-1" || hd.Get("Access-Control-Allow-Origin") != "" {
+			t.Errorf("%s: headers %v", tc.path, hd)
+		}
+	}
+	if id := get(h, "/", "X-Request-Id", "bad id!").Header().Get("X-Request-Id"); !requestIDPattern.MatchString(id) || id == "bad id!" {
+		t.Errorf("an invalid request id was echoed: %q", id)
+	}
+}
+
+func TestAPIConventions(t *testing.T) {
+	h := public(&snapshot.Snapshot{})
+	problem := func(rec *httptest.ResponseRecorder) oapi.Problem {
+		var p oapi.Problem
+		if rec.Header().Get("Content-Type") != "application/problem+json" || rec.Header().Get("Cache-Control") != "no-store" ||
+			json.Unmarshal(rec.Body.Bytes(), &p) != nil {
+			t.Errorf("not a problem: %v %s", rec.Header(), rec.Body)
+		}
+		return p
+	}
+	rec := get(h, "/api/v1/snapshot", "Accept", "text/html")
+	if p := problem(rec); rec.Code != http.StatusNotAcceptable || p.Code != "not-acceptable" {
+		t.Errorf("Accept text/html: %d %+v", rec.Code, p)
+	}
+	for _, accept := range []string{"application/json", "*/*", "text/html, application/*;q=0.5", "application/yaml"} {
+		if rec := get(h, "/api/v1/snapshot", "Accept", accept); rec.Code != http.StatusOK {
+			t.Errorf("Accept %q: %d", accept, rec.Code)
+		}
+	}
+	if rec := get(h, "/api/v1/snapshot", "Accept", "application/json;q=0"); rec.Code != http.StatusNotAcceptable {
+		t.Errorf("Accept q=0: %d", rec.Code)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/snapshot", nil)
+	req.Header.Set("X-Request-Id", "abc")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if p := problem(rec); rec.Code != http.StatusMethodNotAllowed || p.Code != "method-not-allowed" || p.Instance == nil ||
+		*p.Instance != "urn:scp:request:abc" {
+		t.Errorf("POST: %d %+v", rec.Code, p)
+	}
+	if rec := get(h, "/api/v1/openapi.yaml"); rec.Code != 200 || rec.Header().Get("Content-Type") != "application/yaml" {
+		t.Errorf("contract: %d %v", rec.Code, rec.Header())
+	}
+	if rec := get(h, "/api/v1/nope/<script>"); strings.Contains(rec.Body.String(), "script") {
+		t.Errorf("the problem reflects input: %s", rec.Body)
+	}
+}
+
+func TestMiddleware(t *testing.T) {
+	h := public(&snapshot.Snapshot{})
+	rec := get(h, "/panic")
+	if rec.Code != http.StatusInternalServerError || !strings.Contains(rec.Body.String(), "internal") {
+		t.Errorf("panic: %d %s", rec.Code, rec.Body)
+	}
+	rec = get(h, "/big", "Accept-Encoding", "gzip")
+	if rec.Header().Get("Content-Encoding") != "gzip" || !strings.Contains(rec.Header().Get("Vary"), "Accept-Encoding") {
+		t.Fatalf("big text: %v", rec.Header())
+	}
+	zr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := io.ReadAll(zr); len(b) != 4096 {
+		t.Errorf("gunzipped %d bytes", len(b))
+	}
+	if rec := get(h, "/big"); rec.Header().Get("Content-Encoding") != "" || rec.Body.Len() != 4096 {
+		t.Errorf("without Accept-Encoding: %v", rec.Header())
+	}
+	if rec := get(h, "/api/v1/nope", "Accept-Encoding", "gzip"); rec.Header().Get("Content-Encoding") != "" {
+		t.Errorf("a small problem was compressed")
+	}
+	for body, want := range map[string]int{"12345678": 200, "123456789": http.StatusRequestEntityTooLarge} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(body)))
+		if rec.Code != want {
+			t.Errorf("body of %d bytes: %d, want %d", len(body), rec.Code, want)
+		}
+	}
+}
+
+func TestClientIP(t *testing.T) {
+	o := testOptions()
+	for _, tc := range []struct{ peer, xff, want string }{
+		{"203.0.113.9:1", "198.51.100.1", "203.0.113.9"},
+		{"10.0.0.1:1", "198.51.100.1, 10.0.0.2", "198.51.100.1"},
+		{"10.0.0.1:1", "1.1.1.1, 198.51.100.1", "198.51.100.1"},
+		{"10.0.0.1:1", "garbage", "10.0.0.1"},
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = tc.peer
+		r.Header.Set("X-Forwarded-For", tc.xff)
+		if got := o.clientIP(r); got != tc.want {
+			t.Errorf("%s via %s: %s, want %s", tc.xff, tc.peer, got, tc.want)
+		}
 	}
 }

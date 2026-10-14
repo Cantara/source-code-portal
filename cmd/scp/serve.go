@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	contract "github.com/cantara/source-code-portal/api"
 	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/commits"
@@ -129,13 +130,15 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)}}
 	if cfg.Webhook.Secret.IsSet() {
-		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, Handler: webhook.New(cfg.Webhook.Secret.Reveal(),
+		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: webhook.New(cfg.Webhook.Secret.Reveal(),
 			cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.engine, cfg.GitHub.Sources), log)})
 	}
+	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies}
 	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
-	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
-		httpapi.SnapshotAPI{Current: s.pub.Current}}, routes...), log)
-	s.admin = newHTTPServer(httpapi.Admin(ready), log)
+	features := api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
+		httpapi.SnapshotAPI{Current: s.pub.Current}}
+	s.public = httpapi.Server(httpapi.Public(opts, spa, contract.OpenAPI, features, routes...), log)
+	s.admin = httpapi.Server(httpapi.Admin(opts, func() bool { return true }, ready), log)
 	var lc net.ListenConfig
 	if s.publicLn, err = lc.Listen(ctx, "tcp", cfg.Server.PublicAddr); err != nil {
 		return nil, err
@@ -165,17 +168,6 @@ func webhookSink(e *sync.Engine, sources []config.Source) webhook.Sink {
 		default:
 			e.Notify(ev, snapshot.KeyOf(owner, name))
 		}
-	}
-}
-
-func newHTTPServer(h http.Handler, log *slog.Logger) *http.Server {
-	return &http.Server{
-		Handler:           h,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
 	}
 }
 
