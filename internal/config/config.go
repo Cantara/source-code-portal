@@ -28,12 +28,13 @@ type Config struct {
 	Webhook Webhook `mapstructure:"webhook"`
 	Access  Access  `mapstructure:"access"`
 	Cluster Cluster `mapstructure:"cluster"`
+	Web     Web     `mapstructure:"web"`
 	Ops     Ops     `mapstructure:"ops"`
 }
 
 // Server configures the two listeners.
 type Server struct {
-	PublicAddr    string        `mapstructure:"public_addr"`    // SPA, API, badges, llms, webhook
+	PublicAddr    string        `mapstructure:"public_addr"`    // web UI, API, badges, llms, webhook
 	AdminAddr     string        `mapstructure:"admin_addr"`     // probes, metrics, pprof, status
 	ShutdownGrace time.Duration `mapstructure:"shutdown_grace"` // time in-flight work gets after the first signal
 	// PublicURL is the absolute base of the public listener (no trailing slash): absolute links in llms and Markdown, HSTS when https.
@@ -76,6 +77,8 @@ func defaults() map[string]any {
 		"cluster.addresses":            []string{},
 		"cluster.name":                 "dev",
 		"cluster.namespace":            "scp",
+		"web.dir":                      "",
+		"web.node":                     "node",
 	}
 }
 
@@ -206,6 +209,7 @@ func (c Config) validate() []string {
 	}
 	p = append(p, c.Access.validate(c.GitHub, len(c.Server.TrustedProxies) > 0)...)
 	p = append(p, c.Cluster.validate()...)
+	p = append(p, c.Web.validate()...)
 	slices.Sort(p)
 	return p
 }

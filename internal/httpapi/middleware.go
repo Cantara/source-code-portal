@@ -24,10 +24,8 @@ const (
 )
 
 const (
-	cspDefault = "default-src 'none'; frame-ancestors 'none'; sandbox"
-	cspShell   = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; " +
-		"manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
-	permissionsShell = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+	cspDefault      = "default-src 'none'; frame-ancestors 'none'; sandbox"
+	permissionsPage = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 )
 
 var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
@@ -37,6 +35,8 @@ type Options struct {
 	Log            *slog.Logger
 	Build          string         // sent as X-SCP-Build on every response, so the web UI notices a new deployment
 	HSTS           bool           // the public URL is https
+	PublicURL      string         // server.public_url: the origin of canonical URLs; empty: the request's
+	WebToken       string         // the secret the web UI server shows on its API calls to name the page's viewer (Pages)
 	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For, and the Access headers, are believed
 	Access         Access
 	// Observe, when set, receives every request: listener, matched pattern ("unmatched" when none), method, status, duration.
@@ -108,6 +108,16 @@ func newRequestID() string {
 	var b [12]byte
 	_, _ = rand.Read(b[:])
 	return hex.EncodeToString(b[:])
+}
+
+// fromTrusted reports whether the peer of r is a trusted proxy.
+func (o Options) fromTrusted(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && o.trusted(ip)
 }
 
 // clientIP is the peer address, or when the peer is a trusted proxy the right-most X-Forwarded-For entry that is not one.

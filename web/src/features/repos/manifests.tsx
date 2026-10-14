@@ -1,22 +1,19 @@
+"use client"
+
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import Link from "next/link"
 import { Alert } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardTitle } from "@/components/ui/card"
-import type { Schemas } from "@/lib/api/client"
+import { api, type Schemas } from "@/lib/api/client"
+import { addressPath, repoPath } from "@/lib/paths"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { manifestsQuery } from "./api"
 
-/** at is the route parameters of a repository address. */
-function at(address: string) {
-  const [owner = "", name = ""] = address.split("/")
-  return { owner, name }
-}
-
 /** TechnologyCard shows what the repository's manifests state, and the catalogued repositories it uses and is used by. */
 export function TechnologyCard({ owner, name }: { owner: string; name: string }) {
-  const { data, error } = useQuery(manifestsQuery(owner, name))
+  const { data, error } = useQuery(manifestsQuery(api, owner, name))
   if (data && data.manifests.length === 0 && data.usedBy.length === 0) return null
   const t = data?.technology
   return (
@@ -63,8 +60,7 @@ function Repos({ label, links }: { label: string; links: Schemas["RepoLink"][] }
           {links.map((l) => (
             <li key={l.address}>
               <Link
-                to="/repos/$owner/$name"
-                params={l.owner && l.name ? { owner: l.owner, name: l.name } : at(l.address)}
+                href={l.owner && l.name ? repoPath(l.owner, l.name) : addressPath(l.address)}
                 className="hover:underline"
                 title={l.via.join(", ")}
               >
@@ -80,7 +76,7 @@ function Repos({ label, links }: { label: string; links: Schemas["RepoLink"][] }
 
 /** Dependencies lists every manifest with its declared dependencies; internal ones link to their repositories. */
 export function Dependencies({ owner, name }: { owner: string; name: string }) {
-  const { data } = useQuery(manifestsQuery(owner, name))
+  const { data } = useQuery(manifestsQuery(api, owner, name))
   if (!data || data.manifests.length === 0) return null
   return (
     <section aria-labelledby="dependencies" className="flex flex-col gap-3">
@@ -135,7 +131,7 @@ function DependencyTable({ deps }: { deps: Schemas["Dependency"][] }) {
             <tr key={d.scope + d.name} className="border-t border-border">
               <td className="py-1 pr-3 break-all">
                 {d.repos[0] ? (
-                  <Link to="/repos/$owner/$name" params={at(d.repos[0])} className="underline">
+                  <Link href={addressPath(d.repos[0])} className="underline">
                     {d.name}
                   </Link>
                 ) : (

@@ -118,7 +118,9 @@ jobs:
       - name: build
         run: make image VERSION=ci BUILD_ID=${{ github.sha }}
       - name: smoke
-        run: docker run --rm --read-only --cap-drop=ALL scp:dev version
+        run: |
+          docker run --rm --read-only --cap-drop=ALL scp:dev version
+          docker run --rm --read-only --cap-drop=ALL --entrypoint /nodejs/bin/node scp:dev -e 'process.exit(require("fs").existsSync("/web/server.js") ? 0 : 1)'
 
   gate:
     if: always()

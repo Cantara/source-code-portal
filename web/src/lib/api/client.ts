@@ -1,6 +1,5 @@
-import createClient from "openapi-fetch"
+import createClient, { type Client } from "openapi-fetch"
 import type { components, paths } from "./schema"
-import { noteBuild } from "../build"
 
 export type Schemas = components["schemas"]
 export type Freshness = Schemas["Freshness"]
@@ -29,12 +28,17 @@ export class ProblemError extends Error {
   }
 }
 
-// An absolute base, and fetch looked up per request: the tests resolve against jsdom's location and intercept fetch.
-export const api = createClient<paths>({ baseUrl: `${globalThis.location.origin}/api/v1`, fetch: (r) => globalThis.fetch(r) })
-api.use({
-  onResponse({ response }) {
-    noteBuild(response.headers.get("X-SCP-Build"))
-  },
+/** Api is a typed client of /api/v1: the browser's (api) or one per server request (lib/api/server.ts). */
+export type Api = Client<paths>
+
+/**
+ * api is the browser's client. The base is absolute (the tests resolve against jsdom's location) and fetch is looked up per request
+ * (the tests intercept it). On the server it is never called: the pages hand their data to the browser's cache. The providers add
+ * the build check (lib/build.ts).
+ */
+export const api: Api = createClient<paths>({
+  baseUrl: `${globalThis.location?.origin ?? "http://localhost"}/api/v1`,
+  fetch: (r) => globalThis.fetch(r),
 })
 
 interface Result<T> {

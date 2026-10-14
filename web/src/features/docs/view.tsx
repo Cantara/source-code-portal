@@ -1,8 +1,12 @@
+"use client"
+
 import { useQuery } from "@tanstack/react-query"
-import { createLazyRoute, getRouteApi, Link } from "@tanstack/react-router"
+import Link from "next/link"
 import { Alert } from "@/components/ui/alert"
+import { api } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { docAddress, withoutLeadingH1 } from "@/lib/docs"
+import { docPath, repoPath } from "@/lib/paths"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
@@ -10,18 +14,14 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { SafeHtml } from "@/shared/safe-html"
 import { docListQuery, docQuery } from "./api"
 
-export const docRoute = createLazyRoute("/repos/$owner/$name/docs/$")({ component: DocPage })
-
-const route = getRouteApi("/repos/$owner/$name/docs/$")
-
-function DocPage() {
-  const { owner, name, _splat: path = "" } = route.useParams()
-  const { data, error } = useQuery(docQuery(owner, name, path))
+/** DocView is one document of a repository with the repository's document list and the document's outline. */
+export function DocView({ owner, name, path }: { owner: string; name: string; path: string }) {
+  const { data, error } = useQuery(docQuery(api, owner, name, path))
   return (
     <>
       <PageHeader title={data?.title || path} meta={data && <FreshnessBadge freshness={data.freshness} />}>
         <p className="flex flex-wrap gap-x-3 text-sm">
-          <Link to="/repos/$owner/$name" params={{ owner, name }} className="hover:underline">
+          <Link href={repoPath(owner, name)} className="hover:underline">
             {owner}/{name}
           </Link>
           {data && (
@@ -76,7 +76,7 @@ function DocPage() {
 }
 
 function Files({ owner, name, current }: { owner: string; name: string; current: string }) {
-  const { data, error } = useQuery(docListQuery(owner, name))
+  const { data, error } = useQuery(docListQuery(api, owner, name))
   if (error && !data) return <ProblemAlert error={error} />
   if (!data) return null
   return (
@@ -88,11 +88,7 @@ function Files({ owner, name, current }: { owner: string; name: string; current:
               {d.title || d.path}
             </span>
           ) : (
-            <Link
-              to="/repos/$owner/$name/docs/$"
-              params={{ owner, name, _splat: docAddress(d.path) }}
-              className="hover:underline"
-            >
+            <Link href={docPath(owner, name, d.path)} className="hover:underline">
               {d.title || d.path}
             </Link>
           )}

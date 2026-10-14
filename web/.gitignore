@@ -1,4 +1,7 @@
 node_modules/
-dist/
+.next/
+bundle/
+next-env.d.ts
 playwright-report/
 test-results/
+*.tsbuildinfo

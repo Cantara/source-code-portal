@@ -17,6 +17,9 @@ change from its Conventional Commit subjects.
   UI's CSP is `img-src 'self'`.
 - Live updates: `/api/v1/events` streams server-sent events, and an open page shows new data within seconds without polling. The
   snapshot `version` now identifies the data and is equal on every instance.
+- The web UI is rendered on the server with Next.js: every page arrives as complete HTML, readable without JavaScript, with its own
+  title, description and canonical URL, and `/sitemap.xml` and `/robots.txt` list the pages. `scp serve` runs the web UI bundle with
+  Node.js (`web.dir`, `web.node`); releases carry it as `scp-web_<version>.tar.gz`, and the image includes Node.js and the bundle.
 
 ## 2.0.0
 

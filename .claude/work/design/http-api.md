@@ -3,13 +3,13 @@ Status: v1 design note, 2026-10-14. Binding order: ../plan.md > this note > ../r
 
 ## Scope (v1)
 Two listeners, the v1 route set, the OpenAPI 3.1 contract and its codegen, API conventions (problems, pagination, ETag), the
-middleware chain, security headers and CSP, the GitHub webhook receiver, `/llms.txt` and raw Markdown, the v1 metrics. The SPA learns
-about new data by polling `/api/v1/snapshot`.
+middleware chain, security headers and CSP, the proxy to the web UI server, the GitHub webhook receiver, `/llms.txt` and raw Markdown,
+the v1 metrics. The web UI learns about new data from `/api/v1/events` (images-events.md).
 
 ## Decisions
 - stdlib `net/http` `ServeMux` patterns: conflicting patterns panic at start, so routing errors surface at start-up.
 - One `http.Server` constructor in `internal/httpapi` with fixed timeouts; config sets the addresses.
-- Public `:9090` serves the SPA, `/api/v1`, badges, llms and the webhook; admin `:9091` serves `/livez`, `/readyz`, `/metrics`,
+- Public `:9090` serves the pages (proxied to the web UI server, web.md), `/api/v1`, badges, images, llms and the webhook; admin `:9091` serves `/livez`, `/readyz`, `/metrics`,
   `/debug/pprof` and `/api/v1/status`: each port has one audience.
 - Repository identity in URLs is `{owner}/{name}` (two segments, case-insensitive match, lowercase in links); an old address answers 308
   through the catalog alias map.
@@ -20,8 +20,8 @@ about new data by polling `/api/v1/snapshot`.
 - Generated TS types `web/src/lib/api/schema.d.ts` (`openapi-typescript`) + `openapi-fetch`; committed, drift-checked (`make check`).
 - OpenAPI 3.1 subset: nullable as `type: [T, "null"]`, one type per schema: the part oapi-codegen v2.8 generates reliably.
 - Doc ids in the JSON API are the repository path percent-encoded into one segment (`docs%2Fsetup.md`): fits one OpenAPI path param.
-- Static CSP (the shell is a static file). `img-src 'self'`: every document image loads through the image proxy (images-events.md);
-  scripts, styles, fonts and connections are `'self'`.
+- Page CSP with a nonce per request, made by Go (web.md decisions). `img-src 'self'`: every document image loads through the image
+  proxy (images-events.md); scripts, styles, fonts and connections are `'self'`.
 - Webhook events are hints: the receiver hands verified, normalised events to a `Sink` wired in `cmd/scp`, which calls
   `sync.Notify(event, repo)`; job specs declare the events they react to, so `webhook` stays independent of features and job kinds.
 
@@ -30,16 +30,11 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 
 | L | Method | Pattern | Owner | Purpose |
 |---|---|---|---|---|
-| P | GET | `/{$}` | httpapi + `web/` | SPA shell (dashboard) |
-| P | GET | `/commits` | httpapi | SPA shell (commit log across repositories) |
-| P | GET | `/groups/{group}` | httpapi + llms | SPA shell; `Accept: text/markdown` gets the group as Markdown |
-| P | GET | `/groups/{group}/commits` | httpapi | SPA shell (group commit log) |
-| P | GET | `/repos/{o}/{n}` | httpapi + llms | SPA shell; `Accept: text/markdown` gets the README Markdown with the technology and internal dependencies |
-| P | GET | `/repos/{o}/{n}/commits` | httpapi | SPA shell (commit log) |
-| P | GET | `/repos/{o}/{n}/docs/{path...}` | docs | path ends `.md`: raw Markdown; else SPA shell (negotiated like above) |
+| P | GET | `/groups/{group}` | llms | `Accept: text/markdown` gets the group as Markdown; else the page |
+| P | GET | `/repos/{o}/{n}` | llms | `Accept: text/markdown` gets the README Markdown with the technology and internal dependencies; else the page |
+| P | GET | `/repos/{o}/{n}/docs/{path...}` | docs | path ends `.md`: raw Markdown; else the page (negotiated like above) |
 | P | GET | `/repos/{o}/{n}/readme.md` | docs | raw README Markdown with `scp:` front matter |
-| P | GET | `/assets/{file}`, `/favicon.svg`, `/theme-init.js` | httpapi | embedded SPA files (hashed assets immutable) |
-| P | GET | `/{path...}` | httpapi | fallback: known shape -> shell 200; unknown shape -> shell with real 404; reserved prefix or extension -> plain 404 |
+| P | GET | `/{path...}` | httpapi | every other path: `httpapi.Pages`, the proxy to the web UI server (pages, `/_next/static`, `/sitemap.xml`, `/robots.txt`, the 404 page); the reserved prefixes `/badges/`, `/images/`, `/webhooks/`, `/.well-known/` answer a plain 404 |
 | P | GET | `/api/v1/dashboard` | catalog | groups with counts, latest activity, aggregate freshness |
 | P | GET | `/api/v1/groups` | catalog | all groups (matchers resolved), member counts |
 | P | GET | `/api/v1/groups/{group}` | catalog | one group with its repositories |
@@ -83,7 +78,7 @@ Reserved prefixes always answer plain: `/api/`, `/assets/`, `/badges/`, `/webhoo
      `ETag`/`Content-Encoding`. Under `/api/` the mux's plain-text 404/405 are rewritten to problems.
    - `Accept` under `/api/` excluding JSON/problem/YAML -> 406. Human URLs answer HTML or Markdown: Markdown when `text/markdown` has a
      strictly higher q than `text/html`; those responses set `Vary: Accept` and `Link: </llms.txt>; rel="describedby"`.
-   - Caching elsewhere: shell `no-cache`; hashed assets `public, max-age=31536000, immutable` (gzip on the fly);
+   - Caching elsewhere: pages as the web UI server sends them (`no-store` for the dynamic pages, `/_next/static` immutable);
      badges per content.md; llms `public, max-age=300` with strong ETag; probes `no-store`.
 2. **Middleware** (outermost first, `internal/httpapi`): request id (accept `X-Request-Id` matching `[A-Za-z0-9-]{1,64}`, else generate;
    echoed) -> recover (500 `internal` problem, stack logged) -> access log (`slog` JSON after the handler: listener, `r.Pattern`, method,
@@ -93,12 +88,19 @@ Reserved prefixes always answer plain: `/api/`, `/assets/`, `/badges/`, `/webhoo
    Server: `ReadHeaderTimeout 5s`, `ReadTimeout 30s`, `WriteTimeout 60s`, `IdleTimeout 120s`, `MaxHeaderBytes 16 KiB`. Client IP from
    `X-Forwarded-For` when the peer is in `server.trusted_proxies` (right to left). Shutdown follows build-ops.md (Runtime).
 3. **Security headers and CSP.** All responses: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-   same-origin only (no CORS headers). HSTS (`max-age=31536000`) when `server.public_url` is https. Shell (`index.html`):
-   `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self';
-   manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`, plus `Permissions-Policy`
-   denying camera, microphone, geolocation, payment, usb. The SPA side that makes it hold is in web.md (external `/theme-init.js`,
-   class-only components, one `SafeHtml` component). API, llms and `.md`: `default-src 'none'; frame-ancestors 'none';
+   same-origin only (no CORS headers). HSTS (`max-age=31536000`) when `server.public_url` is https. Pages:
+   `default-src 'none'; script-src 'self' 'nonce-<n>'; style-src 'self' 'nonce-<n>'; img-src 'self'; font-src 'self';
+   connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'` with a
+   fresh nonce per request, plus `Permissions-Policy` denying camera, microphone, geolocation, payment, usb; the upstream's own CSP is
+   dropped. The UI side that makes it hold is in web.md (external `/theme-init.js`, class-only components, one `SafeHtml` component). API, llms and `.md`: `default-src 'none'; frame-ancestors 'none';
    sandbox`. Badges: content.md. A Playwright test loads every page with the enforced CSP and fails on any violation.
+   Pages proxy (`Options.Pages(upstream)`, `pages.go`): `httputil.ReverseProxy` to the web UI server on loopback; the request keeps
+   its `Host`, gets `X-Forwarded-*`, the request id, `X-Scp-Token` (random per process, `Options.WebToken`), `X-Scp-Viewer` and
+   `X-Scp-Origin` (`server.public_url`, else scheme and host; https from a trusted proxy's `X-Forwarded-Proto`), loses the identity
+   headers; the response loses `X-Powered-By`. `private()` deletes `X-Scp-Token` and `X-Scp-Viewer` from every request and believes
+   the viewer only with the matching token (constant time). Next.js renders `notFound()` from a page as an empty error shell
+   (vercel/next.js#62228), so an upstream 404 to a page request (GET or HEAD, not an RSC request) gets the body of an upstream GET of
+   `/_scp/not-found`, the not-found page, with the status kept. An unreachable upstream answers 503 with `Retry-After: 5`.
 4. **Webhook receiver** (`POST /webhooks/github`; order is the security argument: size -> signature -> parse -> act).
    1. `Content-Type` not `application/json` -> 415. `X-Hub-Signature-256` not `sha256=` + 64 hex -> 401. `Content-Length` > max -> 413.
    2. Read the raw body through `MaxBytesReader(webhook.max_body)` (overflow 413, abort 400), read deadline 8 s (GitHub waits 10 s).
@@ -157,9 +159,10 @@ Prometheus, prefix `scp_`, plus the Go and process collectors. Labels use route 
 | `ops.pprof` | `false` | admin listener |
 
 ## Tests
-- Route table: every registered pattern listed once; `/api/` routes equal the contract's paths; SPA shapes equal the TanStack route tree.
-- Fallback table: known shape 200 shell, unknown shape 404 shell, reserved prefix and extension plain 404, dotted names, HEAD, 405 under
-  `/api/` as a problem; admin routes absent on the public listener.
+- Route table: every registered pattern listed once; `/api/` routes equal the contract's paths.
+- Pages proxy against a loopback upstream: headers out (token, viewer, origin, request id, nonce CSP; identity headers removed), the
+  response CSP carries the same nonce, an upstream 404 page is replaced by the not-found page, reserved prefixes plain 404, no
+  upstream or an unreachable one 503; 405 under `/api/` as a problem; admin routes absent on the public listener.
 - Conditional GET property: mutate a body input (row, derived status via fake clock) -> ETag must change; 304 carries the same ETag.
 - Problems: fixed text, no input reflected, `no-store`, success headers stripped; strict-server binding errors -> 400 problem.
 - Webhook: table of the status mapping; valid/invalid/rotated secret; body over cap; slow body; duplicate; queue full not recorded;

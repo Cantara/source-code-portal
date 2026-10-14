@@ -26,5 +26,6 @@ export function useConnectionFailing(): boolean {
       return () => listeners.delete(l)
     },
     () => failing,
+    () => false,
   )
 }

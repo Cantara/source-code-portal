@@ -15,12 +15,12 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.build=$(BUILD_ID)
 help: ## list targets
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
 
-web: ## build the web UI into web/dist
+web: ## build the web UI into web/bundle (the Next.js server scp serve runs)
 	$(PNPM) -C web install --frozen-lockfile
 	BUILD_ID=$(BUILD_ID) $(PNPM) -C web build
 
-build: web ## build bin/scp with the web UI embedded
-	CGO_ENABLED=0 go build -tags spa -trimpath -ldflags "$(LDFLAGS)" -o bin/scp ./cmd/scp
+build: ## build bin/scp
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/scp ./cmd/scp
 
 gen: ## regenerate generated sources (Go, chroma.css, the TypeScript API types)
 	go generate ./...
@@ -42,7 +42,7 @@ test: ## Go tests with the race detector, web tests
 	CGO_ENABLED=1 go test -race -count=1 -timeout 10m ./...
 	$(PNPM) -C web test
 
-e2e: web ## Playwright against the server with the UI embedded and a fake GitHub (needs `pnpm -C web exec playwright install chromium`)
+e2e: web ## Playwright against the server running the web bundle and a fake GitHub (needs `pnpm -C web exec playwright install chromium`)
 	$(PNPM) -C web e2e
 
 check: gen ## the gate: generated code current, modules tidy, lint, test
@@ -53,12 +53,12 @@ check: gen ## the gate: generated code current, modules tidy, lint, test
 image: ## build the container image scp:dev
 	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) --build-arg BUILD_ID=$(BUILD_ID) -t scp:dev .
 
-run: build ## build and serve with scp.yaml (a copy of deploy/config.example.yaml; CONFIG= overrides)
-	bin/scp serve --config $(CONFIG)
+run: build web ## build and serve with scp.yaml (a copy of deploy/config.example.yaml; CONFIG= overrides) and web/bundle
+	SCP_WEB_DIR=web/bundle bin/scp serve --config $(CONFIG)
 
-dev: ## serve the API on :9090 and the web UI with hot reload on :5173
+dev: ## serve the API on :9090 and the web UI with hot reload on :3000
 	go run ./cmd/scp serve --config $(CONFIG) & \
 	trap 'kill $$!' EXIT; $(PNPM) -C web dev
 
 clean: ## remove build output
-	rm -rf bin dist web/dist web/playwright-report web/test-results
+	rm -rf bin dist web/.next web/bundle web/playwright-report web/test-results

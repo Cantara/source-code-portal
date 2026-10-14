@@ -1,3 +1,5 @@
+"use client"
+
 import { Alert } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { useNewVersion } from "@/lib/build"

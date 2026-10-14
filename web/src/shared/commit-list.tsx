@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router"
+import Link from "next/link"
 import type { Ref } from "react"
 import type { Commit } from "@/lib/api/client"
+import { addressPath } from "@/lib/paths"
 import { InitialsAvatar } from "./initials-avatar"
 import { RelativeTime } from "./relative-time"
 import { EmptyState } from "./empty-state"
@@ -19,7 +20,6 @@ export function CommitList({
   return (
     <ol className="divide-y divide-border">
       {commits.map((c, i) => {
-        const [owner = "", name = ""] = c.repo.split("/")
         return (
           <li
             key={c.repo + c.sha}
@@ -41,7 +41,7 @@ export function CommitList({
               <p className="text-sm text-muted-foreground">
                 {showRepo && (
                   <>
-                    <Link to="/repos/$owner/$name" params={{ owner, name }} className="font-medium hover:underline">
+                    <Link href={addressPath(c.repo)} className="font-medium hover:underline">
                       {c.repo}
                     </Link>{" "}
                     ·{" "}

@@ -1,5 +1,6 @@
-dist
-placeholder
+.next
+bundle
+next-env.d.ts
 pnpm-lock.yaml
 src/styles/chroma.css
 playwright-report

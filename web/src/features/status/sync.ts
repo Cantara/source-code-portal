@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient, type Query } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
+import { api } from "@/lib/api/client"
 import type { components } from "@/lib/api/schema"
 import { snapshotKey, snapshotQuery } from "@/lib/api/snapshot"
 
@@ -43,7 +44,7 @@ export function useSnapshotSync() {
   const qc = useQueryClient()
   const live = useLiveSnapshot()
   const { data } = useQuery({
-    ...snapshotQuery,
+    ...snapshotQuery(api),
     refetchInterval: live ? false : pollInterval,
     refetchIntervalInBackground: false,
   })

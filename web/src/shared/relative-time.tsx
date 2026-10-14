@@ -6,7 +6,7 @@ export function RelativeTime({ at }: { at: string | null | undefined }) {
   const now = useNow()
   if (!at) return <span>never</span>
   return (
-    <time dateTime={at} title={exactUTC(at)}>
+    <time dateTime={at} title={exactUTC(at)} suppressHydrationWarning>
       {relative(at, now)}
     </time>
   )

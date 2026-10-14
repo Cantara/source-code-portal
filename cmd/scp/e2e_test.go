@@ -28,7 +28,8 @@ import (
 const logoPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
 // TestServeForPlaywright serves the portal against a fake GitHub on E2E_SCP_ADDR until it is interrupted: the server of the web
-// e2e suite (web/playwright.config.ts runs it with -tags spa). Without E2E_SCP_ADDR it is skipped. E2E_CONTROL_ADDR, when set,
+// e2e suite (web/playwright.config.ts runs it), with the web UI server of web/bundle (`pnpm -C web build`) as its child. Without
+// E2E_SCP_ADDR it is skipped. E2E_CONTROL_ADDR, when set,
 // serves POST /push?repo={name}&message={text}: a new commit on the fake GitHub and a push to the engine, as a webhook would.
 func TestServeForPlaywright(t *testing.T) {
 	addr := os.Getenv("E2E_SCP_ADDR")
@@ -67,11 +68,16 @@ func TestServeForPlaywright(t *testing.T) {
 		"<dependency><groupId>no.acme</groupId><artifactId>whydah-core</artifactId><version>1.0</version></dependency></dependencies></project>")
 	gh.SetRelease(core, "v1.2.0", "1.2.0", start)
 
+	bundle, err := filepath.Abs("../../web/bundle")
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := t.TempDir()
 	token := filepath.Join(dir, "token")
 	path := filepath.Join(dir, "scp.yaml")
 	body := `store: {path: ` + filepath.Join(dir, "scp.db") + `}
 server: {public_addr: "` + addr + `", admin_addr: "127.0.0.1:0"}
+web: {dir: ` + bundle + `}
 github:
   sources:
     - {id: gh, base_url: "` + gh.BaseURL() + `", orgs: [acme], token_file: ` + token + `}

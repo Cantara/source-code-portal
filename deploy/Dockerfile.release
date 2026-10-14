@@ -1,6 +1,7 @@
-# Release image: the final stage of deploy/Dockerfile around the binary GoReleaser built, so the bytes in the image are the bytes in
-# the signed archive. GoReleaser's dockers_v2 lays the build context out as <os>/<arch>/scp; $TARGETPLATFORM selects the binary.
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+# Release image: the final stage of deploy/Dockerfile around the binary GoReleaser built and the web bundle release.yml built, so the
+# bytes in the image are the bytes in the signed archives. GoReleaser's dockers_v2 lays the build context out as <os>/<arch>/scp
+# ($TARGETPLATFORM selects the binary) plus the extra file web/bundle.
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e
 ARG BUILD_ID=dev
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="Source Code Portal" \
@@ -10,7 +11,9 @@ LABEL org.opencontainers.image.title="Source Code Portal" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${BUILD_ID}"
 ARG TARGETPLATFORM
-COPY --chown=65532:65532 ${TARGETPLATFORM}/scp /scp
+COPY ${TARGETPLATFORM}/scp /scp
+COPY web/bundle /web
+ENV SCP_WEB_DIR=/web SCP_WEB_NODE=/nodejs/bin/node
 # /data is the one writable path (the SQLite file). distroless has no shell, so the directory is created by copying a file into it.
 COPY --chown=65532:65532 <<EOF /data/.keep
 EOF

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test"
 
-// The suite runs against the real server with the SPA embedded (-tags spa, so `pnpm build` first) and a fake GitHub:
+// The suite runs against the real server with a fake GitHub and the web UI server of web/bundle (`pnpm build` first) as its child:
 // cmd/scp/e2e_test.go serves both on E2E_SCP_ADDR until Playwright stops it.
 const addr = "127.0.0.1:9190"
 
@@ -19,7 +19,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "go test -tags spa -count=1 -timeout 0 -run '^TestServeForPlaywright$' ./cmd/scp",
+    command: "go test -count=1 -timeout 0 -run '^TestServeForPlaywright$' ./cmd/scp",
     cwd: "..",
     env: { E2E_SCP_ADDR: addr, E2E_CONTROL_ADDR: "127.0.0.1:9191" },
     url: `http://${addr}/api/v1/snapshot`,

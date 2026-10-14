@@ -1,54 +1,52 @@
+"use client"
+
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
-import { createLazyRoute, getRouteApi, Link } from "@tanstack/react-router"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Button } from "@/components/ui/button"
+import { api } from "@/lib/api/client"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
+import { groupPath, repoPath } from "@/lib/paths"
 import { CommitList } from "@/shared/commit-list"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
 import { ProblemAlert } from "@/shared/problem-alert"
-import { commitLogQuery, groupsQuery, type Filter } from "./api"
+import { commitFilter, commitLogQuery, groupsQuery, type Filter } from "./api"
 
-export const allCommitsRoute = createLazyRoute("/commits")({ component: AllCommits })
-export const groupCommitsRoute = createLazyRoute("/groups/$group/commits")({ component: GroupCommits })
-export const repoCommitsRoute = createLazyRoute("/repos/$owner/$name/commits")({ component: RepoCommits })
-
-const all = getRouteApi("/commits")
-const group = getRouteApi("/groups/$group/commits")
-const repo = getRouteApi("/repos/$owner/$name/commits")
-
-function AllCommits() {
-  const search = all.useSearch()
+/** AllCommitsView is the commit log across repositories, filtered by group or repository through the URL. */
+export function AllCommitsView() {
+  const filter = commitFilter(Object.fromEntries(useSearchParams()))
   return (
     <>
       <PageHeader title="Commits">
-        <FilterForm filter={search} />
+        <FilterForm key={`${filter.group ?? ""}/${filter.repo ?? ""}`} filter={filter} />
       </PageHeader>
-      <CommitLog filter={search} />
+      <CommitLog filter={filter} />
     </>
   )
 }
 
-function GroupCommits() {
-  const { group: id } = group.useParams()
+/** GroupCommitsView is the commit log of a group. */
+export function GroupCommitsView({ group }: { group: string }) {
   return (
     <>
-      <PageHeader title={`Commits in ${id}`}>
-        <Link to="/groups/$group" params={{ group: id }} className="text-sm hover:underline">
+      <PageHeader title={`Commits in ${group}`}>
+        <Link href={groupPath(group)} className="text-sm hover:underline">
           Back to the group
         </Link>
       </PageHeader>
-      <CommitLog filter={{ group: id }} />
+      <CommitLog filter={{ group }} />
     </>
   )
 }
 
-function RepoCommits() {
-  const { owner, name } = repo.useParams()
+/** RepoCommitsView is the commit log of a repository's default branch. */
+export function RepoCommitsView({ owner, name }: { owner: string; name: string }) {
   return (
     <>
       <PageHeader title={`Commits in ${owner}/${name}`}>
-        <Link to="/repos/$owner/$name" params={{ owner, name }} className="text-sm hover:underline">
+        <Link href={repoPath(owner, name)} className="text-sm hover:underline">
           Back to the repository
         </Link>
       </PageHeader>
@@ -58,17 +56,21 @@ function RepoCommits() {
 }
 
 function FilterForm({ filter }: { filter: Filter }) {
-  const navigate = all.useNavigate()
-  const groups = useQuery(groupsQuery)
+  const router = useRouter()
+  const groups = useQuery(groupsQuery(api))
   const [repoText, setRepoText] = useState(filter.repo ?? "")
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const g = String(form.get("group") ?? "")
-    void navigate({ search: { ...(g ? { group: g } : {}), ...(repoText.trim() ? { repo: repoText.trim().toLowerCase() } : {}) } })
+    const q = new URLSearchParams({
+      ...(g ? { group: g } : {}),
+      ...(repoText.trim() ? { repo: repoText.trim().toLowerCase() } : {}),
+    })
+    router.push(q.size > 0 ? `/commits?${q}` : "/commits")
   }
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-end gap-3 text-sm" aria-label="Filter commits">
+    <form onSubmit={submit} action="/commits" className="flex flex-wrap items-end gap-3 text-sm" aria-label="Filter commits">
       <label className="flex flex-col">
         Group
         <select
@@ -87,6 +89,7 @@ function FilterForm({ filter }: { filter: Filter }) {
       <label className="flex flex-col">
         Repository (owner/name)
         <input
+          name="repo"
           value={repoText}
           onChange={(e) => setRepoText(e.target.value)}
           className="mt-1 min-h-9 rounded-md border border-input bg-background px-2"
@@ -102,7 +105,7 @@ function FilterForm({ filter }: { filter: Filter }) {
 /** CommitLog pages through the commits of the filter with "Load more"; on a new snapshot with several pages loaded it offers "New commits". */
 export function CommitLog({ filter, showRepo = true }: { filter: Filter; showRepo?: boolean }) {
   const qc = useQueryClient()
-  const options = commitLogQuery(qc, filter)
+  const options = commitLogQuery(api, qc, filter)
   const { data, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(options)
   const version = useSnapshotVersion()
   const first = useRef<HTMLLIElement>(null)

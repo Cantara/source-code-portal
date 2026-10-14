@@ -52,5 +52,6 @@ export function useTheme(): Choice {
       return () => listeners.delete(l)
     },
     () => (current ??= stored()),
+    () => "system",
   )
 }

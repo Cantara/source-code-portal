@@ -2,9 +2,8 @@ package httpapi
 
 import (
 	"context"
-	"net"
+	"crypto/subtle"
 	"net/http"
-	"net/netip"
 	"slices"
 	"strings"
 )
@@ -25,17 +24,20 @@ func Private(ctx context.Context) bool {
 	return p
 }
 
-// private decides the viewer of r. The headers count only from a trusted proxy; from any other peer they are removed, so nothing
+// private decides the viewer of r. An API call of the web UI server names the viewer of its page with X-Scp-Viewer, believed only
+// with the right X-Scp-Token. The identity headers count only from a trusted proxy; from any other peer they are removed, so nothing
 // behind the middleware reads a forged identity.
 func (o Options) private(r *http.Request) bool {
+	token, viewer := r.Header.Get(headerToken), r.Header.Get(headerViewer)
+	r.Header.Del(headerToken)
+	r.Header.Del(headerViewer)
+	if token != "" && o.WebToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(o.WebToken)) == 1 {
+		return viewer == "private"
+	}
 	if o.Access.UserHeader == "" {
 		return false
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	if ip, err := netip.ParseAddr(host); err != nil || !o.trusted(ip) {
+	if !o.fromTrusted(r) {
 		r.Header.Del(o.Access.UserHeader)
 		r.Header.Del(o.Access.GroupsHeader)
 		return false

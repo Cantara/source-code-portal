@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright"
 import type { Page } from "@playwright/test"
 import { expect, test } from "./fixtures"
 
-// Every page of the UI with its h1; the server answers each of these addresses with the shell (200).
+// Every page of the UI with its h1; each answers 200.
 const pages = [
   ["/", "Dashboard"],
   ["/commits", "Commits"],
@@ -32,14 +32,15 @@ for (const [path, h1] of pages) {
   })
 }
 
-test("an unknown address answers 404 with the shell", async ({ page }) => {
+test("an unknown address answers 404 with the not-found page", async ({ page }) => {
   const res = await page.goto("/no/such/page")
   expect(res?.status()).toBe(404)
   await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible()
 })
 
-test("an unknown repository shows the not-found page", async ({ page }) => {
-  await page.goto("/repos/acme/nope")
+test("an unknown repository answers 404 with the not-found page", async ({ page }) => {
+  const res = await page.goto("/repos/acme/nope")
+  expect(res?.status()).toBe(404)
   await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible()
 })
 
@@ -91,11 +92,11 @@ test("a stored dark theme paints dark from the first frame", async ({ page }) =>
   ])
 })
 
-test("assets are immutable and compressed; the shell revalidates", async ({ page, request }) => {
+test("static files are immutable and compressed; pages are not stored", async ({ page, request }) => {
   const res = await page.goto("/")
-  expect(res?.headers()["cache-control"]).toBe("no-cache")
-  const script = await page.locator("script[type=module]").getAttribute("src")
-  expect(script).toMatch(/^\/assets\/index-[\w-]{8}\.js$/)
+  expect(res?.headers()["cache-control"]).toContain("no-store")
+  const script = await page.locator("script[src^='/_next/static/']").first().getAttribute("src")
+  expect(script).toMatch(/^\/_next\/static\/chunks\/[\w-]+\.js/)
   const asset = await request.get(script ?? "", { headers: { "Accept-Encoding": "gzip" } })
   expect(asset.headers()["cache-control"]).toBe("public, max-age=31536000, immutable")
   expect(asset.headers()["content-encoding"]).toBe("gzip")

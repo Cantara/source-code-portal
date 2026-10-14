@@ -11,7 +11,6 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -28,12 +27,11 @@ func (s stub) GetSnapshot(ctx context.Context, r oapi.GetSnapshotRequestObject) 
 	return s.SnapshotAPI.GetSnapshot(ctx, r)
 }
 
+// page stands in for the web UI's pages.
+var page = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("<!doctype html>")) }) //nolint:gochecknoglobals // test fixture
+
 func public(cur *snapshot.Snapshot) http.Handler {
-	spa := fstest.MapFS{
-		"index.html":           {Data: []byte("<!doctype html>")},
-		"assets/app-1a2b3c.js": {Data: []byte("console.log(1)")},
-	}
-	return Public(testOptions(), spa, []byte("openapi: 3.1.0\n"), stub{SnapshotAPI: SnapshotAPI{Current: func(context.Context) *snapshot.Snapshot { return cur }}},
+	return Public(testOptions(), page, []byte("openapi: 3.1.0\n"), stub{SnapshotAPI: SnapshotAPI{Current: func(context.Context) *snapshot.Snapshot { return cur }}},
 		Route{Pattern: "POST /upload", MaxBody: 8, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if _, err := io.ReadAll(r.Body); err != nil {
 				http.Error(w, "too large", http.StatusRequestEntityTooLarge)
@@ -61,32 +59,6 @@ func get(h http.Handler, path string, hdr ...string) *httptest.ResponseRecorder 
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
-}
-
-func TestSPA(t *testing.T) {
-	h := public(&snapshot.Snapshot{})
-	tests := []struct {
-		path, cache string
-		status      int
-	}{
-		{"/", "no-cache", http.StatusOK},
-		{"/assets/app-1a2b3c.js", "public, max-age=31536000, immutable", http.StatusOK},
-		{"/assets/missing.js", "", http.StatusNotFound},
-		{"/assets", "", http.StatusNotFound},
-		{"/../index.html", "", http.StatusTemporaryRedirect},
-	}
-	for _, tc := range tests {
-		rec := get(h, tc.path)
-		if rec.Code != tc.status {
-			t.Errorf("%s: status %d, want %d", tc.path, rec.Code, tc.status)
-		}
-		if got := rec.Header().Get("Cache-Control"); tc.cache != "" && got != tc.cache {
-			t.Errorf("%s: Cache-Control %q, want %q", tc.path, got, tc.cache)
-		}
-		if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
-			t.Errorf("%s: no nosniff", tc.path)
-		}
-	}
 }
 
 func TestSnapshotAndValidators(t *testing.T) {
@@ -139,44 +111,9 @@ func TestProbes(t *testing.T) {
 	}
 }
 
-func TestFallback(t *testing.T) {
-	h := public(&snapshot.Snapshot{})
-	for _, tc := range []struct {
-		path   string
-		status int
-		shell  bool
-	}{
-		{"/commits", 200, true},
-		{"/groups/core", 200, true},
-		{"/groups/core/commits", 200, true},
-		{"/repos/acme/core", 200, true},
-		{"/repos/vercel/next.js", 200, true},
-		{"/repos/acme/core/commits", 200, true},
-		{"/repos/acme/core/docs/docs/setup", 200, true},
-		{"/nope/deeper", 404, true},
-		{"/groups/core/extra", 404, true},
-		{"/favicon.ico", 404, false},
-		{"/badges/x", 404, false},
-		{"/webhooks/github", 404, false},
-		{"/.well-known/security.txt", 404, false},
-		{"/assets", 404, false},
-	} {
-		rec := get(h, tc.path)
-		isShell := rec.Body.String() == "<!doctype html>"
-		if rec.Code != tc.status || isShell != tc.shell {
-			t.Errorf("%s: %d shell %v, want %d shell %v", tc.path, rec.Code, isShell, tc.status, tc.shell)
-		}
-		if isShell && rec.Header().Get("Content-Security-Policy") != cspShell {
-			t.Errorf("%s: shell CSP %q", tc.path, rec.Header().Get("Content-Security-Policy"))
-		}
-	}
-}
-
 func TestHeaders(t *testing.T) {
 	h := public(&snapshot.Snapshot{})
 	for _, tc := range []struct{ path, csp string }{
-		{"/", cspShell},
-		{"/repos/a/b", cspShell},
 		{"/api/v1/snapshot", cspDefault},
 		{"/api/v1/nope", cspDefault},
 		{"/api/v1/openapi.yaml", cspDefault},
@@ -341,6 +278,25 @@ func TestPrivateViewer(t *testing.T) {
 		}
 		if strings.HasPrefix(tc.peer, "203.") && leaked != "" {
 			t.Errorf("a header from an untrusted peer reached the handler: %q", leaked)
+		}
+	}
+	o.WebToken = "t0ken"
+	for _, tc := range []struct {
+		token, viewer string
+		want          bool
+	}{{"t0ken", "private", true}, {"t0ken", "public", false}, {"wrong", "private", false}, {"", "private", false}} {
+		var seen bool
+		var leaked string
+		h := o.wrap("public", http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			seen, leaked = Private(r.Context()), r.Header.Get(headerToken)+r.Header.Get(headerViewer)
+		}))
+		r := httptest.NewRequest(http.MethodGet, "/api/v1/dashboard", nil)
+		r.RemoteAddr = "127.0.0.1:1"
+		r.Header.Set(headerToken, tc.token)
+		r.Header.Set(headerViewer, tc.viewer)
+		h.ServeHTTP(httptest.NewRecorder(), r)
+		if seen != tc.want || leaked != "" {
+			t.Errorf("token %q viewer %q: private %v, headers left %q", tc.token, tc.viewer, seen, leaked)
 		}
 	}
 	o.Access.PrivateGroups = []string{"*"}

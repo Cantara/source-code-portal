@@ -6,7 +6,7 @@ Instructions for coding agents working in this repository (Source Code Portal, G
 - The agent drives: milestones in order, the next one started when the last is green; the specs cover the requirements, the owner
   accepts the agent's choices. Decide, record in `decisions.md` and continue; never ask the owner.
 - Layout: `cmd/scp` (Cobra CLI and all wiring), `internal/<package>` (created with its first code), `api/openapi.yaml` (the `/api/v1`
-  contract), `web/` (React SPA, embedded with the `spa` build tag), `deploy/` (Dockerfile, example config), `docs/` (user documentation).
+  contract), `web/` (Next.js web UI; `pnpm build` makes `web/bundle`, which `scp serve` runs with Node via `web.dir`), `deploy/` (Dockerfile, example config), `docs/` (user documentation).
 - Greenfield: change code, contract, config keys and the store schema in place; no compatibility layers or extra migrations.
 - Rules: features (`catalog`, `commits`, `docs`, `badges`, `webhook`, `llms`, `manifests`) never import each other, enforced by
   `cmd/scp/boundary_test.go`; request handlers read only the current snapshot; no globals or `init()`; config keys, metrics and

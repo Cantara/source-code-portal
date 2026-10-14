@@ -148,7 +148,7 @@ func newVersionCmd() *cobra.Command {
 			if bi.Modified {
 				mod = " (modified)"
 			}
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "scp %s build %s%s %s %s/%s web=%s\n", bi.Version, bi.Build, mod, bi.Go, bi.OS, bi.Arch, bi.SPA)
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "scp %s build %s%s %s %s/%s\n", bi.Version, bi.Build, mod, bi.Go, bi.OS, bi.Arch)
 			return failure{err}.orNil()
 		},
 	}

@@ -58,5 +58,10 @@ cluster:
   addresses: [] # ["hazelcast:5701"]
   name: dev
   namespace: scp
+# The web UI: the Next.js server in dir (web/bundle of a build, the scp-web archive of a release) that scp serve runs with node.
+# The image sets both (SCP_WEB_DIR=/web, SCP_WEB_NODE=/nodejs/bin/node); without dir the pages answer 503.
+web:
+  dir: "" # web/bundle
+  node: node
 ops:
   pprof: false # /debug/pprof/ on the admin listener

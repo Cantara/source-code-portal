@@ -1,17 +1,35 @@
-import { QueryClient } from "@tanstack/react-query"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
+import type { ReactNode } from "react"
+import { AllCommitsView } from "@/features/commits/view"
+import { DashboardView } from "@/features/dashboard/view"
+import { DocView } from "@/features/docs/view"
+import { GroupView } from "@/features/groups/view"
+import { RepoView } from "@/features/repos/view"
+import { StatusBanners } from "@/features/status/banners"
+import { setLocation } from "@/test/navigation"
 import { commit, fresh, http, server, snapshot } from "@/test/server"
-import { App } from "./app"
 
 function client() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10_000 } } })
 }
 
+/** show renders a view at path inside the shell's providers and banners, as a page does after hydration. */
+function show(view: ReactNode, path = "/", qc = client()) {
+  setLocation(path)
+  return render(
+    <QueryClientProvider client={qc}>
+      <StatusBanners />
+      {view}
+    </QueryClientProvider>,
+  )
+}
+
 describe("pages", () => {
   it("renders the dashboard with groups, health and the latest commits", async () => {
-    render(<App initialPath="/" queryClient={client()} />)
+    show(<DashboardView />)
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()
     expect(await screen.findByRole("link", { name: "IAM" })).toHaveAttribute("href", "/groups/iam")
     expect(screen.getByText("2 up to date · 1 delayed")).toBeInTheDocument()
@@ -19,16 +37,9 @@ describe("pages", () => {
     expect(screen.getByText("1 repository is in no group.")).toBeInTheDocument()
   })
 
-  it("renders the not-found page for an unknown path and for a 404 problem", async () => {
-    render(<App initialPath="/no/such/page" queryClient={client()} />)
-    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument()
-    cleanupAndRender("/groups/nope")
-    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument()
-  })
-
   it("filters and sorts the repositories of a group through the URL", async () => {
     const user = userEvent.setup()
-    render(<App initialPath="/groups/iam" queryClient={client()} />)
+    show(<GroupView group="iam" />, "/groups/iam")
     await screen.findByRole("heading", { level: 1, name: "IAM" })
     const table = screen.getByRole("table")
     const names = () =>
@@ -45,7 +56,7 @@ describe("pages", () => {
   })
 
   it("renders a repository with its descriptor, badges, README and documents", async () => {
-    render(<App initialPath="/repos/acme/core" queryClient={client()} />)
+    show(<RepoView owner="acme" name="core" />, "/repos/acme/core")
     expect(await screen.findByRole("heading", { level: 1, name: "Core identity" })).toBeInTheDocument()
     expect(await screen.findByText("Hello from the README.")).toBeInTheDocument()
     expect(screen.getByText("@acme/iam")).toBeInTheDocument()
@@ -57,7 +68,7 @@ describe("pages", () => {
   })
 
   it("shows a repository's technology, dependencies and internal links", async () => {
-    render(<App initialPath="/repos/acme/core" queryClient={client()} />)
+    show(<RepoView owner="acme" name="core" />, "/repos/acme/core")
     const tech = await screen.findByRole("region", { name: "Technology" })
     expect(await within(tech).findByText("Maven")).toBeInTheDocument()
     expect(within(tech).getByText("java 21")).toBeInTheDocument()
@@ -69,7 +80,7 @@ describe("pages", () => {
   })
 
   it("renders a document with its outline", async () => {
-    render(<App initialPath="/repos/acme/core/docs/docs/setup.md" queryClient={client()} />)
+    show(<DocView owner="acme" name="core" path="docs/setup.md" />, "/repos/acme/core/docs/docs/setup.md")
     expect(await screen.findByRole("heading", { level: 1, name: "Setup" })).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Install" })).toHaveAttribute("href", "#install")
     expect(screen.getByRole("link", { name: "docs/setup.md on GitHub" })).toBeInTheDocument()
@@ -86,7 +97,7 @@ describe("pages", () => {
         ),
       ),
     )
-    render(<App initialPath="/" queryClient={client()} />)
+    show(<DashboardView />)
     expect(await screen.findByText("Something went wrong on the server")).toBeInTheDocument()
     expect(screen.getByText("Request id: abc")).toBeInTheDocument()
   })
@@ -107,7 +118,7 @@ describe("commit log", () => {
     pages()
     const user = userEvent.setup()
     const qc = client()
-    render(<App initialPath="/commits" queryClient={qc} />)
+    show(<AllCommitsView />, "/commits", qc)
     await screen.findByText("Commit 0")
     await waitFor(() => expect(qc.getQueryData(["snapshot"])).toBeDefined())
     await user.click(screen.getByRole("button", { name: "Load more" }))
@@ -137,7 +148,7 @@ describe("commit log", () => {
       ),
     )
     const qc = client()
-    render(<App initialPath="/" queryClient={qc} />)
+    show(<DashboardView />, "/", qc)
     expect(await screen.findByText("1 repository in the catalogue.")).toBeInTheDocument()
     await waitFor(() => expect(qc.getQueryData(["snapshot"])).toBeDefined())
     server.use(http.get("/snapshot", ({ response }) => response(200).json(snapshot(2, false))))
@@ -178,7 +189,7 @@ describe("commit log", () => {
         ),
       )
       const qc = client()
-      const view = render(<App initialPath="/" queryClient={qc} />)
+      const view = show(<DashboardView />, "/", qc)
       expect(await screen.findByText("1 repository in the catalogue.")).toBeInTheDocument()
       const source = sources[0]
       expect(source?.url).toBe("/api/v1/events")
@@ -200,28 +211,5 @@ describe("commit log", () => {
     } finally {
       vi.unstubAllGlobals()
     }
-  })
-})
-
-let current: ReturnType<typeof render> | undefined
-function cleanupAndRender(path: string) {
-  current?.unmount()
-  document.body.innerHTML = ""
-  current = render(<App initialPath={path} queryClient={client()} />)
-}
-
-describe("route tree", () => {
-  it("has exactly the page shapes the server answers with the shell (internal/httpapi/spa.go shellShape)", async () => {
-    const { routeTree } = await import("./router")
-    const paths = (routeTree.children ?? []).map((r) => r.fullPath as string).sort()
-    expect(paths).toEqual([
-      "/",
-      "/commits",
-      "/groups/$group",
-      "/groups/$group/commits",
-      "/repos/$owner/$name",
-      "/repos/$owner/$name/commits",
-      "/repos/$owner/$name/docs/$",
-    ])
   })
 })

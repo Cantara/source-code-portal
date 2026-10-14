@@ -1,8 +1,13 @@
+"use client"
+
 import { useQuery } from "@tanstack/react-query"
-import { createLazyRoute, getRouteApi, Link } from "@tanstack/react-router"
+import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useState } from "react"
 import { Card, CardTitle } from "@/components/ui/card"
-import type { Repo } from "@/lib/api/client"
+import { api, type Repo } from "@/lib/api/client"
 import { plural } from "@/lib/format"
+import { groupCommitsPath, repoPath } from "@/lib/paths"
 import { CommitList } from "@/shared/commit-list"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
@@ -12,11 +17,7 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { VisibilityBadge } from "@/shared/visibility-badge"
 import { groupCommitsQuery, groupQuery } from "./api"
-import type { SortKey } from "./search"
-
-export const groupRoute = createLazyRoute("/groups/$group")({ component: GroupPage })
-
-const route = getRouteApi("/groups/$group")
+import { validateGroupSearch, type GroupSearch, type SortKey } from "./search"
 
 /** view filters repositories by name or description and sorts them. */
 export function view(repos: Repo[], q = "", sort: SortKey = "name", desc = false): Repo[] {
@@ -26,12 +27,27 @@ export function view(repos: Repo[], q = "", sort: SortKey = "name", desc = false
   return desc ? out.reverse() : out
 }
 
-function GroupPage() {
-  const { group } = route.useParams()
-  const { q, sort = "name", desc = false } = route.useSearch()
-  const navigate = route.useNavigate()
-  const { data, error } = useQuery(groupQuery(group))
-  const repos = data ? view(data.repos, q, sort, desc) : []
+/** searchOf writes the view state of the group page as search parameters. */
+function searchOf(s: GroupSearch): string {
+  const p = new URLSearchParams()
+  if (s.q) p.set("q", s.q)
+  if (s.sort && s.sort !== "name") p.set("sort", s.sort)
+  if (s.desc) p.set("desc", "true")
+  const q = p.toString()
+  return q ? `?${q}` : ""
+}
+
+/** GroupView is a group: its repositories (filtered and sorted through the URL) and its latest commits. */
+export function GroupView({ group }: { group: string }) {
+  const params = useSearchParams()
+  const search = validateGroupSearch(Object.fromEntries(params))
+  const { q, sort = "name", desc = false } = search
+  const router = useRouter()
+  const pathname = usePathname()
+  const navigate = (next: GroupSearch) => router.replace(`${pathname}${searchOf(next)}`, { scroll: false })
+  const [text, setText] = useState(q ?? "") // the filter as typed; the URL follows it
+  const { data, error } = useQuery(groupQuery(api, group))
+  const repos = data ? view(data.repos, text, sort, desc) : []
 
   function header(key: SortKey, label: string) {
     const active = sort === key
@@ -40,9 +56,7 @@ function GroupPage() {
         <button
           type="button"
           className="inline-flex min-h-6 items-center gap-1 font-semibold hover:underline"
-          onClick={() =>
-            void navigate({ search: (s) => ({ ...s, sort: key, desc: active ? !desc || undefined : undefined }), replace: true })
-          }
+          onClick={() => navigate({ ...search, sort: key, desc: active ? !desc || undefined : undefined })}
         >
           {label}
           <span aria-hidden="true">{active ? (desc ? "↓" : "↑") : "↕"}</span>
@@ -68,14 +82,17 @@ function GroupPage() {
                 Filter by name
                 <input
                   type="search"
-                  value={q ?? ""}
-                  onChange={(e) => void navigate({ search: (s) => ({ ...s, q: e.target.value || undefined }), replace: true })}
+                  value={text}
+                  onChange={(e) => {
+                    setText(e.target.value)
+                    navigate({ ...search, q: e.target.value || undefined })
+                  }}
                   className="mt-1 min-h-9 rounded-md border border-input bg-background px-2"
                 />
               </label>
             </div>
             {repos.length === 0 ? (
-              <EmptyState title={q ? "No repository matches the filter" : "No repositories in this group"} />
+              <EmptyState title={text ? "No repository matches the filter" : "No repositories in this group"} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -96,7 +113,7 @@ function GroupPage() {
                       <tr key={r.address}>
                         <td className="p-2 font-medium">
                           <span className="inline-flex flex-wrap items-center gap-2">
-                            <Link to="/repos/$owner/$name" params={{ owner: r.owner, name: r.name }} className="hover:underline">
+                            <Link href={repoPath(r.owner, r.name)} className="hover:underline">
                               {r.owner}/{r.name}
                             </Link>
                             <VisibilityBadge visibility={r.visibility} />
@@ -126,7 +143,7 @@ function GroupPage() {
 }
 
 function LatestCommits({ group }: { group: string }) {
-  const { data, error } = useQuery(groupCommitsQuery(group))
+  const { data, error } = useQuery(groupCommitsQuery(api, group))
   return (
     <Card aria-labelledby="latest">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -135,7 +152,7 @@ function LatestCommits({ group }: { group: string }) {
       </div>
       {error && !data && <ProblemAlert error={error} />}
       {data && <CommitList commits={data.commits} />}
-      <Link to="/groups/$group/commits" params={{ group }} className="mt-2 inline-block text-sm hover:underline">
+      <Link href={groupCommitsPath(group)} className="mt-2 inline-block text-sm hover:underline">
         Commit log of the group
       </Link>
     </Card>

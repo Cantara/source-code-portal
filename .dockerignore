@@ -8,7 +8,8 @@
 !web/
 !LICENSE
 web/node_modules
-web/dist
+web/.next
+web/bundle
 **/*_test.go
 **/testdata
 **/.DS_Store

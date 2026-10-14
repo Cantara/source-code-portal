@@ -1,6 +1,6 @@
 # Operator guide
 
-Source Code Portal (SCP) is one static binary, `scp`, with the web UI embedded. It reads the repositories of one or more GitHub
+Source Code Portal (SCP) is one static binary, `scp`, and a web UI bundle it runs with Node.js. It reads the repositories of one or more GitHub
 organisations, keeps a local SQLite cache and serves the portal. One instance serves up to 1,000 repositories; several instances
 can serve one portal together through Hazelcast (section 3.1).
 
@@ -99,6 +99,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `cluster.addresses` | `[]` | Hazelcast members `host:port`; set to run as one of several instances (section 3.1) |
 | `cluster.name` | `dev` | the Hazelcast cluster name |
 | `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
+| `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
+| `web.node` | `node` | the Node.js 24 executable that runs the bundle |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
@@ -144,16 +146,21 @@ Images in private READMEs load from GitHub and show for users signed in there.
 
 ## 3. Run
 
-**Binary.** Download the archive for your platform from the GitHub release, check it and run it:
+**Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.0.0.tar.gz`, the same for every platform) from
+the GitHub release, check them and run them with Node.js 24 on the `PATH` (or `web.node`):
 
 ```sh
 sha256sum -c scp_2.0.0_checksums.txt --ignore-missing
-tar xzf scp_2.0.0_linux_amd64.tar.gz
-./scp config check -c scp.yaml && ./scp serve -c scp.yaml
+tar xzf scp_2.0.0_linux_amd64.tar.gz && tar xzf scp-web_2.0.0.tar.gz   # the bundle unpacks into bundle/
+./scp config check -c scp.yaml && SCP_WEB_DIR=bundle ./scp serve -c scp.yaml
 ```
 
-**Container.** The image `ghcr.io/cantara/source-code-portal` (linux/amd64 and linux/arm64) runs as UID 65532 on a read-only root file
-system; `/data` is the one writable path.
+`scp serve` starts the bundle's server (`node server.js`) on a free loopback port, passes it nothing from its own environment,
+restarts it when it exits and stops it at shutdown; its output appears in the log with `component=web`. Every page goes through `scp`,
+so the public listener stays the one address to expose.
+
+**Container.** The image `ghcr.io/cantara/source-code-portal` (linux/amd64 and linux/arm64) holds `scp`, Node.js and the bundle
+(`SCP_WEB_DIR` and `SCP_WEB_NODE` are set). It runs as UID 65532 on a read-only root file system; `/data` is the one writable path.
 
 ```sh
 docker run -d --name scp --read-only --cap-drop=ALL \
@@ -193,7 +200,7 @@ spec:
           startupProbe: { httpGet: { path: /readyz, port: admin }, periodSeconds: 10, failureThreshold: 90 }
           readinessProbe: { httpGet: { path: /readyz, port: admin }, periodSeconds: 10 }
           livenessProbe: { httpGet: { path: /livez, port: admin }, periodSeconds: 20, failureThreshold: 3 }
-          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { memory: 512Mi } }
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 768Mi } }
           volumeMounts:
             - { name: data, mountPath: /data }
             - { name: config, mountPath: /etc/scp, readOnly: true }
@@ -237,17 +244,17 @@ cluster:
 
 ## 4. Lifecycle
 
-**Start.** A start loads the cache and serves it at once, then lists every organisation. On the first start (empty cache) the pages
-say the portal is loading and fill in as data arrives; `/readyz` turns 200 once every source has a complete listing. A cold start of
+**Start.** A start loads the cache and serves it at once, then lists every organisation and starts the web UI server. On the first start (empty cache) the pages
+say the portal is loading and fill in as data arrives; `/readyz` turns 200 once every source has a complete listing and the web UI server answers. A cold start of
 1,000 repositories needs about 5,500 GitHub requests; with a token it can wait for the hourly rate-limit reset to finish.
 
 **GitHub outages.** When GitHub fails or the rate limit runs out, the portal keeps serving the last good data, marks the affected
 items *Delayed* or *Update failing*, and retries with backoff. `/readyz` stays 200.
 
-**Stop.** SIGTERM or SIGINT: `/readyz` answers 503, in-flight requests and jobs get `server.shutdown_grace`, the cache is closed and the
-process exits 0.
+**Stop.** SIGTERM or SIGINT: `/readyz` answers 503, in-flight requests and jobs get `server.shutdown_grace`, the web UI server is
+stopped, the cache is closed and the process exits 0.
 
-**Upgrade.** Replace the binary or the image tag and restart. The cache holds only what GitHub can give again: if it is lost, deleted or
+**Upgrade.** Replace the binary and the bundle together (or the image tag) and restart. The cache holds only what GitHub can give again: if it is lost, deleted or
 unreadable, the portal rebuilds it like a first start. There is nothing to back up beyond the configuration and the secrets.
 
 **Rotating the webhook secret.** Set the new secret in `webhook.secret_file` and the old one in `webhook.previous_secret_file`,

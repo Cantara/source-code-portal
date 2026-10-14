@@ -1,7 +1,7 @@
 # Build output
 /bin/
 /dist/
-/web/dist/
+/scp-web.tar.gz
 node_modules/
 # Local configuration and data
 /scp.yaml

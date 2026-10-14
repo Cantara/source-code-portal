@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"io/fs"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -22,7 +21,7 @@ import (
 
 // Route is a handler a feature serves outside the API contract (badges, the webhook, Markdown). MaxBody caps the request body
 // (0: DefaultMaxBody). A Markdown route shares its address with a page of the UI: Handler answers when the path ends in .md or the
-// client prefers text/markdown to text/html, the shell answers otherwise. A Stream route has no request deadline and, under /api/,
+// client prefers text/markdown to text/html, the page answers otherwise. A Stream route has no request deadline and, under /api/,
 // none of the API's buffering.
 type Route struct {
 	Pattern  string
@@ -32,11 +31,10 @@ type Route struct {
 	Stream   bool
 }
 
-// Public returns the handler of the public listener. spa holds the web UI build with index.html at its root; contract is
+// Public returns the handler of the public listener. pages answers the paths no other handler has (Options.Pages); contract is
 // api/openapi.yaml, served at /api/v1/openapi.yaml; api implements it; routes are the features' other handlers.
-func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterface, routes ...Route) http.Handler {
+func Public(o Options, pages http.Handler, contract []byte, api oapi.StrictServerInterface, routes ...Route) http.Handler {
 	mux := http.NewServeMux()
-	shell := spaHandler(spa)
 	streams := map[string]bool{}
 	for _, r := range routes {
 		n := r.MaxBody
@@ -45,7 +43,7 @@ func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterfac
 		}
 		h := r.Handler
 		if r.Markdown {
-			h = negotiated(h, shell)
+			h = negotiated(h, pages)
 		}
 		if r.Stream {
 			h = unbounded(h)
@@ -54,7 +52,7 @@ func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterfac
 		}
 		mux.Handle(r.Pattern, limit(n, h))
 	}
-	mux.Handle("GET /", limit(DefaultMaxBody, shell))
+	mux.Handle("GET /", limit(DefaultMaxBody, pages))
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, _ *http.Request) {
 		WriteProblem(w, http.StatusNotFound, "not-found", "No such API resource.")
 	})
@@ -272,8 +270,8 @@ func (b *buffered) Write(p []byte) (int, error) {
 	return b.body.Write(p)
 }
 
-// negotiated answers with md for a .md path or a client that prefers Markdown, with shell otherwise.
-func negotiated(md, shell http.Handler) http.Handler {
+// negotiated answers with md for a .md path or a client that prefers Markdown, with page otherwise.
+func negotiated(md, page http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Accept")
 		w.Header().Set("Link", `</llms.txt>; rel="describedby"`)
@@ -281,7 +279,7 @@ func negotiated(md, shell http.Handler) http.Handler {
 			md.ServeHTTP(w, r)
 			return
 		}
-		shell.ServeHTTP(w, r)
+		page.ServeHTTP(w, r)
 	})
 }
 

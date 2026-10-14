@@ -7,7 +7,7 @@ detailed design package in `reference/detailed-design/` as the binding document 
 ## 1. What SCP is
 
 An organisational dashboard for GitHub: repositories grouped into systems, with their latest commits, rendered README and docs, status badges
-and an API that scripts and LLM agents can read. One static Go binary with the web UI embedded. Kept fresh by webhooks plus scheduled sync.
+and an API that scripts and LLM agents can read. One static Go binary that serves the API and runs the server-rendered web UI. Kept fresh by webhooks plus scheduled sync.
 Target: up to 1,000 repositories, one instance or several sharing state through Hazelcast.
 
 ## 2. Scope
@@ -47,7 +47,7 @@ More manifest ecosystems, org-wide dependency graph and CycloneDX export, Jenkin
    core        sync (scheduler + job queue)   github (client, App auth)   snapshot   store (SQLite)
                httpapi (server, OpenAPI handlers)                          config (Viper)
    ───────────────────────────────────────────────────────────────────────
-   web/        React SPA (Vite build), embedded with go:embed
+   web/        Next.js web UI (server-rendered), run by scp serve as a supervised child
 ```
 
 ```
@@ -90,14 +90,14 @@ Rule: every dependency is current (a release within the last 18 months, supports
 | Go | 1.27.x |
 | CLI and config | `spf13/cobra` v1.10, `spf13/viper` v1.21 (one instance per run, unknown keys rejected) |
 | HTTP | stdlib `net/http` (`ServeMux` patterns), stdlib `log/slog` |
-| API | OpenAPI 3.1 contract, `oapi-codegen` v2.8 (strict server); `openapi-typescript` for the SPA client |
+| API | OpenAPI 3.1 contract, `oapi-codegen` v2.8 (strict server); `openapi-typescript` for the web client |
 | GitHub | `google/go-github` v92, `bradleyfalzon/ghinstallation` v2.19 (App auth), conditional requests (ETag) in a small own transport |
 | Storage | `modernc.org/sqlite` v1.60 |
 | Markdown | `yuin/goldmark` v1.8, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` (exception above) |
 | Metrics | `prometheus/client_golang` v1.25 |
 | Distributed state | `hazelcast/hazelcast-go-client` v1.6 |
 | Tests | stdlib `testing` + `testing/synctest`, `google/go-cmp`, `go.uber.org/goleak` |
-| Web | React 19, TypeScript, Vite, Tailwind 4 (shadcn-style components), TanStack Router and Query, Vitest, Playwright; pnpm |
+| Web | Next.js 16 (App Router, standalone server), React 19, TypeScript, Tailwind 4 (shadcn-style components), TanStack Query, Vitest, Playwright; pnpm |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, Renovate |
 
 

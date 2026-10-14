@@ -3,8 +3,6 @@ package main
 import (
 	"runtime"
 	"runtime/debug"
-
-	"github.com/cantara/source-code-portal/web"
 )
 
 // version and build are stamped by `-ldflags "-X main.version=... -X main.build=..."` (Makefile, Dockerfile, GoReleaser);
@@ -22,11 +20,10 @@ type BuildInfo struct {
 	Go       string `json:"go"`
 	OS       string `json:"os"`
 	Arch     string `json:"arch"`
-	SPA      string `json:"spa"` // "spa" or "placeholder": which bundle is embedded
 }
 
 func readBuildInfo() BuildInfo {
-	bi := BuildInfo{Version: version, Build: build, Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH, SPA: string(web.EmbeddedMode)}
+	bi := BuildInfo{Version: version, Build: build, Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range info.Settings {
 			switch s.Key {

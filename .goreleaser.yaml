@@ -1,13 +1,15 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# Release v2 (release.yml on tags v*): one CGO-free binary per platform with the web UI embedded (release.yml builds web/dist first),
-# archives with sha256 checksums signed keyless by cosign, and one multi-platform image around those binaries (deploy/Dockerfile.release),
+# Release v2 (release.yml on tags v*): one CGO-free binary per platform and the platform-independent web bundle (release.yml builds
+# web/bundle first) as scp-web_<version>.tar.gz, archives with sha256 checksums signed keyless by cosign, and one multi-platform image
+# around those binaries and the bundle (deploy/Dockerfile.release),
 # signed by digest and carrying a BuildKit SBOM. Full releases also move :latest.
 version: 2
 project_name: scp
 
 before:
   hooks:
-    - test -s web/dist/index.html # a release without the built UI would embed the placeholder page
+    - test -s web/bundle/server.js # a release without the built web UI serves no pages
+    - tar --sort=name --mtime=@{{ .CommitTimestamp }} --owner=0 --group=0 --numeric-owner -czf scp-web.tar.gz -C web bundle
 
 builds:
   - id: scp
@@ -15,7 +17,6 @@ builds:
     binary: scp
     env: [CGO_ENABLED=0]
     flags: [-trimpath]
-    tags: [spa]
     ldflags:
       - "-s -w -X main.version={{ .Version }} -X main.build={{ .FullCommit }}"
     mod_timestamp: "{{ .CommitTimestamp }}"
@@ -33,6 +34,9 @@ archives:
 checksum:
   name_template: "scp_{{ .Version }}_checksums.txt"
   algorithm: sha256
+  extra_files:
+    - glob: scp-web.tar.gz
+      name_template: "scp-web_{{ .Version }}.tar.gz"
 
 signs:
   - id: checksums
@@ -51,6 +55,7 @@ dockers_v2:
       - "{{ .Version }}"
       - "{{ if not .Prerelease }}latest{{ end }}"
     platforms: [linux/amd64, linux/arm64]
+    extra_files: [web/bundle]
     build_args:
       VERSION: "{{ .Version }}"
       BUILD_ID: "{{ .FullCommit }}"
@@ -66,6 +71,9 @@ docker_signs:
 
 release:
   prerelease: auto
+  extra_files:
+    - glob: scp-web.tar.gz
+      name_template: "scp-web_{{ .Version }}.tar.gz"
   name_template: "v{{ .Version }}"
 
 changelog:

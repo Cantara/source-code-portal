@@ -74,7 +74,7 @@ func TestExitCodes(t *testing.T) {
 func TestVersionJSON(t *testing.T) {
 	code, stdout, _ := execute(t, "version", "--json")
 	var bi BuildInfo
-	if code != exitOK || json.Unmarshal([]byte(stdout), &bi) != nil || bi.Version != "dev" || bi.SPA != "placeholder" {
+	if code != exitOK || json.Unmarshal([]byte(stdout), &bi) != nil || bi.Version != "dev" {
 		t.Fatalf("version --json: exit %d, %q", code, stdout)
 	}
 }
@@ -288,8 +288,8 @@ catalog:
 		if code := fetch(public+"/api/v1/repos/acme/secret", nil); code != http.StatusNotFound {
 			t.Errorf("private repository: %d, want 404", code)
 		}
-		if code := fetch(public+"/", nil); code != http.StatusOK {
-			t.Errorf("shell: %d", code)
+		if code := fetch(public+"/", nil); code != http.StatusServiceUnavailable {
+			t.Errorf("a page without web.dir: %d, want 503", code)
 		}
 	}
 
@@ -399,7 +399,7 @@ catalog:
 	if code := fetch(admin+"/debug/pprof/", nil); code != http.StatusNotFound {
 		t.Errorf("pprof without ops.pprof: %d", code)
 	}
-	if code := fetch(public+"/metrics", nil); code != http.StatusNotFound {
+	if code := fetch(public+"/metrics", nil); code == http.StatusOK { // a page path: 503 without the web UI
 		t.Errorf("metrics on the public listener: %d", code)
 	}
 	stop()

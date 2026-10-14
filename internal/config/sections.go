@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -83,6 +84,26 @@ type Cluster struct {
 	Addresses []string `mapstructure:"addresses"` // Hazelcast members, host:port
 	Name      string   `mapstructure:"name"`      // the Hazelcast cluster name
 	Namespace string   `mapstructure:"namespace"` // prefix of the Hazelcast objects
+}
+
+// Web runs the web UI: the Next.js server in Dir (web/bundle of the build), started with Node; empty Dir: no web UI, the pages
+// answer 503.
+type Web struct {
+	Dir  string `mapstructure:"dir"`  // holds server.js
+	Node string `mapstructure:"node"` // the Node.js executable, a path or a name on PATH
+}
+
+func (w Web) validate() []string {
+	var p []string
+	if w.Dir != "" {
+		if info, err := os.Stat(filepath.Join(w.Dir, "server.js")); err != nil || !info.Mode().IsRegular() {
+			p = append(p, fmt.Sprintf("web.dir: %q holds no server.js", w.Dir))
+		}
+	}
+	if strings.TrimSpace(w.Node) == "" {
+		p = append(p, "web.node: required")
+	}
+	return p
 }
 
 var namespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)

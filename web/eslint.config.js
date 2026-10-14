@@ -4,7 +4,7 @@ import globals from "globals"
 import tseslint from "typescript-eslint"
 
 export default tseslint.config(
-  { ignores: ["dist", "placeholder", "playwright-report", "test-results"] },
+  { ignores: [".next", "bundle", "next-env.d.ts", "playwright-report", "test-results"] },
   {
     files: ["**/*.{ts,tsx,js}"],
     extends: [js.configs.recommended, tseslint.configs.strict, reactHooks.configs.flat.recommended],
@@ -20,6 +20,8 @@ export default tseslint.config(
       ],
     },
   },
+  // Configuration, build scripts and the Playwright tests run in Node.
+  { files: ["*.{ts,js,mjs}", "scripts/**", "e2e/**"], languageOptions: { globals: globals.node } },
   { files: ["src/shared/safe-html.tsx"], rules: { "no-restricted-syntax": "off" } },
   {
     // Features never import features: they share through shared/, lib/ and typed links.

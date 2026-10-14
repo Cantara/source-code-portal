@@ -1,10 +1,13 @@
+"use client"
+
 import { useQuery } from "@tanstack/react-query"
-import { createLazyRoute, getRouteApi, Link, Navigate } from "@tanstack/react-router"
+import Link from "next/link"
 import { Alert } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardTitle } from "@/components/ui/card"
-import type { Schemas } from "@/lib/api/client"
-import { docAddress, withoutLeadingH1 } from "@/lib/docs"
+import { api, type Schemas } from "@/lib/api/client"
+import { withoutLeadingH1 } from "@/lib/docs"
+import { docPath, repoCommitsPath } from "@/lib/paths"
 import { CommitList } from "@/shared/commit-list"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
@@ -17,18 +20,11 @@ import { VisibilityBadge } from "@/shared/visibility-badge"
 import { docListQuery, docQuery, repoQuery } from "./api"
 import { Dependencies, TechnologyCard } from "./manifests"
 
-export const repoRoute = createLazyRoute("/repos/$owner/$name")({ component: RepoPage })
-
-const route = getRouteApi("/repos/$owner/$name")
 const badges = ["last-commit", "release", "license", "issues"] as const
 
-function RepoPage() {
-  const { owner, name } = route.useParams()
-  const { data, error } = useQuery(repoQuery(owner, name))
-  if (data && data.repo.address !== `${owner}/${name}`.toLowerCase()) {
-    // A renamed or transferred repository: the API followed the redirect, the address bar follows too.
-    return <Navigate to="/repos/$owner/$name" params={{ owner: data.repo.owner, name: data.repo.name }} replace />
-  }
+/** RepoView is a repository: descriptor, badges, README, technology, dependencies, documents and the latest commits. */
+export function RepoView({ owner, name }: { owner: string; name: string }) {
+  const { data, error } = useQuery(repoQuery(api, owner, name))
   const repo = data?.repo
   return (
     <>
@@ -92,11 +88,7 @@ function RepoPage() {
                 <FreshnessBadge freshness={data.commitsFreshness} />
               </div>
               <CommitList commits={data.commits} showRepo={false} />
-              <Link
-                to="/repos/$owner/$name/commits"
-                params={{ owner, name }}
-                className="mt-2 inline-block text-sm hover:underline"
-              >
+              <Link href={repoCommitsPath(owner, name)} className="mt-2 inline-block text-sm hover:underline">
                 Commit log
               </Link>
             </Card>
@@ -165,7 +157,7 @@ function DescriptorCard({ d }: { d: Schemas["Descriptor"] }) {
 }
 
 function DocsCard({ owner, name }: { owner: string; name: string }) {
-  const { data, error } = useQuery(docListQuery(owner, name))
+  const { data, error } = useQuery(docListQuery(api, owner, name))
   const docs = data?.docs.filter((d) => !d.readme) ?? []
   return (
     <Card aria-labelledby="docs">
@@ -178,11 +170,7 @@ function DocsCard({ owner, name }: { owner: string; name: string }) {
           <ul className="mt-2 text-sm">
             {docs.map((d) => (
               <li key={d.id}>
-                <Link
-                  to="/repos/$owner/$name/docs/$"
-                  params={{ owner, name, _splat: docAddress(d.path) }}
-                  className="hover:underline"
-                >
+                <Link href={docPath(owner, name, d.path)} className="hover:underline">
                   {d.title || d.path}
                 </Link>
               </li>
@@ -194,9 +182,9 @@ function DocsCard({ owner, name }: { owner: string; name: string }) {
 }
 
 function Readme({ owner, name }: { owner: string; name: string }) {
-  const list = useQuery(docListQuery(owner, name))
+  const list = useQuery(docListQuery(api, owner, name))
   const readme = list.data?.docs.find((d) => d.readme)
-  const doc = useQuery({ ...docQuery(owner, name, readme?.id ?? ""), enabled: readme !== undefined })
+  const doc = useQuery({ ...docQuery(api, owner, name, readme?.id ?? ""), enabled: readme !== undefined })
   if (list.error && !list.data) return <ProblemAlert error={list.error} />
   if (list.data && !readme) return <EmptyState title="This repository has no README" />
   if (doc.error && !doc.data) return <ProblemAlert error={doc.error} />

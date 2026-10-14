@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -72,7 +71,7 @@ func TestEvents(t *testing.T) {
 	ev := NewEvents(current, pub.Published)
 	ev.beat, ev.max = 100*time.Millisecond, 2
 	deadline := make(chan bool, 1)
-	h := Public(testOptions(), fstest.MapFS{"index.html": {Data: []byte("<!doctype html>")}}, nil,
+	h := Public(testOptions(), page, nil,
 		stub{SnapshotAPI: SnapshotAPI{Current: current}}, ev.Route(),
 		Route{Pattern: "GET /api/v1/deadline", Stream: true, Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})},
 		Route{Pattern: "GET /deadline", Stream: true, Handler: http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {

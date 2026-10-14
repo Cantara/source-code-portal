@@ -37,7 +37,10 @@ function subscribe(l: () => void) {
   }
 }
 
+// The server renders against its own clock, on the tick grid so repeated reads in one render agree.
+const serverNow = () => Math.floor(Date.now() / period) * period
+
 /** useNow is the time of the last tick, in milliseconds. */
 export function useNow(): number {
-  return useSyncExternalStore(subscribe, () => now)
+  return useSyncExternalStore(subscribe, () => now, typeof window === "undefined" ? serverNow : () => now)
 }

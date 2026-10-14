@@ -1,9 +1,12 @@
+"use client"
+
 import { useQuery } from "@tanstack/react-query"
-import { createLazyRoute, Link } from "@tanstack/react-router"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardTitle } from "@/components/ui/card"
-import type { Schemas } from "@/lib/api/client"
+import { api, type Schemas } from "@/lib/api/client"
 import { count, plural } from "@/lib/format"
+import { groupPath } from "@/lib/paths"
 import { CommitList } from "@/shared/commit-list"
 import { EmptyState } from "@/shared/empty-state"
 import { PageHeader } from "@/shared/page-header"
@@ -11,8 +14,6 @@ import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { dashboardQuery } from "./api"
-
-export const dashboardRoute = createLazyRoute("/")({ component: Dashboard })
 
 function Health({ counts }: { counts: Schemas["FreshnessCounts"] }) {
   const parts = [
@@ -31,8 +32,9 @@ function Health({ counts }: { counts: Schemas["FreshnessCounts"] }) {
   )
 }
 
-function Dashboard() {
-  const { data, error } = useQuery(dashboardQuery)
+/** DashboardView is the dashboard: groups, health and the latest commits. */
+export function DashboardView() {
+  const { data, error } = useQuery(dashboardQuery(api))
   return (
     <>
       <PageHeader title="Dashboard">{data && <Health counts={data.freshness} />}</PageHeader>
@@ -54,7 +56,7 @@ function Dashboard() {
                     <Card className="h-full">
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-semibold">
-                          <Link to="/groups/$group" params={{ group: g.id }} className="hover:underline">
+                          <Link href={groupPath(g.id)} className="hover:underline">
                             {g.name}
                           </Link>
                         </h3>
@@ -79,7 +81,7 @@ function Dashboard() {
             <Card aria-labelledby="latest">
               <div className="flex items-baseline justify-between">
                 <CardTitle id="latest">Latest commits</CardTitle>
-                <Link to="/commits" className="text-sm hover:underline">
+                <Link href="/commits" className="text-sm hover:underline">
                   All commits
                 </Link>
               </div>

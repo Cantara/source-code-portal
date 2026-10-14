@@ -145,7 +145,7 @@ func TestLoad1000(t *testing.T) {
 	pages := []string{"/api/v1/dashboard", "/api/v1/groups", "/api/v1/groups/g3", "/api/v1/repos", "/api/v1/repos?group=g5",
 		"/api/v1/repos/acme/g3-svc-003", "/api/v1/repos/acme/g3-svc-003/docs", "/api/v1/commits?limit=200",
 		"/api/v1/commits?group=g7&limit=50", "/api/v1/snapshot", "/badges/repos/acme/g4-svc-004/last-commit.svg",
-		"/badges/groups/all/repos.svg", "/llms.txt", "/llms-full.txt", "/repos/acme/g0-svc-010/readme.md", "/repos/acme/g1-svc-001"}
+		"/badges/groups/all/repos.svg", "/llms.txt", "/llms-full.txt", "/repos/acme/g0-svc-010/readme.md"}
 	var mu gosync.Mutex
 	took := map[string][]time.Duration{}
 	var wg gosync.WaitGroup

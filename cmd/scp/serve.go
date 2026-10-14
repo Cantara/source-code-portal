@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"net/url"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -30,7 +33,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
 	"github.com/cantara/source-code-portal/internal/webhook"
-	"github.com/cantara/source-code-portal/web"
+	"github.com/cantara/source-code-portal/internal/webui"
 )
 
 const (
@@ -88,6 +91,7 @@ type server struct {
 	pub               *snapshot.Publisher
 	engine            *sync.Engine
 	member            *cluster.Member // nil when the instance is alone
+	web               *webui.Server   // nil without web.dir
 	stopping          atomic.Bool
 	public, admin     *http.Server
 	publicLn, adminLn net.Listener
@@ -102,10 +106,6 @@ type deps struct {
 
 // newServer opens the store, wires the features and binds both listeners.
 func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger) (_ *server, err error) {
-	spa, err := web.FS()
-	if err != nil {
-		return nil, err
-	}
 	gh, err := github.New(cfg.GitHub, d.github, log)
 	if err != nil {
 		return nil, err
@@ -169,7 +169,16 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	m := newMetrics(g)
 	gh.Observe(m.githubResponse)
 	s.engine.Observe(m.job)
-	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
+	var upstream *url.URL
+	if cfg.Web.Dir != "" {
+		if s.web, err = webui.New(cfg.Web.Dir, cfg.Web.Node, log); err != nil {
+			return nil, err
+		}
+		upstream = s.web.URL()
+	}
+	ready := func() bool {
+		return !s.stopping.Load() && s.pub.Current().Catalogued && (s.web == nil || s.web.Ready())
+	}
 	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		webhook: cfg.Webhook.Secret.IsSet(), deliveries: map[string]int{}}
 	if s.member != nil {
@@ -197,13 +206,14 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
 	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
-	opts := httpapi.Options{Log: log, Build: build, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies,
+	opts := httpapi.Options{Log: log, Build: build, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
+		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
 			Vary: private},
 		Observe: m.request}
 	features := api{catalog.API{Current: view}, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		httpapi.SnapshotAPI{Current: view}}
-	s.public = httpapi.Server(httpapi.Public(opts, spa, contract.OpenAPI, features, routes...), log)
+	s.public = httpapi.Server(httpapi.Public(opts, opts.Pages(upstream), contract.OpenAPI, features, routes...), log)
 	s.public.RegisterOnShutdown(events.Close)
 	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
 	if cfg.Ops.Pprof {
@@ -223,6 +233,22 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return nil, err
 	}
 	return s, nil
+}
+
+// newToken is the secret of this process the web UI server shows on its API calls (httpapi.Options.WebToken).
+func newToken() string {
+	var b [32]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}
+
+// loopback is the address the web UI server reaches the public listener at: its own IP, or loopback when it listens on all.
+func loopback(addr net.Addr) string {
+	host, port, _ := net.SplitHostPort(addr.String())
+	if ip := net.ParseIP(host); ip == nil || ip.IsUnspecified() {
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 // deliver hands a webhook event to the engine of every instance (through the cluster when there is one, else or when it fails to
@@ -263,8 +289,8 @@ func webhookSink(deliver func(sync.Event, snapshot.RepoKey, string), sources []c
 	}
 }
 
-// run serves until ctx is cancelled, then shuts down within the grace period: readiness drops, the servers drain, the instance leaves
-// the cluster (another takes the lead), the engine stops (jobs in flight are cancelled and run again after a restart), pending
+// run serves until ctx is cancelled, then shuts down within the grace period: readiness drops, the servers drain, the web UI server
+// stops, the instance leaves the cluster (another takes the lead), the engine stops (jobs in flight are cancelled and run again after a restart), pending
 // snapshot updates are dropped and the store closes.
 func (s *server) run(ctx context.Context) error {
 	engineCtx, stopEngine := context.WithCancel(context.WithoutCancel(ctx))
@@ -286,6 +312,14 @@ func (s *server) run(ctx context.Context) error {
 	}{{"public", s.public, s.publicLn}, {"admin", s.admin, s.adminLn}} {
 		s.log.Info("listening", "listener", p.name, "addr", p.ln.Addr().String())
 		go func() { errc <- p.srv.Serve(p.ln) }()
+	}
+
+	webCtx, stopWeb := context.WithCancel(context.WithoutCancel(ctx))
+	webDone := make(chan error, 1)
+	if s.web != nil {
+		go func() { webDone <- s.web.Run(webCtx, loopback(s.publicLn.Addr())) }()
+	} else {
+		webDone <- nil
 	}
 
 	var serveErr error
@@ -310,6 +344,8 @@ func (s *server) run(ctx context.Context) error {
 			err = errors.Join(err, e)
 		}
 	}
+	stopWeb()
+	err = errors.Join(err, <-webDone)
 	stopMember()
 	err = errors.Join(err, <-memberDone)
 	stopEngine()

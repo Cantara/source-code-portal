@@ -1,128 +1,132 @@
 # Web UI
-Status: v1 design note, 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+Status: v1 design note (M11), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
 This note fixes the technical frame of the UI and, with the route table below, its page composition.
 
 ## Scope (v1)
-A read-only React SPA for the pages of plan.md section 2: dashboard, group, repository (README), docs viewer, commit logs (all, group,
-repository) and a 404 page. It reads only `/api/v1`, shows freshness everywhere and is embedded in the Go binary.
+A read-only web UI rendered on the server with Next.js (owner decision P-13) for the pages of plan.md section 2: dashboard, group,
+repository (README), docs viewer, commit logs (all, group, repository) and a 404 page. Every page arrives as complete HTML, readable
+without JavaScript, with its own title, description and canonical URL; `/sitemap.xml` and `/robots.txt` list the pages. After load the
+page is the same React application as before: it reads only `/api/v1`, shows freshness everywhere and follows `/api/v1/events`.
 
 ## Decisions (bullets with one-line reasons)
-- Stack as plan.md: React 19, TypeScript, Vite, Tailwind 4, TanStack Router + Query, Vitest, Playwright, pnpm. The few components
-  (button, card, badge, alert) are written in `components/ui/` in the shadcn style on the same tokens: plain elements, no runtime styles.
-- Code-based TanStack Router tree in `src/app/router.tsx`, each page lazy: typed links and params straight from code.
-- Client: `openapi-typescript` generates `web/src/lib/api/schema.d.ts` from `api/openapi.yaml` (committed, drift-checked);
-  `openapi-fetch` is the thin typed fetch wrapper; one `unwrap()` turns every failure into a `ProblemError`: every request is typed.
-- Features never import features (mirror of the Go rule); they share through `shared/`, `lib/` and typed `<Link>`s. One ESLint
-  `no-restricted-imports` rule enforces it.
-- Freshness through one hook: the event stream `GET /api/v1/events`, and polling `GET /api/v1/snapshot` every 30 s while it is not open.
-- One component, `shared/safe-html.tsx`, renders server-sanitised HTML: the server's sanitiser is the single source of safe markup.
-- Commit authors are initials on a deterministic colour: every request stays on the portal's origin.
-- Static CSP set by the server; scripts and styles are external files: the shell is a cacheable static file.
-- English strings in code; dates and numbers through `Intl`, all times shown relative with the exact UTC instant in `<time>`.
-- TanStack Query holds server state and the URL holds view state: two places, both inspectable.
+- Stack: Next.js 16 (App Router, `output: "standalone"`), React 19, TypeScript, Tailwind 4 (PostCSS), TanStack Query, Vitest,
+  Playwright, pnpm. The few components (button, card, badge, alert) are written in `components/ui/` in the shadcn style: plain elements.
+- Go stays the one public entry point. `scp serve` runs the Next.js server as a child process (`node server.js` from `web.dir`) on a
+  loopback port and proxies every page path to it; API, badges, images, llms, Markdown and the webhook stay in Go. One port, one
+  process to deploy, one place for headers, access and logs.
+- The viewer travels with the page: Go adds `X-Scp-Token` (random per process) and `X-Scp-Viewer` (`private` or `public`) to the
+  proxied request, the Next.js server sends both on its API calls, and Go believes `X-Scp-Viewer` only with the matching token (constant
+  time). A private viewer's page is rendered from the full snapshot, a public viewer's from the public view; the browser never sees the token.
+- The Next.js server reaches the API at `SCP_API` (the public listener on loopback, set by Go) and sends the page's `X-Request-Id`, so
+  one request id follows a page through every API call.
+- Server pages load their queries with the same `queryOptions` factories as the browser into a per-request `QueryClient` and hand them
+  over with `HydrationBoundary`; the views are client components that read those queries. One data path, no second set of components.
+- Query factories take the API client as their first argument: `serverApi()` (per request, `server-only`) on the server, `api` (the
+  browser's) in client components. Query keys do not include the client, so server data hydrates the browser's cache.
+- A page's main query decides the status: a 404 problem calls `notFound()` (Next.js answers 404 with the not-found page), a renamed
+  repository calls `permanentRedirect` (308); other failures render the page without data and the browser retries.
+- Metadata through `generateMetadata` on the same per-request loader (`React.cache`): title `"<page> · Source Code Portal"`,
+  description from the descriptor or repository description, canonical from the origin Go sends (`X-Scp-Origin`: `server.public_url`,
+  else the request's scheme and host). Robots: index everything public; a private viewer's pages carry `noindex`.
+- Nonce CSP: Go makes a nonce per page request, sets the page CSP on the response and on the proxied request (Next.js reads its nonce
+  from that header and puts it on every script it emits). Components use classes only, so `style-src` needs no `'unsafe-inline'`.
+- Every page is dynamic (it reads request headers); the `/_next/static` files are immutable. Next.js compresses its responses; Go's
+  gzip leaves a response with a `Content-Encoding` alone.
+- Typed client: `openapi-typescript` generates `web/src/lib/api/schema.d.ts` from `api/openapi.yaml` (committed, drift-checked);
+  `openapi-fetch` wraps fetch; one `unwrap()` turns every failure into a `ProblemError`.
+- Features never import features (mirror of the Go rule); they share through `shared/`, `lib/` and `lib/paths.ts`. ESLint enforces it;
+  `src/app` (the Next.js routes) composes features.
+- One component, `shared/safe-html.tsx`, renders server-sanitised HTML.
+- Development: `next dev` on 127.0.0.1:3000 rewrites `/api`, `/badges`, `/images`, `/llms*.txt` and the `.md` addresses to `SCP_API`
+  (default `http://127.0.0.1:9090`, a running `scp serve`): hot reload without Go in front.
 
 ## Structure and routes
 ```
 web/
-  package.json pnpm-lock.yaml                      exact pins, frozen lockfile in CI; Renovate waits 7 days for a release
-  index.html vite.config.ts playwright.config.ts tsconfig.json eslint.config.js
-  web.go embed_spa.go embed_placeholder.go placeholder/index.html     go:embed (Build and embed)
-  public/theme-init.js favicon.svg                  copied verbatim to dist/
-  scripts/budget.ts
-  e2e/global-setup.ts fixtures.ts smoke.spec.ts       against cmd/scp/e2e_test.go (fake GitHub plus the server)
+  package.json pnpm-lock.yaml next.config.ts postcss.config.mjs tsconfig.json eslint.config.js vitest.config.ts playwright.config.ts
+  public/theme-init.js favicon.svg
+  scripts/bundle.ts                                  assembles web/bundle (standalone server, static files, public/) and checks the budget
+  e2e/global-setup.ts fixtures.ts smoke.spec.ts live.spec.ts seo.spec.ts   against cmd/scp/e2e_test.go (fake GitHub, Go, the Next.js child)
   src/
-    main.tsx                                        createRoot, providers, stale-chunk reload handler
-    app/       root.tsx (shell: skip link, header, nav, theme select, status banners, <main>), router.tsx, app.tsx, not-found.tsx
-    features/  dashboard/ groups/ repos/ commits/ docs/ status/      each: route.tsx, api.ts, components, *.test.tsx
+    app/       layout.tsx (html, head, shell), providers.tsx (client: QueryClient, snapshot sync, focus), shell.tsx, not-found.tsx,
+               error.tsx, sitemap.ts, robots.ts, and one page.tsx per route below
+    features/  dashboard/ groups/ repos/ commits/ docs/ status/      each: api.ts (query factories), view.tsx (client), *.test.tsx
     components/ui/                                  button card badge alert
     shared/    safe-html freshness-badge relative-time page-header problem-alert empty-state initials-avatar panel-boundary commit-list
-    lib/       api/{schema.d.ts,client.ts,snapshot.ts}  query.ts connection.ts clock.ts theme.ts format.ts build.ts docs.ts cn.ts
-    styles/    index.css (tokens, light and dark)  docs.css (prose and Chroma classes for both themes)
-    test/      setup.ts server.ts (MSW, unmocked request fails the test)
+    lib/       api/{schema.d.ts,client.ts,server.ts,snapshot.ts}  query.ts load.ts paths.ts connection.ts clock.ts theme.ts format.ts build.ts docs.ts cn.ts
+    styles/    index.css (tokens, light and dark)  docs.css (prose and Chroma classes for both themes)  chroma.css (generated)
+    test/      setup.ts server.ts (MSW, unmocked request fails the test) navigation.ts (next/navigation for tests)
 ```
-`api.ts` holds the feature's `queryOptions` factories and is the only place that knows endpoint paths (the snapshot query is in
-`lib/api/snapshot.ts`, shared by the shell and the commit log). `status/` owns the shell's snapshot sync hook and the banners; it has no
-route. Each route's loader (in `router.tsx`) loads the page's main query so a 404 problem shows the not-found page; the page itself is a
-lazy chunk.
-
 | Path | Feature | Shows |
 |---|---|---|
 | `/` | dashboard | groups as cards (count badge, freshness), latest commits across the org |
 | `/groups/{group}` | groups | group header, repository table (filter by name, sort), latest commits |
 | `/groups/{group}/commits` | commits | commit log scoped to the group |
-| `/repos/{owner}/{name}` | repos | descriptor (title, owners, lifecycle, tags, links), badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
+| `/repos/{owner}/{name}` | repos | descriptor, badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
 | `/repos/{owner}/{name}/commits` | commits | commit log of the default branch |
 | `/repos/{owner}/{name}/docs/{path}` | docs | rendered doc with a file list and heading outline; `{path}` is the repository path without its extension |
 | `/commits` | commits | commit log across all repositories, filter by group or repository |
+| `/sitemap.xml`, `/robots.txt` | app | the dashboard, the commit log, every group and repository of the viewer's view, absolute |
 | anything else | app | 404 page (also for an unknown group or repository from a 404 problem) |
 
-The server's SPA shapes (http-api.md Routes) equal this table; a Vitest test pins the route tree and the Playwright smoke pins the server.
 A document's own leading `h1` is dropped on the page, whose `h1` already names it.
 
 ## Behaviour (numbered)
 1. Queries: `staleTime` 10 s, `gcTime` 5 min, retry network/429/5xx at most twice (honour `Retry-After`), refetch on window focus,
-   previous data kept on error. ETag revalidation is the browser's (API answers `no-cache` + ETag).
-2. Snapshot sync: one `useSnapshotSync()` in the shell opens an `EventSource` on `/api/v1/events`; each `snapshot` event replaces the
-   snapshot query's data. While the stream is not open it polls `GET /api/v1/snapshot` every 30 s while the tab is visible (304 when
-   unchanged). A different `version` (compared for equality) invalidates every other query; active ones refetch. Readiness `warming`
-   shows a banner.
-3. Commit logs page with "Load more" (cursor, 50 rows) on `GET /api/v1/commits` with the page's `group` or `repo` filter. When more than
-   one page is loaded a snapshot change leaves the log as it is; a "New commits" button refetches and moves focus to the first row.
-4. Freshness: every view shows a `FreshnessBadge` from the response's `freshness` (`fresh` "Up to date", `stale` "Delayed", `error`
-   "Update failing", unknown value "Unknown"): icon plus text. Ages re-render on one 30 s ticker, paused while hidden.
-5. Failure is data on the client too: a failed refetch keeps the data on screen; one polite `ConnectionBanner` says "Cannot refresh right
-   now. Showing the last data that loaded." after network, 429 or 5xx failures and clears on the next success.
-6. Problems (`application/problem+json`): `ProblemAlert` titles come from `code` (`not-found`, `not-ready`, `queue-full`, `internal`,
-   default "Unexpected problem") and always show the request id. Each independent panel has its own error boundary, so one failing
-   panel leaves the page standing; a root boundary catches the rest.
-7. Deploy skew: `X-SCP-Build` on any API response differing from the compiled `BUILD_ID` shows "A new version is available" with Reload;
-   a missing lazy chunk (`vite:preloadError`) reloads once, guarded against loops.
-8. `SafeHtml` takes the API field `html` and sets it with `dangerouslySetInnerHTML`, memoised on the string so a refetch with equal
-   content keeps scroll and DOM. Lint allows `dangerouslySetInnerHTML` in this component only. The docs HTML carries classes (Chroma)
-   and no inline styles; images load from the portal's image proxy.
-9. Theme: `system | light | dark` in `localStorage` key `scp-theme`. The blocking external `/theme-init.js` in `<head>` sets the `dark`
-   class and `colorScheme` before first paint; `<meta name="color-scheme" content="light dark">`. `lib/theme.ts` resolves the same
-   way; a unit test runs the script for every stored value and compares. Blocked storage falls back to `system`.
-10. CSP: the shell policy of http-api.md behaviour 3 (`img-src 'self'`, everything else `'self'` or `'none'`). Components use classes
-    only; avatar colours come from a fixed palette of classes.
-11. Accessibility (WCAG 2.2 AA): skip link to `#main`, landmarks, one `h1` per page, focus to `h1` and title announced after client
-    navigation, visible focus ring (token contrast >= 3:1, text >= 4.5:1 in both themes), targets >= 24 px, real `<table>`s with keyboard
-    sortable headers, reflow at 320 px, `prefers-reduced-motion` honoured, `<noscript>` pointing to `/llms.txt` and the OpenAPI document.
-12. URLs are state: filters and sort live in search params, so every view is shareable; repositories are `{owner}/{name}`, doc paths a
-    splat encoded per segment.
+   previous data kept on error.
+2. Snapshot sync: one `useSnapshotSync()` in the providers opens an `EventSource` on `/api/v1/events`; each `snapshot` event replaces
+   the snapshot query's data. While the stream is not open it polls `GET /api/v1/snapshot` every 30 s while the tab is visible. A
+   different `version` (equality) invalidates every other query; active ones refetch. Readiness `warming` shows a banner.
+3. Commit logs page with "Load more" (cursor, 50 rows); the server renders the first page. With more than one page loaded a snapshot
+   change leaves the log as it is; a "New commits" button refetches and moves focus to the first row.
+4. Freshness: every view shows a `FreshnessBadge` (icon plus text). Relative ages re-render on one 30 s ticker, paused while hidden; the
+   server renders them against its clock and `<time>` suppresses the hydration difference.
+5. Failure is data: a failed refetch keeps the data on screen; one polite banner says "Cannot refresh right now. Showing the last data
+   that loaded." after network, 429 or 5xx failures and clears on the next success.
+6. Problems: `ProblemAlert` titles come from `code` and always show the request id. Each independent panel has its own error boundary;
+   `error.tsx` catches the rest.
+7. Deploy skew: `X-SCP-Build` on an API response differing from the bundle's build id shows "A new version is available" with Reload;
+   Next.js's `deploymentId` (the build id) makes a navigation across a deployment a full load.
+8. `SafeHtml` sets the API field `html` with `dangerouslySetInnerHTML`, memoised on the string. Lint allows it in this component only.
+9. Theme: `system | light | dark` in `localStorage` key `scp-theme`. The blocking `/theme-init.js` in `<head>` sets the `dark` class
+   and `colorScheme` before first paint (`<html suppressHydrationWarning>`); `lib/theme.ts` resolves the same way.
+10. CSP (Go sets it): `default-src 'none'; script-src 'self' 'nonce-<n>'; style-src 'self' 'nonce-<n>'; img-src 'self';
+    font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none';
+    object-src 'none'`, plus the `Permissions-Policy` of http-api.md.
+11. Accessibility (WCAG 2.2 AA): skip link to `#main`, landmarks, one `h1` per page, focus to `h1` after a client navigation (Next.js
+    announces the title), visible focus ring, targets >= 24 px, real `<table>`s with keyboard sortable headers, reflow at 320 px,
+    `prefers-reduced-motion` honoured.
+12. URLs are state: filters and sort live in search params (the server renders them too); repositories are `{owner}/{name}`, doc paths
+    a catch-all encoded per segment (`lib/paths.ts`).
 
-## Build and embed
-- `pnpm build`: `vite build` (assets `assets/<name>-<8 hex>.<ext>`, no source maps, `assetsInlineLimit: 0` so every asset is a file, system
-  font stack), then `budget.ts` (fails the build).
-- Budget (gzip, cold load): initial JS <= 200 KB, initial CSS <= 25 KB, any lazy route chunk <= 60 KB, fonts 0. The report names the offender.
-- `BUILD_ID` (git SHA, `dev` locally) goes to Vite's `define` and to `go build -ldflags -X main.build=...`.
-- `web/embed_spa.go` (`//go:build spa`, `//go:embed all:dist`); `web/embed_placeholder.go` (`!spa`, `//go:embed placeholder`) so
-  `go test ./...` runs with Go alone. `make build` = `pnpm -C web build` then `CGO_ENABLED=0 go build -tags spa`.
-- Serving (`httpapi`): GET/HEAD; `assets/*` `public, max-age=31536000, immutable`; `index.html`, `theme-init.js`, `favicon.svg`
-  `no-cache` + ETag from the build id; gzip on the fly (http-api.md); `X-SCP-Build` on every response. `index.html` answers 200
-  for the SPA shapes above and 404 for other extensionless paths outside the reserved prefixes (http-api.md Routes); a missing file with an
-  extension is a plain 404.
-- Dev: `make dev` runs `scp serve` on :9090 (against a test org or the fake GitHub) and Vite on 127.0.0.1:5173, which proxies `/api`,
-  `/badges`, `/llms.txt` and `^/(repos|groups)/.+\.(md|txt)$` to `SCP_DEV_API` (default `http://127.0.0.1:9090`). The e2e job enforces
-  the CSP. `make gen` regenerates `schema.d.ts` and `styles/chroma.css`; CI fails on drift. `make e2e` runs Playwright.
+## Build and serve
+- `pnpm build`: `next build` with `NEXT_PUBLIC_BUILD_ID` (git SHA, `dev` locally) as `deploymentId`, then `scripts/bundle.ts`: copies
+  `.next/standalone`, `.next/static` and `public/` into `web/bundle` and fails when the gzip JS under `/_next/static` exceeds 300 KB,
+  the CSS 25 KB, or any font is present. `web/bundle` is platform-independent JavaScript (`sharp` is not traced).
+- `web.dir` (the bundle directory) and `web.node` (default `node`): `scp serve` starts `node server.js` with `PORT` (a free loopback
+  port), `HOSTNAME=127.0.0.1`, `NODE_ENV=production`, `SCP_API` and nothing else from its environment; output goes to the log
+  (`component=web`). It restarts the child after an exit (1 s doubling to 30 s), stops it at shutdown after the listeners drained,
+  and `/readyz` waits for the child's first answer. Without `web.dir` page paths answer 503 with a short text naming `/llms.txt` and
+  the API.
+- Proxy (`httpapi.Pages`): `httputil.ReverseProxy` to the child; it sets the CSP and `Permissions-Policy`, the `X-Scp-*` headers and
+  `X-Forwarded-*`, removes the identity headers, keeps the response's caching headers; an unreachable child answers 503 with
+  `Retry-After: 5`.
+- Release: `scp-web_<version>.tar.gz` (the bundle) beside the binaries, in the signed checksums; the image is
+  `distroless/nodejs24-debian13` with `/scp`, the bundle in `/web`, `SCP_WEB_DIR=/web` and `SCP_WEB_NODE=/nodejs/bin/node`.
 
 ## Tests
-- Vitest + Testing Library (jsdom) + MSW typed from `paths` (`openapi-msw`), any unmocked request fails: components, hooks, `unwrap`,
-  freshness labels, snapshot invalidation on a version change, load-more and "New commits", theme script parity, ProblemAlert mapping.
-  Fake timers throughout.
-- Playwright smoke against the real `-tags spa` binary with the fake GitHub, desktop 1280x800 and phone 360x740: every route renders its
-  `h1`; unknown path answers 404 with the shell; asset cache headers and compression; a dark-mode reload paints dark from the first frame.
-- An auto fixture fails any test on a `securitypolicyviolation` event, `pageerror` or unexpected `console.error`: the CSP check, which
-  also catches a component upgrade that starts injecting `<style>`.
+- Vitest + Testing Library (jsdom) + MSW typed from `paths`, any unmocked request fails: the views with a test `next/navigation`,
+  hooks, `unwrap`, freshness labels, snapshot invalidation, load-more and "New commits", theme script parity, ProblemAlert mapping.
+- Go: `httpapi.Pages` against a loopback upstream (headers, token, nonce in request and response CSP, 503); the token admits a
+  private viewer only with the right value; `webui` starts a fake child (a Go test binary acting as `node`), restarts it, stops it.
+- Playwright against `cmd/scp/e2e_test.go` (the real binary path: Go supervising the built bundle) at 1280x800 and 360x740: every
+  route renders its `h1`; with JavaScript disabled every page shows its content, title, description and canonical; the sitemap lists
+  the pages; unknown paths and repositories answer 404; dark mode paints dark from the first frame; static files are immutable.
+- An auto fixture fails any test on a `securitypolicyviolation`, `pageerror` or unexpected `console.error` (the CSP and hydration check).
 - axe (`@axe-core/playwright`, tags up to `wcag22aa`) on every route in both themes: zero violations.
-- CI `web` job: frozen install, gen drift, typecheck, lint, Vitest, build with budget; `e2e` job: binary build plus Playwright. Both required.
+- CI `web` job: frozen install, gen drift, typecheck, lint, Vitest, build with budget; `e2e` job: build plus Playwright. Both required.
 
 ## Reference (archive pointers)
 - `../reference/detailed-design/20-design/17-web-foundation.md` 4.3 (client, `unwrap`), 4.4 (query defaults, polling, skew), 4.5-4.8
-  (freshness, errors, theme, accessibility), 4.11 (budgets), 4.14 (dev proxy), 7.2 (dist contract).
+  (freshness, errors, theme, accessibility), 4.11 (budgets).
 - `../reference/detailed-design/20-design/18-web-pages.md` 4.2-4.6 (page layouts and state matrices), 4.1.10 (load more), 4.14 (404, empty states).
-- `../reference/detailed-design/11-adr/ADR-010-*` (embedding, fallback, CSP), `ADR-019-*`.
-- `../reference/detailed-design/10-architecture.md` section 12 (structure, data, budgets, build loop).
-- `../reference/detailed-design/50-repo-seed/repo/web/`: `vite.config.ts` (build options, proxy), `pnpm-workspace.yaml`,
-  `public/theme-init.js`, `embed_*.go` + `placeholder/`, `e2e/fixtures.ts` (CSP gate), `scripts/budget.ts`,
-  `src/lib/stale-chunk.ts`, `src/test/`, and the pins of `package.json` for the stack above.

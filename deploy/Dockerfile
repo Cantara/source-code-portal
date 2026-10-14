@@ -1,4 +1,4 @@
-# Source Code Portal image: node (web UI) -> golang (static binary) -> distroless static, non-root.
+# Source Code Portal image: node (web bundle) -> golang (static binary) -> distroless Node.js, non-root.
 # Base images are pinned by tag and digest; Renovate updates both.
 #   docker build -f deploy/Dockerfile --build-arg VERSION=2.0.0 --build-arg BUILD_ID=$(git rev-parse HEAD) -t scp:dev .
 
@@ -18,15 +18,14 @@ ENV GOFLAGS=-mod=readonly CGO_ENABLED=0 GOTOOLCHAIN=local
 COPY go.mod go.sum ./
 RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod go mod download && go mod verify
 COPY . .
-COPY --from=web /src/web/dist ./web/dist
 ARG BUILD_ID=dev
 ARG VERSION=dev
 RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod --mount=type=cache,id=go-build,target=/root/.cache/go-build \
-    go build -tags spa -trimpath -buildvcs=false -ldflags "-s -w -X main.version=${VERSION} -X main.build=${BUILD_ID}" -o /out/scp ./cmd/scp \
+    go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=${VERSION} -X main.build=${BUILD_ID}" -o /out/scp ./cmd/scp \
  && /out/scp version
 
-# static-debian13 carries CA certificates and nothing else.
-FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
+# nodejs24-debian13 carries CA certificates and Node.js for the web server scp supervises.
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e
 ARG BUILD_ID=dev
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="Source Code Portal" \
@@ -35,7 +34,9 @@ LABEL org.opencontainers.image.title="Source Code Portal" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${BUILD_ID}"
-COPY --from=go --chown=65532:65532 /out/scp /scp
+COPY --from=go /out/scp /scp
+COPY --from=web /src/web/bundle /web
+ENV SCP_WEB_DIR=/web SCP_WEB_NODE=/nodejs/bin/node
 # /data is the one writable path (the SQLite file). distroless has no shell, so the directory is created by copying a file into it.
 COPY --chown=65532:65532 <<EOF /data/.keep
 EOF

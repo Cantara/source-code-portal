@@ -1,8 +1,8 @@
 # Source Code Portal
 
 An organisational dashboard for GitHub: repositories grouped into systems, with their latest commits, rendered README and docs, status
-badges and an API that scripts and LLM agents can read. One static Go binary with the web UI embedded, kept fresh by webhooks and
-scheduled sync.
+badges and an API that scripts and LLM agents can read. One static Go binary that serves the API and runs the server-rendered web UI
+(Next.js on Node.js), kept fresh by webhooks and scheduled sync.
 
 Documentation: [operator guide](docs/operator-guide.md), [repository guide](docs/repository-guide.md), [API guide](docs/api.md).
 
@@ -11,15 +11,15 @@ docker run --rm -p 9090:9090 -v scp-data:/data -v "$PWD/scp.yaml:/etc/scp/scp.ya
   ghcr.io/cantara/source-code-portal:2.0.0 serve --config /etc/scp/scp.yaml
 ```
 
-Binaries for Linux (amd64, arm64) and macOS (arm64) are on the [releases page](https://github.com/Cantara/source-code-portal/releases).
+Binaries for Linux (amd64, arm64) and macOS (arm64) and the web UI bundle are on the [releases page](https://github.com/Cantara/source-code-portal/releases).
 
 ## Build from source
 
 ```sh
-make build                     # web UI and bin/scp (needs Go 1.27, Node 24, pnpm 12)
+make build web                 # bin/scp and the web UI in web/bundle (needs Go 1.27, Node 24, pnpm 12)
 cp deploy/config.example.yaml scp.yaml   # then set your organisations and the App key or token file
 bin/scp config check -c scp.yaml
-bin/scp serve -c scp.yaml      # public :9090 (UI, /api/v1, /badges, /webhooks/github), admin :9091 (/livez, /readyz)
+SCP_WEB_DIR=web/bundle bin/scp serve -c scp.yaml   # public :9090 (UI, /api/v1, /badges, /webhooks/github), admin :9091 (/livez, /readyz)
 make image                     # container image scp:dev
 ```
 
@@ -32,7 +32,7 @@ updates within seconds; without it the portal still refreshes on its schedule.
 
 ```sh
 make check                     # the gate: generated code, tidy modules, lint, tests, Playwright
-make dev                       # Go server (scp.yaml) on :9090 and the web UI with hot reload on :5173
+make dev                       # Go server (scp.yaml) on :9090 and the web UI with hot reload on :3000
 go test -race ./internal/config/
 ```
 

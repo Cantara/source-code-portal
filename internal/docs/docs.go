@@ -2,6 +2,8 @@
 // contents, and serves them.
 package docs
 
+//go:generate go run ./chromacss ../../web/src/styles/chroma.css
+
 import (
 	"bytes"
 	"cmp"
