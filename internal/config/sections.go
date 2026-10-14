@@ -56,6 +56,15 @@ type Catalog struct {
 	Groups            []Group       `mapstructure:"groups"`
 }
 
+// Webhook configures the GitHub webhook receiver; it is served when SecretFile is set. PreviousSecretFile is accepted too while the
+// secret is rotated.
+type Webhook struct {
+	SecretFile         string `mapstructure:"secret_file"`
+	PreviousSecretFile string `mapstructure:"previous_secret_file"`
+	Secret             Secret `mapstructure:"-"`
+	PreviousSecret     Secret `mapstructure:"-"`
+}
+
 // Group is a configured group of repositories. Matchers are compiled and checked by the catalog.
 type Group struct {
 	ID          string   `mapstructure:"id"`
@@ -228,6 +237,12 @@ func (c *Config) readSecrets() []string {
 		if s.App != nil && s.App.PrivateKeyFile != "" {
 			read(at+".app.private_key_file", s.App.PrivateKeyFile, &s.App.PrivateKey)
 		}
+	}
+	if c.Webhook.SecretFile != "" {
+		read("webhook.secret_file", c.Webhook.SecretFile, &c.Webhook.Secret)
+	}
+	if c.Webhook.PreviousSecretFile != "" {
+		read("webhook.previous_secret_file", c.Webhook.PreviousSecretFile, &c.Webhook.PreviousSecret)
 	}
 	slices.Sort(p)
 	return p

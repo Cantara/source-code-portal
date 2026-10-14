@@ -21,6 +21,8 @@ type lister struct {
 	files map[string]string // path -> content, for the descriptor job
 }
 
+func (l *lister) RefreshInstallations(context.Context) error { return nil }
+
 func (l *lister) Tree(_ context.Context, _, _, ref string, _ bool) ([]github.TreeEntry, error) {
 	var out []github.TreeEntry
 	dirs := map[string]bool{}

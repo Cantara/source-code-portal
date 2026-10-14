@@ -108,6 +108,8 @@ func TestRefused(t *testing.T) {
 		"unknown matcher":        {file: group("[{suffix: a}]"), want: "suffix"},
 		"bare matcher":           {file: group("[prefix]"), want: "match"},
 		"bad group id":           {file: "catalog:\n  groups:\n    - {id: Core, name: Core, default_repo: x, match: [{catch_all: true}]}\n", want: "must match"},
+		"previous secret alone":  {file: "webhook:\n  previous_secret_file: /x\n", want: "needs webhook.secret_file"},
+		"missing secret file":    {file: "webhook:\n  secret_file: /does/not/exist\n", want: "webhook.secret_file"},
 		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {
@@ -147,6 +149,14 @@ func TestMissingFile(t *testing.T) {
 	var inv *Invalid
 	if err == nil || errors.As(err, &inv) {
 		t.Fatalf("err = %v, want a read error", err)
+	}
+}
+
+func TestWebhookSecrets(t *testing.T) {
+	cur, prev := write(t, "cur", "s3cret\n"), write(t, "prev", "old")
+	cfg, _, err := Load(file(t, "webhook:\n  secret_file: "+cur+"\n  previous_secret_file: "+prev+"\n"), nil)
+	if err != nil || string(cfg.Webhook.Secret.Reveal()) != "s3cret" || string(cfg.Webhook.PreviousSecret.Reveal()) != "old" {
+		t.Errorf("webhook = %+v, %v", cfg.Webhook, err)
 	}
 }
 

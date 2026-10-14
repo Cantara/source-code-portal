@@ -433,3 +433,25 @@ func TestWarmStartHonoursAShorterTTL(t *testing.T) {
 		r.stop()
 	})
 }
+
+func TestNotifySource(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := &counter{}
+		r := newRig(t, t.TempDir(), nil, 1, sourceSpec(c, time.Hour))
+		r.run()
+		time.Sleep(time.Second)
+		base := c.n.Load()
+		r.eng.NotifySource(EventPush, "gh") // not an event of the listing
+		r.eng.NotifySource(EventSourceChanged, "other")
+		time.Sleep(time.Second)
+		if c.n.Load() != base {
+			t.Errorf("unrelated events ran the listing")
+		}
+		r.eng.NotifySource(EventSourceChanged, "gh")
+		time.Sleep(time.Second)
+		if c.n.Load() != base+1 {
+			t.Errorf("EventSourceChanged gave %d runs, want 1", c.n.Load()-base)
+		}
+		r.stop()
+	})
+}

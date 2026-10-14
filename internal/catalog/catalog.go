@@ -26,6 +26,7 @@ const schema = 1
 
 // GitHub is what the catalogue reads from one source; *github.Source implements it.
 type GitHub interface {
+	RefreshInstallations(ctx context.Context) error
 	ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error)
 	Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]github.TreeEntry, error)
 	Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
@@ -102,6 +103,10 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	src, ok := c.sources[j.Source]
 	if !ok {
 		return sync.Result{}, fmt.Errorf("catalog: unknown source %s", j.Source)
+	}
+	// App installations come and go (installed, suspended, removed); every listing starts from the current set.
+	if err := src.gh.RefreshInstallations(ctx); err != nil {
+		return sync.Result{}, fmt.Errorf("installations: %w", err)
 	}
 	var listed []snapshot.Repo
 	for _, org := range src.orgs {

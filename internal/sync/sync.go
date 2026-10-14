@@ -191,16 +191,36 @@ func (e *Engine) Notify(ev Event, repo snapshot.RepoKey) {
 		if s.PerSource {
 			key = s.Kind + "/" + r.ID.Source
 		}
-		en := e.entries[key]
-		if en == nil {
+		if en := e.entries[key]; en != nil {
+			en.event(now)
+		}
+	}
+	e.poke()
+}
+
+// event makes the entry due now at event priority; a running job runs once more, a retry keeps its time. Callers hold e.mu.
+func (en *entry) event(now time.Time) {
+	en.prio = PrioEvent
+	switch {
+	case en.running:
+		en.dirty = true
+	case !en.backoff && en.due.After(now):
+		en.due = now
+	}
+}
+
+// NotifySource runs every per-source spec listening for ev for source soon, for events about repositories the engine may not know yet
+// (created, transferred in, installation changes). It never blocks.
+func (e *Engine) NotifySource(ev Event, source string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := time.Now()
+	for _, s := range e.specs {
+		if !s.PerSource || !slices.Contains(s.On, ev) {
 			continue
 		}
-		en.prio = PrioEvent
-		switch {
-		case en.running:
-			en.dirty = true
-		case !en.backoff && en.due.After(now):
-			en.due = now
+		if en := e.entries[s.Kind+"/"+source]; en != nil {
+			en.event(now)
 		}
 	}
 	e.poke()

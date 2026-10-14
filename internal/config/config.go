@@ -23,6 +23,7 @@ type Config struct {
 	Sync    Sync    `mapstructure:"sync"`
 	GitHub  GitHub  `mapstructure:"github"`
 	Catalog Catalog `mapstructure:"catalog"`
+	Webhook Webhook `mapstructure:"webhook"`
 }
 
 // Server configures the two listeners.
@@ -41,14 +42,16 @@ type Log struct {
 // defaults holds every key with its built-in value; it is also the list of keys the environment may set.
 func defaults() map[string]any {
 	return map[string]any{
-		"server.public_addr":         ":9090",
-		"server.admin_addr":          ":9091",
-		"server.shutdown_grace":      "20s",
-		"log.level":                  "info",
-		"log.format":                 "json",
-		"store.path":                 "/data/scp.db",
-		"sync.concurrency":           4,
-		"catalog.reconcile_interval": "5m",
+		"server.public_addr":           ":9090",
+		"server.admin_addr":            ":9091",
+		"server.shutdown_grace":        "20s",
+		"log.level":                    "info",
+		"log.format":                   "json",
+		"store.path":                   "/data/scp.db",
+		"sync.concurrency":             4,
+		"catalog.reconcile_interval":   "5m",
+		"webhook.secret_file":          "",
+		"webhook.previous_secret_file": "",
 	}
 }
 
@@ -163,6 +166,9 @@ func (c Config) validate() []string {
 	}
 	p = append(p, c.GitHub.validate()...)
 	p = append(p, c.Catalog.validate(c.GitHub)...)
+	if c.Webhook.PreviousSecretFile != "" && c.Webhook.SecretFile == "" {
+		p = append(p, "webhook.previous_secret_file: needs webhook.secret_file")
+	}
 	slices.Sort(p)
 	return p
 }

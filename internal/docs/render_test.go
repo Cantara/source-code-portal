@@ -118,7 +118,7 @@ func TestRenderBounds(t *testing.T) {
 	} {
 		start := time.Now()
 		got := r.render("docs/x.md", []byte(tc.src), testLinks("docs"))
-		if d := time.Since(start); d > 3*time.Second || got.Format != tc.format {
+		if d := time.Since(start); d > slowdown*2*time.Second || got.Format != tc.format {
 			t.Errorf("%s: %v, format %s, want %s", name, d, got.Format, tc.format)
 		}
 	}
