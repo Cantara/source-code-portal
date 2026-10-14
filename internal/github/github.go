@@ -53,6 +53,34 @@ func New(cfg config.GitHub, base http.RoundTripper, log *slog.Logger) (*Client, 
 // Source returns the source with id, or nil.
 func (c *Client) Source(id string) *Source { return c.sources[id] }
 
+// Observe sets fn to receive the HTTP status of every GitHub response (304 included). Call it before the first request.
+func (c *Client) Observe(fn func(source string, status int)) {
+	for _, s := range c.sources {
+		s.observe = fn
+	}
+}
+
+// RateRemaining returns, per source, the smallest fraction of the core rate limit left over its credentials (1 when unknown).
+func (c *Client) RateRemaining() map[string]float64 {
+	out := map[string]float64{}
+	for id, s := range c.sources {
+		s.mu.Lock()
+		least := 1.0
+		creds := []*credential{s.token}
+		for _, cr := range s.owners {
+			creds = append(creds, cr)
+		}
+		for _, cr := range creds {
+			if cr != nil {
+				least = min(least, cr.rate.fraction())
+			}
+		}
+		s.mu.Unlock()
+		out[id] = least
+	}
+	return out
+}
+
 // Remaining reports the fraction of the core rate limit left for owner's credential and when it resets. Unknown limits report 1.
 func (c *Client) Remaining(source, owner string) (float64, time.Time) {
 	s := c.sources[source]
@@ -78,6 +106,8 @@ type Source struct {
 	app *ghinstallation.AppsTransport // nil in token mode
 	// appClient lists installations with the App's JWT.
 	appClient *gh.Client
+
+	observe func(source string, status int) // set before the first request
 
 	mu     sync.Mutex
 	token  *credential            // token mode
@@ -116,7 +146,7 @@ func newSource(sc config.Source, base http.RoundTripper, log *slog.Logger) (*Sou
 
 // transport is the chain below authentication: request headers, conditional cache, rate observer, concurrency limit.
 func (s *Source) transport(rate *rateBook) http.RoundTripper {
-	return &scpTransport{base: s.base, cache: s.cache, rate: rate, sem: s.sem}
+	return &scpTransport{base: s.base, cache: s.cache, rate: rate, sem: s.sem, src: s}
 }
 
 func (s *Source) newClient(rt http.RoundTripper, token []byte) (*gh.Client, error) {

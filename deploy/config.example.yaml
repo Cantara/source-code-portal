@@ -5,6 +5,10 @@ server:
   public_addr: ":9090"
   admin_addr: ":9091"
   shutdown_grace: 20s
+  # Absolute base of the public listener: absolute links in /llms.txt and Markdown; https also turns on HSTS.
+  public_url: https://scp.example.org
+  # CIDRs of reverse proxies whose X-Forwarded-For names the client.
+  trusted_proxies: [10.0.0.0/8]
 log:
   level: info
   format: text
@@ -43,3 +47,5 @@ catalog:
 webhook:
   secret_file: /run/secrets/webhook-secret
   # previous_secret_file: /run/secrets/webhook-secret-old
+ops:
+  pprof: false # /debug/pprof/ on the admin listener

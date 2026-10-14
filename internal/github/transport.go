@@ -23,6 +23,7 @@ type scpTransport struct {
 	cache *etagCache
 	rate  *rateBook
 	sem   chan struct{}
+	src   *Source // its observe hook sees every status, 304s included
 }
 
 func (t *scpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -49,6 +50,9 @@ func (t *scpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	t.rate.observe(resp.Header)
+	if t.src.observe != nil {
+		t.src.observe(t.src.id, resp.StatusCode)
+	}
 
 	switch {
 	case resp.StatusCode == http.StatusNotModified && cached != nil:
@@ -155,6 +159,12 @@ func (r *rateBook) observe(h http.Header) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.limit, r.left, r.reset, r.known = limit, remaining, time.Unix(reset, 0), true
+}
+
+// fraction returns the fraction left; 1 when no limit is known or the window has reset.
+func (r *rateBook) fraction() float64 {
+	f, _ := r.remaining()
+	return f
 }
 
 // remaining returns the fraction left and the reset time; 1 when no limit is known or the window has reset.

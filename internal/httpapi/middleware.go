@@ -37,7 +37,8 @@ type Options struct {
 	Log            *slog.Logger
 	HSTS           bool           // the public URL is https
 	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For is believed
-	Metrics        *Metrics       // nil: none recorded
+	// Observe, when set, receives every request: listener, matched pattern ("unmatched" when none), method, status, duration.
+	Observe func(listener, pattern, method string, status int, d time.Duration)
 }
 
 // wrap is the middleware chain, outermost first: request id, recover, access log and metrics, security headers, request deadline,
@@ -80,7 +81,9 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 				status = http.StatusOK
 			}
 			d := time.Since(start)
-			o.Metrics.observeRequest(listener, pattern, r.Method, status, d)
+			if o.Observe != nil {
+				o.Observe(listener, pattern, r.Method, status, d)
+			}
 			o.Log.Info("request", "listener", listener, "pattern", pattern, "method", r.Method, "status", status, "bytes", sw.bytes,
 				"duration_ms", d.Milliseconds(), "request_id", id, "client_ip", o.clientIP(r))
 		}()

@@ -37,6 +37,7 @@ var (
 	deliveryPattern  = regexp.MustCompile(`^[0-9A-Za-z-]{1,64}$`)
 	ownerPattern     = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
 	namePattern      = regexp.MustCompile(`^[A-Za-z0-9._-]{1,100}$`)
+	eventPattern     = regexp.MustCompile(`^[a-z_]{1,40}$`) // event names as metric labels
 )
 
 // Sink receives normalised events. name is empty for events about an owner's set of repositories.
@@ -48,6 +49,7 @@ type Receiver struct {
 	sink    Sink
 	log     *slog.Logger
 	seen    *dedupe
+	observe func(event, result string)
 }
 
 // New returns a receiver verifying with secret, then previous (may be empty).
@@ -56,21 +58,28 @@ func New(secret, previous []byte, sink Sink, log *slog.Logger) *Receiver {
 	if len(previous) > 0 {
 		secrets = append(secrets, previous)
 	}
-	return &Receiver{secrets: secrets, sink: sink, log: log, seen: &dedupe{at: map[string]time.Time{}}}
+	return &Receiver{secrets: secrets, sink: sink, log: log, seen: &dedupe{at: map[string]time.Time{}}, observe: func(string, string) {}}
 }
+
+// Observe sets fn to receive every delivery's event (empty before the signature is verified) and result: accepted, duplicate, ping,
+// ignored, invalid_signature, too_large, malformed or unsupported_media_type.
+func (rc *Receiver) Observe(fn func(event, result string)) { rc.observe = fn }
 
 // ServeHTTP checks size and signature before anything reads the payload.
 func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+		rc.observe("", "unsupported_media_type")
 		httpapi.WriteProblem(w, http.StatusUnsupportedMediaType, "unsupported-media-type", "Deliveries must use content type application/json.")
 		return
 	}
 	sig := r.Header.Get("X-Hub-Signature-256")
 	if !signaturePattern.MatchString(sig) {
+		rc.observe("", "invalid_signature")
 		httpapi.WriteProblem(w, http.StatusUnauthorized, "bad-signature", "The signature is missing or invalid.")
 		return
 	}
 	if r.ContentLength > MaxBody {
+		rc.observe("", "too_large")
 		httpapi.WriteProblem(w, http.StatusRequestEntityTooLarge, "too-large", "The payload is too large.")
 		return
 	}
@@ -79,37 +88,49 @@ func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
+			rc.observe("", "too_large")
 			httpapi.WriteProblem(w, http.StatusRequestEntityTooLarge, "too-large", "The payload is too large.")
 			return
 		}
+		rc.observe("", "malformed")
 		httpapi.WriteProblem(w, http.StatusBadRequest, "bad-body", "The payload could not be read.")
 		return
 	}
 	delivery := r.Header.Get("X-GitHub-Delivery")
 	if !rc.verify(body, sig) {
 		rc.log.Warn("webhook signature mismatch", "delivery", printable(delivery))
+		rc.observe("", "invalid_signature")
 		httpapi.WriteProblem(w, http.StatusUnauthorized, "bad-signature", "The signature is missing or invalid.")
 		return
 	}
 	event := r.Header.Get("X-GitHub-Event")
 	if !deliveryPattern.MatchString(delivery) || event == "" || !json.Valid(body) {
+		rc.observe("", "malformed")
 		httpapi.WriteProblem(w, http.StatusBadRequest, "bad-delivery", "The delivery id, event or payload is invalid.")
 		return
 	}
+	label := event
+	if !eventPattern.MatchString(label) {
+		label = "other"
+	}
 	switch {
 	case event == "ping":
+		rc.observe(label, "ping")
 		accepted(w, "pong", delivery)
 	case !rc.seen.add(delivery, time.Now()):
+		rc.observe(label, "duplicate")
 		accepted(w, "duplicate", delivery)
 	default:
 		n, ok := Normalise(event, body)
 		if !ok {
 			rc.log.Debug("webhook ignored", "delivery", delivery, "event", printable(event))
+			rc.observe(label, "ignored")
 			accepted(w, "ignored", delivery)
 			return
 		}
 		rc.log.Debug("webhook accepted", "delivery", delivery, "event", event, "owner", n.Owner, "name", n.Name)
 		rc.sink(n.Event, n.Owner, n.Name)
+		rc.observe(label, "accepted")
 		accepted(w, "accepted", delivery)
 	}
 }

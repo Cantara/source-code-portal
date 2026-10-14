@@ -83,6 +83,13 @@ func TestReceiver(t *testing.T) {
 func TestDuplicateAndOversize(t *testing.T) {
 	calls := 0
 	rc := New([]byte("s"), nil, func(sync.Event, string, string) { calls++ }, slog.New(slog.DiscardHandler))
+	var observed []string
+	rc.Observe(func(event, result string) { observed = append(observed, event+":"+result) })
+	defer func() {
+		if got := strings.Join(observed, ","); got != "push:accepted,push:duplicate,:too_large,:too_large" {
+			t.Errorf("observed %s", got)
+		}
+	}()
 	for i, want := range []string{"accepted", "duplicate"} {
 		if code, status := deliver(t, rc, "push", "same", sign("s", pushMain), pushMain, nil); code != 202 || status != want {
 			t.Errorf("delivery %d: %d %q, want %s", i, code, status, want)

@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	gosync "sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -120,6 +121,9 @@ type Engine struct {
 	wake  chan struct{}
 	done  chan outcome
 
+	observe func(kind, result string, d time.Duration)
+	beat    atomic.Int64 // unix nanoseconds of the dispatcher's last loop
+
 	mu      gosync.Mutex
 	entries map[string]*entry
 	repos   map[snapshot.RepoKey]store.Repo
@@ -146,16 +150,43 @@ type pause struct {
 }
 
 type outcome struct {
-	e   *entry
-	res Result
-	err error
+	e       *entry
+	res     Result
+	err     error
+	started time.Time
 }
 
 // New returns an engine for the configured source ids. budget may be nil.
 func New(st *store.DB, pub *snapshot.Publisher, budget Budget, sources []string, concurrency int, log *slog.Logger) *Engine {
 	return &Engine{store: st, pub: pub, budget: budget, sources: slices.Clone(sources), n: max(concurrency, 1), log: log,
 		wake: make(chan struct{}, 1), done: make(chan outcome), entries: map[string]*entry{},
-		repos: map[snapshot.RepoKey]store.Repo{}, pauses: map[string]*pause{}}
+		repos: map[snapshot.RepoKey]store.Repo{}, pauses: map[string]*pause{}, observe: func(string, string, time.Duration) {}}
+}
+
+// Observe sets fn to receive every finished job: its kind, result (ok, not_modified, error, rate_limited) and duration. Call it
+// before Run.
+func (e *Engine) Observe(fn func(kind, result string, d time.Duration)) { e.observe = fn }
+
+// Alive reports whether the dispatcher loop ran recently; it is true until Run starts.
+func (e *Engine) Alive() bool {
+	b := e.beat.Load()
+	return b == 0 || time.Since(time.Unix(0, b)) < 3*idleWake
+}
+
+// Depth returns how many jobs are due and waiting, and how many run.
+func (e *Engine) Depth() (waiting, running int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := time.Now()
+	for _, en := range e.entries {
+		switch {
+		case en.running:
+			running++
+		case !en.due.After(now):
+			waiting++
+		}
+	}
+	return waiting, running
 }
 
 // Register adds a job kind. It must be called before Run.
@@ -244,6 +275,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	running := 0
 	var lastStart time.Time
 	for {
+		e.beat.Store(time.Now().UnixNano())
 		wait := idleWake
 		if running < e.n {
 			if next := lastStart.Add(pace); time.Now().Before(next) {
@@ -315,10 +347,11 @@ func (e *Engine) next(now time.Time) (*entry, time.Time) {
 func (e *Engine) start(ctx context.Context, en *entry) {
 	j := Job{Key: en.key, Source: en.source, Repo: en.repo, Prev: en.item}
 	go func() {
+		started := time.Now()
 		jctx, cancel := context.WithTimeout(ctx, en.spec.Timeout)
 		defer cancel()
 		res, err := safeRun(jctx, en.spec, j)
-		e.done <- outcome{e: en, res: res, err: err}
+		e.done <- outcome{e: en, res: res, err: err, started: started}
 	}()
 }
 
@@ -350,6 +383,16 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 		return // the repository left the catalogue while the job ran
 	}
 	class, retryAt := classify(o.err)
+	result := "error"
+	switch {
+	case class == classOK && o.res.Unchanged:
+		result = "not_modified"
+	case class == classOK:
+		result = "ok"
+	case class == classRate:
+		result = "rate_limited"
+	}
+	e.observe(en.spec.Kind, result, now.Sub(o.started))
 	switch class {
 	case classOK:
 		e.succeeded(en, o.res, now)

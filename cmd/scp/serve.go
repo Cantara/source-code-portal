@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -128,17 +129,33 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 		}
 	}
 
+	m := newMetrics(gauges{current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining})
+	gh.Observe(m.githubResponse)
+	s.engine.Observe(m.job)
+	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
+	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
+		webhook: cfg.Webhook.Secret.IsSet(), deliveries: map[string]int{}}
+
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)}}
 	if cfg.Webhook.Secret.IsSet() {
-		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: webhook.New(cfg.Webhook.Secret.Reveal(),
-			cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.engine, cfg.GitHub.Sources), log)})
+		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.engine, cfg.GitHub.Sources), log)
+		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })
+		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
-	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies}
-	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
+	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies,
+		Observe: m.request}
 	features := api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
 		httpapi.SnapshotAPI{Current: s.pub.Current}}
 	s.public = httpapi.Server(httpapi.Public(opts, spa, contract.OpenAPI, features, routes...), log)
-	s.admin = httpapi.Server(httpapi.Admin(opts, func() bool { return true }, ready), log)
+	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
+	if cfg.Ops.Pprof {
+		admin = append(admin, httpapi.Route{Pattern: "GET /debug/pprof/", Handler: http.HandlerFunc(pprof.Index)},
+			httpapi.Route{Pattern: "GET /debug/pprof/cmdline", Handler: http.HandlerFunc(pprof.Cmdline)},
+			httpapi.Route{Pattern: "GET /debug/pprof/profile", Handler: http.HandlerFunc(pprof.Profile)},
+			httpapi.Route{Pattern: "GET /debug/pprof/symbol", Handler: http.HandlerFunc(pprof.Symbol)},
+			httpapi.Route{Pattern: "GET /debug/pprof/trace", Handler: http.HandlerFunc(pprof.Trace)})
+	}
+	s.admin = httpapi.Server(httpapi.Admin(opts, s.engine.Alive, ready, admin...), log)
 	var lc net.ListenConfig
 	if s.publicLn, err = lc.Listen(ctx, "tcp", cfg.Server.PublicAddr); err != nil {
 		return nil, err

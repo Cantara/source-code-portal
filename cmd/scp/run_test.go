@@ -366,5 +366,28 @@ catalog:
 	if d := time.Since(start); d > 5*time.Second {
 		t.Errorf("the push took %v to show", d)
 	}
+	exposition := read(admin + "/metrics")
+	for _, want := range []string{`scp_http_requests_total{code="200",listener="public",method="GET",pattern="GET /api/v1/repos/{owner}/{name}"}`,
+		`scp_webhook_deliveries_total{event="push",result="accepted"} 2`, `scp_sync_jobs_total{kind="commits",result="ok"}`,
+		`scp_github_requests_total{code="502",source="gh"}`, `scp_items{freshness="fresh",kind="commits"}`, "scp_snapshot_age_seconds",
+		"scp_build_info", "go_goroutines"} {
+		if !strings.Contains(exposition, want) {
+			t.Errorf("metrics lack %s", want)
+		}
+	}
+	var st struct {
+		Ready   bool
+		Sources []struct{ ID string }
+		Webhook struct{ Deliveries map[string]int }
+	}
+	if code := fetch(admin+"/api/v1/status", &st); code != 200 || !st.Ready || len(st.Sources) != 1 || st.Webhook.Deliveries["accepted"] != 2 {
+		t.Errorf("status: %d %+v", code, st)
+	}
+	if code := fetch(admin+"/debug/pprof/", nil); code != http.StatusNotFound {
+		t.Errorf("pprof without ops.pprof: %d", code)
+	}
+	if code := fetch(public+"/metrics", nil); code != http.StatusNotFound {
+		t.Errorf("metrics on the public listener: %d", code)
+	}
 	stop()
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	gosync "sync"
 	"sync/atomic"
 	"testing"
@@ -451,6 +452,38 @@ func TestNotifySource(t *testing.T) {
 		time.Sleep(time.Second)
 		if c.n.Load() != base+1 {
 			t.Errorf("EventSourceChanged gave %d runs, want 1", c.n.Load()-base)
+		}
+		r.stop()
+	})
+}
+
+func TestObserveDepthAlive(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := &counter{errs: []error{fakeErr{code: "x"}}}
+		r := newRig(t, t.TempDir(), nil, 1, sourceSpec(c, time.Hour))
+		var mu gosync.Mutex
+		var results []string
+		r.eng.Observe(func(kind, result string, _ time.Duration) {
+			mu.Lock()
+			defer mu.Unlock()
+			results = append(results, kind+":"+result)
+		})
+		if !r.eng.Alive() {
+			t.Error("not alive before Run")
+		}
+		r.run()
+		time.Sleep(2 * time.Minute) // the failure retries after its backoff
+		mu.Lock()
+		got := strings.Join(results, ",")
+		mu.Unlock()
+		if !strings.HasPrefix(got, "list:error,list:ok") {
+			t.Errorf("observed %s", got)
+		}
+		if waiting, running := r.eng.Depth(); waiting != 0 || running != 0 {
+			t.Errorf("depth %d waiting, %d running", waiting, running)
+		}
+		if !r.eng.Alive() {
+			t.Error("the dispatcher is not alive")
 		}
 		r.stop()
 	})
