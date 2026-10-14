@@ -4,6 +4,7 @@
 !go.sum
 !cmd/
 !internal/
+!api/
 !web/
 !LICENSE
 web/node_modules
