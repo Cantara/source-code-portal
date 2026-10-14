@@ -22,6 +22,10 @@ The completed rewrite: package manifests, private repositories, several instance
 - The web UI is rendered on the server with Next.js: every page arrives as complete HTML, readable without JavaScript, with its own
   title, description and canonical URL, and `/sitemap.xml` and `/robots.txt` list the pages. `scp serve` runs the web UI bundle with
   Node.js (`web.dir`, `web.node`); releases carry it as `scp-web_<version>.tar.gz`, and the image includes Node.js and the bundle.
+- Every page under a renamed or transferred repository answers 308 to the same page at its current address, and its canonical URL
+  names the repository as GitHub spells it; a failed panel offers Retry.
+- Internally, each feature owns its data, its GitHub calls and its pages, so a new feature is its own package or folder plus one wiring
+  line.
 
 ## 2.0.0
 
