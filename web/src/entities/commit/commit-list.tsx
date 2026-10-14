@@ -2,9 +2,9 @@ import Link from "next/link"
 import type { Ref } from "react"
 import type { Commit } from "@/lib/api/client"
 import { addressPath } from "@/lib/paths"
-import { InitialsAvatar } from "./initials-avatar"
-import { RelativeTime } from "./relative-time"
-import { EmptyState } from "./empty-state"
+import { InitialsAvatar } from "@/shared/initials-avatar"
+import { RelativeTime } from "@/shared/relative-time"
+import { EmptyState } from "@/shared/empty-state"
 
 /** CommitList is commits newest first: subject, repository, author and time. */
 export function CommitList({

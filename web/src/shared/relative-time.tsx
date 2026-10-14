@@ -1,3 +1,5 @@
+"use client"
+
 import { useNow } from "@/lib/clock"
 import { exactUTC, relative } from "@/lib/format"
 

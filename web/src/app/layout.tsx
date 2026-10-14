@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { LiveIndicator, StatusBanners } from "@/features/status/banners"
-import { origin, privateViewer } from "@/lib/api/server"
+import { origin, privateViewer, renderedAt } from "@/lib/api/server"
 import { Providers } from "./providers"
 import { FocusOnNavigation, MainNav, Mark, ThemeSelect } from "./shell"
 import "@/styles/index.css"
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script src="/theme-init.js" />
       </head>
       <body className="cosmos">
-        <Providers>
+        <Providers now={renderedAt()}>
           <FocusOnNavigation />
           <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-2">
             Skip to content

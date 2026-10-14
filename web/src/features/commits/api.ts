@@ -1,5 +1,6 @@
-import { infiniteQueryOptions, queryOptions, type QueryClient } from "@tanstack/react-query"
+import { infiniteQueryOptions, type QueryClient } from "@tanstack/react-query"
 import { unwrap, type Api } from "@/lib/api/client"
+import { keys } from "@/lib/api/queries"
 import { snapshotQuery } from "@/lib/api/snapshot"
 
 export const pageSize = 50
@@ -15,9 +16,9 @@ export interface Filter {
  */
 export const commitLogQuery = (api: Api, qc: QueryClient, f: Filter) =>
   infiniteQueryOptions({
-    queryKey: ["commits", "log", f.group ?? "", f.repo ?? ""],
+    queryKey: keys.commitLog(f.group, f.repo),
     queryFn: async ({ pageParam, signal }) => {
-      const version = (await qc.ensureQueryData(snapshotQuery(api)).catch(() => undefined))?.version ?? 0
+      const version = (await qc.query({ ...snapshotQuery(api), staleTime: "static" }).catch(() => undefined))?.version ?? 0
       const page = await unwrap(
         api.GET("/commits", {
           params: { query: { ...f, limit: pageSize, ...(pageParam ? { cursor: pageParam } : {}) } },
@@ -29,12 +30,6 @@ export const commitLogQuery = (api: Api, qc: QueryClient, f: Filter) =>
     initialPageParam: "",
     getNextPageParam: (last) => last.page.nextCursor ?? undefined,
     meta: { keepWhenPaged: true },
-  })
-
-export const groupsQuery = (api: Api) =>
-  queryOptions({
-    queryKey: ["groups"],
-    queryFn: ({ signal }) => unwrap(api.GET("/groups", { signal })),
   })
 
 /** commitFilter keeps the known filters of the commit log from the URL. */

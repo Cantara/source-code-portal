@@ -1,3 +1,4 @@
+import "server-only"
 import createClient from "openapi-fetch"
 import { headers } from "next/headers"
 import { cache } from "react"
@@ -29,3 +30,6 @@ export const origin = cache(async (): Promise<string> => {
 export async function privateViewer(): Promise<boolean> {
   return (await headers()).get("x-scp-viewer") === "private"
 }
+
+/** renderedAt is the instant the request renders at, on the clock's 30 s tick grid; the browser hydrates against it (lib/clock.ts). */
+export const renderedAt = cache((): number => Math.floor(Date.now() / 30_000) * 30_000)

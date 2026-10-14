@@ -3,6 +3,38 @@ import reactHooks from "eslint-plugin-react-hooks"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 
+const innerHTML = {
+  selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+  message: "Render server HTML through shared/safe-html.tsx.",
+}
+
+/** layer bans the given import patterns (static and dynamic) and every relative escape for files; except may set markup. */
+function layer(files, banned, except = []) {
+  const patterns = ["../*", "./../*", ...banned]
+  const message = "Import only from your own folder (./) and the layers below (see eslint.config.js)."
+  const dynamic = patterns.map((p) => ({
+    selector: `ImportExpression[source.value=/^${p.replace(/[.*/@]/g, (c) => (c === "*" ? ".*" : `\\${c}`))}/]`,
+    message,
+  }))
+  return [
+    {
+      files: [files],
+      ignores: except,
+      rules: {
+        "no-restricted-imports": ["error", { patterns: [{ group: patterns, message }] }],
+        "no-restricted-syntax": ["error", innerHTML, ...dynamic],
+      },
+    },
+    ...except.map((f) => ({
+      files: [f],
+      rules: {
+        "no-restricted-imports": ["error", { patterns: [{ group: patterns, message }] }],
+        "no-restricted-syntax": ["error", ...dynamic],
+      },
+    })),
+  ]
+}
+
 export default tseslint.config(
   { ignores: [".next", "bundle", "next-env.d.ts", "playwright-report", "test-results"] },
   {
@@ -11,39 +43,18 @@ export default tseslint.config(
     languageOptions: { globals: globals.browser },
     rules: {
       // Only shared/safe-html.tsx sets markup, and only the server-sanitised html field.
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
-          message: "Render server HTML through shared/safe-html.tsx.",
-        },
-      ],
+      "no-restricted-syntax": ["error", innerHTML],
     },
   },
   // Configuration, build scripts and the Playwright tests run in Node.
   { files: ["*.{ts,js,mjs}", "scripts/**", "e2e/**"], languageOptions: { globals: globals.node } },
-  { files: ["src/shared/safe-html.tsx"], rules: { "no-restricted-syntax": "off" } },
-  {
-    // Features never import features: they share through shared/, lib/ and typed links.
-    files: ["src/features/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            { group: ["@/features/*", "../*"], message: "A feature imports only itself (./), shared/, lib/ and components/." },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/shared/**", "src/lib/**", "src/components/**"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        { patterns: [{ group: ["@/features/*", "@/app/*"], message: "Shared code imports no feature." }] },
-      ],
-    },
-  },
+  // Layers, bottom up: lib, components/ui, shared (generic UI), entities (repository and commit pieces), features, app. A layer
+  // imports only those below it; a feature imports itself (./) and the layers below, never another feature; only app/ composes.
+  // Imports go through @/ or ./, so a relative escape cannot dodge the rules, and dynamic imports obey them too.
+  ...layer("src/lib/**", ["@/components/*", "@/shared/*", "@/entities/*", "@/features/*", "@/app/*"]),
+  ...layer("src/components/**", ["@/shared/*", "@/entities/*", "@/features/*", "@/app/*"]),
+  ...layer("src/shared/**", ["@/entities/*", "@/features/*", "@/app/*"], ["src/shared/safe-html.tsx"]),
+  ...layer("src/entities/**", ["@/features/*", "@/app/*"]),
+  ...layer("src/features/**", ["@/features/*", "@/app/*"]),
+  ...layer("src/app/**", []),
 )

@@ -7,7 +7,10 @@ import { AllCommitsView } from "@/features/commits/view"
 import { DashboardView } from "@/features/dashboard/view"
 import { DocView } from "@/features/docs/view"
 import { GroupView } from "@/features/groups/view"
+import { repoRoute } from "@/features/repos/route"
 import { RepoView } from "@/features/repos/view"
+import type { Ctx } from "@/lib/page"
+import { panels } from "./repos/[owner]/[name]/panels"
 import { StatusBanners } from "@/features/status/banners"
 import { setLocation } from "@/test/navigation"
 import { commit, fresh, http, server, snapshot } from "@/test/server"
@@ -72,8 +75,11 @@ describe("pages", () => {
     expect(await screen.findByRole("link", { name: "Setup" })).toHaveAttribute("href", "/repos/acme/core/docs/docs/setup")
   })
 
-  it("shows a repository's technology, dependencies and internal links", async () => {
-    show(<RepoView owner="acme" name="core" />, "/repos/acme/core")
+  it("shows a repository's technology, dependencies and internal links from the composed panels", async () => {
+    show(
+      repoRoute(panels).render({ params: { owner: "acme", name: "core" } } as Ctx<{ owner: string; name: string }>),
+      "/repos/acme/core",
+    )
     const tech = await screen.findByRole("region", { name: "Technology" })
     expect(await within(tech).findByText("Maven")).toBeInTheDocument()
     expect(within(tech).getByText("java 21")).toBeInTheDocument()

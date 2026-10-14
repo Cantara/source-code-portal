@@ -7,9 +7,9 @@ const pages = [
   ["/", "Dashboard"],
   ["/commits", "Commits"],
   ["/groups/whydah", "Whydah"],
-  ["/groups/whydah/commits", "Commits in whydah"],
+  ["/groups/whydah/commits", "Commits in Whydah"],
   ["/repos/acme/whydah-core", "Whydah Core"],
-  ["/repos/acme/whydah-core/commits", "Commits in acme/whydah-core"],
+  ["/repos/acme/whydah-core/commits", "Commits in acme/Whydah-Core"],
   ["/repos/acme/whydah-core/docs/docs/setup", "Setup"],
 ] as const
 

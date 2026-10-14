@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import type { ReactNode } from "react"
 import Link from "next/link"
 import { Alert } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +9,7 @@ import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Schemas } from "@/lib/api/client"
 import { withoutLeadingH1 } from "@/lib/docs"
 import { docPath, repoCommitsPath } from "@/lib/paths"
-import { CommitList } from "@/shared/commit-list"
+import { CommitList } from "@/entities/commit/commit-list"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
@@ -16,13 +17,16 @@ import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { SafeHtml } from "@/shared/safe-html"
-import { RepoBadges } from "@/shared/repo-badges"
-import { VisibilityBadge } from "@/shared/visibility-badge"
-import { docListQuery, docQuery, repoQuery } from "./api"
-import { Dependencies, TechnologyCard } from "./manifests"
+import { VisibilityBadge } from "@/entities/repo/visibility-badge"
+import { docListQuery, docQuery, repoQuery } from "@/lib/api/queries"
+import { RepoBadges } from "./badges"
+import { readmeOf } from "./readme"
 
-/** RepoView is a repository: descriptor, badges, README, technology, dependencies, documents and the latest commits. */
-export function RepoView({ owner, name }: { owner: string; name: string }) {
+/**
+ * RepoView is a repository: descriptor, badges, README, documents and the latest commits, with the panels other features contribute
+ * (composed in app/) in the main and side columns.
+ */
+export function RepoView({ owner, name, main, side }: { owner: string; name: string; main?: ReactNode; side?: ReactNode }) {
   const { data, error } = useQuery(repoQuery(api, owner, name))
   const repo = data?.repo
   return (
@@ -59,15 +63,11 @@ export function RepoView({ owner, name }: { owner: string; name: string }) {
             <PanelBoundary>
               <Readme owner={owner} name={name} />
             </PanelBoundary>
-            <PanelBoundary>
-              <Dependencies owner={owner} name={name} />
-            </PanelBoundary>
+            {main}
           </div>
           <div className="flex min-w-0 flex-col gap-6">
             {data.descriptor.present && <DescriptorCard d={data.descriptor} />}
-            <PanelBoundary>
-              <TechnologyCard owner={owner} name={name} />
-            </PanelBoundary>
+            {side}
             <PanelBoundary>
               <DocsCard owner={owner} name={name} />
             </PanelBoundary>
@@ -172,7 +172,7 @@ function DocsCard({ owner, name }: { owner: string; name: string }) {
 
 function Readme({ owner, name }: { owner: string; name: string }) {
   const list = useQuery(docListQuery(api, owner, name))
-  const readme = list.data?.docs.find((d) => d.readme)
+  const readme = readmeOf(list.data)
   const doc = useQuery({ ...docQuery(api, owner, name, readme?.id ?? ""), enabled: readme !== undefined })
   if (list.error && !list.data) return <ProblemAlert error={list.error} />
   if (list.data && !readme) return <EmptyState title="This repository has no README" />

@@ -8,16 +8,17 @@ import { api, type Repo, type Schemas } from "@/lib/api/client"
 import { useNow } from "@/lib/clock"
 import { cn } from "@/lib/cn"
 import { count, plural } from "@/lib/format"
-import { byActivity, pulse, type Pulse } from "@/lib/health"
+import { byActivity, pulse, type Pulse } from "@/entities/repo/health"
 import { groupPath, repoPath } from "@/lib/paths"
-import { CommitList } from "@/shared/commit-list"
+import { CommitList } from "@/entities/commit/commit-list"
 import { EmptyState } from "@/shared/empty-state"
-import { ActivityLegend, ActivityLight, HealthBadges, HealthStrip } from "@/shared/health"
+import { ActivityLegend, ActivityLight, HealthBadges, HealthStrip } from "@/entities/repo/health-badges"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
-import { dashboardQuery, reposQuery } from "./api"
+import { reposQuery } from "@/lib/api/queries"
+import { dashboardQuery } from "./api"
 
 type Group = Schemas["DashboardGroup"]
 
@@ -63,10 +64,10 @@ function Telemetry({ p, data }: { p: Pulse; data: Schemas["Dashboard"] }) {
 }
 
 /** RepoRow is one repository inside a product card: activity light, name, description and its health badges. */
-function RepoRow({ repo }: { repo: Repo }) {
+function RepoRow({ repo, now }: { repo: Repo; now: number }) {
   return (
     <li className="grid break-inside-avoid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 border-b border-border/60 py-2 last:border-b-0">
-      <ActivityLight repo={repo} />
+      <ActivityLight repo={repo} now={now} decorative />
       <div className="min-w-0">
         <Link href={repoPath(repo.owner, repo.name)} className="block truncate font-medium hover:text-primary hover:underline">
           {repo.name}
@@ -76,15 +77,14 @@ function RepoRow({ repo }: { repo: Repo }) {
             {repo.description}
           </p>
         )}
-        <HealthBadges repo={repo} className="mt-1" />
+        <HealthBadges repo={repo} now={now} className="mt-1" />
       </div>
     </li>
   )
 }
 
 /** ProductCard is one group with all its repositories, newest change first; large groups span more columns. */
-function ProductCard({ group, repos, wide }: { group: Group; repos: Repo[]; wide: boolean }) {
-  const now = useNow()
+function ProductCard({ group, repos, wide, now }: { group: Group; repos: Repo[]; wide: boolean; now: number }) {
   const p = useMemo(() => pulse(repos, now), [repos, now])
   const name = group.id ? (
     <Link href={groupPath(group.id)} className="hover:text-primary hover:underline">
@@ -105,7 +105,7 @@ function ProductCard({ group, repos, wide }: { group: Group; repos: Repo[]; wide
       </div>
       {group.description && <p className="mt-1 text-sm text-muted-foreground">{group.description}</p>}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <HealthStrip repos={repos} pulse={p} />
+        <HealthStrip repos={repos} pulse={p} now={now} />
         <span className="text-xs text-muted-foreground">
           {count(p.active)} active
           {group.lastActivity && (
@@ -121,7 +121,7 @@ function ProductCard({ group, repos, wide }: { group: Group; repos: Repo[]; wide
       ) : (
         <ul className={cn("mt-2", repos.length > 14 && "md:columns-2 md:gap-6", wide && "xl:columns-3 2xl:columns-4")}>
           {repos.map((r) => (
-            <RepoRow key={r.address} repo={r} />
+            <RepoRow key={r.address} repo={r} now={now} />
           ))}
         </ul>
       )}
@@ -138,7 +138,12 @@ export function DashboardView() {
   const p = useMemo(() => pulse(repos, now), [repos, now])
   const members = useMemo(() => {
     const m = new Map<string, Repo[]>()
-    for (const r of repos) for (const g of r.groups) m.set(g, [...(m.get(g) ?? []), r])
+    for (const r of repos)
+      for (const g of r.groups) {
+        const list = m.get(g)
+        if (list) list.push(r)
+        else m.set(g, [r])
+      }
     return m
   }, [repos])
   const ungrouped = useMemo(() => repos.filter((r) => r.groups.length === 0), [repos])
@@ -175,6 +180,7 @@ export function DashboardView() {
                       group={g}
                       repos={members.get(g.id) ?? []}
                       wide={g.repoCount > 40 || (g.repoCount === data.repoCount && data.groups.length > 1)}
+                      now={now}
                     />
                   ))}
                   {ungrouped.length > 0 && (
@@ -189,6 +195,7 @@ export function DashboardView() {
                       }}
                       repos={ungrouped}
                       wide={ungrouped.length > 40}
+                      now={now}
                     />
                   )}
                 </ul>

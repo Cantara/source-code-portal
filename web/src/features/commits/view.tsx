@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api/client"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { groupPath, repoPath } from "@/lib/paths"
-import { CommitList } from "@/shared/commit-list"
+import { CommitList } from "@/entities/commit/commit-list"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
 import { ProblemAlert } from "@/shared/problem-alert"
-import { commitFilter, commitLogQuery, groupsQuery, type Filter } from "./api"
+import { groupQuery, groupsQuery, repoQuery } from "@/lib/api/queries"
+import { commitFilter, commitLogQuery, type Filter } from "./api"
 
 /** AllCommitsView is the commit log across repositories, filtered by group or repository through the URL. */
 export function AllCommitsView() {
@@ -29,9 +30,10 @@ export function AllCommitsView() {
 
 /** GroupCommitsView is the commit log of a group. */
 export function GroupCommitsView({ group }: { group: string }) {
+  const { data } = useQuery(groupQuery(api, group))
   return (
     <>
-      <PageHeader title={`Commits in ${group}`}>
+      <PageHeader title={`Commits in ${data?.name ?? group}`}>
         <Link href={groupPath(group)} className="text-sm hover:underline">
           Back to the group
         </Link>
@@ -43,9 +45,10 @@ export function GroupCommitsView({ group }: { group: string }) {
 
 /** RepoCommitsView is the commit log of a repository's default branch. */
 export function RepoCommitsView({ owner, name }: { owner: string; name: string }) {
+  const repo = useQuery(repoQuery(api, owner, name)).data?.repo
   return (
     <>
-      <PageHeader title={`Commits in ${owner}/${name}`}>
+      <PageHeader title={`Commits in ${repo ? `${repo.owner}/${repo.name}` : `${owner}/${name}`}`}>
         <Link href={repoPath(owner, name)} className="text-sm hover:underline">
           Back to the repository
         </Link>

@@ -2,22 +2,23 @@
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Repo } from "@/lib/api/client"
+import { useNow } from "@/lib/clock"
 import { plural } from "@/lib/format"
 import { groupCommitsPath, repoPath } from "@/lib/paths"
-import { CommitList } from "@/shared/commit-list"
+import { CommitList } from "@/entities/commit/commit-list"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
-import { ActivityLight, HealthBadges } from "@/shared/health"
-import { VisibilityBadge } from "@/shared/visibility-badge"
-import { groupCommitsQuery, groupQuery } from "./api"
+import { ActivityLight, HealthBadges } from "@/entities/repo/health-badges"
+import { VisibilityBadge } from "@/entities/repo/visibility-badge"
+import { groupQuery } from "@/lib/api/queries"
+import { groupCommitsQuery } from "./api"
 import { validateGroupSearch, type GroupSearch, type SortKey } from "./search"
 
 /** view filters repositories by name or description and sorts them. */
@@ -43,10 +44,11 @@ export function GroupView({ group }: { group: string }) {
   const params = useSearchParams()
   const search = validateGroupSearch(Object.fromEntries(params))
   const { q, sort = "name", desc = false } = search
-  const router = useRouter()
   const pathname = usePathname()
-  const navigate = (next: GroupSearch) => router.replace(`${pathname}${searchOf(next)}`, { scroll: false })
-  const [text, setText] = useState(q ?? "") // the filter as typed; the URL follows it
+  // The view state lives in the URL, written in place: Next.js follows history.replaceState without asking the server again.
+  const navigate = (next: GroupSearch) => window.history.replaceState(null, "", `${pathname}${searchOf(next)}`)
+  const text = q ?? ""
+  const now = useNow()
   const { data, error } = useQuery(groupQuery(api, group))
   const repos = data ? view(data.repos, text, sort, desc) : []
 
@@ -84,10 +86,7 @@ export function GroupView({ group }: { group: string }) {
                 <input
                   type="search"
                   value={text}
-                  onChange={(e) => {
-                    setText(e.target.value)
-                    navigate({ ...search, q: e.target.value || undefined })
-                  }}
+                  onChange={(e) => navigate({ ...search, q: e.target.value || undefined })}
                   className="mt-1 min-h-9 rounded-md border border-input bg-background px-2"
                 />
               </label>
@@ -117,7 +116,7 @@ export function GroupView({ group }: { group: string }) {
                       <tr key={r.address}>
                         <td className="p-2 font-medium">
                           <span className="inline-flex flex-wrap items-center gap-2">
-                            <ActivityLight repo={r} decorative />
+                            <ActivityLight repo={r} now={now} decorative />
                             <Link href={repoPath(r.owner, r.name)} className="hover:underline">
                               {r.owner}/{r.name}
                             </Link>
@@ -129,7 +128,7 @@ export function GroupView({ group }: { group: string }) {
                           <RelativeTime at={r.pushedAt} />
                         </td>
                         <td className="p-2">
-                          <HealthBadges repo={r} className="min-w-72" />
+                          <HealthBadges repo={r} now={now} className="min-w-72" />
                         </td>
                         <td className="p-2">
                           <FreshnessBadge freshness={r.freshness} />

@@ -1,15 +1,28 @@
 import type { Repo } from "@/lib/api/client"
-import { useNow } from "@/lib/clock"
 import { ago, count, exactUTC } from "@/lib/format"
-import { activities, activity, lastChange, type Activity, type Pulse } from "@/lib/health"
+import { activities, activity, lastChange, type Activity, type Pulse } from "./health"
 import { cn } from "@/lib/cn"
 
 const label = Object.fromEntries(activities.map((a) => [a.level, a])) as Record<Activity, (typeof activities)[number]>
 
-/** ActivityLight is a repository's activity as a coloured light with its label for screen readers (none when decorative: the
- * health badges beside it say it). */
-export function ActivityLight({ repo, decorative = false, className }: { repo: Repo; decorative?: boolean; className?: string }) {
-  const level = activity(repo, useNow())
+// The components take the view's instant (useNow, read once per view): one clock subscription per page, not one per repository.
+
+/**
+ * ActivityLight is a repository's activity as a coloured light with its label for screen readers (none when decorative: the
+ * health badges beside it say it).
+ */
+export function ActivityLight({
+  repo,
+  now,
+  decorative = false,
+  className,
+}: {
+  repo: Repo
+  now: number
+  decorative?: boolean
+  className?: string
+}) {
+  const level = activity(repo, now)
   return (
     <span
       className={cn(`lvl-${level} led led-live`, className)}
@@ -25,8 +38,7 @@ export function ActivityLight({ repo, decorative = false, className }: { repo: R
  * HealthBadges are a repository's health at a glance: activity and age, latest release, licence, open issues and language.
  * Every badge carries its meaning in text, so colour is never the only signal.
  */
-export function HealthBadges({ repo, className }: { repo: Repo; className?: string }) {
-  const now = useNow()
+export function HealthBadges({ repo, now, className }: { repo: Repo; now: number; className?: string }) {
   const level = activity(repo, now)
   const licensed = repo.license !== "" && repo.license !== "NOASSERTION"
   return (
@@ -66,8 +78,7 @@ export function HealthBadges({ repo, className }: { repo: Repo; className?: stri
 }
 
 /** HealthStrip is one cell per repository, coloured by activity, newest change first; the label says the counts. */
-export function HealthStrip({ repos, pulse, className }: { repos: Repo[]; pulse: Pulse; className?: string }) {
-  const now = useNow()
+export function HealthStrip({ repos, pulse, now, className }: { repos: Repo[]; pulse: Pulse; now: number; className?: string }) {
   const summary = activities
     .filter((a) => pulse.levels[a.level] > 0)
     .map((a) => `${pulse.levels[a.level]} ${a.label.toLowerCase()}`)

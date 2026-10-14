@@ -12,7 +12,7 @@ import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { SafeHtml } from "@/shared/safe-html"
-import { docListQuery, docQuery } from "./api"
+import { docListQuery, docQuery } from "@/lib/api/queries"
 
 /** DocView is one document of a repository with the repository's document list and the document's outline. */
 export function DocView({ owner, name, path }: { owner: string; name: string; path: string }) {

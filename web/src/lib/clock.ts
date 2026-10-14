@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react"
+import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from "react"
 
 // One ticker for every relative time: it fires every 30 s while the page is visible.
 const period = 30_000
@@ -37,10 +37,24 @@ function subscribe(l: () => void) {
   }
 }
 
-// The server renders against its own clock, on the tick grid so repeated reads in one render agree.
+// The server's instant on the tick grid, so repeated reads in one render agree (layout.tsx passes the same instant).
 const serverNow = () => Math.floor(Date.now() / period) * period
 
-/** useNow is the time of the last tick, in milliseconds. */
+// The instant the server rendered at: hydration renders against it, so a level or label that depends on the time cannot differ
+// between the server's HTML and the first client render.
+const RenderedAt = createContext<number | undefined>(undefined)
+
+/** NowProvider passes the server's render instant to the browser's first render. */
+export function NowProvider({ at, children }: { at: number; children: ReactNode }) {
+  return createElement(RenderedAt, { value: at }, children)
+}
+
+/** useNow is the time of the last tick, in milliseconds; the server's render instant during server rendering and hydration. */
 export function useNow(): number {
-  return useSyncExternalStore(subscribe, () => now, typeof window === "undefined" ? serverNow : () => now)
+  const at = useContext(RenderedAt)
+  return useSyncExternalStore(
+    subscribe,
+    () => now,
+    () => at ?? serverNow(),
+  )
 }

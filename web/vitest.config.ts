@@ -4,13 +4,15 @@ import { defineConfig } from "vitest/config"
 
 const src = (p: string) => fileURLToPath(new URL(`./src/${p}`, import.meta.url))
 
-// Component tests in jsdom; next/navigation and next/link are replaced by small stand-ins (src/test/navigation.ts, link.tsx).
+// Component and route tests in jsdom; next/navigation and next/link are replaced by small stand-ins (src/test/navigation.ts,
+// link.tsx), and server-only by an empty module so route modules load.
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
       "next/navigation": src("test/navigation.ts"),
       "next/link": src("test/link.tsx"),
+      "server-only": src("test/server-only.ts"),
       "@": src(""),
     },
   },
