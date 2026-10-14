@@ -21,6 +21,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/docs"
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
+	"github.com/cantara/source-code-portal/internal/llms"
 	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
@@ -136,7 +137,13 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		webhook: cfg.Webhook.Secret.IsSet(), deliveries: map[string]int{}}
 
-	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)}}
+	md := llms.New(s.pub.Current, cfg.Server.PublicURL)
+	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)},
+		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
+		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
+		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Readme(), Markdown: true},
+		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
+		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}}
 	if cfg.Webhook.Secret.IsSet() {
 		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.engine, cfg.GitHub.Sources), log)
 		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })

@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,26 +20,33 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
-// Route is a handler a feature serves outside the API contract (badges, the webhook). MaxBody caps the request body
-// (0: DefaultMaxBody).
+// Route is a handler a feature serves outside the API contract (badges, the webhook, Markdown). MaxBody caps the request body
+// (0: DefaultMaxBody). A Markdown route shares its address with a page of the UI: Handler answers when the path ends in .md or the
+// client prefers text/markdown to text/html, the shell answers otherwise.
 type Route struct {
-	Pattern string
-	Handler http.Handler
-	MaxBody int64
+	Pattern  string
+	Handler  http.Handler
+	MaxBody  int64
+	Markdown bool
 }
 
 // Public returns the handler of the public listener. spa holds the web UI build with index.html at its root; contract is
 // api/openapi.yaml, served at /api/v1/openapi.yaml; api implements it; routes are the features' other handlers.
 func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterface, routes ...Route) http.Handler {
 	mux := http.NewServeMux()
+	shell := spaHandler(spa)
 	for _, r := range routes {
 		n := r.MaxBody
 		if n == 0 {
 			n = DefaultMaxBody
 		}
-		mux.Handle(r.Pattern, limit(n, r.Handler))
+		h := r.Handler
+		if r.Markdown {
+			h = negotiated(h, shell)
+		}
+		mux.Handle(r.Pattern, limit(n, h))
 	}
-	mux.Handle("GET /", limit(DefaultMaxBody, spaHandler(spa)))
+	mux.Handle("GET /", limit(DefaultMaxBody, shell))
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, _ *http.Request) {
 		WriteProblem(w, http.StatusNotFound, "not-found", "No such API resource.")
 	})
@@ -251,4 +259,55 @@ func (b *buffered) WriteHeader(status int) {
 func (b *buffered) Write(p []byte) (int, error) {
 	b.wrote = true
 	return b.body.Write(p)
+}
+
+// negotiated answers with md for a .md path or a client that prefers Markdown, with shell otherwise.
+func negotiated(md, shell http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept")
+		w.Header().Set("Link", `</llms.txt>; rel="describedby"`)
+		if strings.HasSuffix(r.URL.Path, ".md") || prefersMarkdown(r.Header.Values("Accept")) {
+			md.ServeHTTP(w, r)
+			return
+		}
+		shell.ServeHTTP(w, r)
+	})
+}
+
+// prefersMarkdown reports whether text/markdown has a strictly higher quality than text/html in the Accept header.
+func prefersMarkdown(values []string) bool {
+	return quality(values, "text/markdown") > quality(values, "text/html")
+}
+
+// quality is the q the most specific matching range gives mediaType (0 when none matches).
+func quality(values []string, mediaType string) float64 {
+	typ, _, _ := strings.Cut(mediaType, "/")
+	best, rank := 0.0, 0
+	for v := range strings.SplitSeq(strings.Join(values, ","), ",") {
+		mt, params, err := mime.ParseMediaType(strings.TrimSpace(v))
+		if err != nil {
+			continue
+		}
+		r := 0
+		switch mt {
+		case mediaType:
+			r = 3
+		case typ + "/*":
+			r = 2
+		case "*/*":
+			r = 1
+		default:
+			continue
+		}
+		q := 1.0
+		if qs, ok := params["q"]; ok {
+			if f, err := strconv.ParseFloat(qs, 64); err == nil {
+				q = f
+			}
+		}
+		if r > rank {
+			best, rank = q, r
+		}
+	}
+	return best
 }

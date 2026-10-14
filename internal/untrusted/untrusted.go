@@ -16,8 +16,7 @@ func Text(s string, maxRunes int) string {
 		switch {
 		case unicode.IsSpace(r):
 			space = len(out) > 0
-		case unicode.IsControl(r), unicode.Is(unicode.Bidi_Control, r), unicode.Is(unicode.Join_Control, r),
-			r == '\u200b', r == '\u2060', r == '\ufeff':
+		case invisible(r):
 		default:
 			if space {
 				out = append(out, ' ')
@@ -36,4 +35,19 @@ func Text(s string, maxRunes int) string {
 func FirstLine(s string) string {
 	line, _, _ := strings.Cut(strings.TrimLeft(s, "\r\n\t "), "\n")
 	return line
+}
+
+// Strip removes control (except newline and tab), bidirectional-formatting and zero-width characters from multi-line text.
+func Strip(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r != '\n' && r != '\t' && invisible(r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+func invisible(r rune) bool {
+	return unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r) || unicode.Is(unicode.Join_Control, r) ||
+		r == '\u200b' || r == '\u2060' || r == '\ufeff'
 }

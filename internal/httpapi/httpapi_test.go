@@ -39,6 +39,9 @@ func public(cur *snapshot.Snapshot) http.Handler {
 				http.Error(w, "too large", http.StatusRequestEntityTooLarge)
 			}
 		})},
+		Route{Pattern: "GET /repos/{owner}/{name}", Markdown: true, Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("# md"))
+		})},
 		Route{Pattern: "GET /panic", Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") })},
 		Route{Pattern: "GET /big", Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -275,6 +278,30 @@ func TestClientIP(t *testing.T) {
 		r.Header.Set("X-Forwarded-For", tc.xff)
 		if got := o.clientIP(r); got != tc.want {
 			t.Errorf("%s via %s: %s, want %s", tc.xff, tc.peer, got, tc.want)
+		}
+	}
+}
+
+func TestNegotiation(t *testing.T) {
+	h := public(&snapshot.Snapshot{})
+	for _, tc := range []struct {
+		path, accept string
+		md           bool
+	}{
+		{"/repos/a/b", "", false},
+		{"/repos/a/b", "text/html,application/xhtml+xml,*/*;q=0.8", false},
+		{"/repos/a/b", "text/markdown", true},
+		{"/repos/a/b", "text/markdown, text/html", false},
+		{"/repos/a/b", "text/markdown, text/html;q=0.9", true},
+		{"/repos/a/b", "text/*;q=0.5, text/markdown;q=0.6", true},
+		{"/repos/a/b.md", "", true},
+	} {
+		rec := get(h, tc.path, "Accept", tc.accept)
+		if got := rec.Body.String() == "# md"; got != tc.md || rec.Code != 200 {
+			t.Errorf("%s Accept %q: %d markdown %v, want %v", tc.path, tc.accept, rec.Code, got, tc.md)
+		}
+		if !strings.Contains(rec.Header().Get("Vary"), "Accept") || rec.Header().Get("Link") != `</llms.txt>; rel="describedby"` {
+			t.Errorf("%s: Vary %q Link %q", tc.path, rec.Header().Get("Vary"), rec.Header().Get("Link"))
 		}
 	}
 }
