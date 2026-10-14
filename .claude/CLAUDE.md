@@ -31,7 +31,8 @@ never modify it, push to it or open issues or pull requests on it.
   `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
 - **Version**: semantic versioning from `v2.1.0` (P-16), the release of the completed greenfield streams; published tags are never moved.
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
-- Dependencies must be current (release within 18 months), widely used and pure Go; `bluemonday` is the one exception (`plan.md` section 4).
+- Dependencies are the latest releases of the best-in-class choice (owner P-17), pure Go on the server; `bluemonday` is the one exception
+  (`plan.md` section 4). Web: TypeScript 7 is `tsc` (`@typescript/native`); the `typescript` name holds the 6.0 API for typescript-eslint and Next.js.
 - Planning and design live under `.claude/work/`; `docs/` is user documentation only. Documents describe what is built, not what is not.
 - Commits: Conventional Commits, no AI attribution lines. Generated files are never edited by hand (`make gen`).
 - No test touches the network: loopback only, `internal/github/githubtest` and recorded fixtures.
