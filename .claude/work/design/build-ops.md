@@ -109,7 +109,7 @@ Makefile (GNU make 3.81 compatible; each target is one command that CI also runs
 | `test` | `CGO_ENABLED=1 go test -race -count=1 -timeout 10m ./...` and `pnpm test` (vitest) |
 | `check` | the PR gate: `gen` then `git diff --exit-code`, `go mod tidy -diff`, `lint`, `test` |
 | `image` | `docker build -f deploy/Dockerfile --build-arg VERSION --build-arg BUILD_ID -t scp:dev .` |
-| `run` | `build`, then `bin/scp serve --config deploy/config.example.yaml` |
+| `run` | `build`, then `bin/scp serve --config $(CONFIG)` (default `scp.yaml`, a local copy of `deploy/config.example.yaml`) |
 | `dev` | `scp serve` on :9090 plus the Vite dev server (web.md Build and embed) |
 | `clean` | removes `bin/`, `dist/`, `web/dist` |
 

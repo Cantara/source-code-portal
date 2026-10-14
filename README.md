@@ -10,18 +10,20 @@ Status: under development towards v1.0. The plan is in [`.claude/work/plan.md`](
 
 ```sh
 make build                     # web UI and bin/scp (needs Go 1.27, Node 24, pnpm 12)
-bin/scp serve                  # public :9090, admin :9091 (/livez)
-bin/scp config check -c deploy/config.example.yaml
+cp deploy/config.example.yaml scp.yaml   # then set your organisations and the App key or token file
+bin/scp config check -c scp.yaml
+bin/scp serve -c scp.yaml      # public :9090 (UI, /api/v1), admin :9091 (/livez, /readyz)
 make image                     # container image scp:dev
 ```
 
-Configuration is one YAML file (`--config`) with `SCP_*` environment overrides; `scp config check` prints the effective settings.
+Configuration is one YAML file (`--config`) with `SCP_*` environment overrides; at least one GitHub source (`github.sources`, a GitHub
+App or a token file) is required. `deploy/config.example.yaml` shows every key; `scp config check` prints the effective settings.
 
 ## Develop
 
 ```sh
-make check                     # the pull request gate: generated code, tidy modules, lint, tests
-make dev                       # Go server on :9090 and the web UI with hot reload on :5173
+make check                     # the gate: generated code, tidy modules, lint, tests
+make dev                       # Go server (scp.yaml) on :9090 and the web UI with hot reload on :5173
 go test -race ./internal/config/
 ```
 

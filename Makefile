@@ -6,6 +6,7 @@ SHELL := bash
 GOLANGCI_LINT_VERSION := 2.14.0
 PNPM ?= pnpm
 VERSION ?= dev
+CONFIG ?= scp.yaml
 BUILD_ID ?= $(shell git rev-parse HEAD 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.build=$(BUILD_ID)
 
@@ -40,7 +41,7 @@ test: ## Go tests with the race detector, web tests
 	CGO_ENABLED=1 go test -race -count=1 -timeout 10m ./...
 	$(PNPM) -C web test
 
-check: gen ## the pull request gate: generated code current, modules tidy, lint, test
+check: gen ## the gate: generated code current, modules tidy, lint, test
 	git diff --exit-code
 	go mod tidy -diff
 	$(MAKE) lint test
@@ -48,11 +49,11 @@ check: gen ## the pull request gate: generated code current, modules tidy, lint,
 image: ## build the container image scp:dev
 	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) --build-arg BUILD_ID=$(BUILD_ID) -t scp:dev .
 
-run: build ## build and serve with the example configuration
-	bin/scp serve --config deploy/config.example.yaml
+run: build ## build and serve with scp.yaml (a copy of deploy/config.example.yaml; CONFIG= overrides)
+	bin/scp serve --config $(CONFIG)
 
 dev: ## serve the API on :9090 and the web UI with hot reload on :5173
-	go run ./cmd/scp serve --config deploy/config.example.yaml & \
+	go run ./cmd/scp serve --config $(CONFIG) & \
 	trap 'kill $$!' EXIT; $(PNPM) -C web dev
 
 clean: ## remove build output

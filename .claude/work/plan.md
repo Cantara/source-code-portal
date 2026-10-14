@@ -121,7 +121,8 @@ v1.1 follows the same pattern, one milestone per bullet of section 2.
 
 ## 6. How we work
 
-- One milestone at a time; each lands in small pull requests with tests. No test touches the network: a fake GitHub server and recorded
+- Greenfield: code, contract, config and the store schema change in place, without compatibility layers or extra migrations.
+- One milestone at a time; each lands as small commits with tests directly on `main`, CI green. No test touches the network: a fake GitHub server and recorded
   fixtures.
 - The agent decides and records decisions in `decisions.md`; open questions are not left in documents.
 - Planning stays under `.claude/work/`; `docs/` is user documentation.

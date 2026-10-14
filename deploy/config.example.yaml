@@ -1,4 +1,4 @@
-# Example configuration for `scp serve --config deploy/config.example.yaml`.
+# Example configuration. Copy it to scp.yaml (gitignored), set your organisations and the App key or token file, then `make run`.
 # Every key can also be set as SCP_<KEY> with dots as underscores, for example SCP_SERVER_PUBLIC_ADDR.
 # `scp config check --config <file>` prints the effective settings.
 server:
