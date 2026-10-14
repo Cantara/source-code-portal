@@ -5,15 +5,15 @@ Guidance for Claude Code in this repository.
 ## State
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`) is the
-home of the Go rewrite of Source Code Portal (SCP). **M0 (skeleton), M1 (catalogue and sync), M2 (read API for the pages) and M3 (docs,
-badges, webhooks, freshness) are done; next is M4.** Coding instructions for the repository itself are in the root `AGENTS.md`.
+home of the Go rewrite of Source Code Portal (SCP). **M0 (skeleton), M1 (catalogue and sync), M2 (read API for the pages), M3 (docs,
+badges, webhooks, freshness) and M4 (LLM surface, metrics, hardening) are done; next is M5.** Coding instructions for the repository itself are in the root `AGENTS.md`.
 
 - **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M6. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: short v1 design notes per area (GitHub, sync/snapshot/store, catalog, content, HTTP/API, web, build/ops,
   principles). Binding below `plan.md`.
-- `.claude/work/decisions.md`: every decision taken, with where it is recorded. The M1, M2 and M3 entries list where the code is
-  leaner than the notes and what was deferred.
+- `.claude/work/decisions.md`: every decision taken, with where it is recorded. The milestone entries (M1..M4) list where the code
+  is leaner than the notes and what was deferred.
 - `.claude/work/reference/detailed-design/`: the earlier detailed design package (about 1,900 files). **Reference only**: consult it
   when building a part, copy what helps. It is not kept in sync; `plan.md` and `design/` win.
 
@@ -45,7 +45,7 @@ only in `cmd/scp`. Untrusted bytes pass through bounded parsers and one sanitise
 
 | Path | What it is |
 |---|---|
-| `cmd/scp` | Cobra CLI (`serve`, `config check`, `version`); `serve.go` wires everything; `metrics.go` is the only Prometheus code (packages report through hooks: `Observe` on httpapi options, the engine, the GitHub client and the webhook receiver; gauges read live state at scrape); `status.go` serves the admin `/api/v1/status`; `boundary_test.go` enforces feature isolation; `run_test.go` holds the end-to-end test against the fake GitHub (warm start, `pushed_at` push, outage served stale, signed webhook push) |
+| `cmd/scp` | Cobra CLI (`serve`, `config check`, `version`); `serve.go` wires everything; `metrics.go` is the only Prometheus code (packages report through hooks: `Observe` on httpapi options, the engine, the GitHub client and the webhook receiver; gauges read live state at scrape); `status.go` serves the admin `/api/v1/status`; `boundary_test.go` enforces feature isolation; `run_test.go` holds the end-to-end test against the fake GitHub (warm start, `pushed_at` push, outage served stale, signed webhook push, metrics, status, llms); `load_test.go` is the 1,000-repository load check (cold start on fake time through an in-memory transport, warm start, p99 per page) |
 | `internal/config` | Viper loading with `UnmarshalExact`; all validation; `Secret` (redacted). Required: `github.sources`. Keys: `server.*` (addresses, grace, `public_url`, `trusted_proxies`), `ops.pprof`, `log.*`, `store.path`, `sync.concurrency`, `github.sources[]`, `catalog.reconcile_interval`, `catalog.groups[]`, `webhook.secret_file`, `webhook.previous_secret_file` |
 | `internal/github` | go-github v92 client per source (App via ghinstallation, or token): listings, commits, trees (optionally recursive), blobs, latest release, `WebURL`, `Observe` (every response status), `RateRemaining`; `transport.go`: ETag replay of 304 as 200, rate book, in-flight limit; errors classified (`Error.Kind`; 409 is `NotFound` with code `empty`) |
 | `internal/github/githubtest` | Fake GitHub: App JWT check, installations, tokens, org listings with pagination, commits, trees, blobs and releases (`SetCommits`, `SetFile`, `SetRelease`), ETags/304, rate limits, fault injection (`Fail`, `Heal`), ledger |
@@ -67,8 +67,9 @@ only in `cmd/scp`. Untrusted bytes pass through bounded parsers and one sanitise
 
 Test idioms: engine tests run in `testing/synctest` bubbles with a real store in a temp dir; every package with goroutines uses `goleak`.
 
-## Next: M4
+## Next: M5
 
-`/llms.txt`, raw Markdown, metrics, readiness, hardening (CSP, limits) (`plan.md` section 5): security and load checks pass for 1,000
-repositories. Read `design/http-api.md` (middleware chain, CSP, llms, metrics), `design/build-ops.md` and the M3 entry in `decisions.md`.
-The raw `.md` document path was left for M4; request id, access log and metrics middleware were deferred here from M1.
+The web UI built from the Claude Design work (`plan.md` section 5): dashboard, group, repository, docs and commit pages; every page
+renders a real org, Playwright smoke, axe and CSP checks pass. Read `design/web.md`, `design/http-api.md` (routes, CSP) and the M4 entry
+in `decisions.md`. Deferred here from M4: generated TS types from `api/openapi.yaml`, the Playwright CSP check, and a test pinning the
+shell shapes in `internal/httpapi/spa.go` to the TanStack route tree.

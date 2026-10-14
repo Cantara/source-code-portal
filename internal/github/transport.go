@@ -171,7 +171,7 @@ func (r *rateBook) fraction() float64 {
 func (r *rateBook) remaining() (float64, time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if !r.known || time.Now().After(r.reset) {
+	if !r.known || !time.Now().Before(r.reset) { // at the reset instant the window is new
 		return 1, time.Time{}
 	}
 	return float64(r.left) / float64(r.limit), r.reset

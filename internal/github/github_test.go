@@ -246,3 +246,14 @@ func TestWebURL(t *testing.T) {
 		}
 	}
 }
+
+func TestRateBookResetInstant(t *testing.T) {
+	r := &rateBook{limit: 100, left: 1, reset: time.Now().Add(time.Hour), known: true}
+	if f, _ := r.remaining(); f != 0.01 {
+		t.Errorf("before the reset: %v", f)
+	}
+	r.reset = time.Now()
+	if f, _ := r.remaining(); f != 1 {
+		t.Errorf("at the reset: %v, want 1 (a fraction kept at the reset instant made the dispatcher spin)", f)
+	}
+}

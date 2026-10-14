@@ -47,7 +47,7 @@ func newServeCmd(opts *options) *cobra.Command {
 			}
 			log := newLogger(cfg.Log, cmd.ErrOrStderr())
 			slog.SetDefault(log)
-			srv, err := newServer(cmd.Context(), cfg, log)
+			srv, err := newServer(cmd.Context(), cfg, nil, log)
 			if err != nil {
 				return failure{err}
 			}
@@ -87,13 +87,13 @@ type server struct {
 	publicLn, adminLn net.Listener
 }
 
-// newServer opens the store, wires the features and binds both listeners.
-func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *server, err error) {
+// newServer opens the store, wires the features and binds both listeners. base is the transport to GitHub (nil: the default).
+func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, log *slog.Logger) (_ *server, err error) {
 	spa, err := web.FS()
 	if err != nil {
 		return nil, err
 	}
-	gh, err := github.New(cfg.GitHub, nil, log)
+	gh, err := github.New(cfg.GitHub, base, log)
 	if err != nil {
 		return nil, err
 	}
