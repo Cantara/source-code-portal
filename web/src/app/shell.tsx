@@ -14,7 +14,7 @@ export function ThemeSelect() {
       <select
         value={theme}
         onChange={(e) => apply(e.target.value as Choice)}
-        className="min-h-8 rounded-md border border-input bg-background px-2"
+        className="min-h-8 rounded-md border border-border bg-card px-2 text-sm"
         aria-label="Theme"
       >
         <option value="system">System</option>
@@ -25,7 +25,8 @@ export function ThemeSelect() {
   )
 }
 
-const nav = "rounded-md px-2 py-1 hover:bg-accent aria-[current=page]:font-semibold aria-[current=page]:underline"
+const nav =
+  "rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-foreground"
 
 /** MainNav is the header navigation; the current section is marked. */
 export function MainNav() {
@@ -52,4 +53,17 @@ export function FocusOnNavigation() {
     document.querySelector<HTMLElement>("main h1")?.focus()
   }, [path])
   return null
+}
+
+/** Mark is the portal's logo: a node graph in a hexagon. */
+export function Mark() {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className="size-7 text-primary drop-shadow-[0_0_6px_var(--glow)]">
+      <path d="M16 2.5 27.7 9.25v13.5L16 29.5 4.3 22.75V9.25Z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M16 9v7m0 0-6 4m6-4 6 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="16" cy="9" r="2.2" fill="currentColor" />
+      <circle cx="10" cy="20" r="2.2" fill="currentColor" />
+      <circle cx="22" cy="20" r="2.2" fill="currentColor" />
+    </svg>
+  )
 }

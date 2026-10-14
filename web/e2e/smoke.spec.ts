@@ -102,19 +102,25 @@ test("static files are immutable and compressed; pages are not stored", async ({
   expect(asset.headers()["content-encoding"]).toBe("gzip")
 })
 
-// Badges are a hard requirement: group cards, group tables and repository pages show them, and every one loads as an SVG.
-for (const [path, min] of [
-  ["/", 5],
-  ["/groups/whydah", 5],
-  ["/repos/acme/whydah-core", 4],
-] as const) {
-  test(`${path} shows its badges`, async ({ page }) => {
+// Badges are a hard requirement: every repository on the dashboard and its group shows its health badges, and the repository page
+// shows its SVG badges, every one loaded.
+for (const path of ["/", "/groups/whydah"]) {
+  test(`${path} shows health badges for every repository`, async ({ page }) => {
     await page.goto(path)
-    const badges = page.locator('img[src^="/badges/"]')
-    await expect.poll(() => badges.count()).toBeGreaterThanOrEqual(min)
-    for (const img of await badges.all()) {
-      await img.scrollIntoViewIfNeeded()
-      await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
+    const repos = page.locator('a[href^="/repos/"]:not([href*="/commits"]):not([href*="/docs/"])')
+    await expect.poll(() => repos.count()).toBeGreaterThanOrEqual(3)
+    for (const row of await page.locator("li:has(> div > a[href^='/repos/']), tr:has(a[href^='/repos/'])").all()) {
+      await expect(row.getByText(/issues$/)).toBeVisible()
+      await expect(row.getByText(/^(no licence|Apache-2\.0|MIT|[A-Z][\w.-]+)$/).first()).toBeVisible()
     }
   })
 }
+
+test("a repository page shows its SVG badges", async ({ page }) => {
+  await page.goto("/repos/acme/whydah-core")
+  const badges = page.locator('img[src^="/badges/"]')
+  await expect(badges).toHaveCount(4)
+  for (const img of await badges.all()) {
+    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
+  }
+})

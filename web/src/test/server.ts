@@ -39,6 +39,9 @@ export function repo(name: string, over: Partial<S["Repo"]> = {}): S["Repo"] {
     stars: 1,
     openIssues: 0,
     pushedAt: at,
+    lastCommitAt: at,
+    release: { tag: "v1.0.0", url: `https://github.com/acme/${name}/releases/tag/v1.0.0`, publishedAt: at },
+    language: "Go",
     groups: ["iam"],
     freshness: fresh,
     ...over,
@@ -63,6 +66,7 @@ export const snapshot = (version: number, ready = true): S["SnapshotInfo"] => ({
 /** defaults answer every page with one group, two repositories and a README. */
 export const defaults = [
   http.get("/snapshot", ({ response }) => response(200).json(snapshot(1))),
+  http.get("/repos", ({ response }) => response(200).json({ repos: [repo("Whydah"), repo("Whydah-Core")] })),
   http.get("/dashboard", ({ response }) =>
     response(200).json({
       groups: [

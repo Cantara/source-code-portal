@@ -240,9 +240,24 @@ export interface components {
       openIssues: number
       /** Format: date-time */
       pushedAt: string
+      /**
+       * Format: date-time
+       * @description The newest default-branch commit; null until read
+       */
+      lastCommitAt: string | null
+      /** @description The latest release; null when there is none or it is not read yet */
+      release: components["schemas"]["Release"] | null
+      /** @description Language of the first package manifest; empty when there is none */
+      language: string
       /** @description Group ids in configuration order */
       groups: string[]
       freshness: components["schemas"]["Freshness"]
+    }
+    Release: {
+      tag: string
+      url: string
+      /** Format: date-time */
+      publishedAt: string
     }
     RepoDetail: {
       repo: components["schemas"]["Repo"]

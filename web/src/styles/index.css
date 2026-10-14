@@ -31,45 +31,74 @@
 
 :root {
   color-scheme: light dark;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.985 0.004 250);
+  --foreground: oklch(0.2 0.03 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.03 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.55 0.2 27);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.62 0 0);
-  --ring: oklch(0.6 0 0);
+  --popover-foreground: oklch(0.2 0.03 260);
+  --primary: oklch(0.47 0.14 235);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.955 0.008 250);
+  --secondary-foreground: oklch(0.25 0.03 260);
+  --muted: oklch(0.955 0.008 250);
+  --muted-foreground: oklch(0.47 0.03 260);
+  --accent: oklch(0.94 0.02 240);
+  --accent-foreground: oklch(0.22 0.04 260);
+  --destructive: oklch(0.52 0.2 27);
+  --border: oklch(0.89 0.015 250);
+  --input: oklch(0.6 0.03 255);
+  --ring: oklch(0.55 0.14 235);
+  --grid: oklch(0.5 0.05 250 / 6%);
+  --glow: oklch(0.6 0.14 230 / 10%);
   --radius: 0.625rem;
+  /* Activity levels: --lvl paints lights and strips, --lvl-fg is text on a tinted chip (AA in both themes). */
+  --active: oklch(0.62 0.17 155);
+  --active-fg: oklch(0.38 0.11 155);
+  --recent: oklch(0.65 0.13 215);
+  --recent-fg: oklch(0.4 0.1 225);
+  --quiet: oklch(0.75 0.15 75);
+  --quiet-fg: oklch(0.43 0.1 65);
+  --dormant: oklch(0.65 0.02 260);
+  --dormant-fg: oklch(0.42 0.02 260);
+  --archived: oklch(0.58 0.08 300);
+  --archived-fg: oklch(0.42 0.1 300);
+  --danger: oklch(0.62 0.2 25);
+  --danger-fg: oklch(0.45 0.17 25);
 }
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(0.52 0 0);
-  --ring: oklch(0.65 0 0);
+  --background: oklch(0.135 0.025 262);
+  --foreground: oklch(0.95 0.01 250);
+  --card: oklch(0.175 0.03 262 / 82%);
+  --card-foreground: oklch(0.95 0.01 250);
+  --popover: oklch(0.19 0.03 262);
+  --popover-foreground: oklch(0.95 0.01 250);
+  --primary: oklch(0.83 0.13 205);
+  --primary-foreground: oklch(0.17 0.03 262);
+  --secondary: oklch(0.23 0.035 262);
+  --secondary-foreground: oklch(0.95 0.01 250);
+  --muted: oklch(0.23 0.035 262);
+  --muted-foreground: oklch(0.74 0.03 255);
+  --accent: oklch(0.26 0.05 255);
+  --accent-foreground: oklch(0.96 0.01 250);
+  --destructive: oklch(0.7 0.19 22);
+  --border: oklch(0.75 0.08 235 / 16%);
+  --input: oklch(0.55 0.04 255);
+  --ring: oklch(0.8 0.13 205);
+  --grid: oklch(0.8 0.1 220 / 4.5%);
+  --glow: oklch(0.7 0.15 220 / 16%);
+  --active: oklch(0.78 0.18 155);
+  --active-fg: oklch(0.86 0.13 155);
+  --recent: oklch(0.8 0.13 210);
+  --recent-fg: oklch(0.86 0.1 210);
+  --quiet: oklch(0.82 0.15 80);
+  --quiet-fg: oklch(0.87 0.12 80);
+  --dormant: oklch(0.6 0.03 260);
+  --dormant-fg: oklch(0.78 0.03 260);
+  --archived: oklch(0.68 0.1 300);
+  --archived-fg: oklch(0.82 0.08 300);
+  --danger: oklch(0.7 0.19 25);
+  --danger-fg: oklch(0.82 0.13 25);
 }
 
 @layer base {
@@ -77,6 +106,89 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background font-sans text-foreground;
+    @apply min-h-dvh bg-background font-sans text-foreground antialiased;
+  }
+}
+
+@layer components {
+  /* The page backdrop: a faint grid under a glow from the top. */
+  .cosmos {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, var(--glow), transparent 70%),
+      linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size:
+      auto,
+      2rem 2rem,
+      2rem 2rem;
+    background-attachment: fixed;
+  }
+  /* A panel: card surface with a lit top edge; interactive panels glow on hover and focus within. */
+  .panel {
+    @apply rounded-xl border border-border bg-card text-card-foreground backdrop-blur-sm;
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 6%),
+      0 1px 2px oklch(0 0 0 / 6%);
+  }
+  .panel-live {
+    @apply transition-[border-color,box-shadow] duration-200;
+  }
+  .panel-live:hover,
+  .panel-live:focus-within {
+    border-color: color-mix(in oklch, var(--primary) 45%, transparent);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 8%),
+      0 0 0 1px color-mix(in oklch, var(--primary) 20%, transparent),
+      0 8px 32px -12px color-mix(in oklch, var(--primary) 45%, transparent);
+  }
+  /* Activity levels set --lvl and --lvl-fg for the light, strip cell and chip inside. */
+  .lvl-active {
+    --lvl: var(--active);
+    --lvl-fg: var(--active-fg);
+  }
+  .lvl-recent {
+    --lvl: var(--recent);
+    --lvl-fg: var(--recent-fg);
+  }
+  .lvl-quiet {
+    --lvl: var(--quiet);
+    --lvl-fg: var(--quiet-fg);
+  }
+  .lvl-dormant {
+    --lvl: var(--dormant);
+    --lvl-fg: var(--dormant-fg);
+  }
+  .lvl-archived {
+    --lvl: var(--archived);
+    --lvl-fg: var(--archived-fg);
+  }
+  .lvl-danger {
+    --lvl: var(--danger);
+    --lvl-fg: var(--danger-fg);
+  }
+  .led {
+    @apply inline-block size-2 shrink-0 rounded-full;
+    background: var(--lvl);
+    box-shadow: 0 0 0.5rem color-mix(in oklch, var(--lvl) 70%, transparent);
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md border px-1.5 py-px font-mono text-[0.6875rem] leading-4 whitespace-nowrap;
+    color: var(--lvl-fg, var(--muted-foreground));
+    border-color: color-mix(in oklch, var(--lvl, var(--border)) 35%, transparent);
+    background: color-mix(in oklch, var(--lvl, var(--muted)) 10%, transparent);
+  }
+  .cell {
+    @apply size-2.5 rounded-[2px];
+    background: var(--lvl);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lvl-active.led-live {
+    animation: pulse-led 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse-led {
+    50% {
+      box-shadow: 0 0 0.9rem var(--lvl);
+    }
   }
 }

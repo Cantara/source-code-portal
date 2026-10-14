@@ -33,3 +33,21 @@ export function count(n: number): string {
 export function plural(n: number, one: string, many: string): string {
   return `${count(n)} ${n === 1 ? one : many}`
 }
+
+const short: [string, number][] = [
+  ["y", 365 * 24 * 3600],
+  ["mo", 30 * 24 * 3600],
+  ["w", 7 * 24 * 3600],
+  ["d", 24 * 3600],
+  ["h", 3600],
+  ["m", 60],
+]
+
+/** ago is the compact age of at relative to now: "3d", "5mo", "2y"; "now" under a minute. */
+export function ago(at: string | Date, now: number): string {
+  const seconds = Math.max(0, Math.round((now - new Date(at).getTime()) / 1000))
+  for (const [unit, size] of short) {
+    if (seconds >= size) return `${Math.floor(seconds / size)}${unit}`
+  }
+  return "now"
+}

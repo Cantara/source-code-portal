@@ -6,3 +6,9 @@ export const dashboardQuery = (api: Api) =>
     queryKey: ["dashboard"],
     queryFn: ({ signal }) => unwrap(api.GET("/dashboard", { signal })),
   })
+
+export const reposQuery = (api: Api) =>
+  queryOptions({
+    queryKey: ["repos"],
+    queryFn: ({ signal }) => unwrap(api.GET("/repos", { signal })),
+  })

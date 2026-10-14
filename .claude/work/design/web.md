@@ -59,10 +59,10 @@ web/
 ```
 | Path | Feature | Shows |
 |---|---|---|
-| `/` | dashboard | groups as cards (count badge, freshness), latest commits across the org |
-| `/groups/{group}` | groups | group header, repository table (filter by name, sort), latest commits |
+| `/` | dashboard | telemetry strip (repositories, active, released, licensed, open issues, in sync; activity legend), one card per group holding every member repository with its activity light and health badges, newest change first (large groups span columns), the repositories in no group, latest commits in a side rail |
+| `/groups/{group}` | groups | group header, repository table with activity and health badges (filter by name, sort), latest commits |
 | `/groups/{group}/commits` | commits | commit log scoped to the group |
-| `/repos/{owner}/{name}` | repos | descriptor, badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
+| `/repos/{owner}/{name}` | repos | descriptor, SVG badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
 | `/repos/{owner}/{name}/commits` | commits | commit log of the default branch |
 | `/repos/{owner}/{name}/docs/{path}` | docs | rendered doc with a file list and heading outline; `{path}` is the repository path without its extension |
 | `/commits` | commits | commit log across all repositories, filter by group or repository |
@@ -70,6 +70,13 @@ web/
 | anything else | app | 404 page (also for an unknown group or repository from a 404 problem) |
 
 A document's own leading `h1` is dropped on the page, whose `h1` already names it.
+
+Look: full width (no centred column), dense, dark first. Surfaces are `.panel` (lit top edge, glow on hover and focus within) over a
+faint grid backdrop (`.cosmos`). Health is drawn in HTML, not with badge images: `lib/health.ts` classifies a repository by its
+newest commit (else its last push) as active (30 days), recent (6 months), quiet (2 years), dormant or archived; `shared/health.tsx`
+renders the light (`.led`), the chips (`.chip`: age, latest release, licence, open issues, language, each with its meaning in text)
+and the per-group strip (one `.cell` per repository). The level colours are tokens (`--active`, `--active-fg`, ...) with AA text
+contrast in both themes. The header shows whether the live stream is open (`LiveIndicator`).
 
 ## Behaviour (numbered)
 1. Queries: `staleTime` 10 s, `gcTime` 5 min, retry network/429/5xx at most twice (honour `Retry-After`), refetch on window focus,

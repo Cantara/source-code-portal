@@ -554,6 +554,13 @@ type Problem struct {
 	Type     string  `json:"type"`
 }
 
+// Release defines model for Release.
+type Release struct {
+	PublishedAt time.Time `json:"publishedAt"`
+	Tag         string    `json:"tag"`
+	Url         string    `json:"url"`
+}
+
 // Repo defines model for Repo.
 type Repo struct {
 	// Address Lower-case owner/name, used in URLs
@@ -571,6 +578,12 @@ type Repo struct {
 	Homepage string `json:"homepage"`
 	HtmlUrl  string `json:"htmlUrl"`
 
+	// Language Language of the first package manifest; empty when there is none
+	Language string `json:"language"`
+
+	// LastCommitAt The newest default-branch commit; null until read
+	LastCommitAt *time.Time `json:"lastCommitAt"`
+
 	// License SPDX id; empty when unknown
 	License string `json:"license"`
 	Name    string `json:"name"`
@@ -579,9 +592,12 @@ type Repo struct {
 	OpenIssues int       `json:"openIssues"`
 	Owner      string    `json:"owner"`
 	PushedAt   time.Time `json:"pushedAt"`
-	Stars      int       `json:"stars"`
-	Topics     []string  `json:"topics"`
-	Visibility string    `json:"visibility"`
+
+	// Release The latest release; null when there is none or it is not read yet
+	Release    *Release `json:"release"`
+	Stars      int      `json:"stars"`
+	Topics     []string `json:"topics"`
+	Visibility string   `json:"visibility"`
 }
 
 // RepoDetail defines model for RepoDetail.

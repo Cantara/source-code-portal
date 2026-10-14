@@ -32,9 +32,14 @@ describe("pages", () => {
     show(<DashboardView />)
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()
     expect(await screen.findByRole("link", { name: "IAM" })).toHaveAttribute("href", "/groups/iam")
-    expect(screen.getByText("2 up to date · 1 delayed")).toBeInTheDocument()
     expect(screen.getByText("Commit 1")).toBeInTheDocument()
-    expect(screen.getByText("1 repository is in no group.")).toBeInTheDocument()
+    // Every repository of the group shows with its health badges.
+    const card = (await screen.findByRole("link", { name: "Whydah-Core" })).closest("li")
+    expect(card).toHaveTextContent("v1.0.0")
+    expect(card).toHaveTextContent("Apache-2.0")
+    expect(card).toHaveTextContent("0 open issues")
+    expect(screen.getByRole("img", { name: "Activity: 2 active" })).toBeInTheDocument()
+    expect(screen.getByText("Repositories").nextElementSibling).toHaveTextContent("2")
   })
 
   it("filters and sorts the repositories of a group through the URL", async () => {

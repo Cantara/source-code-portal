@@ -221,7 +221,7 @@ components:
     Repo:
       type: object
       required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, topics, archived, fork,
-                 stars, openIssues, pushedAt, groups, freshness]
+                 stars, openIssues, pushedAt, lastCommitAt, release, language, groups, freshness]
       properties:
         address: { type: string, description: "Lower-case owner/name, used in URLs" }
         owner: { type: string }
@@ -238,8 +238,18 @@ components:
         stars: { type: integer }
         openIssues: { type: integer, description: Open issues and pull requests }
         pushedAt: { type: string, format: date-time }
+        lastCommitAt: { type: [string, "null"], format: date-time, description: The newest default-branch commit; null until read }
+        release: { oneOf: [{ $ref: "#/components/schemas/Release" }, { type: "null" }], description: The latest release; null when there is none or it is not read yet }
+        language: { type: string, description: Language of the first package manifest; empty when there is none }
         groups: { type: array, items: { type: string }, description: Group ids in configuration order }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    Release:
+      type: object
+      required: [tag, url, publishedAt]
+      properties:
+        tag: { type: string }
+        url: { type: string }
+        publishedAt: { type: string, format: date-time }
     RepoDetail:
       type: object
       required: [repo, title, descriptor, commits, commitsFreshness]

@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { StatusBanners } from "@/features/status/banners"
+import { LiveIndicator, StatusBanners } from "@/features/status/banners"
 import { origin, privateViewer } from "@/lib/api/server"
 import { Providers } from "./providers"
-import { FocusOnNavigation, MainNav, ThemeSelect } from "./shell"
+import { FocusOnNavigation, MainNav, Mark, ThemeSelect } from "./shell"
 import "@/styles/index.css"
 import "@/styles/docs.css"
 
@@ -29,25 +29,32 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Sets the stored theme before the first paint. */}
         <script src="/theme-init.js" />
       </head>
-      <body>
+      <body className="cosmos">
         <Providers>
           <FocusOnNavigation />
           <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-2">
             Skip to content
           </a>
-          <header className="border-b border-border">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 p-3">
-              <Link href="/" className="font-semibold">
-                Source Code Portal
+          <header className="sticky top-0 z-40 border-b border-border bg-background/75 backdrop-blur-md">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 lg:px-6">
+              <Link href="/" className="group flex items-center gap-2.5 font-semibold tracking-tight">
+                <Mark />
+                <span>
+                  Source Code Portal
+                  <span className="ml-2 hidden font-mono text-[0.6875rem] font-normal tracking-widest text-muted-foreground uppercase sm:inline">
+                    Mission control
+                  </span>
+                </span>
               </Link>
               <MainNav />
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-4">
+                <LiveIndicator />
                 <ThemeSelect />
               </div>
             </div>
           </header>
           <StatusBanners />
-          <main id="main" className="mx-auto max-w-6xl p-4">
+          <main id="main" className="px-4 py-5 lg:px-6">
             {children}
           </main>
         </Providers>

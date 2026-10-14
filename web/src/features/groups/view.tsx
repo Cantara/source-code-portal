@@ -15,7 +15,7 @@ import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
-import { RepoBadges } from "@/shared/repo-badges"
+import { ActivityLight, HealthBadges } from "@/shared/health"
 import { VisibilityBadge } from "@/shared/visibility-badge"
 import { groupCommitsQuery, groupQuery } from "./api"
 import { validateGroupSearch, type GroupSearch, type SortKey } from "./search"
@@ -105,7 +105,7 @@ export function GroupView({ group }: { group: string }) {
                       </th>
                       {header("pushed", "Last push")}
                       <th scope="col" className="p-2 text-left font-semibold">
-                        Badges
+                        Health
                       </th>
                       <th scope="col" className="p-2 text-left font-semibold">
                         Freshness
@@ -117,6 +117,7 @@ export function GroupView({ group }: { group: string }) {
                       <tr key={r.address}>
                         <td className="p-2 font-medium">
                           <span className="inline-flex flex-wrap items-center gap-2">
+                            <ActivityLight repo={r} />
                             <Link href={repoPath(r.owner, r.name)} className="hover:underline">
                               {r.owner}/{r.name}
                             </Link>
@@ -128,7 +129,7 @@ export function GroupView({ group }: { group: string }) {
                           <RelativeTime at={r.pushedAt} />
                         </td>
                         <td className="p-2">
-                          <RepoBadges address={r.address} lazy className="min-w-80" />
+                          <HealthBadges repo={r} className="min-w-72" />
                         </td>
                         <td className="p-2">
                           <FreshnessBadge freshness={r.freshness} />

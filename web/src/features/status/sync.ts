@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, type Query } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/lib/api/client"
+import { setLive } from "@/lib/connection"
 import type { components } from "@/lib/api/schema"
 import { snapshotKey, snapshotQuery } from "@/lib/api/snapshot"
 
@@ -23,6 +24,7 @@ export function keep(q: Query): boolean {
 function useLiveSnapshot(): boolean {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
+  useEffect(() => setLive(open), [open])
   useEffect(() => {
     if (typeof EventSource === "undefined") return
     const source = new EventSource("/api/v1/events")

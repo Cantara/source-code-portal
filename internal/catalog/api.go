@@ -154,12 +154,25 @@ func repos(s *snapshot.Snapshot, keys []snapshot.RepoKey, now time.Time) []oapi.
 
 func repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.Repo {
 	r := e.Repo
-	return oapi.Repo{
+	out := oapi.Repo{
 		Address: string(r.Key()), Owner: r.Owner, Name: r.Name, Description: r.Description, HtmlUrl: r.HTMLURL, Homepage: r.Homepage,
 		DefaultBranch: r.DefaultBranch, License: r.License, Visibility: r.Visibility, Topics: nonNil(r.Topics), Archived: r.Archived,
 		Fork: r.Fork, Stars: r.Stars, OpenIssues: r.OpenIssues, PushedAt: r.PushedAt.UTC(), Groups: nonNil(s.GroupsOf(r.Key())),
 		Freshness: oapi.FreshnessOf(e.Fresh, now),
 	}
+	if len(e.Commits) > 0 {
+		out.LastCommitAt = oapi.TimeOrNil(e.Commits[0].CommittedAt)
+	}
+	if rel := e.Release; rel != nil {
+		out.Release = &oapi.Release{Tag: rel.Tag, Url: rel.URL, PublishedAt: rel.Published.UTC()}
+	}
+	for _, m := range e.Manifests {
+		if m.Language != "" {
+			out.Language = m.Language
+			break
+		}
+	}
+	return out
 }
 
 func nonNil(ss []string) []string {
