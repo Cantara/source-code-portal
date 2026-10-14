@@ -1,8 +1,8 @@
 # Images and live updates
-Status: v1 design note (M10), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
-- Image proxy: every image in a rendered document loads from the portal, `GET /images/{owner}/{name}/{id}`, so the shell's CSP is
+- Image proxy: every image in a rendered document loads from the portal, `GET /images/{owner}/{name}/{id}`, so the page CSP has
   `img-src 'self'`. Repository files come from GitHub by blob SHA through the source's client (private repositories work for the viewers
   allowed to see them); external `https` images through a guarded client.
 - Live updates: `GET /api/v1/events` is a server-sent event stream that announces every new snapshot; the web UI listens and stops
@@ -36,14 +36,14 @@ Status: v1 design note (M10), 2026-10-14. Binding order: ../plan.md > this note 
 - Events: `GET /api/v1/events` (`text/event-stream`, in the contract) sends `event: snapshot` with the `SnapshotInfo` of the viewer's
   view at connect and after every publish (a burst of publishes gives one event with the latest), a comment every 25 s, `retry: 5000`.
   The stream is exempt from the 30 s request deadline, the API's buffering for ETags and the server's write timeout (a write deadline
-  of 30 s per event instead); `Cache-Control: no-store` and `X-Accel-Buffering: no`. At most 1,000 streams per instance (503 beyond);
-  streams end when the server shuts down. Each instance announces its own snapshots.
+  of 30 s per event instead); `Cache-Control: no-store` and `X-Accel-Buffering: no`. At most 1,000 streams per instance
+  (503 with `Retry-After: 30` beyond); streams end when the server shuts down. Each instance announces its own snapshots.
 - The snapshot version: the sum of a 64-bit FNV-1a digest per published item (key, state, error, content SHA, checked time in seconds,
   payload), kept by the builder as items are published and dropped, masked to 53 bits for JavaScript. Equal items give equal
   versions on every instance and after a restart; it identifies a snapshot and is compared for equality only.
-- Web: the shell opens an `EventSource` on `/api/v1/events`; an event replaces the snapshot query's data, which invalidates the other
+- Web: `features/status/sync.ts` opens an `EventSource` on `/api/v1/events`; an event replaces the snapshot query's data, which invalidates the other
   queries as a polled version change did. While the stream is open the snapshot is not polled; on an error the browser reconnects and
-  the 30 s polling runs until it does.
+  the 30 s polling runs until it does. A new version invalidates every other query except a paged log with more than one page loaded.
 
 ## Shapes
 ```go

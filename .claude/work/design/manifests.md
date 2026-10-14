@@ -1,5 +1,5 @@
 # Package manifests
-Status: v1 design note (M7), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
 - `internal/manifests` (feature): per repository, the `go.mod`, `package.json` and `pom.xml` files read as untrusted input, the
@@ -51,12 +51,8 @@ API `GET /api/v1/repos/{owner}/{name}/manifests`: `technology` (languages, build
 `freshness`. Weak ETag as every API response; an old address answers 308.
 
 ## Tests
-- Golden tables per parser (typical files, inheritance and interpolation, scopes, hostile input: deep nesting, entity declarations, a
-  billion-laughs DTD, huge token counts, invalid UTF-8, bidi names); a fuzz target per parser (no panic, bounds hold).
-- The job against the fake GitHub: discovery rules, blob reuse by SHA, too-large files, empty repositories.
-- Internal links across repositories in the snapshot (both directions, multiple providers, self-reference ignored); end to end in
-  `cmd/scp/run_test.go`; the panel in Vitest and the Playwright smoke.
-
-## Reference (archive pointers)
-- `../reference/detailed-design/20-design/11-manifests-core.md` sections 3 and 4.1-4.5 (model, parser contract, discovery).
-- `../reference/detailed-design/20-design/12-manifests-ecosystems-a.md` (Maven, npm and Go format details).
+- `internal/manifests`: `TestGoMod`, `TestPackageJSON`, `TestPOM` (inheritance, interpolation, scopes), `TestPOMHostile` (deep nesting,
+  entity declarations, token counts, invalid encodings), `FuzzParsers` (no panic, bounds hold), `TestJob` (discovery rules, blob reuse by
+  SHA, too-large files, empty repositories), `TestAPI`.
+- `internal/snapshot` `TestDependencyIndex` (both directions, several providers, self-reference ignored); end to end in
+  `cmd/scp/run_test.go`; the panel in `web/src/app/views.test.tsx` and the Playwright smoke.

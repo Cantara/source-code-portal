@@ -1,5 +1,5 @@
 # Private repositories
-Status: v1 design note (M8), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
 - Private and internal repositories in the catalogue, per source (`github.sources[].include_private`).
@@ -10,7 +10,8 @@ Status: v1 design note (M8), 2026-10-14. Binding order: ../plan.md > this note >
 - SCP does not authenticate. The proxy (oauth2-proxy, an ingress with OIDC, a corporate SSO gateway) authenticates and passes the user
   and groups in headers: `access.user_header` (default `X-Forwarded-User`) and `access.groups_header` (default `X-Forwarded-Groups`,
   comma-separated, names compared exactly). Headers are believed only from a peer in `server.trusted_proxies`, the same list that governs `X-Forwarded-For`;
-  from any other peer both are removed before routing.
+  from any other peer both are removed before routing. An API call of the web UI server names its page's viewer with `X-Scp-Viewer`,
+  believed only with the right `X-Scp-Token` (http-api.md).
 - `access.private_groups` lists the groups whose members see private repositories; `"*"` admits every authenticated user. A source with
   `include_private` needs a non-empty list (config check), so private data is never admitted without a way to restrict it.
 - The snapshot carries two views built at publish: the full one and the public one (private and internal repositories removed, with
@@ -23,7 +24,7 @@ Status: v1 design note (M8), 2026-10-14. Binding order: ../plan.md > this note >
 - `/llms.txt` and `/llms-full.txt` are built once per view and snapshot.
 - Admin surfaces (`/metrics`, `/api/v1/status`) read the full view; they are on the admin listener.
 - Images of private repositories load through the image proxy (images-events.md), which answers only viewers who see the repository.
-- The SPA shows a "Private" or "Internal" badge on repository rows and pages; nothing else changes in the UI.
+- The web UI shows a "Private" or "Internal" badge on repository rows and pages.
 
 ## Shapes
 ```go
@@ -49,5 +50,5 @@ Features take `Current func(context.Context) *snapshot.Snapshot`; `cmd/scp` buil
 - Snapshot views: removed entries, aliases to private targets, group members and default repository, feeds, dependency links,
   pointer identity when nothing is private.
 - Middleware: headers from an untrusted peer are removed and ignored; group matching (`*`, exact names, spaces around commas); cache headers.
-- End to end (`cmd/scp/run_test.go`): a private repository is absent from every public surface (API list and detail, badge 404, group
+- End to end (`TestPrivateRepositories` in `cmd/scp/access_test.go`): a private repository is absent from every public surface (API list and detail, badge 404, group
   count, dashboard, commits feed, `/llms.txt`) and present for a request from the trusted proxy with a permitted group.

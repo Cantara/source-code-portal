@@ -1,15 +1,14 @@
 # Web UI
-Status: v1 design note (M11), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
-This note fixes the technical frame of the UI and, with the route table below, its page composition.
+Status: as built. Binding order: ../plan.md > this note.
 
-## Scope (v1)
-A read-only web UI rendered on the server with Next.js (owner decision P-13) for the pages of plan.md section 2: dashboard, group,
-repository (README), docs viewer, commit logs (all, group, repository) and a 404 page. Every page arrives as complete HTML, readable
+## Scope
+A read-only web UI rendered on the server with Next.js for the pages: dashboard, group, repository (README), docs viewer, commit logs
+(all, group, repository) and a 404 page. Every page arrives as complete HTML, readable
 without JavaScript, with its own title, description and canonical URL; `/sitemap.xml` and `/robots.txt` list the pages. After load the
-page is the same React application as before: it reads only `/api/v1`, shows freshness everywhere and follows `/api/v1/events`.
+page is a React application that reads only `/api/v1`, shows freshness everywhere and follows `/api/v1/events`.
 
 ## Decisions (bullets with one-line reasons)
-- Stack: Next.js 16 (App Router, `output: "standalone"`), React 19, TypeScript, Tailwind 4 (PostCSS), TanStack Query, Vitest,
+- Stack: Next.js 16 (App Router, `output: "standalone"`), React 19, TypeScript, Tailwind 4 (PostCSS), TanStack Query, `vitest`,
   Playwright, pnpm. The few components (button, card, badge, alert) are written in `components/ui/` in the shadcn style: plain elements.
 - Go stays the one public entry point. `scp serve` runs the Next.js server as a child process (`node server.js` from `web.dir`) on a
   loopback port and proxies every page path to it; API, badges, images, llms, Markdown and the webhook stay in Go. One port, one
@@ -19,12 +18,15 @@ page is the same React application as before: it reads only `/api/v1`, shows fre
   time). A private viewer's page is rendered from the full snapshot, a public viewer's from the public view; the browser never sees the token.
 - The Next.js server reaches the API at `SCP_API` (the public listener on loopback, set by Go) and sends the page's `X-Request-Id`, so
   one request id follows a page through every API call.
-- Server pages load their queries with the same `queryOptions` factories as the browser into a per-request `QueryClient` and hand them
-  over with `HydrationBoundary`; the views are client components that read those queries. One data path, no second set of components.
+- Each page is a route module of its feature (`route.tsx`: `load`, `metadata`, `render`, the `Route` type of `lib/page.tsx`); the
+  `app/` page file is `page(route)`. `load` fills a per-request `QueryClient` with the same `queryOptions` factories the browser uses
+  and `page` hands it over with `HydrationBoundary`; the views are client components that read those queries. One data path, no second
+  set of components.
 - Query factories take the API client as their first argument: `serverApi()` (per request, `server-only`) on the server, `api` (the
-  browser's) in client components. Query keys do not include the client, so server data hydrates the browser's cache.
-- A page's main query decides the status: a 404 problem calls `notFound()` (Next.js answers 404 with the not-found page), a renamed
-  repository calls `permanentRedirect` (308); other failures render the page without data and the browser retries.
+  browser's) in client components. Query keys (`lib/api/queries.ts` `keys`) do not include the client, so server data hydrates the
+  browser's cache.
+- A page's main query decides the status (`lib/load.ts`): a 404 problem calls `notFound()` (Next.js answers 404 with the not-found
+  page), a renamed repository calls `permanentRedirect` (308); other failures render the page without data and the browser retries.
 - Metadata through `generateMetadata` on the same per-request loader (`React.cache`): title `"<page> · Source Code Portal"`,
   description from the descriptor or repository description, canonical from the origin Go sends (`X-Scp-Origin`: `server.public_url`,
   else the request's scheme and host). Robots: index everything public; a private viewer's pages carry `noindex`.
@@ -34,8 +36,10 @@ page is the same React application as before: it reads only `/api/v1`, shows fre
   gzip leaves a response with a `Content-Encoding` alone.
 - Typed client: `openapi-typescript` generates `web/src/lib/api/schema.d.ts` from `api/openapi.yaml` (committed, drift-checked);
   `openapi-fetch` wraps fetch; one `unwrap()` turns every failure into a `ProblemError`.
-- Features never import features (mirror of the Go rule); they share through `shared/`, `lib/` and `lib/paths.ts`. ESLint enforces it;
-  `src/app` (the Next.js routes) composes features.
+- Layers, bottom up: `lib`, `components/ui`, `shared` (generic UI), `entities` (repository and commit pieces), `features`, `app`. A
+  layer imports only those below it (through `@/` or `./`, dynamic imports included); a feature never imports another feature (mirror
+  of the Go rule). ESLint enforces it. Only `app/` composes: the repository page takes the panels other features contribute
+  (`Panel` in `lib/page.tsx`; `app/repos/[owner]/[name]/panels.ts` lists the manifests panels).
 - One component, `shared/safe-html.tsx`, renders server-sanitised HTML.
 - Development: `next dev` on 127.0.0.1:3000 rewrites `/api`, `/badges`, `/images`, `/llms*.txt` and the `.md` addresses to `SCP_API`
   (default `http://127.0.0.1:9090`, a running `scp serve`): hot reload without Go in front.
@@ -48,21 +52,25 @@ web/
   scripts/bundle.ts                                  assembles web/bundle (standalone server, static files, public/) and checks the budget
   e2e/global-setup.ts fixtures.ts smoke.spec.ts live.spec.ts seo.spec.ts   against cmd/scp/e2e_test.go (fake GitHub, Go, the Next.js child)
   src/
-    app/       layout.tsx (html, head, shell), providers.tsx (client: QueryClient, snapshot sync, focus), shell.tsx, not-found.tsx,
-               error.tsx, sitemap.ts, robots.ts, and one page.tsx per route below
-    features/  dashboard/ groups/ repos/ commits/ docs/ status/      each: api.ts (query factories), view.tsx (client), *.test.tsx
+    app/       layout.tsx (html, head, shell, metadata), providers.tsx (client: QueryClient, snapshot sync, focus), shell.tsx,
+               not-found.tsx, error.tsx, sitemap.ts, robots.ts, one page.tsx per route below (page(route) of its feature),
+               repos/[owner]/[name]/panels.ts, views.test.tsx
+    features/  dashboard/ groups/ repos/ docs/ commits/ (each route.tsx, view.tsx, api.ts with its queries where it has its own)
+               manifests/ (api.ts, panels.tsx, view.tsx: the technology and dependency panels)  status/ (sync.ts, banners.tsx)
+    entities/  repo/ (health.ts, health-badges.tsx, visibility-badge.tsx)  commit/ (commit-list.tsx)  entities.test.tsx
     components/ui/                                  button card badge alert
-    shared/    safe-html freshness-badge relative-time page-header problem-alert empty-state initials-avatar panel-boundary commit-list
-    lib/       api/{schema.d.ts,client.ts,server.ts,snapshot.ts}  query.ts load.ts paths.ts connection.ts clock.ts theme.ts format.ts build.ts docs.ts cn.ts
+    shared/    safe-html freshness-badge relative-time page-header problem-alert empty-state initials-avatar panel-boundary, shared.test.tsx
+    lib/       api/{schema.d.ts,client.ts,server.ts,queries.ts,snapshot.ts}  page.tsx load.ts query.ts paths.ts connection.ts clock.ts
+               theme.ts format.ts build.ts docs.ts cn.ts, lib.test.ts
     styles/    index.css (tokens, light and dark)  docs.css (prose and Chroma classes for both themes)  chroma.css (generated)
-    test/      setup.ts server.ts (MSW, unmocked request fails the test) navigation.ts (next/navigation for tests)
+    test/      setup.ts server.ts (MSW, unmocked request fails the test) navigation.ts link.tsx (next/navigation and next/link for tests)
 ```
 | Path | Feature | Shows |
 |---|---|---|
 | `/` | dashboard | telemetry strip (repositories, active, released, licensed, open issues, in sync; activity legend), one card per group holding every member repository with its activity light and health badges, newest change first (large groups span columns), the repositories in no group, latest commits in a side rail |
 | `/groups/{group}` | groups | group header, repository table with activity and health badges (filter by name, sort), latest commits |
 | `/groups/{group}/commits` | commits | commit log scoped to the group |
-| `/repos/{owner}/{name}` | repos | descriptor, SVG badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
+| `/repos/{owner}/{name}` | repos (+ manifests panels) | descriptor, SVG badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
 | `/repos/{owner}/{name}/commits` | commits | commit log of the default branch |
 | `/repos/{owner}/{name}/docs/{path}` | docs | rendered doc with a file list and heading outline; `{path}` is the repository path without its extension |
 | `/commits` | commits | commit log across all repositories, filter by group or repository |
@@ -72,9 +80,9 @@ web/
 A document's own leading `h1` is dropped on the page, whose `h1` already names it.
 
 Look: full width (no centred column), dense, dark first. Surfaces are `.panel` (lit top edge, glow on hover and focus within) over a
-faint grid backdrop (`.cosmos`). Health is drawn in HTML, not with badge images: `lib/health.ts` classifies a repository by its
-newest commit (else its last push) as active (30 days), recent (6 months), quiet (2 years), dormant or archived; `shared/health.tsx`
-renders the light (`.led`), the chips (`.chip`: age, latest release, licence, open issues, language, each with its meaning in text)
+faint grid backdrop (`.cosmos`). Health is drawn in HTML, not with badge images: a repository is classified by its
+newest commit (else its last push) as active (30 days), recent (6 months), quiet (2 years), dormant or archived (`entities/repo/health.ts`);
+`entities/repo/health-badges.tsx` renders the light (`.led`), the chips (`.chip`: age, latest release, licence, open issues, language, each with its meaning in text)
 and the per-group strip (one `.cell` per repository). The level colours are tokens (`--active`, `--active-fg`, ...) with AA text
 contrast in both themes. The header shows whether the live stream is open (`LiveIndicator`).
 
@@ -107,7 +115,7 @@ contrast in both themes. The header shows whether the live stream is open (`Live
     a catch-all encoded per segment (`lib/paths.ts`).
 
 ## Build and serve
-- `pnpm build`: `next build` with `NEXT_PUBLIC_BUILD_ID` (git SHA, `dev` locally) as `deploymentId`, then `scripts/bundle.ts`: copies
+- `pnpm build`: `next build` with `BUILD_ID` (git SHA, `dev` locally) as `deploymentId` and `NEXT_PUBLIC_BUILD_ID`, then `scripts/bundle.ts`: copies
   `.next/standalone`, `.next/static` and `public/` into `web/bundle` and fails when the gzip JS under `/_next/static` exceeds 300 KB,
   the CSS 25 KB, or any font is present. `web/bundle` is platform-independent JavaScript (`sharp` is not traced).
 - `web.dir` (the bundle directory) and `web.node` (default `node`): `scp serve` starts `node server.js` with `PORT` (a free loopback
@@ -123,18 +131,15 @@ contrast in both themes. The header shows whether the live stream is open (`Live
   `distroless/nodejs24-debian13` with `/scp`, the bundle in `/web`, `SCP_WEB_DIR=/web` and `SCP_WEB_NODE=/nodejs/bin/node`.
 
 ## Tests
-- Vitest + Testing Library (jsdom) + MSW typed from `paths`, any unmocked request fails: the views with a test `next/navigation`,
-  hooks, `unwrap`, freshness labels, snapshot invalidation, load-more and "New commits", theme script parity, ProblemAlert mapping.
-- Go: `httpapi.Pages` against a loopback upstream (headers, token, nonce in request and response CSP, 503); the token admits a
-  private viewer only with the right value; `webui` starts a fake child (a Go test binary acting as `node`), restarts it, stops it.
+- `vitest` + Testing Library (jsdom) + MSW typed from `paths`, any unmocked request fails (`app/views.test.tsx`, `entities/entities.test.tsx`,
+  `shared/shared.test.tsx`, `lib/lib.test.ts`): the views with test `next/navigation` and `next/link`, `unwrap`, freshness labels,
+  snapshot invalidation, load-more and "New commits", theme script parity, ProblemAlert mapping, the manifests panels.
+- Go: `TestPages` (headers, token, nonce in request and response CSP, 503); `TestPrivateViewer` (the token admits a private viewer only
+  with the right value); `webui` `TestServer` starts a fake child (a Go test binary acting as `node`), restarts it, stops it.
 - Playwright against `cmd/scp/e2e_test.go` (the real binary path: Go supervising the built bundle) at 1280x800 and 360x740: every
   route renders its `h1`; with JavaScript disabled every page shows its content, title, description and canonical; the sitemap lists
   the pages; unknown paths and repositories answer 404; dark mode paints dark from the first frame; static files are immutable.
 - An auto fixture fails any test on a `securitypolicyviolation`, `pageerror` or unexpected `console.error` (the CSP and hydration check).
 - axe (`@axe-core/playwright`, tags up to `wcag22aa`) on every route in both themes: zero violations.
-- CI `web` job: frozen install, gen drift, typecheck, lint, Vitest, build with budget; `e2e` job: build plus Playwright. Both required.
-
-## Reference (archive pointers)
-- `../reference/detailed-design/20-design/17-web-foundation.md` 4.3 (client, `unwrap`), 4.4 (query defaults, polling, skew), 4.5-4.8
-  (freshness, errors, theme, accessibility), 4.11 (budgets).
-- `../reference/detailed-design/20-design/18-web-pages.md` 4.2-4.6 (page layouts and state matrices), 4.1.10 (load more), 4.14 (404, empty states).
+- CI `web` job: frozen install, gen drift, lint, typecheck, format check, `vitest`, build with budget; `e2e` job: build plus Playwright;
+  both behind the required `gate`.

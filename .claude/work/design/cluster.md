@@ -1,5 +1,5 @@
 # Multiple instances
-Status: v1 design note (M9), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
 - `internal/cluster`: two or more instances on one Hazelcast cluster (`cluster.addresses`). One instance leads and runs the sync jobs;
@@ -9,11 +9,10 @@ Status: v1 design note (M9), 2026-10-14. Binding order: ../plan.md > this note >
 
 ## Decisions
 - One leader instead of shared job leases: only the leader calls GitHub, so each call is made once and the rate budget, ETags and App
-  tokens stay in one process, as in a single instance. The work of one portal fits one process; the other instances serve and stand by.
+  tokens stay in one process, as in a single instance. The other instances serve and stand by.
 - The leader lock is a Hazelcast map lock taken with `TryLock` every 2 s by the instances that do not hold it. Hazelcast releases it when the
   holder shuts down (about 10 s) or stops heartbeating (60 s, the server's `hazelcast.client.max.no.heartbeat.seconds`). An instance that
-  loses its connection stops leading at once and takes part again after it reconnects. The CP subsystem (FencedLock) is not used: it is a
-  Hazelcast Enterprise feature from 5.5 and needs three members.
+  loses its connection stops leading at once and takes part again after it reconnects.
 - The state map holds, per job key, the last recorded outcome (the store item with its schedule; listing jobs add the source's catalogue)
   with a revision. The leader writes after each outcome through a coalescing queue (latest per key) in its own goroutine, so a slow
   Hazelcast never holds the dispatcher. Items of repositories that left are deleted.
@@ -37,9 +36,9 @@ Status: v1 design note (M9), 2026-10-14. Binding order: ../plan.md > this note >
 - Values are JSON. Hazelcast object names start with `cluster.namespace` (default `scp`), so several portals or test runs can share a
   cluster. Hazelcast OSS has no authentication or TLS: it belongs on a private network, like the admin listener.
 - `internal/cluster` holds the member logic over a small `Backend` interface; `Hazelcast` implements it with
-  `hazelcast-go-client` v1.6; `clustertest` implements it in memory for tests. The sync engine knows nothing of Hazelcast: it shares
+  `hazelcast-go-client` v1.6 (maps `<namespace>.state`, `.lock`, `.deliveries`, topic `<namespace>.events`); `clustertest` implements it in memory for tests. The sync engine knows nothing of Hazelcast: it shares
   outcomes through a hook and receives them through a method.
-- Followers report an empty queue; `/api/v1/status` shows the role; the gauge `scp_cluster_leader` is 1 on the leader.
+- Followers report an empty queue; `/api/v1/status` has a `cluster` section; the gauge `scp_cluster_leader` is 1 on the leader.
 
 ## Shapes
 ```go
@@ -62,6 +61,7 @@ type Backend interface {
     TryLead(ctx context.Context) (bool, error)
     Put(ctx context.Context, key string, value []byte) error
     Delete(ctx context.Context, key string) error
+    Keys(ctx context.Context) ([]string, error)
     Entries(ctx context.Context) (map[string][]byte, error)
     Watch(ctx context.Context, fn func(key string, value []byte)) error
     Once(ctx context.Context, id string, ttl time.Duration) (bool, error)
@@ -71,8 +71,10 @@ type Backend interface {
     Close(ctx context.Context) error
 }
 func New(dial func(context.Context) (Backend, error), log *slog.Logger) *Member
-func (m *Member) Run(ctx context.Context, e Engine) error  // until ctx ends
-func (m *Member) Share(r sync.Shared); Leader() bool; Seen(id string) bool; Event(ev sync.Event, repo snapshot.RepoKey, source string)
+func (m *Member) Run(ctx context.Context, e Engine) error  // until ctx ends; Engine is the narrow view of *sync.Engine
+func (m *Member) Share(r sync.Shared); Leader() bool; Connected() bool
+func (m *Member) First(ctx context.Context, id string) (bool, error)                                 // delivery de-duplication
+func (m *Member) Event(ctx context.Context, ev sync.Event, repo snapshot.RepoKey, source string) error // to every engine
 ```
 
 ## Config
