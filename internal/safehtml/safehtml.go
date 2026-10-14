@@ -10,7 +10,7 @@ import (
 )
 
 // PolicyVersion changes whenever the policy's output changes; stored HTML of another version is rendered again.
-const PolicyVersion = 1
+const PolicyVersion = 2
 
 const maxInput = 8 << 20
 
@@ -67,7 +67,7 @@ func New() *Policy {
 	p.AllowRelativeURLs(true)
 	p.AllowAttrs("href").OnElements("a")
 	p.AllowAttrs("rel").Matching(regexp.MustCompile(`^noopener noreferrer nofollow ugc$`)).OnElements("a")
-	p.AllowAttrs("src").Matching(regexp.MustCompile(`^https://`)).OnElements("img")
+	p.AllowAttrs("src").Matching(regexp.MustCompile(`^/images/[^/?#]+/[^/?#]+/[0-9a-f]{32}$`)).OnElements("img") // the image proxy
 	p.AllowAttrs("alt").Matching(bluemonday.Paragraph).OnElements("img")
 	p.AllowAttrs("width", "height").Matching(regexp.MustCompile(`^[0-9]{1,4}%?$`)).OnElements("img")
 	p.AllowAttrs("loading").Matching(regexp.MustCompile(`^lazy$`)).OnElements("img")

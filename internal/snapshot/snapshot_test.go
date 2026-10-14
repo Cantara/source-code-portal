@@ -50,38 +50,64 @@ func TestDebounce(t *testing.T) {
 		defer p.Close()
 
 		// A burst of updates 100 ms apart keeps resetting the quiet timer; the max delay publishes after 1 s.
-		start := time.Now()
+		start, empty := time.Now(), p.Current()
 		for i := range 15 {
 			p.Update(func(b *Builder) {
 				b.ReplaceSource("gh", []*RepoEntry{repo("gh", int64(i), "o", "r")}, nil, SourceStatus{ID: "gh"})
 			})
 			time.Sleep(100 * time.Millisecond)
 			synctest.Wait()
-			if v := p.Current().Version; i < 9 && v != 0 {
+			if i < 9 && p.Current() != empty {
 				t.Fatalf("published after %v, before the max delay", time.Since(start))
 			}
 		}
-		if v := p.Current().Version; v < 1 {
-			t.Fatalf("version %d after 1.5 s of updates, want a publish at the max delay", v)
+		if p.Current() == empty {
+			t.Fatal("no publish after 1.5 s of updates, want one at the max delay")
 		}
 
 		// A single update publishes after the quiet period.
-		before := p.Current().Version
 		time.Sleep(time.Second)
 		synctest.Wait()
-		v := p.Current().Version
+		cur := p.Current()
 		p.Update(func(b *Builder) { b.SetCatalogued() })
 		time.Sleep(199 * time.Millisecond)
 		synctest.Wait()
-		if p.Current().Version != v {
+		if p.Current() != cur {
 			t.Fatal("published before the quiet period")
 		}
 		time.Sleep(time.Millisecond)
 		synctest.Wait()
-		if got := p.Current(); got.Version != v+1 || !got.Catalogued || v < before {
-			t.Fatalf("after quiet period: version %d catalogued %v, want %d true", got.Version, got.Catalogued, v+1)
+		if got := p.Current(); got == cur || !got.Catalogued {
+			t.Fatalf("after quiet period: catalogued %v, want a publish", got.Catalogued)
 		}
 	})
+}
+
+func TestVersionFollowsTheItems(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	defer p.Close()
+	publish := func(fn func(*Builder)) uint64 { p.Update(fn); p.Flush(); return p.Current().Version }
+	ab := publish(func(b *Builder) { b.Mark("a", 1<<60|7); b.Mark("b", 9) })
+	if ab == 0 || ab >= 1<<53 {
+		t.Fatalf("version %d, want nonzero within 53 bits", ab)
+	}
+	if v := publish(func(b *Builder) { b.Mark("b", 10) }); v == ab {
+		t.Error("a changed item kept the version")
+	}
+	if v := publish(func(b *Builder) { b.Mark("b", 9) }); v != ab {
+		t.Errorf("the same items give %d, want %d", v, ab)
+	}
+	if v := publish(func(b *Builder) { b.Mark("b", 0) }); v == ab {
+		t.Error("a dropped item kept the version")
+	}
+	q := NewPublisher(time.Hour, time.Hour, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	defer q.Close()
+	q.Update(func(b *Builder) { b.Mark("b", 9) })
+	q.Update(func(b *Builder) { b.Mark("a", 3); b.Mark("a", 1<<60|7) })
+	q.Flush()
+	if v := q.Current().Version; v != ab {
+		t.Errorf("the same items in another order give %d, want %d", v, ab)
+	}
 }
 
 func TestSnapshotsAreImmutable(t *testing.T) {
@@ -101,7 +127,7 @@ func TestSnapshotsAreImmutable(t *testing.T) {
 	p.Flush()
 	v2 := p.Current()
 
-	if _, ok := v1.Repos["cantara/old"]; !ok || len(v1.Repos) != 1 || v1.Version != 1 {
+	if _, ok := v1.Repos["cantara/old"]; !ok || len(v1.Repos) != 1 {
 		t.Fatalf("v1 changed: %+v", v1.Repos)
 	}
 	if e, moved := v2.Repo("cantara/old"); e == nil || !moved || e.Repo.Name != "New" {
@@ -118,8 +144,8 @@ func TestPanicKeepsSnapshot(t *testing.T) {
 	p.Update(func(b *Builder) { b.SetCatalogued() })
 	p.Update(func(*Builder) { panic("boom") })
 	p.Flush()
-	if got := p.Current(); got.Version != 0 || got.Catalogued {
-		t.Fatalf("a panicking batch was published: version %d", got.Version)
+	if got := p.Current(); !got.BuiltAt.IsZero() || got.Catalogued {
+		t.Fatal("a panicking batch was published")
 	}
 }
 

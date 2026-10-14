@@ -157,3 +157,38 @@ func TestPublishSanitisesStoredHTML(t *testing.T) {
 		t.Errorf("published HTML = %s", got)
 	}
 }
+
+func TestImagesFollowTheTree(t *testing.T) {
+	r := &repo{files: map[string]string{
+		"README.md":       "![logo](assets/logo.png) ![badge](https://img.example/b.svg) ![gone](missing.png) ![big](big.png)\n",
+		"assets/logo.png": "png1",
+		"big.png":         strings.Repeat("x", maxImageBytes+1),
+	}}
+	d := New(map[string]GitHub{"gh": r}, safehtml.New())
+	res, p := run(t, d, store.Item{})
+	imgs := p.Docs[0].Images
+	byPath := map[string]snapshot.Image{}
+	for _, img := range imgs {
+		byPath[img.Path+img.URL] = img
+		if !strings.Contains(p.Docs[0].HTML, `src="/images/acme/x/`+img.ID+`"`) {
+			t.Errorf("the HTML does not show %+v", img)
+		}
+	}
+	if len(imgs) != 4 || byPath["assets/logo.png"].BlobSHA != "blob:png1" || byPath["missing.png"].BlobSHA != "" ||
+		byPath["big.png"].BlobSHA != "" || byPath["https://img.example/b.svg"].BlobSHA != "" {
+		t.Fatalf("images = %+v", imgs)
+	}
+
+	r.files["assets/logo.png"] = "png2" // a changed image, the same README: no new render, a new blob
+	blobs := r.blobs
+	prev := store.Item{State: res.State, ContentSHA: res.ContentSHA, Payload: res.Payload}
+	res, p = run(t, d, prev)
+	if res.Unchanged || r.blobs != blobs {
+		t.Errorf("changed image: Unchanged %v, %d blob fetches", res.Unchanged, r.blobs-blobs)
+	}
+	for _, img := range p.Docs[0].Images {
+		if img.Path == "assets/logo.png" && img.BlobSHA != "blob:png2" {
+			t.Errorf("the image keeps its old blob: %+v", img)
+		}
+	}
+}

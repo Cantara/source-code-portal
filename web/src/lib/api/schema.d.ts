@@ -169,8 +169,30 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** Data health; the web UI polls it to learn about new data */
+    /** Data health; the web UI reads it to learn about new data */
     get: operations["getSnapshot"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/events": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Server-sent events announcing every new snapshot
+     * @description A `text/event-stream` that sends `event: snapshot` with the SnapshotInfo of the caller's view when it opens and whenever a
+     *     snapshot with another version is published, a comment line every 25 s and `retry: 5000`. Served outside the generated
+     *     handlers; at most 1,000 streams per instance.
+     */
+    get: operations["streamEvents"]
     put?: never
     post?: never
     delete?: never
@@ -438,7 +460,10 @@ export interface components {
       freshness: components["schemas"]["Freshness"]
     }
     SnapshotInfo: {
-      /** Format: int64 */
+      /**
+       * Format: int64
+       * @description Identifies the content; equal on every instance for equal data. Compare for equality only.
+       */
       version: number
       /** Format: date-time */
       builtAt: string | null
@@ -755,6 +780,35 @@ export interface operations {
         }
       }
       304: components["responses"]["NotModified"]
+    }
+  }
+  streamEvents: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The event stream; each event's data is a SnapshotInfo */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "text/event-stream": string
+        }
+      }
+      /** @description Too many streams; poll /snapshot instead */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
     }
   }
 }

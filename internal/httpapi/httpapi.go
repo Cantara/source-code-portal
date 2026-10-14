@@ -22,12 +22,14 @@ import (
 
 // Route is a handler a feature serves outside the API contract (badges, the webhook, Markdown). MaxBody caps the request body
 // (0: DefaultMaxBody). A Markdown route shares its address with a page of the UI: Handler answers when the path ends in .md or the
-// client prefers text/markdown to text/html, the shell answers otherwise.
+// client prefers text/markdown to text/html, the shell answers otherwise. A Stream route has no request deadline and, under /api/,
+// none of the API's buffering.
 type Route struct {
 	Pattern  string
 	Handler  http.Handler
 	MaxBody  int64
 	Markdown bool
+	Stream   bool
 }
 
 // Public returns the handler of the public listener. spa holds the web UI build with index.html at its root; contract is
@@ -35,6 +37,7 @@ type Route struct {
 func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterface, routes ...Route) http.Handler {
 	mux := http.NewServeMux()
 	shell := spaHandler(spa)
+	streams := map[string]bool{}
 	for _, r := range routes {
 		n := r.MaxBody
 		if n == 0 {
@@ -43,6 +46,11 @@ func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterfac
 		h := r.Handler
 		if r.Markdown {
 			h = negotiated(h, shell)
+		}
+		if r.Stream {
+			h = unbounded(h)
+			_, p, _ := strings.Cut(r.Pattern, " ")
+			streams[p] = true
 		}
 		mux.Handle(r.Pattern, limit(n, h))
 	}
@@ -66,7 +74,7 @@ func Public(o Options, spa fs.FS, contract []byte, api oapi.StrictServerInterfac
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, _ error) {
 			WriteProblem(w, http.StatusBadRequest, "validation-failed", "The request parameters are not valid.")
 		}})
-	return o.wrap("public", apiGuard(mux))
+	return o.wrap("public", apiGuard(mux, streams))
 }
 
 // Admin returns the handler of the admin listener. ready reports whether the portal serves a catalogue, alive whether the sync
@@ -112,13 +120,16 @@ type SnapshotAPI struct {
 }
 
 func (a SnapshotAPI) GetSnapshot(ctx context.Context, _ oapi.GetSnapshotRequestObject) (oapi.GetSnapshotResponseObject, error) {
-	s, now := a.Current(ctx), time.Now()
-	out := oapi.SnapshotInfo{Version: int64(s.Version), BuiltAt: oapi.TimeOrNil(s.BuiltAt), Ready: s.Catalogued, //nolint:gosec // G115: a count
+	return oapi.GetSnapshot200JSONResponse{Body: snapshotInfo(a.Current(ctx), time.Now())}, nil
+}
+
+func snapshotInfo(s *snapshot.Snapshot, now time.Time) oapi.SnapshotInfo {
+	out := oapi.SnapshotInfo{Version: int64(s.Version), BuiltAt: oapi.TimeOrNil(s.BuiltAt), Ready: s.Catalogued, //nolint:gosec // G115: 53 bits
 		Sources: make([]oapi.SourceInfo, 0, len(s.Sources))}
 	for _, src := range s.Sources {
 		out.Sources = append(out.Sources, oapi.SourceInfo{Id: src.ID, Repos: src.Repos, Freshness: oapi.FreshnessOf(src.Fresh, now)})
 	}
-	return oapi.GetSnapshot200JSONResponse{Body: out}, nil
+	return out
 }
 
 // WriteProblem writes an RFC 9457 problem with fixed text; the instance is the request id the middleware set.
@@ -138,11 +149,11 @@ func WriteProblem(w http.ResponseWriter, status int, code, detail string) {
 	_ = json.NewEncoder(w).Encode(p)
 }
 
-// apiGuard applies the API conventions under /api/: 406 for an Accept without JSON or YAML, the mux's plain 405 rewritten to a
-// problem, validators on GET.
-func apiGuard(next http.Handler) http.Handler {
+// apiGuard applies the API conventions under /api/, except on the stream paths: 406 for an Accept without JSON or YAML, the mux's
+// plain 405 rewritten to a problem, validators on GET.
+func apiGuard(next http.Handler, streams map[string]bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/api/") {
+		if !strings.HasPrefix(r.URL.Path, "/api/") || streams[r.URL.Path] {
 			next.ServeHTTP(w, r)
 			return
 		}

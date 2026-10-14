@@ -205,7 +205,11 @@ spec:
 ```
 
 Expose only the `public` port through your ingress. The ingress must pass `X-Forwarded-For` from an address in
-`server.trusted_proxies` and keep request bodies up to 25 MiB for `/webhooks/github`.
+`server.trusted_proxies`, keep request bodies up to 25 MiB for `/webhooks/github`, and pass `/api/v1/events` unbuffered with a read
+timeout above 30 seconds (the stream sends a comment every 25 seconds; nginx honours the `X-Accel-Buffering: no` it sends).
+
+**Outbound.** Besides GitHub, the portal fetches the external images documents show (`https` on port 443, public addresses only, at
+most 5 MiB, cached in memory for an hour). Where it may not reach the internet those images show their alt text.
 
 ### 3.1 Several instances
 
@@ -228,6 +232,8 @@ cluster:
   open-source edition: run it on a private network that only the instances reach.
 - When Hazelcast is unreachable every instance keeps serving its last good data and stays ready, but nothing is refreshed until the
   connection is back; `/api/v1/status` warns.
+- Each instance reads the images it serves itself, and its event stream announces its own snapshots; equal data has the same version on
+  every instance.
 
 ## 4. Lifecycle
 
@@ -273,6 +279,7 @@ Metrics:
 | `scp_items` | `kind`, `freshness` | repositories by data kind and freshness |
 | `scp_build_info` | `version`, `commit`, `goversion` | the running build |
 | `scp_cluster_leader` | | 1 on the instance that leads the cluster, 0 on the others (only with `cluster.addresses`) |
+| `scp_event_streams` | | open `/api/v1/events` streams (at most 1,000 per instance; beyond that browsers poll) |
 
 Useful alerts: `scp_github_rate_remaining_ratio < 0.1` for 15 minutes; `scp_items{freshness="error"}` above zero for an hour;
 an increase of `scp_webhook_deliveries_total{result="invalid_signature"}` (a wrong secret or a sender that is not GitHub);

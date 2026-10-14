@@ -111,14 +111,14 @@ CREATE TABLE item (key TEXT PRIMARY KEY, kind TEXT NOT NULL,
    `(source, github_id)`, then owner/name; delete the rest; items cascade). `Result.Remove` deletes those repositories at once. A result
    arriving for a removed repository writes nothing (`repo_id` lookup misses) and `Builder.Repo` returns false.
 7. **Snapshot build**: `Update` mutations are queued; the publisher applies them in order to a builder over the current snapshot after 200 ms
-   without new updates or 1 s after the first pending one, derives `Groups`, `Latest` and `LatestByGroup`, sets `Version+1`, and stores the
+   without new updates or 1 s after the first pending one, derives `Groups`, `Latest` and `LatestByGroup`, sets `Version` from the item digests (images-events.md), and stores the
    atomic pointer. Builds run beside readers; a panic in a mutation drops that batch, keeps the old snapshot and is logged and counted.
 8. **Store open**: version guard (SQLite >= 3.51.3), pragmas `journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`, `foreign_keys=1`,
    `temp_store=MEMORY` (read-only root filesystem), `quick_check`, migrate. Corrupt file, failed migration or `user_version` newer than the binary
    -> rename the file and its `-wal`/`-shm` to `scp.db.quarantine-<UTC>` (keep 2), start cold. One writer connection, a pool of 2 readers.
 9. **Migrations**: embedded `NNNN_name.sql`, contiguous; each runs in one transaction together with `PRAGMA user_version = N`; additive where
    possible; payload changes use the inner `schema` field. Rows of unknown kinds and of sources no longer configured are deleted at open.
-10. **Warm start**: read repo and item rows, call each kind's `Publish` into one builder, publish version 1, restore `next_due_at`. A restart
+10. **Warm start**: read repo and item rows, call each kind's `Publish` into one builder, publish, restore `next_due_at`. A restart
     inside the TTLs makes almost no GitHub calls. HTML read back from the store is re-sanitised (it is untrusted bytes).
 11. **Degraded store**: a write error is logged once per minute and counted; the snapshot is still published (it is what serving reads).
 12. **Readiness** (`/readyz` 200): the store is open and a snapshot with a catalogue is published, from the warm start or from the first

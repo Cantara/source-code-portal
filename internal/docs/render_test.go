@@ -25,8 +25,13 @@ func TestRender(t *testing.T) {
 		"```go\nfunc main() {}\n```\n\n```mermaid\ngraph TD\n```\n\n- [x] done\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nNote[^1].\n\n[^1]: Foot.\n" +
 		"<script>alert(1)</script>\n"
 	r := &pipeline{policy: safehtml.New()}
-	got := r.render("README.md", []byte(src), testLinks(""))
+	l := testLinks("")
+	l.images = map[string]snapshot.Image{}
+	got := r.render("README.md", []byte(src), l)
 	h := got.HTML.String()
+	if len(l.images) != 3 || l.images["2b1558de6b38c18220eb77d05cf786e6"].Path != "img/logo.png" || l.images["4702d2316f48165aa2bf05493dbf6734"].URL != "https://e.org/a.png" {
+		t.Errorf("images = %+v", l.images)
+	}
 	for _, want := range []string{
 		`<h1 id="doc-heading-one">Heading One</h1>`,
 		`<h2 id="doc-setup">Setup</h2>`, `<h2 id="doc-setup-1">Setup</h2>`,
@@ -35,9 +40,9 @@ func TestRender(t *testing.T) {
 		`href="https://github.com/acme/x/blob/HEAD/src/main.go" rel="noopener noreferrer nofollow ugc"`,
 		`href="https://github.com/acme/x/tree/HEAD/src/"`,
 		`href="#doc-setup"`, `href="https://e.org" rel="noopener noreferrer nofollow ugc"`,
-		`<img src="https://raw.githubusercontent.com/acme/x/HEAD/img/logo.png" alt="logo" loading="lazy" referrerpolicy="no-referrer">`,
-		`<img src="https://e.org/a.png"`, `insecure`,
-		`<p align="center"><img src="https://raw.githubusercontent.com/acme/x/HEAD/img/b.png" alt="" loading="lazy" referrerpolicy="no-referrer"></p>`,
+		`<img src="/images/acme/x/2b1558de6b38c18220eb77d05cf786e6" alt="logo" loading="lazy" referrerpolicy="no-referrer">`,
+		`<img src="/images/acme/x/4702d2316f48165aa2bf05493dbf6734"`, `insecure`,
+		`<p align="center"><img src="/images/acme/x/553a2a7c9198fb4248495296b1c27aa5" alt="" loading="lazy" referrerpolicy="no-referrer"></p>`,
 		`<pre class="chroma"><code class="language-go"><span class="kd">func</span>`,
 		`<pre class="chroma"><code class="language-mermaid">graph TD`,
 		`<input checked="" disabled="" type="checkbox">`, `<table>`,
@@ -125,7 +130,7 @@ func TestRenderBounds(t *testing.T) {
 }
 
 // lockDigest pins the pipeline output for renderCorpus. When it changes, bump pipelineVersion and set the new digest.
-const lockDigest = "f0ac396f43dcf45e875d1dff2ae348704cce232fc14d6ce83c36b4b791fac592"
+const lockDigest = "991c22c08966b22161b229208a17131c89fa0451dfcd1fe6f82a62fd67e28e5a"
 
 func TestPipelineLock(t *testing.T) {
 	r := &pipeline{policy: safehtml.New()}

@@ -25,7 +25,7 @@ const (
 
 const (
 	cspDefault = "default-src 'none'; frame-ancestors 'none'; sandbox"
-	cspShell   = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https:; font-src 'self'; connect-src 'self'; " +
+	cspShell   = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; " +
 		"manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
 	permissionsShell = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 )
@@ -67,7 +67,8 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		if o.Access.Vary {
 			h.Add("Vary", o.Access.UserHeader+", "+o.Access.GroupsHeader)
 		}
-		ctx, cancel := context.WithTimeout(context.WithValue(r.Context(), privateKey{}, private), requestTimeout)
+		base := context.WithValue(r.Context(), privateKey{}, private)
+		ctx, cancel := context.WithTimeout(context.WithValue(base, baseKey{}, base), requestTimeout)
 		defer cancel()
 		r = r.WithContext(ctx)
 		sw := &statusWriter{ResponseWriter: w, private: private}
@@ -295,7 +296,5 @@ func (w *gzipWriter) Flush() {
 	if w.gz != nil {
 		_ = w.gz.Flush()
 	}
-	if f, ok := w.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+	_ = http.NewResponseController(w.ResponseWriter).Flush()
 }

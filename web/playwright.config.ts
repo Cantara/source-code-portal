@@ -21,7 +21,7 @@ export default defineConfig({
   webServer: {
     command: "go test -tags spa -count=1 -timeout 0 -run '^TestServeForPlaywright$' ./cmd/scp",
     cwd: "..",
-    env: { E2E_SCP_ADDR: addr },
+    env: { E2E_SCP_ADDR: addr, E2E_CONTROL_ADDR: "127.0.0.1:9191" },
     url: `http://${addr}/api/v1/snapshot`,
     timeout: 180_000,
     reuseExistingServer: !process.env.CI,

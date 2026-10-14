@@ -132,6 +132,16 @@ type Doc struct {
 	BlobSHA     string
 	Truncated   bool  // the source was cut at the size cap
 	State       State // ok | too_large | unsupported
+	Images      []Image
+}
+
+// Image is one image a document shows, served at /images/{owner}/{name}/{ID}: a repository file (Path, with its BlobSHA when the
+// tree has it within the size cap) or an external https image (URL).
+type Image struct {
+	ID      string `json:"id"`
+	Path    string `json:"path,omitempty"`
+	URL     string `json:"url,omitempty"`
+	BlobSHA string `json:"blobSha,omitempty"`
 }
 
 // Heading is a TOC entry.
@@ -186,6 +196,8 @@ type RepoEntry struct {
 
 // Snapshot is the serving state. It is immutable after publish.
 type Snapshot struct {
+	// Version identifies the content: the sum of the digests of the published items (Builder.Mark), 53 bits. Equal items give
+	// equal versions, on every instance and after a restart; it is compared for equality only.
 	Version uint64
 	BuiltAt time.Time
 	// Catalogued is true once a catalogue is loaded, from the store at start or from a complete listing.
@@ -200,7 +212,9 @@ type Snapshot struct {
 	latestByGroup map[string][]CommitRef
 	providers     map[pkg][]RepoKey // sorted
 	usedBy        map[RepoKey][]RepoKey
-	public        *Snapshot // the view without private and internal repositories; s itself when there are none
+	public        *Snapshot         // the view without private and internal repositories; s itself when there are none
+	marks         map[string]uint64 // item key -> digest
+	sum           uint64
 }
 
 // Public returns the view of s without its private and internal repositories: s itself when it has none.

@@ -96,6 +96,7 @@ type server struct {
 // deps are the outside services; the zero value is the real ones.
 type deps struct {
 	github  http.RoundTripper                              // transport to GitHub
+	images  http.RoundTripper                              // transport to external images (docs.Guarded when nil)
 	cluster func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
 }
 
@@ -143,15 +144,25 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if err != nil {
 		return nil, err
 	}
+	documents := docs.New(trees, safehtml.New())
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
-	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), docs.New(trees, safehtml.New()).Spec(), cat.DescriptorSpec(),
+	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
 		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
 	}
 
-	g := gauges{current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining}
+	// view is what a request may see: the full snapshot for a private viewer, else its public view.
+	view := func(ctx context.Context) *snapshot.Snapshot {
+		cur := s.pub.Current()
+		if httpapi.Private(ctx) {
+			return cur
+		}
+		return cur.Public()
+	}
+	events := httpapi.NewEvents(view, s.pub.Published)
+	g := gauges{current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining, streams: events.Streams}
 	if s.member != nil {
 		g.leader = s.member.Leader
 	}
@@ -165,21 +176,18 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		st.cluster = s.member
 	}
 
-	// view is what a request may see: the full snapshot for a private viewer, else its public view.
-	view := func(ctx context.Context) *snapshot.Snapshot {
-		cur := s.pub.Current()
-		if httpapi.Private(ctx) {
-			return cur
-		}
-		return cur.Public()
-	}
 	md := llms.New(view, cfg.Server.PublicURL)
+	external := d.images
+	if external == nil {
+		external = docs.Guarded()
+	}
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view)},
+		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
 		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
-		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}}
+		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
 	if cfg.Webhook.Secret.IsSet() {
 		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.deliver, cfg.GitHub.Sources), log)
 		if s.member != nil {
@@ -196,6 +204,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	features := api{catalog.API{Current: view}, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		httpapi.SnapshotAPI{Current: view}}
 	s.public = httpapi.Server(httpapi.Public(opts, spa, contract.OpenAPI, features, routes...), log)
+	s.public.RegisterOnShutdown(events.Close)
 	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
 	if cfg.Ops.Pprof {
 		admin = append(admin, httpapi.Route{Pattern: "GET /debug/pprof/", Handler: http.HandlerFunc(pprof.Index)},

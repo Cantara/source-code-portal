@@ -18,8 +18,9 @@ type Builder struct {
 
 func newBuilder(cur *Snapshot) *Builder {
 	return &Builder{s: &Snapshot{
-		Version:    cur.Version,
 		Catalogued: cur.Catalogued,
+		marks:      maps.Clone(cur.marks),
+		sum:        cur.sum,
 		Repos:      maps.Clone(cur.Repos),
 		Aliases:    maps.Clone(cur.Aliases),
 		Groups:     slices.Clone(cur.Groups),
@@ -83,6 +84,20 @@ func (b *Builder) UpdateRepo(key RepoKey, fn func(*RepoEntry)) bool {
 // Sources returns the builder's source statuses. Callers must not modify the slice.
 func (b *Builder) Sources() []SourceStatus { return b.s.Sources }
 
+// Mark records the digest of the published item at key, 0 when it is gone; the version is the sum of the digests.
+func (b *Builder) Mark(key string, digest uint64) {
+	if b.s.marks == nil {
+		b.s.marks = map[string]uint64{}
+	}
+	b.s.sum -= b.s.marks[key]
+	if digest == 0 {
+		delete(b.s.marks, key)
+	} else {
+		b.s.marks[key] = digest
+	}
+	b.s.sum += digest
+}
+
 // SetGroups replaces the groups (config order).
 func (b *Builder) SetGroups(groups []Group) { b.s.Groups = groups }
 
@@ -91,7 +106,7 @@ func (b *Builder) SetCatalogued() { b.s.Catalogued = true }
 
 func (b *Builder) finish(now time.Time) *Snapshot {
 	s := b.s
-	s.Version++
+	s.Version = s.sum & (1<<53 - 1)
 	s.BuiltAt = now
 	s.index()
 	s.public = s.publicView()

@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	gosync "sync"
 	"syscall"
 	"testing"
 	"time"
@@ -15,10 +20,16 @@ import (
 
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/sync"
 )
 
+// logoPNG is a 1x1 PNG for the README image.
+const logoPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
 // TestServeForPlaywright serves the portal against a fake GitHub on E2E_SCP_ADDR until it is interrupted: the server of the web
-// e2e suite (web/playwright.config.ts runs it with -tags spa). Without E2E_SCP_ADDR it is skipped.
+// e2e suite (web/playwright.config.ts runs it with -tags spa). Without E2E_SCP_ADDR it is skipped. E2E_CONTROL_ADDR, when set,
+// serves POST /push?repo={name}&message={text}: a new commit on the fake GitHub and a push to the engine, as a webhook would.
 func TestServeForPlaywright(t *testing.T) {
 	addr := os.Getenv("E2E_SCP_ADDR")
 	if addr == "" {
@@ -31,6 +42,7 @@ func TestServeForPlaywright(t *testing.T) {
 	sso := gh.AddRepo("acme", gogh.Repository{Name: new("whydah-sso"), Description: new("Single sign-on"), Visibility: new("public")})
 	tool := gh.AddRepo("acme", gogh.Repository{Name: new("tool"), Description: new("A tool"), Visibility: new("public")})
 	start := time.Now().Add(-48 * time.Hour)
+	history := map[int64][]githubtest.Commit{}
 	for i, id := range []int64{core, sso, tool} {
 		var cs []githubtest.Commit
 		for j := range 30 {
@@ -38,10 +50,13 @@ func TestServeForPlaywright(t *testing.T) {
 				AuthorName: "Ann Example", AuthorLogin: "ann", Date: start.Add(time.Duration(30-j)*time.Hour + time.Duration(i)*time.Minute)})
 		}
 		gh.SetCommits(id, cs...)
+		history[id] = cs
 	}
 	gh.SetFile(core, ".github/scp.yaml", "schema: 1\ntitle: Whydah Core\nlifecycle: production\nowners: ['@acme/iam']\ntags: [java]\n"+
 		"links: [{title: Runbook, url: 'https://runbook.example/core'}]\n")
-	gh.SetFile(core, "README.md", "# Whydah Core\n\nIdentity. See [setup](docs/setup.md).\n\n> [!NOTE]\n> Read the docs.\n\n"+
+	logo, _ := base64.StdEncoding.DecodeString(logoPNG)
+	gh.SetFile(core, "docs/logo.png", string(logo))
+	gh.SetFile(core, "README.md", "# Whydah Core\n\n![Whydah logo](docs/logo.png)\n\nIdentity. See [setup](docs/setup.md).\n\n> [!NOTE]\n> Read the docs.\n\n"+
 		"```go\nfunc main() { println(\"hi\") }\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")
 	gh.SetFile(core, "docs/setup.md", "# Setup\n\n## Install\n\nRun it.\n\n## Configure\n\n<script>alert(1)</script>\n")
 	gh.SetFile(sso, "README.md", "# SSO\n")
@@ -78,6 +93,33 @@ catalog:
 	}
 	ctx, stop := signal.NotifyContext(t.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if control := os.Getenv("E2E_CONTROL_ADDR"); control != "" {
+		repos := map[string]int64{"whydah-core": core, "whydah-sso": sso, "tool": tool}
+		var mu gosync.Mutex
+		mux := http.NewServeMux()
+		mux.HandleFunc("POST /push", func(w http.ResponseWriter, r *http.Request) {
+			name := r.URL.Query().Get("repo")
+			id, ok := repos[name]
+			if !ok {
+				http.NotFound(w, r)
+				return
+			}
+			mu.Lock()
+			history[id] = append([]githubtest.Commit{{SHA: fmt.Sprintf("%040x", time.Now().UnixNano()), Message: r.URL.Query().Get("message"),
+				AuthorName: "Ann Example", AuthorLogin: "ann", Date: time.Now()}}, history[id]...)
+			gh.SetCommits(id, history[id]...)
+			mu.Unlock()
+			srv.engine.Notify(sync.EventPush, snapshot.KeyOf("acme", name))
+			w.WriteHeader(http.StatusNoContent)
+		})
+		ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", control)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cs := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+		go func() { _ = cs.Serve(ln) }()
+		defer func() { _ = cs.Shutdown(context.Background()) }()
+	}
 	if err := srv.run(ctx); err != nil {
 		t.Fatal(err)
 	}

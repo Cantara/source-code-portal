@@ -14,7 +14,7 @@ repository) and a 404 page. It reads only `/api/v1`, shows freshness everywhere 
   `openapi-fetch` is the thin typed fetch wrapper; one `unwrap()` turns every failure into a `ProblemError`: every request is typed.
 - Features never import features (mirror of the Go rule); they share through `shared/`, `lib/` and typed `<Link>`s. One ESLint
   `no-restricted-imports` rule enforces it.
-- Freshness by polling `GET /api/v1/snapshot` every 30 s through one hook, so the transport can change behind it.
+- Freshness through one hook: the event stream `GET /api/v1/events`, and polling `GET /api/v1/snapshot` every 30 s while it is not open.
 - One component, `shared/safe-html.tsx`, renders server-sanitised HTML: the server's sanitiser is the single source of safe markup.
 - Commit authors are initials on a deterministic colour: every request stays on the portal's origin.
 - Static CSP set by the server; scripts and styles are external files: the shell is a cacheable static file.
@@ -62,8 +62,10 @@ A document's own leading `h1` is dropped on the page, whose `h1` already names i
 ## Behaviour (numbered)
 1. Queries: `staleTime` 10 s, `gcTime` 5 min, retry network/429/5xx at most twice (honour `Retry-After`), refetch on window focus,
    previous data kept on error. ETag revalidation is the browser's (API answers `no-cache` + ETag).
-2. Snapshot sync: one `useSnapshotSync()` in the shell polls `GET /api/v1/snapshot` every 30 s while the tab is visible (304 when
-   unchanged). A new `version` invalidates every other query; active ones refetch. Readiness `warming` shows a banner.
+2. Snapshot sync: one `useSnapshotSync()` in the shell opens an `EventSource` on `/api/v1/events`; each `snapshot` event replaces the
+   snapshot query's data. While the stream is not open it polls `GET /api/v1/snapshot` every 30 s while the tab is visible (304 when
+   unchanged). A different `version` (compared for equality) invalidates every other query; active ones refetch. Readiness `warming`
+   shows a banner.
 3. Commit logs page with "Load more" (cursor, 50 rows) on `GET /api/v1/commits` with the page's `group` or `repo` filter. When more than
    one page is loaded a snapshot change leaves the log as it is; a "New commits" button refetches and moves focus to the first row.
 4. Freshness: every view shows a `FreshnessBadge` from the response's `freshness` (`fresh` "Up to date", `stale` "Delayed", `error`
@@ -77,11 +79,11 @@ A document's own leading `h1` is dropped on the page, whose `h1` already names i
    a missing lazy chunk (`vite:preloadError`) reloads once, guarded against loops.
 8. `SafeHtml` takes the API field `html` and sets it with `dangerouslySetInnerHTML`, memoised on the string so a refetch with equal
    content keeps scroll and DOM. Lint allows `dangerouslySetInnerHTML` in this component only. The docs HTML carries classes (Chroma)
-   and no inline styles; relative images point to `raw.githubusercontent.com` and absolute https images load from their hosts.
+   and no inline styles; images load from the portal's image proxy.
 9. Theme: `system | light | dark` in `localStorage` key `scp-theme`. The blocking external `/theme-init.js` in `<head>` sets the `dark`
    class and `colorScheme` before first paint; `<meta name="color-scheme" content="light dark">`. `lib/theme.ts` resolves the same
    way; a unit test runs the script for every stored value and compares. Blocked storage falls back to `system`.
-10. CSP: the shell policy of http-api.md behaviour 3 (`img-src 'self' https:`, everything else `'self'` or `'none'`). Components use classes
+10. CSP: the shell policy of http-api.md behaviour 3 (`img-src 'self'`, everything else `'self'` or `'none'`). Components use classes
     only; avatar colours come from a fixed palette of classes.
 11. Accessibility (WCAG 2.2 AA): skip link to `#main`, landmarks, one `h1` per page, focus to `h1` and title announced after client
     navigation, visible focus ring (token contrast >= 3:1, text >= 4.5:1 in both themes), targets >= 24 px, real `<table>`s with keyboard

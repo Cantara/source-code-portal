@@ -26,8 +26,9 @@ order: 1
 ```
 
 Documents render as GitHub-flavoured Markdown: tables, task lists, footnotes, alerts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`,
-`[!WARNING]`, `[!CAUTION]`) and highlighted code blocks. Relative links to other documents stay in the portal; relative images load from
-`raw.githubusercontent.com`. Scripts, styles, forms and embedded frames are removed. A very large document shows its first part with a
+`[!WARNING]`, `[!CAUTION]`) and highlighted code blocks. Relative links to other documents stay in the portal. Images, relative
+ones and `https` ones from other hosts, are served by the portal: PNG, JPEG, GIF, WebP, BMP, ICO, AVIF and SVG up to 5 MiB. Images outside
+the root, `.github/` and `docs/` are found in up to five other top-level directories. Scripts, styles, forms and embedded frames are removed. A very large document shows its first part with a
 link to the full file on GitHub.
 
 Manifests are read, never run: the portal shows what they declare. From `go.mod` the module path, the `go` and `toolchain` versions,

@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"maps"
 	"path"
 	"regexp"
 	"slices"
@@ -31,6 +32,8 @@ const (
 	root          = "docs"    // the documentation directory
 	maxDocs       = 50        // files under docs/, in path order
 	maxFileBytes  = 1 << 20   // larger files are not fetched
+	maxImageBytes = 5 << 20   // larger repository images are not served
+	maxImageDirs  = 5         // top-level directories read for images outside the root, .github/ and docs/
 	payloadSchema = 1
 )
 
@@ -69,6 +72,7 @@ type record struct {
 	BlobSHA     string             `json:"blobSha"`
 	Truncated   bool               `json:"truncated,omitempty"`
 	State       snapshot.State     `json:"state"`
+	Images      []snapshot.Image   `json:"images,omitempty"`
 }
 
 type payload struct {
@@ -105,7 +109,7 @@ func (d *Docs) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		return sync.Result{}, errors.New("docs: unknown source " + j.Source)
 	}
 	owner, name, _ := strings.Cut(string(j.Repo), "/")
-	files, err := list(ctx, gh, owner, name)
+	files, tree, err := list(ctx, gh, owner, name)
 	var e *github.Error
 	switch {
 	case errors.As(err, &e) && e.Code == "empty":
@@ -152,6 +156,9 @@ func (d *Docs) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		r.README, r.BlobSHA = f.readme, f.entry.SHA
 		next.Docs = append(next.Docs, r)
 	}
+	if err := resolveImages(ctx, gh, owner, name, tree, next.Docs); err != nil {
+		return sync.Result{}, err
+	}
 	slices.SortStableFunc(next.Docs, func(a, b record) int {
 		switch {
 		case a.README != b.README:
@@ -176,9 +183,11 @@ func (d *Docs) record(f file, b []byte, l links) record {
 	if l.dir == "." {
 		l.dir = ""
 	}
+	l.images = map[string]snapshot.Image{}
 	out := d.pipe.render(f.path, b, l)
+	images := slices.SortedFunc(maps.Values(l.images), func(a, b snapshot.Image) int { return strings.Compare(a.ID, b.ID) })
 	return record{Path: f.path, Title: out.Title, Description: out.Description, Order: out.Order, Hidden: out.Hidden, Format: out.Format,
-		HTML: out.HTML.String(), Source: out.Source, TOC: out.TOC, Truncated: out.Truncated, State: out.State}
+		HTML: out.HTML.String(), Source: out.Source, TOC: out.TOC, Truncated: out.Truncated, State: out.State, Images: images}
 }
 
 func result(state snapshot.State, p payload, prev store.Item) (sync.Result, error) {
@@ -195,12 +204,21 @@ func result(state snapshot.State, p payload, prev store.Item) (sync.Result, erro
 		Unchanged: prev.State == state && prev.ContentSHA == sha && bytes.Equal(prev.Payload, b)}, nil
 }
 
-// list finds the README (.github/, then the root, then docs/, as GitHub resolves it) and the Markdown files under docs/.
-func list(ctx context.Context, gh GitHub, owner, name string) ([]file, error) {
+// list finds the README (.github/, then the root, then docs/, as GitHub resolves it) and the Markdown files under docs/. It returns
+// the entries it read by repository path: the root, .github/ and everything under docs/.
+func list(ctx context.Context, gh GitHub, owner, name string) ([]file, map[string]github.TreeEntry, error) {
 	top, err := gh.Tree(ctx, owner, name, "HEAD", false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	tree := map[string]github.TreeEntry{}
+	add := func(prefix string, entries []github.TreeEntry) {
+		for _, e := range entries {
+			e.Path = prefix + e.Path
+			tree[e.Path] = e
+		}
+	}
+	add("", top)
 	var dotGitHub, docsDir []github.TreeEntry
 	for _, e := range top {
 		if e.Type != "tree" || e.Path != ".github" && e.Path != root {
@@ -208,8 +226,9 @@ func list(ctx context.Context, gh GitHub, owner, name string) ([]file, error) {
 		}
 		sub, err := gh.Tree(ctx, owner, name, e.SHA, e.Path == root)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		add(e.Path+"/", sub)
 		if e.Path == root {
 			docsDir = sub
 		} else {
@@ -234,7 +253,43 @@ func list(ctx context.Context, gh GitHub, owner, name string) ([]file, error) {
 		}
 	}
 	slices.SortFunc(docs, func(a, b file) int { return strings.Compare(a.path, b.path) })
-	return append(out, docs[:min(len(docs), maxDocs)]...), nil
+	return append(out, docs[:min(len(docs), maxDocs)]...), tree, nil
+}
+
+// resolveImages sets the blob of every repository image at HEAD, on every run, so a changed image shows without a changed document. Images
+// outside what list read are looked up in the recursive tree of their top-level directory, for at most maxImageDirs directories.
+func resolveImages(ctx context.Context, gh GitHub, owner, name string, tree map[string]github.TreeEntry, docs []record) error {
+	var dirs []string
+	for _, r := range docs {
+		for _, img := range r.Images {
+			top, _, nested := strings.Cut(img.Path, "/")
+			if _, known := tree[img.Path]; !known && nested && tree[top].Type == "tree" && !slices.Contains(dirs, top) {
+				dirs = append(dirs, top)
+			}
+		}
+	}
+	slices.Sort(dirs)
+	for _, dir := range dirs[:min(len(dirs), maxImageDirs)] {
+		sub, err := gh.Tree(ctx, owner, name, tree[dir].SHA, true)
+		if err != nil {
+			return err
+		}
+		for _, e := range sub {
+			e.Path = dir + "/" + e.Path
+			tree[e.Path] = e
+		}
+	}
+	for i := range docs {
+		docs[i].Images = slices.Clone(docs[i].Images)
+		for j, img := range docs[i].Images {
+			e, ok := tree[img.Path]
+			docs[i].Images[j].BlobSHA = ""
+			if ok && img.Path != "" && e.Type == "blob" && e.Size <= maxImageBytes {
+				docs[i].Images[j].BlobSHA = e.SHA
+			}
+		}
+	}
+	return nil
 }
 
 // readme picks the README among the direct entries of one tree: README.md first, then by name.
@@ -270,7 +325,8 @@ func (d *Docs) publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshn
 			h = safehtml.SafeHTML{}
 		}
 		docs = append(docs, snapshot.Doc{Path: r.Path, README: r.README, Title: r.Title, Description: r.Description, Order: r.Order,
-			Hidden: r.Hidden, Format: r.Format, HTML: h, Source: r.Source, TOC: r.TOC, BlobSHA: r.BlobSHA, Truncated: r.Truncated, State: r.State})
+			Hidden: r.Hidden, Format: r.Format, HTML: h, Source: r.Source, TOC: r.TOC, BlobSHA: r.BlobSHA, Truncated: r.Truncated, State: r.State,
+			Images: r.Images})
 	}
 	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { e.Docs, e.DocsFresh = docs, fresh })
 }

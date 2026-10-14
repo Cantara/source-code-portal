@@ -618,7 +618,9 @@ type SnapshotInfo struct {
 	// Ready A catalogue is loaded
 	Ready   bool         `json:"ready"`
 	Sources []SourceInfo `json:"sources"`
-	Version int64        `json:"version"`
+
+	// Version Identifies the content; equal on every instance for equal data. Compare for equality only.
+	Version int64 `json:"version"`
 }
 
 // SourceInfo defines model for SourceInfo.
@@ -705,7 +707,7 @@ type ServerInterface interface {
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(w http.ResponseWriter, r *http.Request, owner string, name string)
-	// GetSnapshot Data health; the web UI polls it to learn about new data
+	// GetSnapshot Data health; the web UI reads it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(w http.ResponseWriter, r *http.Request)
 }
@@ -1770,7 +1772,7 @@ type StrictServerInterface interface {
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(ctx context.Context, request GetManifestsRequestObject) (GetManifestsResponseObject, error)
-	// GetSnapshot Data health; the web UI polls it to learn about new data
+	// GetSnapshot Data health; the web UI reads it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(ctx context.Context, request GetSnapshotRequestObject) (GetSnapshotResponseObject, error)
 }

@@ -2,6 +2,8 @@ package docs
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html"
@@ -33,7 +35,7 @@ import (
 
 // pipelineVersion is part of every stored document; a different value renders the stored source again. Bump it whenever the output
 // for the same input changes (TestPipelineLock).
-const pipelineVersion = 1
+const pipelineVersion = 2
 
 const (
 	maxDocBytes      = 512 << 10 // rendered; the rest is cut at a line boundary
@@ -52,8 +54,9 @@ const (
 type links struct {
 	web     string // https://github.com/
 	repo    snapshot.RepoKey
-	dir     string          // the document's directory, "" at the root
-	indexed map[string]bool // repository paths with a portal page
+	dir     string                    // the document's directory, "" at the root
+	indexed map[string]bool           // repository paths with a portal page
+	images  map[string]snapshot.Image // filled with the images the document shows, by id
 }
 
 // rendered is the outcome of the pipeline for one file.
@@ -494,25 +497,40 @@ func (l links) link(href string) (string, bool) {
 	return l.web + string(l.repo) + "/" + kind + "/HEAD/" + escapePath(p) + frag, true
 }
 
-// image resolves an img src: relative paths to the raw file at the default branch head, absolute https kept, anything else "".
+// image resolves an img src to its address on the portal and records the image: a repository path, or an absolute https URL.
+// Anything else is "".
 func (l links) image(src string) string {
 	u, err := url.Parse(strings.TrimSpace(src))
+	var img snapshot.Image
 	switch {
 	case err != nil || src == "":
 		return ""
-	case u.Scheme == "https":
-		return u.String()
+	case u.Scheme == "https" && u.Host != "":
+		img.URL = u.String()
 	case u.Scheme != "" || u.Host != "":
 		return ""
+	default:
+		p, dir, ok := l.resolve(u.Path)
+		if !ok || dir || p == "" {
+			return ""
+		}
+		img.Path = p
 	}
-	p, dir, ok := l.resolve(u.Path)
-	if !ok || dir || p == "" {
-		return ""
+	img.ID = imageID(img)
+	if l.images != nil {
+		l.images[img.ID] = img
 	}
-	if l.web == "https://github.com/" {
-		return "https://raw.githubusercontent.com/" + string(l.repo) + "/HEAD/" + escapePath(p)
+	return "/images/" + string(l.repo) + "/" + img.ID
+}
+
+// imageID names an image within its repository: 16 bytes of SHA-256 over its path or URL, hex.
+func imageID(img snapshot.Image) string {
+	ref := img.URL
+	if img.Path != "" {
+		ref = "path:" + img.Path
 	}
-	return l.web + string(l.repo) + "/raw/HEAD/" + escapePath(p)
+	sum := sha256.Sum256([]byte(ref))
+	return hex.EncodeToString(sum[:16])
 }
 
 // resolve turns a relative path into a repository path; a leading / is repository-relative. ok is false above the root.

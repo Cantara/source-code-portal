@@ -210,7 +210,14 @@ catalog:
 		}
 		return true
 	}
+	version := func(n *node) int64 {
+		var info oapi.SnapshotInfo
+		b, _ := get(n.public + "/api/v1/snapshot")
+		_ = json.Unmarshal([]byte(b), &info)
+		return info.Version
+	}
 	waitFor("the same responses on both instances", same)
+	waitFor("the same snapshot version on both instances", func() bool { v := version(leader); return v != 0 && v == version(follower) })
 	for _, p := range paths {
 		lb, _ := get(leader.public + p)
 		if fb, _ := get(follower.public + p); lb != fb {

@@ -20,6 +20,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/repos/{owner}/{name}/manifests` | the repository's `go.mod`, `package.json` and `pom.xml` files with their dependencies, the technology they state, and the catalogued repositories it uses and is used by |
 | `GET /api/v1/commits[?group=][&repo=owner/name][&limit=][&cursor=]` | commits newest first, a page at a time |
 | `GET /api/v1/snapshot` | the version and time of the data being served, and readiness |
+| `GET /api/v1/events` | server-sent events: `event: snapshot` with the same JSON as `/api/v1/snapshot`, when the stream opens and whenever the data changes |
 
 ```sh
 curl -s https://scp.example.org/api/v1/repos/cantara/whydah-useradminservice | jq '.repo.description, .commits[0].subject'
@@ -36,7 +37,15 @@ example during a GitHub outage), `error` (the last attempts failed; the data sho
 on the last one. A cursor belongs to its filter and stays valid while new commits arrive.
 
 **Caching.** Responses have a weak `ETag` and `Cache-Control: no-cache`; send `If-None-Match` to get `304 Not Modified` when nothing
-changed. Poll `GET /api/v1/snapshot` (about every 30 seconds) and refetch when its `version` changes.
+changed. To learn about new data, listen to `GET /api/v1/events` (or poll `GET /api/v1/snapshot` about every 30 seconds) and refetch
+when `version` differs from the one you saw; it identifies the data and is the same on every instance, so compare it for equality only.
+
+```sh
+curl -sN https://scp.example.org/api/v1/events
+```
+
+**Images.** Documents show images at `/images/{owner}/{name}/{id}`, served by the portal with a strong `ETag` and
+`Cache-Control: public, max-age=3600`.
 
 **Errors** are `application/problem+json` (RFC 9457) with a stable `code` and the request id in `instance` (`urn:scp:request:<id>`, also
 the `X-Request-Id` header):

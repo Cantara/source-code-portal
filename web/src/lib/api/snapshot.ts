@@ -3,12 +3,10 @@ import { api, unwrap } from "./client"
 
 export const snapshotKey = ["snapshot"] as const
 
-/** snapshotQuery polls the snapshot every 30 s while the page is visible; its version changes with every new snapshot. */
+/** snapshotQuery reads the snapshot; its version identifies the data. The shell keeps it current (features/status/sync.ts). */
 export const snapshotQuery = queryOptions({
   queryKey: snapshotKey,
   queryFn: ({ signal }) => unwrap(api.GET("/snapshot", { signal })),
-  refetchInterval: 30_000,
-  refetchIntervalInBackground: false,
   staleTime: 0,
 })
 

@@ -9,8 +9,9 @@ Status: v1 design note, 2026-10-14. Binding order: ../plan.md > this note > ../r
 - The `scp.yaml` descriptor is owned by `catalog.md`.
 
 ## Decisions
-- Relative images resolve to `raw.githubusercontent.com` at the commit SHA; absolute `https` images are kept: images load from their hosts.
-- CSP for the SPA is `img-src 'self' https:` (http-api.md); `<img>` gets `referrerpolicy="no-referrer"` and `loading="lazy"`: image hosts see no portal URL.
+- Images (relative and absolute `https`) are rewritten to the image proxy, `/images/{owner}/{name}/{id}`, and recorded with the document
+  (images-events.md); the sanitiser admits only that `src` form.
+- CSP for the SPA is `img-src 'self'` (http-api.md); `<img>` gets `referrerpolicy="no-referrer"` and `loading="lazy"`.
 - `.adoc`/`.rst`/`.txt` and extensionless non-Markdown READMEs render as escaped text (`safehtml.Text`): every README shows something, with a typed state (GR-29).
 - Mermaid fences render as code blocks (`<pre><code class="language-mermaid">`).
 - goldmark v1.8 with `html.WithUnsafe` (raw `<details>`, `<img>`, `<kbd>`, `<sub>` are common in READMEs); sanitising after rendering is therefore mandatory.
@@ -70,10 +71,10 @@ Per repository the snapshot holds `RepoEntry{Repo, Commits, Docs, Release}` (syn
 9. Links: relative paths resolve against the document's directory (leading `/` is repository-relative; a path above the root keeps only
    the text); an indexed doc becomes its portal route `/repos/{owner}/{name}/docs/{path}`; any other path `{html_url}/blob/{sha}/{path}`
    (`/tree/` for a trailing slash). Schemes `http`, `https`, `mailto`. External links get `rel="noopener noreferrer nofollow ugc"`.
-10. Images: relative path -> `https://raw.githubusercontent.com/{owner}/{name}/{sha}/{path}`; absolute `https` kept; any other scheme
+10. Images: relative path or absolute `https` URL -> `/images/{owner}/{name}/{id}` (images-events.md); any other scheme
     keeps the alt text as text; `srcset` candidates follow the same rule (failing candidates removed); `alt` always present.
 11. Code: `<pre class="chroma"><code class="language-x">`, language must match `^[A-Za-z0-9_+#.-]{1,32}$`; budgets per Decisions.
-12. Sanitiser policy (`PolicyVersion` 1), starting from bluemonday `UGCPolicy`:
+12. Sanitiser policy (`PolicyVersion` 2), starting from bluemonday `UGCPolicy`:
     - Allowed beyond UGC: `details`, `summary`, `kbd`, `sub`, `sup`, `picture`/`source[srcset]`, `input[type=checkbox][disabled][checked]`,
       `div[align]`, `p[align]`, `img[width,height,align,loading,referrerpolicy]`, `td/th[align]`, `role` on footnote elements.
     - `id`: `^doc-[A-Za-z0-9_:.-]{1,100}$`; `class`: allow-list (`chroma` token classes, `language-*`, `md-alert*`, `footnote*`, `task-list-item`).

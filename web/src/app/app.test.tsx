@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { commit, fresh, http, server, snapshot } from "@/test/server"
 import { App } from "./app"
 
@@ -144,6 +144,62 @@ describe("commit log", () => {
     await qc.refetchQueries({ queryKey: ["snapshot"] })
     expect(await screen.findByText("2 repositories in the catalogue.")).toBeInTheDocument()
     expect(screen.getByText(/loading its catalogue/)).toBeInTheDocument()
+  })
+
+  it("follows the event stream and stops polling while it is open", async () => {
+    const sources: FakeEventSource[] = []
+    class FakeEventSource extends EventTarget {
+      onopen: (() => void) | null = null
+      onerror: (() => void) | null = null
+      closed = false
+      constructor(readonly url: string) {
+        super()
+        sources.push(this)
+      }
+      close() {
+        this.closed = true
+      }
+      emit(data: unknown) {
+        this.dispatchEvent(new MessageEvent("snapshot", { data: JSON.stringify(data) }))
+      }
+    }
+    vi.stubGlobal("EventSource", FakeEventSource)
+    try {
+      let n = 0
+      server.use(
+        http.get("/dashboard", ({ response }) =>
+          response(200).json({
+            groups: [],
+            repoCount: ++n,
+            ungroupedCount: 0,
+            latest: [],
+            freshness: { fresh: 0, stale: 0, unknown: 0, error: 0 },
+          }),
+        ),
+      )
+      const qc = client()
+      const view = render(<App initialPath="/" queryClient={qc} />)
+      expect(await screen.findByText("1 repository in the catalogue.")).toBeInTheDocument()
+      const source = sources[0]
+      expect(source?.url).toBe("/api/v1/events")
+      source?.onopen?.()
+      await waitFor(() => expect(qc.getQueryData(["snapshot"])).toBeDefined())
+      await waitFor(() =>
+        expect(
+          qc
+            .getQueryCache()
+            .find({ queryKey: ["snapshot"] })
+            ?.observers.some((o) => o.options.refetchInterval === false),
+        ).toBe(true),
+      )
+      source?.emit(snapshot(7))
+      expect(await screen.findByText("2 repositories in the catalogue.")).toBeInTheDocument()
+      expect(qc.getQueryData<{ version: number }>(["snapshot"])?.version).toBe(7)
+      view.unmount()
+      expect(source?.closed).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 

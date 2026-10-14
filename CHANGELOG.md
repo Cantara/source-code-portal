@@ -13,6 +13,10 @@ change from its Conventional Commit subjects.
 - Several instances serve one portal through Hazelcast (`cluster.addresses`): one leads and alone calls GitHub, every instance serves
   the same data, webhook deliveries are de-duplicated across instances and reach the leader from any of them, and another instance takes
   over when the leader stops.
+- Images in documents load from the portal (`/images/...`), relative and external ones alike, also for private repositories; the web
+  UI's CSP is `img-src 'self'`.
+- Live updates: `/api/v1/events` streams server-sent events, and an open page shows new data within seconds without polling. The
+  snapshot `version` now identifies the data and is equal on every instance.
 
 ## 2.0.0
 

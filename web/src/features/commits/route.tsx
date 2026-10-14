@@ -109,7 +109,7 @@ export function CommitLog({ filter, showRepo = true }: { filter: Filter; showRep
   const focusFirst = useRef(false)
   const pages = data?.pages ?? []
   const top = pages[0]
-  const newer = pages.length > 1 && top !== undefined && top.version > 0 && version > top.version
+  const newer = pages.length > 1 && top !== undefined && top.version !== 0 && version !== 0 && version !== top.version
 
   const loaded = data?.pages.length ?? 0
   useEffect(() => {

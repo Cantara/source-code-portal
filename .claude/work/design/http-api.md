@@ -20,8 +20,8 @@ about new data by polling `/api/v1/snapshot`.
 - Generated TS types `web/src/lib/api/schema.d.ts` (`openapi-typescript`) + `openapi-fetch`; committed, drift-checked (`make check`).
 - OpenAPI 3.1 subset: nullable as `type: [T, "null"]`, one type per schema: the part oapi-codegen v2.8 generates reliably.
 - Doc ids in the JSON API are the repository path percent-encoded into one segment (`docs%2Fsetup.md`): fits one OpenAPI path param.
-- Static CSP (the shell is a static file). `img-src 'self' https:`: relative README images resolve to `raw.githubusercontent.com` and
-  absolute https images load from their hosts; scripts, styles, fonts and connections are `'self'`.
+- Static CSP (the shell is a static file). `img-src 'self'`: every document image loads through the image proxy (images-events.md);
+  scripts, styles, fonts and connections are `'self'`.
 - Webhook events are hints: the receiver hands verified, normalised events to a `Sink` wired in `cmd/scp`, which calls
   `sync.Notify(event, repo)`; job specs declare the events they react to, so `webhook` stays independent of features and job kinds.
 
@@ -49,7 +49,9 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/api/v1/repos/{o}/{n}/docs/{docId}` | docs | one document: `SafeHTML`, title, blob SHA, freshness |
 | P | GET | `/api/v1/repos/{o}/{n}/manifests` | manifests | manifests with dependencies, technology, uses and used by (`manifests.md`) |
 | P | GET | `/api/v1/commits` | commits | merged default-branch commits; `?group=`, `?repo=owner/name`, cursor-paginated |
-| P | GET | `/api/v1/snapshot` | httpapi | data health: snapshot version, builtAt, ready flag, freshness counts; the SPA polls it |
+| P | GET | `/api/v1/snapshot` | httpapi | data health: snapshot version, builtAt, ready flag, freshness counts |
+| P | GET | `/api/v1/events` | httpapi | server-sent events: the SnapshotInfo at connect and after every new version (images-events.md) |
+| P | GET | `/images/{o}/{n}/{id}` | docs | the images documents show, through the proxy (images-events.md) |
 | P | GET | `/api/v1/openapi.yaml` | httpapi | the embedded contract |
 | P | GET | `/badges/repos/{o}/{n}/{file}` | badges | `last-commit.svg`, `release.svg`, `license.svg`, `issues.svg` |
 | P | GET | `/badges/groups/{group}/{file}` | badges | `repos.svg` (repository count) |
@@ -86,12 +88,13 @@ Reserved prefixes always answer plain: `/api/`, `/assets/`, `/badges/`, `/webhoo
 2. **Middleware** (outermost first, `internal/httpapi`): request id (accept `X-Request-Id` matching `[A-Za-z0-9-]{1,64}`, else generate;
    echoed) -> recover (500 `internal` problem, stack logged) -> access log (`slog` JSON after the handler: listener, `r.Pattern`, method,
    status, bytes, duration, request id, client IP) -> metrics -> security headers -> body limit
-   (`MaxBytesReader` 64 KiB; webhook route `webhook.max_body`) -> request deadline (context 30 s) -> gzip (JSON/text >= 1 KiB) -> mux.
+   (`MaxBytesReader` 64 KiB; webhook route `webhook.max_body`) -> request deadline (context 30 s; not on the event stream) -> gzip
+   (JSON/text >= 1 KiB; a flushed stream stays uncompressed) -> mux.
    Server: `ReadHeaderTimeout 5s`, `ReadTimeout 30s`, `WriteTimeout 60s`, `IdleTimeout 120s`, `MaxHeaderBytes 16 KiB`. Client IP from
    `X-Forwarded-For` when the peer is in `server.trusted_proxies` (right to left). Shutdown follows build-ops.md (Runtime).
 3. **Security headers and CSP.** All responses: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
    same-origin only (no CORS headers). HSTS (`max-age=31536000`) when `server.public_url` is https. Shell (`index.html`):
-   `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https:; font-src 'self'; connect-src 'self';
+   `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self';
    manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`, plus `Permissions-Policy`
    denying camera, microphone, geolocation, payment, usb. The SPA side that makes it hold is in web.md (external `/theme-init.js`,
    class-only components, one `SafeHtml` component). API, llms and `.md`: `default-src 'none'; frame-ancestors 'none';
@@ -127,6 +130,7 @@ Prometheus, prefix `scp_`, plus the Go and process collectors. Labels use route 
 |---|---|---|---|
 | `scp_build_info` | gauge | version, commit, goversion | cmd/scp |
 | `scp_cluster_leader` | gauge | | cmd/scp (with `cluster.addresses`) |
+| `scp_event_streams` | gauge | | cmd/scp (open `/api/v1/events` streams) |
 | `scp_http_requests_total` | counter | listener, pattern, method, code | httpapi |
 | `scp_http_request_duration_seconds` | histogram | listener, pattern | httpapi |
 | `scp_webhook_deliveries_total` | counter | event, result (accepted, duplicate, ping, ignored, invalid_signature, too_large, malformed, queue_full) | webhook |

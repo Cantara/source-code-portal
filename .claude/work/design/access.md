@@ -22,8 +22,7 @@ Status: v1 design note (M8), 2026-10-14. Binding order: ../plan.md > this note >
   `Vary` on the two headers while private repositories are admitted.
 - `/llms.txt` and `/llms-full.txt` are built once per view and snapshot.
 - Admin surfaces (`/metrics`, `/api/v1/status`) read the full view; they are on the admin listener.
-- Relative images in private READMEs point at `raw.githubusercontent.com`, which needs a GitHub session; the image proxy (M10) serves
-  them through the portal.
+- Images of private repositories load through the image proxy (images-events.md), which answers only viewers who see the repository.
 - The SPA shows a "Private" or "Internal" badge on repository rows and pages; nothing else changes in the UI.
 
 ## Shapes

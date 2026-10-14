@@ -5,8 +5,10 @@ package sync
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"math/rand/v2"
 	"slices"
@@ -476,10 +478,34 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 		e.log.Error("store write failed; serving from memory", "key", en.key, "err", err)
 	}
 	fresh := freshness(it, spec.TTL)
-	e.pub.Update(func(b *snapshot.Builder) { spec.Publish(b, it, fresh) })
+	e.pub.Update(func(b *snapshot.Builder) { publish(b, spec, it, fresh, removed) })
 	if e.share != nil {
 		e.share(shared)
 	}
+}
+
+// publish sets an item in the snapshot with its digest and drops the digests of the items that left.
+func publish(b *snapshot.Builder, spec *Spec, it store.Item, fresh snapshot.Freshness, removed []string) {
+	spec.Publish(b, it, fresh)
+	b.Mark(it.Key, digest(it))
+	for _, k := range removed {
+		b.Mark(k, 0)
+	}
+}
+
+// digest is the item's contribution to the snapshot version: what its publish shows, in the precision the store keeps.
+func digest(it store.Item) uint64 {
+	h := fnv.New64a()
+	for _, s := range []string{it.Key, string(it.State), it.ErrCode, it.ContentSHA} {
+		_, _ = h.Write([]byte(s))
+		_, _ = h.Write([]byte{0})
+	}
+	var b [16]byte
+	binary.BigEndian.PutUint64(b[:8], uint64(it.CheckedAt.Unix())) //nolint:gosec // G115: bits of a digest
+	binary.BigEndian.PutUint64(b[8:], uint64(it.FetchedAt.Unix())) //nolint:gosec // G115: bits of a digest
+	_, _ = h.Write(b[:])
+	_, _ = h.Write(it.Payload)
+	return max(h.Sum64(), 1)
 }
 
 // nextRev returns a revision newer than every one made or seen. Callers hold e.mu.
@@ -521,9 +547,10 @@ func (e *Engine) Receive(ctx context.Context, r Shared) {
 	}
 	ch := store.Change{Item: r.Item}
 	var adopted []Shared
+	var removed []string
 	if r.Catalogue != nil {
 		ch.Source, ch.Catalogue = r.Source, r.Catalogue
-		e.setCatalogue(r.Source, r.Catalogue, now)
+		removed = e.setCatalogue(r.Source, r.Catalogue, now)
 		for k, o := range e.orphans {
 			switch {
 			case e.entries[k] != nil:
@@ -541,7 +568,7 @@ func (e *Engine) Receive(ctx context.Context, r Shared) {
 		e.log.Error("store write failed; serving from memory", "key", it.Key, "err", err)
 	}
 	fresh := freshness(it, spec.TTL)
-	e.pub.Update(func(b *snapshot.Builder) { spec.Publish(b, it, fresh) })
+	e.pub.Update(func(b *snapshot.Builder) { publish(b, spec, it, fresh, removed) })
 	slices.SortFunc(adopted, func(a, b Shared) int { return strings.Compare(a.Item.Key, b.Item.Key) })
 	for _, o := range adopted {
 		e.Receive(ctx, o)
@@ -800,7 +827,7 @@ func (e *Engine) warmStart(ctx context.Context) error {
 		for _, s := range e.specs { // registration order: the catalogue before what hangs off it
 			for _, it := range items {
 				if it.Kind == s.Kind {
-					s.Publish(b, it, freshness(it, s.TTL))
+					publish(b, s, it, freshness(it, s.TTL), nil)
 				}
 			}
 		}

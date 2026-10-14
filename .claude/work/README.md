@@ -17,6 +17,7 @@ Everything needed to build Source Code Portal v1 in Go. Binding order: `plan.md`
 | `design/manifests.md` | `go.mod`, `package.json`, `pom.xml`: technology, dependencies, internal dependencies. M7. |
 | `design/access.md` | Private repositories behind a trusted authenticating proxy: the viewer, the public view. M8. |
 | `design/cluster.md` | Several instances on Hazelcast: the leader, the shared state, webhook de-duplication. M9. |
+| `design/images-events.md` | The image proxy for document images, server-sent events, the content-derived snapshot version. M10. |
 | `reference/detailed-design/` | The earlier detailed design (archive). Background material, consulted per note's Reference section. |
 
 Work one milestone at a time: read `plan.md` section 5, then the notes tagged with that milestone. New decisions go into
