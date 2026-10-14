@@ -6,13 +6,24 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
+	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/store"
+	"github.com/cantara/source-code-portal/internal/sync"
 	"github.com/cantara/source-code-portal/web"
+)
+
+const (
+	publishDebounce = 200 * time.Millisecond
+	publishMaxDelay = time.Second
 )
 
 func newServeCmd(opts *options) *cobra.Command {
@@ -42,26 +53,62 @@ func newServeCmd(opts *options) *cobra.Command {
 	return cmd
 }
 
-// server owns the two listeners and their HTTP servers.
+// api composes the strict server from the features that implement its methods.
+type api struct {
+	catalog.API
+	httpapi.SnapshotAPI
+}
+
+// server owns the store, the snapshot, the sync engine and the two listeners.
 type server struct {
 	log               *slog.Logger
 	grace             time.Duration
+	store             *store.DB
+	pub               *snapshot.Publisher
+	engine            *sync.Engine
+	stopping          atomic.Bool
 	public, admin     *http.Server
 	publicLn, adminLn net.Listener
 }
 
-// newServer builds the handlers and binds both listeners.
-func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (*server, error) {
+// newServer opens the store, wires the features and binds both listeners.
+func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *server, err error) {
 	spa, err := web.FS()
 	if err != nil {
 		return nil, err
 	}
-	s := &server{
-		log:    log,
-		grace:  cfg.Server.ShutdownGrace,
-		public: newHTTPServer(httpapi.Public(spa), log),
-		admin:  newHTTPServer(httpapi.Admin(), log),
+	gh, err := github.New(cfg.GitHub, nil, log)
+	if err != nil {
+		return nil, err
 	}
+	listers := map[string]catalog.Lister{}
+	sources := make([]string, 0, len(cfg.GitHub.Sources))
+	for _, s := range cfg.GitHub.Sources {
+		listers[s.ID] = gh.Source(s.ID)
+		sources = append(sources, s.ID)
+	}
+	cat, err := catalog.New(cfg.Catalog, cfg.GitHub.Sources, listers, log)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log)}
+	if s.store, err = store.Open(ctx, cfg.Store.Path, log); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			_ = s.store.Close()
+		}
+	}()
+	s.engine = sync.New(s.store, s.pub, gh, sources, cfg.Sync.Concurrency, log)
+	if err := s.engine.Register(cat.Spec()); err != nil {
+		return nil, err
+	}
+
+	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
+	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, httpapi.SnapshotAPI{Current: s.pub.Current}}), log)
+	s.admin = newHTTPServer(httpapi.Admin(ready), log)
 	var lc net.ListenConfig
 	if s.publicLn, err = lc.Listen(ctx, "tcp", cfg.Server.PublicAddr); err != nil {
 		return nil, err
@@ -84,8 +131,13 @@ func newHTTPServer(h http.Handler, log *slog.Logger) *http.Server {
 	}
 }
 
-// run serves until ctx is cancelled, then shuts both servers down within the grace period.
+// run serves until ctx is cancelled, then shuts down within the grace period: readiness drops, the servers drain, the engine
+// stops (jobs in flight are cancelled and run again after a restart), pending snapshot updates are dropped and the store closes.
 func (s *server) run(ctx context.Context) error {
+	engineCtx, stopEngine := context.WithCancel(context.WithoutCancel(ctx))
+	engineDone := make(chan error, 1)
+	go func() { engineDone <- s.engine.Run(engineCtx) }()
+
 	errc := make(chan error, 2)
 	for _, p := range []struct {
 		name string
@@ -97,24 +149,31 @@ func (s *server) run(ctx context.Context) error {
 	}
 
 	var serveErr error
+	serversLeft, engineRunning := 2, true
 	select {
 	case <-ctx.Done():
 		s.log.Info("shutting down", "grace", s.grace.String())
 	case serveErr = <-errc:
+		serversLeft--
 		s.log.Error("listener failed", "err", serveErr)
+	case serveErr = <-engineDone:
+		engineRunning = false
+		s.log.Error("sync engine stopped", "err", serveErr)
 	}
+	s.stopping.Store(true)
 
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.grace)
 	defer cancel()
 	err := errors.Join(serveErr, s.public.Shutdown(shutdownCtx), s.admin.Shutdown(shutdownCtx))
-	pending := 2
-	if serveErr != nil {
-		pending = 1
-	}
-	for range pending {
+	for range serversLeft {
 		if e := <-errc; !errors.Is(e, http.ErrServerClosed) {
 			err = errors.Join(err, e)
 		}
 	}
-	return err
+	stopEngine()
+	if engineRunning {
+		err = errors.Join(err, <-engineDone)
+	}
+	s.pub.Close()
+	return errors.Join(err, s.store.Close())
 }

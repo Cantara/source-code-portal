@@ -1,0 +1,184 @@
+openapi: 3.1.0
+info:
+  title: Source Code Portal API
+  version: "1"
+  description: |
+    Read API over the portal's snapshot. Every list is returned whole. Every 200 response carries a weak ETag; send it back in
+    If-None-Match to get 304 Not Modified. Errors are RFC 9457 problems.
+servers:
+  - url: /api/v1
+paths:
+  /groups:
+    get:
+      operationId: listGroups
+      summary: All groups in configuration order, with member counts
+      responses:
+        "200":
+          description: The groups
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupList" }
+        "304": { $ref: "#/components/responses/NotModified" }
+  /groups/{group}:
+    get:
+      operationId: getGroup
+      summary: One group with its repositories
+      parameters:
+        - { name: group, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The group
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Group" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /repos:
+    get:
+      operationId: listRepos
+      summary: All repositories sorted by address, optionally of one group
+      parameters:
+        - { name: group, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: The repositories
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RepoList" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /repos/{owner}/{name}:
+    get:
+      operationId: getRepo
+      summary: One repository; an old address redirects to the current one
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The repository
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Repo" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "308":
+          description: The repository was renamed or transferred
+          headers:
+            Location:
+              required: true
+              schema: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /snapshot:
+    get:
+      operationId: getSnapshot
+      summary: Data health; the web UI polls it to learn about new data
+      responses:
+        "200":
+          description: The current snapshot
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SnapshotInfo" }
+        "304": { $ref: "#/components/responses/NotModified" }
+components:
+  headers:
+    ETag:
+      description: Weak validator of the response body
+      schema: { type: string }
+  responses:
+    NotModified:
+      description: The representation matches If-None-Match
+    NotFound:
+      description: No such resource
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    Freshness:
+      type: object
+      required: [status, fetchedAt, checkedAt]
+      properties:
+        status: { type: string, enum: [fresh, stale, unknown, error] }
+        fetchedAt: { type: [string, "null"], format: date-time, description: Last time the content was read }
+        checkedAt: { type: [string, "null"], format: date-time, description: Last time the content was confirmed }
+    Repo:
+      type: object
+      required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, topics, archived, fork,
+                 stars, openIssues, pushedAt, groups, freshness]
+      properties:
+        address: { type: string, description: "Lower-case owner/name, used in URLs" }
+        owner: { type: string }
+        name: { type: string }
+        description: { type: string }
+        htmlUrl: { type: string }
+        homepage: { type: string, description: Empty when not set }
+        defaultBranch: { type: string }
+        license: { type: string, description: SPDX id; empty when unknown }
+        visibility: { type: string }
+        topics: { type: array, items: { type: string } }
+        archived: { type: boolean }
+        fork: { type: boolean }
+        stars: { type: integer }
+        openIssues: { type: integer, description: Open issues and pull requests }
+        pushedAt: { type: string, format: date-time }
+        groups: { type: array, items: { type: string }, description: Group ids in configuration order }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    RepoList:
+      type: object
+      required: [repos]
+      properties:
+        repos: { type: array, items: { $ref: "#/components/schemas/Repo" } }
+    GroupSummary:
+      type: object
+      required: [id, name, description, defaultRepo, defaultRepoState, repoCount]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        defaultRepo: { type: [string, "null"], description: Address of the group's main repository }
+        defaultRepoState: { type: string, enum: [ok, missing] }
+        repoCount: { type: integer }
+    GroupList:
+      type: object
+      required: [groups]
+      properties:
+        groups: { type: array, items: { $ref: "#/components/schemas/GroupSummary" } }
+    Group:
+      type: object
+      required: [id, name, description, defaultRepo, defaultRepoState, repoCount, repos]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        defaultRepo: { type: [string, "null"] }
+        defaultRepoState: { type: string, enum: [ok, missing] }
+        repoCount: { type: integer }
+        repos: { type: array, items: { $ref: "#/components/schemas/Repo" } }
+    SourceInfo:
+      type: object
+      required: [id, repos, freshness]
+      properties:
+        id: { type: string }
+        repos: { type: integer }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    SnapshotInfo:
+      type: object
+      required: [version, builtAt, ready, sources]
+      properties:
+        version: { type: integer, format: int64 }
+        builtAt: { type: [string, "null"], format: date-time }
+        ready: { type: boolean, description: A catalogue is loaded }
+        sources: { type: array, items: { $ref: "#/components/schemas/SourceInfo" } }
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }

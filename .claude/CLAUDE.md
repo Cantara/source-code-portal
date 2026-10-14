@@ -5,7 +5,7 @@ Guidance for Claude Code in this repository.
 ## State
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`) is the
-home of the Go rewrite of Source Code Portal (SCP). M0 (skeleton) is done; the next milestone is M1. Coding instructions for the
+home of the Go rewrite of Source Code Portal (SCP). M0 (skeleton) and M1 (catalogue and sync) are done; the next milestone is M2. Coding instructions for the
 repository itself are in the root `AGENTS.md`.
 
 - **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M6. Read it first.
@@ -34,6 +34,7 @@ One static Go binary (`CGO_ENABLED=0`) with the React SPA embedded. GitHub feeds
 publish an immutable snapshot behind an atomic pointer; request handlers read only the snapshot. Features never import features; wiring
 only in `cmd/scp`. Untrusted bytes pass through bounded parsers and one sanitiser producing `SafeHTML`. Public port `:9090`, admin `:9091`.
 
-## Next: M1
+## Next: M2
 
-Catalogue and sync (`plan.md` section 5): read `design/github.md`, `design/sync-snapshot-store.md` and `design/catalog.md`.
+The read API for the pages (`plan.md` section 5): commits and repository detail. Read `design/content.md`, `design/http-api.md` and the
+M1 entry in `decisions.md` (what M1 deferred to M2 and M3).
