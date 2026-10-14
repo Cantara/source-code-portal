@@ -12,14 +12,16 @@ import (
 
 func feedSnapshot(t *testing.T) *snapshot.Snapshot {
 	t.Helper()
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
 	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	fresh := snapshot.Freshness{State: snapshot.StateOK, FetchedAt: time.Now(), CheckedAt: time.Now(), TTL: time.Hour}
 	entry := func(id int64, name string, n int, f snapshot.Freshness) *snapshot.RepoEntry {
-		e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: id}, Owner: "acme", Name: name}, CommitsFresh: f}
+		e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: id}, Owner: "acme", Name: name}}
+		var cs []Commit
 		for i := range n {
-			e.Commits = append(e.Commits, snapshot.Commit{SHA: sha(byte('a' + int(id)*5 + i)), CommittedAt: at.Add(-time.Duration(i) * time.Hour)})
+			cs = append(cs, Commit{SHA: sha(byte('a' + int(id)*5 + i)), CommittedAt: at.Add(-time.Duration(i) * time.Hour)})
 		}
+		facet.Set(e, cs, f)
 		return e
 	}
 	p.Update(func(b *snapshot.Builder) {

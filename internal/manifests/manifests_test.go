@@ -3,6 +3,7 @@ package manifests
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -107,9 +108,9 @@ require (
 
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 `))
-	want := snapshot.Manifest{Ecosystem: "go", Name: "github.com/acme/x", Language: "Go", BuildTool: "Go modules",
-		Toolchain: []snapshot.Toolchain{{Name: "go", Version: "1.27.2"}, {Name: "go", Version: "1.27.3"}},
-		Dependencies: []snapshot.Dependency{{Name: "github.com/spf13/cobra", Version: "v1.10.1", Scope: "runtime"},
+	want := Manifest{Ecosystem: "go", Name: "github.com/acme/x", Language: "Go", BuildTool: "Go modules",
+		Toolchain: []Toolchain{{Name: "go", Version: "1.27.2"}, {Name: "go", Version: "1.27.3"}},
+		Dependencies: []Dependency{{Name: "github.com/spf13/cobra", Version: "v1.10.1", Scope: "runtime"},
 			{Name: "golang.org/x/mod", Version: "v0.42.0", Scope: "indirect"},
 			{Name: "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen", Scope: "tool"}}}
 	if d := cmp.Diff(want, got); d != "" {
@@ -130,9 +131,9 @@ func TestPackageJSON(t *testing.T) {
 		"dependencies":{"react":"^19.3.0","zod":4},"devDependencies":{"typescript":"~6.0.3","`+"\u202e"+`bidi":"1"},
 		"peerDependencies":{"react-dom":"*"},"optionalDependencies":{"fsevents":"^2"},"scripts":{"x":"rm -rf /"}}`),
 		func(n string) bool { return beside[n] })
-	want := snapshot.Manifest{Ecosystem: "npm", Name: "@acme/web", Version: "2.0.0", Language: "TypeScript", BuildTool: "pnpm",
-		Toolchain: []snapshot.Toolchain{{Name: "node", Version: ">=24"}},
-		Dependencies: []snapshot.Dependency{{Name: "react", Version: "^19.3.0", Scope: "runtime"}, {Name: "react-dom", Version: "*", Scope: "peer"},
+	want := Manifest{Ecosystem: "npm", Name: "@acme/web", Version: "2.0.0", Language: "TypeScript", BuildTool: "pnpm",
+		Toolchain: []Toolchain{{Name: "node", Version: ">=24"}},
+		Dependencies: []Dependency{{Name: "react", Version: "^19.3.0", Scope: "runtime"}, {Name: "react-dom", Version: "*", Scope: "peer"},
 			{Name: "fsevents", Version: "^2", Scope: "optional"}, {Name: "bidi", Version: "1", Scope: "dev"},
 			{Name: "typescript", Version: "~6.0.3", Scope: "dev"}}}
 	sortDependencies(got.Dependencies)
@@ -174,9 +175,9 @@ func TestPOM(t *testing.T) {
   </dependencies>
   <profiles><profile><dependencies><dependency><groupId>p</groupId><artifactId>p</artifactId></dependency></dependencies></profile></profiles>
 </project>`))
-	want := snapshot.Manifest{Ecosystem: "maven", Name: "no.cantara:whydah-sso", Version: "3.1.0-SNAPSHOT", Language: "Java", BuildTool: "Maven",
-		Toolchain: []snapshot.Toolchain{{Name: "java", Version: "21"}},
-		Dependencies: []snapshot.Dependency{{Name: "no.cantara:cantara-parent", Version: "7", Scope: "parent"},
+	want := Manifest{Ecosystem: "maven", Name: "no.cantara:whydah-sso", Version: "3.1.0-SNAPSHOT", Language: "Java", BuildTool: "Maven",
+		Toolchain: []Toolchain{{Name: "java", Version: "21"}},
+		Dependencies: []Dependency{{Name: "no.cantara:cantara-parent", Version: "7", Scope: "parent"},
 			{Name: "com.fasterxml.jackson:jackson-bom", Version: "2.20.0", Scope: "import"},
 			{Name: "no.cantara:whydah-api", Version: "3.1.0-SNAPSHOT", Scope: "runtime"}, {Name: "org.slf4j:slf4j-api", Scope: "runtime"},
 			{Name: "jakarta.servlet:jakarta.servlet-api", Scope: "provided"},
@@ -226,7 +227,7 @@ func FuzzParsers(f *testing.F) {
 		f.Add([]byte(s))
 	}
 	f.Fuzz(func(t *testing.T, b []byte) {
-		for _, m := range []snapshot.Manifest{parseGoMod(b), parsePackageJSON(b, func(string) bool { return false }), parsePOM(b)} {
+		for _, m := range []Manifest{parseGoMod(b), parsePackageJSON(b, func(string) bool { return false }), parsePOM(b)} {
 			if len(m.Dependencies) > maxDependencies || len([]rune(m.Name)) > maxName {
 				t.Fatalf("bounds: %d dependencies, name %q", len(m.Dependencies), m.Name)
 			}
@@ -235,7 +236,7 @@ func FuzzParsers(f *testing.F) {
 }
 
 func TestAPI(t *testing.T) {
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Graph())
 	entry := func(id int64, name string) *snapshot.RepoEntry {
 		return &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: id}, Owner: "Acme", Name: name}}
 	}
@@ -243,16 +244,16 @@ func TestAPI(t *testing.T) {
 		b.ReplaceSource("gh", []*snapshot.RepoEntry{entry(1, "lib"), entry(2, "app")}, map[snapshot.RepoKey]snapshot.RepoKey{"acme/old": "acme/lib"},
 			snapshot.SourceStatus{ID: "gh"})
 		b.UpdateRepo("acme/lib", func(e *snapshot.RepoEntry) {
-			e.Manifests = []snapshot.Manifest{{Path: "go.mod", Ecosystem: "go", Name: "github.com/acme/lib", Language: "Go", BuildTool: "Go modules",
-				Toolchain: []snapshot.Toolchain{{Name: "go", Version: "1.27"}}}}
+			facet.Set(e, []Manifest{{Path: "go.mod", Ecosystem: "go", Name: "github.com/acme/lib", Language: "Go", BuildTool: "Go modules",
+				Toolchain: []Toolchain{{Name: "go", Version: "1.27"}}}}, snapshot.Freshness{})
 		})
 		b.UpdateRepo("acme/app", func(e *snapshot.RepoEntry) {
-			e.Manifests = []snapshot.Manifest{
+			facet.Set(e, []Manifest{
 				{Path: "go.mod", Ecosystem: "go", Name: "github.com/acme/app", Language: "Go", BuildTool: "Go modules",
-					Toolchain:    []snapshot.Toolchain{{Name: "go", Version: "1.27"}},
-					Dependencies: []snapshot.Dependency{{Name: "github.com/acme/lib", Version: "v1.0.0", Scope: "runtime"}, {Name: "x", Scope: "runtime"}}},
+					Toolchain:    []Toolchain{{Name: "go", Version: "1.27"}},
+					Dependencies: []Dependency{{Name: "github.com/acme/lib", Version: "v1.0.0", Scope: "runtime"}, {Name: "x", Scope: "runtime"}}},
 				{Path: "web/package.json", Ecosystem: "npm", Language: "TypeScript", BuildTool: "pnpm",
-					Toolchain: []snapshot.Toolchain{{Name: "node", Version: ">=24"}}, Problems: []snapshot.Problem{{Code: "invalid", Message: "m"}}}}
+					Toolchain: []Toolchain{{Name: "node", Version: ">=24"}}, Problems: []snapshot.Problem{{Code: "invalid", Message: "m"}}}}, snapshot.Freshness{})
 		})
 	})
 	p.Flush()
@@ -287,5 +288,50 @@ func TestAPI(t *testing.T) {
 		return !ok
 	}() {
 		t.Errorf("unknown repository: %T", res)
+	}
+}
+
+func TestGraph(t *testing.T) {
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Graph())
+	defer p.Close()
+	entry := func(id int64, name string) *snapshot.RepoEntry {
+		return &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: id}, Owner: "acme", Name: name}}
+	}
+	set := func(b *snapshot.Builder, key snapshot.RepoKey, ms ...Manifest) {
+		b.UpdateRepo(key, func(e *snapshot.RepoEntry) { facet.Set(e, ms, snapshot.Freshness{}) })
+	}
+	p.Update(func(b *snapshot.Builder) {
+		b.ReplaceSource("gh", []*snapshot.RepoEntry{entry(1, "lib"), entry(2, "fork"), entry(3, "app")}, nil, snapshot.SourceStatus{ID: "gh"})
+		set(b, "acme/lib", Manifest{Ecosystem: "go", Name: "github.com/acme/lib", Dependencies: []Dependency{{Name: "github.com/acme/lib/v2"}}})
+		set(b, "acme/fork", Manifest{Ecosystem: "go", Name: "github.com/acme/lib", Dependencies: []Dependency{{Name: "github.com/acme/lib"}}},
+			Manifest{Ecosystem: "npm", Name: "github.com/acme/lib"})
+		set(b, "acme/app", Manifest{Ecosystem: "go", Name: "app", Language: "Go", Dependencies: []Dependency{{Name: "github.com/acme/lib"}, {Name: "other"}}},
+			Manifest{Ecosystem: "maven", Dependencies: []Dependency{{Name: "github.com/acme/lib"}}})
+	})
+	p.Flush()
+	s := p.Current()
+	if got := providers(s, "go", "github.com/acme/lib"); !slices.Equal(got, []snapshot.RepoKey{"acme/fork", "acme/lib"}) {
+		t.Errorf("providers = %v", got)
+	}
+	if got := providers(s, "maven", "github.com/acme/lib"); got != nil {
+		t.Errorf("a name in another ecosystem matches: %v", got)
+	}
+	// fork declares lib's name and depends on it: lib is used by fork, fork by itself is not counted.
+	if got := usedBy(s, "acme/lib"); !slices.Equal(got, []snapshot.RepoKey{"acme/app", "acme/fork"}) {
+		t.Errorf("usedBy(lib) = %v", got)
+	}
+	if got := usedBy(s, "acme/fork"); !slices.Equal(got, []snapshot.RepoKey{"acme/app"}) {
+		t.Errorf("usedBy(fork) = %v", got)
+	}
+	if got := usedBy(s, "acme/app"); got != nil {
+		t.Errorf("usedBy(app) = %v", got)
+	}
+	sum := Summarise(s, s.Repos["acme/app"])
+	if !slices.Equal(sum.Uses, []snapshot.RepoKey{"acme/fork", "acme/lib"}) || sum.UsedBy != nil || !slices.Equal(sum.Technology.Languages, []string{"Go"}) {
+		t.Errorf("summary = %+v", sum)
+	}
+	var r oapi.Repo
+	if Repo(s.Repos["acme/app"], &r); r.Language != "Go" {
+		t.Errorf("language = %q", r.Language)
 	}
 }

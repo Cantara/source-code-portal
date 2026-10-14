@@ -26,6 +26,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/docs"
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
+	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/llms"
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/safehtml"
@@ -52,7 +53,6 @@ func newServeCmd(opts *options) *cobra.Command {
 				return err
 			}
 			log := newLogger(cfg.Log, cmd.ErrOrStderr())
-			slog.SetDefault(log)
 			srv, err := newServer(cmd.Context(), cfg, deps{}, log)
 			if err != nil {
 				return failure{err}
@@ -118,11 +118,13 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
 		src := gh.Source(s.ID)
-		sources[s.ID], fetchers[s.ID], trees[s.ID], manifestTrees[s.ID], releases[s.ID] = src, src, src, src, src
+		sources[s.ID], trees[s.ID], manifestTrees[s.ID] = src, src, src
+		fetchers[s.ID], releases[s.ID] = commits.FromGitHub(src), badges.FromGitHub(src)
 		ids = append(ids, s.ID)
 	}
 
-	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log)}
+	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log,
+		commits.Feeds(), manifests.Graph())}
 	if s.store, err = store.Open(ctx, cfg.Store.Path, log); err != nil {
 		return nil, err
 	}
@@ -185,12 +187,12 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		st.cluster = s.member
 	}
 
-	md := llms.New(view, cfg.Server.PublicURL)
+	md := llms.New(view, cfg.Server.PublicURL, llmsOptions())
 	external := d.images
 	if external == nil {
 		external = docs.Guarded()
 	}
-	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view)},
+	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view, commits.LastCommit)},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
@@ -211,7 +213,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
 			Vary: private},
 		Observe: m.request}
-	features := api{catalog.API{Current: view}, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
+	catalogAPI := catalog.API{Current: view, Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard},
+		Repo:   []func(*snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo},
+		Detail: []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
+	features := api{catalogAPI, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		httpapi.SnapshotAPI{Current: view}}
 	s.public = httpapi.Server(httpapi.Public(opts, opts.Pages(upstream), contract.OpenAPI, features, routes...), log)
 	s.public.RegisterOnShutdown(events.Close)
@@ -233,6 +238,36 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return nil, err
 	}
 	return s, nil
+}
+
+// llmsOptions is what the Markdown surface shows of the other features: documents, the descriptor, the manifests' summary and the
+// commits' freshness.
+func llmsOptions() llms.Options {
+	return llms.Options{
+		Docs: func(e *snapshot.RepoEntry) ([]llms.Doc, snapshot.Freshness) {
+			ds, fresh := docs.Of(e)
+			out := make([]llms.Doc, 0, len(ds))
+			for _, d := range ds {
+				out = append(out, llms.Doc{Path: d.Path, BlobSHA: d.BlobSHA, README: d.README, Truncated: d.Truncated, Source: d.Source})
+			}
+			return out, fresh
+		},
+		About: func(e *snapshot.RepoEntry) llms.About {
+			d, _ := catalog.DescriptorOf(e)
+			return llms.About{Description: d.Description, Lifecycle: d.Lifecycle, Owners: d.Owners}
+		},
+		Technology: func(s *snapshot.Snapshot, e *snapshot.RepoEntry) llms.Technology {
+			sum := manifests.Summarise(s, e)
+			t := llms.Technology{Languages: sum.Technology.Languages, BuildTools: sum.Technology.BuildTools, Uses: sum.Uses, UsedBy: sum.UsedBy}
+			for _, tc := range sum.Technology.Toolchains {
+				for _, v := range tc.Versions {
+					t.Toolchains = append(t.Toolchains, string(tc.Name)+" "+v)
+				}
+			}
+			return t
+		},
+		Freshness: func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
+	}
 }
 
 // newToken is the secret of this process the web UI server shows on its API calls (httpapi.Options.WebToken).

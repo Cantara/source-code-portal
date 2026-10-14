@@ -57,8 +57,8 @@ func New(sources map[string]GitHub) *Manifests { return &Manifests{sources: sour
 
 // record is one stored manifest with the blob it was parsed from.
 type record struct {
-	BlobSHA  string            `json:"blobSha"`
-	Manifest snapshot.Manifest `json:"manifest"`
+	BlobSHA  string   `json:"blobSha"`
+	Manifest Manifest `json:"manifest"`
 }
 
 type payload struct {
@@ -117,7 +117,7 @@ func (m *Manifests) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		}
 		eco := ecosystems[path.Base(f.Path)]
 		if f.Size > maxFileBytes {
-			next.Records = append(next.Records, record{BlobSHA: f.SHA, Manifest: snapshot.Manifest{Path: f.Path, Ecosystem: eco,
+			next.Records = append(next.Records, record{BlobSHA: f.SHA, Manifest: Manifest{Path: f.Path, Ecosystem: eco,
 				Problems: []snapshot.Problem{{Code: "too-large", Message: "the file is over 512 KiB and was not read"}}}})
 			continue
 		}
@@ -154,8 +154,8 @@ func discover(tree []github.TreeEntry) []github.TreeEntry {
 }
 
 // parse reads one manifest; paths are the repository's files, for what sits beside it.
-func parse(p string, b []byte, paths map[string]bool) snapshot.Manifest {
-	var m snapshot.Manifest
+func parse(p string, b []byte, paths map[string]bool) Manifest {
+	var m Manifest
 	switch ecosystems[path.Base(p)] {
 	case "go":
 		m = parseGoMod(b)
@@ -173,8 +173,8 @@ func parse(p string, b []byte, paths map[string]bool) snapshot.Manifest {
 // scopeOrder is the display order of dependency scopes.
 var scopeOrder = []string{"parent", "import", "runtime", "peer", "optional", "provided", "dev", "test", "tool", "indirect"} //nolint:gochecknoglobals // fixed table
 
-func sortDependencies(ds []snapshot.Dependency) {
-	slices.SortStableFunc(ds, func(a, b snapshot.Dependency) int {
+func sortDependencies(ds []Dependency) {
+	slices.SortStableFunc(ds, func(a, b Dependency) int {
 		return cmp.Or(cmp.Compare(slices.Index(scopeOrder, a.Scope), slices.Index(scopeOrder, b.Scope)), strings.Compare(a.Name, b.Name))
 	})
 }
@@ -195,10 +195,10 @@ func result(state snapshot.State, p payload, prev store.Item) (sync.Result, erro
 
 func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 	p := decode(it.Payload)
-	ms := make([]snapshot.Manifest, 0, len(p.Records))
+	ms := make([]Manifest, 0, len(p.Records))
 	for _, r := range p.Records {
 		ms = append(ms, r.Manifest)
 	}
-	slices.SortFunc(ms, func(a, b snapshot.Manifest) int { return strings.Compare(a.Path, b.Path) })
-	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { e.Manifests, e.ManifestsFresh = ms, fresh })
+	slices.SortFunc(ms, func(a, b Manifest) int { return strings.Compare(a.Path, b.Path) })
+	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, ms, fresh) })
 }

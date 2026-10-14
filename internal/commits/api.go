@@ -54,16 +54,16 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 	}
 	var filter cursor
 	var scope []snapshot.RepoKey
-	var refs []snapshot.CommitRef
+	var refs []Ref
 	if p.Group != nil {
 		g, ok := s.Group(*p.Group)
 		if !ok {
 			return notFound("no such group"), nil
 		}
 		filter.Group, scope = g.ID, g.Members
-		refs, _ = s.Feed(g.ID)
+		refs, _ = feed(s, g.ID)
 	} else {
-		refs = s.Latest
+		refs, _ = feed(s, "")
 		for k := range s.Repos {
 			scope = append(scope, k)
 		}
@@ -77,10 +77,11 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		key := e.Repo.Key()
 		filter.Repo, refs = string(key), nil
 		if slices.Contains(scope, key) {
-			for i := range e.Commits {
-				refs = append(refs, snapshot.CommitRef{Repo: key, Commit: &e.Commits[i]})
+			cs, _ := Of(e)
+			for i := range cs {
+				refs = append(refs, Ref{Repo: key, Commit: &cs[i]})
 			}
-			slices.SortFunc(refs, snapshot.CompareRefs)
+			slices.SortFunc(refs, compareRefs)
 		}
 		scope = []snapshot.RepoKey{key}
 	}
@@ -91,14 +92,14 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		if !ok || c.Group != filter.Group || c.Repo != filter.Repo {
 			return badRequest("invalid-cursor", "the cursor is not valid for this filter"), nil
 		}
-		pos := snapshot.CommitRef{Repo: snapshot.RepoKey(c.Key), Commit: &snapshot.Commit{SHA: c.SHA, CommittedAt: time.Unix(0, c.At)}}
-		start = sort.Search(len(refs), func(i int) bool { return snapshot.CompareRefs(refs[i], pos) > 0 })
+		pos := Ref{Repo: snapshot.RepoKey(c.Key), Commit: &Commit{SHA: c.SHA, CommittedAt: time.Unix(0, c.At)}}
+		start = sort.Search(len(refs), func(i int) bool { return compareRefs(refs[i], pos) > 0 })
 	}
 	end := min(start+limit, len(refs))
 	page := oapi.CommitPage{Commits: make([]oapi.Commit, 0, end-start), Page: oapi.Page{Limit: limit},
 		Freshness: scopeFreshness(s, scope, now)}
 	for _, r := range refs[start:end] {
-		page.Commits = append(page.Commits, oapi.CommitOf(r.Repo, r.Commit))
+		page.Commits = append(page.Commits, commitOf(r.Repo, r.Commit))
 	}
 	if end < len(refs) {
 		last := refs[end-1]
@@ -114,7 +115,8 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 func scopeFreshness(s *snapshot.Snapshot, scope []snapshot.RepoKey, now time.Time) oapi.Freshness {
 	if len(scope) == 1 {
 		if e := s.Repos[scope[0]]; e != nil {
-			return oapi.FreshnessOf(e.CommitsFresh, now)
+			_, f := Of(e)
+			return oapi.FreshnessOf(f, now)
 		}
 	}
 	var fetched, checked time.Time
@@ -124,7 +126,7 @@ func scopeFreshness(s *snapshot.Snapshot, scope []snapshot.RepoKey, now time.Tim
 		if e == nil {
 			continue
 		}
-		f := e.CommitsFresh
+		_, f := Of(e)
 		stale = stale || f.Derive(now) != snapshot.StatusFresh
 		never = never || f.FetchedAt.IsZero() || f.CheckedAt.IsZero()
 		if !seen || f.FetchedAt.Before(fetched) {

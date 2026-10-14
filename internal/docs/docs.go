@@ -61,20 +61,20 @@ func New(sources map[string]GitHub, policy *safehtml.Policy) *Docs {
 
 // record is one stored document. The HTML is untrusted bytes until it passes the sanitiser again at publish.
 type record struct {
-	Path        string             `json:"path"`
-	README      bool               `json:"readme,omitempty"`
-	Title       string             `json:"title"`
-	Description string             `json:"description,omitempty"`
-	Order       int                `json:"order"`
-	Hidden      bool               `json:"hidden,omitempty"`
-	Format      string             `json:"format"`
-	HTML        string             `json:"html"`
-	Source      []byte             `json:"source,omitempty"`
-	TOC         []snapshot.Heading `json:"toc,omitempty"`
-	BlobSHA     string             `json:"blobSha"`
-	Truncated   bool               `json:"truncated,omitempty"`
-	State       snapshot.State     `json:"state"`
-	Images      []snapshot.Image   `json:"images,omitempty"`
+	Path        string         `json:"path"`
+	README      bool           `json:"readme,omitempty"`
+	Title       string         `json:"title"`
+	Description string         `json:"description,omitempty"`
+	Order       int            `json:"order"`
+	Hidden      bool           `json:"hidden,omitempty"`
+	Format      string         `json:"format"`
+	HTML        string         `json:"html"`
+	Source      []byte         `json:"source,omitempty"`
+	TOC         []Heading      `json:"toc,omitempty"`
+	BlobSHA     string         `json:"blobSha"`
+	Truncated   bool           `json:"truncated,omitempty"`
+	State       snapshot.State `json:"state"`
+	Images      []Image        `json:"images,omitempty"`
 }
 
 type payload struct {
@@ -185,9 +185,9 @@ func (d *Docs) record(f file, b []byte, l links) record {
 	if l.dir == "." {
 		l.dir = ""
 	}
-	l.images = map[string]snapshot.Image{}
+	l.images = map[string]Image{}
 	out := d.pipe.render(f.path, b, l)
-	images := slices.SortedFunc(maps.Values(l.images), func(a, b snapshot.Image) int { return strings.Compare(a.ID, b.ID) })
+	images := slices.SortedFunc(maps.Values(l.images), func(a, b Image) int { return strings.Compare(a.ID, b.ID) })
 	return record{Path: f.path, Title: out.Title, Description: out.Description, Order: out.Order, Hidden: out.Hidden, Format: out.Format,
 		HTML: out.HTML.String(), Source: out.Source, TOC: out.TOC, Truncated: out.Truncated, State: out.State, Images: images}
 }
@@ -320,15 +320,15 @@ func readme(entries []github.TreeEntry) (github.TreeEntry, bool) {
 // publish sanitises the stored HTML again (the store is untrusted) and sets the repository's documents.
 func (d *Docs) publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 	p := decode(it.Payload)
-	docs := make([]snapshot.Doc, 0, len(p.Docs))
+	docs := make([]Doc, 0, len(p.Docs))
 	for _, r := range p.Docs {
 		h, err := d.pipe.policy.Sanitize([]byte(r.HTML))
 		if err != nil {
 			h = safehtml.SafeHTML{}
 		}
-		docs = append(docs, snapshot.Doc{Path: r.Path, README: r.README, Title: r.Title, Description: r.Description, Order: r.Order,
+		docs = append(docs, Doc{Path: r.Path, README: r.README, Title: r.Title, Description: r.Description, Order: r.Order,
 			Hidden: r.Hidden, Format: r.Format, HTML: h, Source: r.Source, TOC: r.TOC, BlobSHA: r.BlobSHA, Truncated: r.Truncated, State: r.State,
 			Images: r.Images})
 	}
-	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { e.Docs, e.DocsFresh = docs, fresh })
+	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, docs, fresh) })
 }

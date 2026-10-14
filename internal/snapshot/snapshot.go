@@ -1,13 +1,11 @@
-// Package snapshot holds the immutable serving state of SCP and the value types every feature shares. Sync jobs contribute to a
-// Builder; the Publisher applies their updates in batches and swaps in a new Snapshot behind an atomic pointer. Request handlers call
-// Current once per request and read only that value.
+// Package snapshot holds the immutable serving state of SCP: the catalogue, the facets features hang on its repositories and the
+// indexes they derive. Sync jobs contribute to a Builder; the Publisher applies their updates in batches and swaps in a new Snapshot
+// behind an atomic pointer. Request handlers call Current once per request and read only that value.
 package snapshot
 
 import (
 	"strings"
 	"time"
-
-	"github.com/cantara/source-code-portal/internal/safehtml"
 )
 
 // RepoID is the identity of a repository: the numeric GitHub id survives renames and transfers.
@@ -67,49 +65,6 @@ type SourceStatus struct {
 	Repos int
 }
 
-// Commit is one default-branch commit.
-type Commit struct {
-	SHA         string    `json:"sha"`
-	Subject     string    `json:"subject"` // first line of the message
-	AuthorName  string    `json:"authorName"`
-	AuthorLogin string    `json:"authorLogin,omitempty"`
-	URL         string    `json:"url"`
-	CommittedAt time.Time `json:"committedAt"`
-}
-
-// Release is a repository's latest published release.
-type Release struct {
-	Tag       string    `json:"tag"`
-	Name      string    `json:"name"`
-	URL       string    `json:"url"`
-	Published time.Time `json:"published"`
-}
-
-// CommitRef is a commit in a merged feed.
-type CommitRef struct {
-	Repo   RepoKey
-	Commit *Commit // points into the repository's entry
-}
-
-// Descriptor is the repository's own scp.yaml. It affects display only.
-type Descriptor struct {
-	Present     bool      `json:"present"`
-	File        string    `json:"file,omitempty"` // ".github/scp.yaml" etc.
-	Title       string    `json:"title,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Lifecycle   string    `json:"lifecycle,omitempty"` // "" | experimental | production | deprecated
-	Owners      []string  `json:"owners,omitempty"`
-	Tags        []string  `json:"tags,omitempty"`
-	Links       []Link    `json:"links,omitempty"`
-	Problems    []Problem `json:"problems,omitempty"`
-}
-
-// Link is a titled https link.
-type Link struct {
-	Title string `json:"title"`
-	URL   string `json:"url"`
-}
-
 // Problem is a finding in a repository-authored file.
 type Problem struct {
 	Pointer string `json:"pointer"` // JSON pointer into the document; "" for the whole document
@@ -117,81 +72,12 @@ type Problem struct {
 	Message string `json:"message"`
 }
 
-// Doc is one rendered document of a repository: the README or a Markdown file under docs/.
-type Doc struct {
-	Path        string // repository path
-	README      bool
-	Title       string
-	Description string
-	Order       int    // front matter order
-	Hidden      bool   // front matter hidden: left out of the document list
-	Format      string // markdown | text
-	HTML        safehtml.SafeHTML
-	Source      []byte    // the text after truncation, for the Markdown surface
-	TOC         []Heading // h2 and h3
-	BlobSHA     string
-	Truncated   bool  // the source was cut at the size cap
-	State       State // ok | too_large | unsupported
-	Images      []Image
-}
-
-// Image is one image a document shows, served at /images/{owner}/{name}/{ID}: a repository file (Path, with its BlobSHA when the
-// tree has it within the size cap) or an external https image (URL).
-type Image struct {
-	ID      string `json:"id"`
-	Path    string `json:"path,omitempty"`
-	URL     string `json:"url,omitempty"`
-	BlobSHA string `json:"blobSha,omitempty"`
-}
-
-// Heading is a TOC entry.
-type Heading struct {
-	Level int
-	ID    string
-	Text  string
-}
-
-// Manifest is one package manifest of a repository (go.mod, package.json, pom.xml) with what it declares.
-type Manifest struct {
-	Path         string       `json:"path"`
-	Ecosystem    string       `json:"ecosystem"` // go | npm | maven
-	Name         string       `json:"name"`      // Go module path, npm package name, Maven groupId:artifactId
-	Version      string       `json:"version,omitempty"`
-	Language     string       `json:"language"`
-	BuildTool    string       `json:"buildTool"`
-	Toolchain    []Toolchain  `json:"toolchain,omitempty"`
-	Dependencies []Dependency `json:"dependencies,omitempty"`
-	Problems     []Problem    `json:"problems,omitempty"`
-}
-
-// Toolchain is a toolchain version a manifest states.
-type Toolchain struct {
-	Name    string `json:"name"` // go | node | java
-	Version string `json:"version"`
-}
-
-// Dependency is one declared dependency.
-type Dependency struct {
-	Name    string `json:"name"`
-	Version string `json:"version,omitempty"` // the requirement as written
-	Scope   string `json:"scope"`             // runtime dev peer optional provided test indirect tool parent import
-}
-
-// RepoEntry is everything the snapshot holds about one repository. Entries are shared by pointer between snapshot versions and
-// never mutated after publish; Builder.UpdateRepo replaces them.
+// RepoEntry is everything the snapshot holds about one repository: its listing and the facets features contribute. Entries are
+// shared by pointer between snapshot versions and never mutated after publish; Builder.UpdateRepo replaces them.
 type RepoEntry struct {
-	Repo            Repo
-	Fresh           Freshness // of the listing that last confirmed the repository
-	Commits         []Commit  // newest first
-	CommitsFresh    Freshness
-	Descriptor      Descriptor
-	DescriptorFresh Freshness
-	Docs            []Doc // README first, then by order, then path
-	DocsFresh       Freshness
-	Release         *Release // nil when there is none or it is not known yet (ReleaseFresh.State tells which)
-	ReleaseFresh    Freshness
-	Manifests       []Manifest // by path
-	ManifestsFresh  Freshness
+	Repo   Repo
+	Fresh  Freshness        // of the listing that last confirmed the repository
+	facets map[string]facet // by name; copied on write
 }
 
 // Snapshot is the serving state. It is immutable after publish.
@@ -206,15 +92,18 @@ type Snapshot struct {
 	Aliases    map[RepoKey]RepoKey // old address -> current address
 	Groups     []Group             // config order
 	Sources    []SourceStatus      // sorted by id
-	// Latest is every repository's commits merged, newest first (committedAt desc, repo asc, sha desc).
-	Latest        []CommitRef
-	groupsOf      map[RepoKey][]string
-	latestByGroup map[string][]CommitRef
-	providers     map[pkg][]RepoKey // sorted
-	usedBy        map[RepoKey][]RepoKey
-	public        *Snapshot         // the view without private and internal repositories; s itself when there are none
-	marks         map[string]uint64 // item key -> digest
-	sum           uint64
+	groupsOf   map[RepoKey][]string
+	indexers   []Indexer      // what the features derive from every repository, run at publish
+	indexes    map[string]any // index name -> what its indexer built
+	public     *Snapshot      // the view without private and internal repositories; s itself when there are none
+	marks      map[string]mark
+	sum        uint64
+}
+
+// mark is the digest of one published item and the repository it belongs to ("" for a source's items).
+type mark struct {
+	repo   RepoKey
+	digest uint64
 }
 
 // Public returns the view of s without its private and internal repositories: s itself when it has none.
@@ -223,18 +112,6 @@ func (s *Snapshot) Public() *Snapshot {
 		return s
 	}
 	return s.public
-}
-
-// pkg is a package name within its ecosystem.
-type pkg struct{ ecosystem, name string }
-
-// Feed returns the merged commits of the group with id, or of every repository when id is empty.
-func (s *Snapshot) Feed(id string) ([]CommitRef, bool) {
-	if id == "" {
-		return s.Latest, true
-	}
-	f, ok := s.latestByGroup[id]
-	return f, ok
 }
 
 // Repo returns the entry at key, following an alias. moved is true when key is an old address.
@@ -260,11 +137,3 @@ func (s *Snapshot) Group(id string) (Group, bool) {
 
 // GroupsOf returns the ids of the groups that contain key, in config order.
 func (s *Snapshot) GroupsOf(key RepoKey) []string { return s.groupsOf[key] }
-
-// Providers returns the repositories with a manifest that declares the package name in ecosystem, sorted.
-func (s *Snapshot) Providers(ecosystem, name string) []RepoKey {
-	return s.providers[pkg{ecosystem, name}]
-}
-
-// UsedBy returns the repositories that declare a dependency on a package key provides, sorted.
-func (s *Snapshot) UsedBy(key RepoKey) []RepoKey { return s.usedBy[key] }

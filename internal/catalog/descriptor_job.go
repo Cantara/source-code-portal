@@ -39,15 +39,15 @@ func (c *Catalog) runDescriptor(ctx context.Context, j sync.Job) (sync.Result, e
 	var e *github.Error
 	switch {
 	case errors.As(err, &e) && e.Code == "empty":
-		return descriptorResult(snapshot.StateNoContent, "", snapshot.Descriptor{}, j.Prev)
+		return descriptorResult(snapshot.StateNoContent, "", Descriptor{}, j.Prev)
 	case github.IsNotFound(err):
-		return descriptorResult(snapshot.StateNotFound, "", snapshot.Descriptor{}, j.Prev)
+		return descriptorResult(snapshot.StateNotFound, "", Descriptor{}, j.Prev)
 	case err != nil:
 		return sync.Result{}, err
 	case entry == nil:
 		return descriptorResult(snapshot.StateNotFound, "", d, j.Prev) // none, or ambiguous (d holds the problem)
 	case entry.Size > maxDescriptorBytes:
-		d = snapshot.Descriptor{File: file, Problems: []snapshot.Problem{{Code: "descriptor.too_large",
+		d = Descriptor{File: file, Problems: []snapshot.Problem{{Code: "descriptor.too_large",
 			Message: fmt.Sprintf("the file is larger than %d bytes", maxDescriptorBytes)}}}
 		return descriptorResult(snapshot.StateTooLarge, entry.SHA, d, j.Prev)
 	case j.Prev.State == snapshot.StateOK && j.Prev.ContentSHA == entry.SHA:
@@ -63,10 +63,10 @@ func (c *Catalog) runDescriptor(ctx context.Context, j sync.Job) (sync.Result, e
 }
 
 // locate finds the descriptor file. Both extensions in the winning location is a problem and no descriptor.
-func locate(ctx context.Context, gh GitHub, owner, name string) (string, *github.TreeEntry, snapshot.Descriptor, error) {
+func locate(ctx context.Context, gh GitHub, owner, name string) (string, *github.TreeEntry, Descriptor, error) {
 	root, err := gh.Tree(ctx, owner, name, "HEAD", false)
 	if err != nil {
-		return "", nil, snapshot.Descriptor{}, err
+		return "", nil, Descriptor{}, err
 	}
 	locations := []struct {
 		dir     string
@@ -76,7 +76,7 @@ func locate(ctx context.Context, gh GitHub, owner, name string) (string, *github
 		if e.Path == ".github" && e.Type == "tree" {
 			sub, err := gh.Tree(ctx, owner, name, e.SHA, false)
 			if err != nil {
-				return "", nil, snapshot.Descriptor{}, err
+				return "", nil, Descriptor{}, err
 			}
 			locations = append([]struct {
 				dir     string
@@ -97,16 +97,16 @@ func locate(ctx context.Context, gh GitHub, owner, name string) (string, *github
 		case 0:
 			continue
 		case 1:
-			return loc.dir + found[0].Path, &found[0], snapshot.Descriptor{}, nil
+			return loc.dir + found[0].Path, &found[0], Descriptor{}, nil
 		default:
-			return "", nil, snapshot.Descriptor{Problems: []snapshot.Problem{{Code: "descriptor.ambiguous",
+			return "", nil, Descriptor{Problems: []snapshot.Problem{{Code: "descriptor.ambiguous",
 				Message: "both " + loc.dir + "scp.yaml and " + loc.dir + "scp.yml exist; rename one"}}}, nil
 		}
 	}
-	return "", nil, snapshot.Descriptor{}, nil
+	return "", nil, Descriptor{}, nil
 }
 
-func descriptorResult(state snapshot.State, sha string, d snapshot.Descriptor, prev store.Item) (sync.Result, error) {
+func descriptorResult(state snapshot.State, sha string, d Descriptor, prev store.Item) (sync.Result, error) {
 	b, err := json.Marshal(d)
 	if err != nil {
 		return sync.Result{}, err
@@ -116,9 +116,9 @@ func descriptorResult(state snapshot.State, sha string, d snapshot.Descriptor, p
 }
 
 func publishDescriptor(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
-	var d snapshot.Descriptor
+	var d Descriptor
 	if len(it.Payload) > 0 && json.Unmarshal(it.Payload, &d) != nil {
-		d = snapshot.Descriptor{}
+		d = Descriptor{}
 	}
-	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { e.Descriptor, e.DescriptorFresh = d, fresh })
+	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { descriptorFacet.Set(e, d, fresh) })
 }

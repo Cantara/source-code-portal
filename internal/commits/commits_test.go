@@ -19,7 +19,7 @@ func sha(c byte) string { return strings.Repeat(string(c), 40) }
 
 func TestNormalise(t *testing.T) {
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
-	in := []github.CommitInfo{
+	in := []CommitInfo{
 		{SHA: sha('a'), Message: "older", Date: now.Add(-2 * time.Hour)},
 		{SHA: strings.ToUpper(sha('b')), Message: "\nfix: thing\u202e\n\nbody", AuthorName: "Ann", AuthorLogin: "ann",
 			HTMLURL: "https://github.com/acme/x/commit/b", Date: now.Add(-time.Hour).Add(300 * time.Millisecond)},
@@ -29,7 +29,7 @@ func TestNormalise(t *testing.T) {
 		{SHA: sha('d'), Message: strings.Repeat("x", 300), AuthorLogin: "not a login", HTMLURL: "http://insecure", Date: now.Add(72 * time.Hour)},
 	}
 	firstSeen := now.Add(-30 * time.Minute)
-	got := normalise(in, []snapshot.Commit{{SHA: sha('d'), CommittedAt: firstSeen}}, now)
+	got := normalise(in, []Commit{{SHA: sha('d'), CommittedAt: firstSeen}}, now)
 	if len(got) != 3 {
 		t.Fatalf("got %d commits: %+v", len(got), got)
 	}
@@ -46,16 +46,16 @@ func TestNormalise(t *testing.T) {
 }
 
 type fetcher struct {
-	cs  []github.CommitInfo
+	cs  []CommitInfo
 	err error
 }
 
-func (f fetcher) Commits(context.Context, string, string, int) ([]github.CommitInfo, error) {
+func (f fetcher) Commits(context.Context, string, string, int) ([]CommitInfo, error) {
 	return f.cs, f.err
 }
 
 func TestRunStates(t *testing.T) {
-	ok := fetcher{cs: []github.CommitInfo{{SHA: sha('a'), Message: "m", Date: time.Now()}}}
+	ok := fetcher{cs: []CommitInfo{{SHA: sha('a'), Message: "m", Date: time.Now()}}}
 	tests := map[string]struct {
 		f       Fetcher
 		state   snapshot.State
@@ -91,16 +91,17 @@ func TestRunStates(t *testing.T) {
 }
 
 func TestPublish(t *testing.T) {
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
 	r := snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x"}
-	b, _ := json.Marshal(payload{Schema: payloadSchema, Commits: []snapshot.Commit{{SHA: sha('a'), CommittedAt: time.Now()}}})
+	b, _ := json.Marshal(payload{Schema: payloadSchema, Commits: []Commit{{SHA: sha('a'), CommittedAt: time.Now()}}})
 	p.Update(func(bd *snapshot.Builder) {
 		bd.ReplaceSource("gh", []*snapshot.RepoEntry{{Repo: r}}, nil, snapshot.SourceStatus{ID: "gh"})
 		publish(bd, store.Item{Repo: "acme/x", State: snapshot.StateOK, Payload: b}, snapshot.Freshness{State: snapshot.StateOK})
 		publish(bd, store.Item{Repo: "acme/gone", Payload: b}, snapshot.Freshness{}) // a removed repository: ignored
 	})
 	p.Flush()
-	if s := p.Current(); len(s.Repos["acme/x"].Commits) != 1 || len(s.Latest) != 1 || len(s.Repos) != 1 {
+	s := p.Current()
+	if cs, _ := Of(s.Repos["acme/x"]); len(cs) != 1 || len(s.Repos) != 1 {
 		t.Errorf("published: %+v", s.Repos)
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/httpapi"
+	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -27,9 +29,22 @@ const (
 	csp           = "default-src 'none'; sandbox"
 )
 
-// Releases reads the latest release; *github.Source implements it. nil, nil is no release.
-type Releases interface {
-	LatestRelease(ctx context.Context, owner, name string) (*snapshot.Release, error)
+// Release is a repository's latest published release.
+type Release struct {
+	Tag       string    `json:"tag"`
+	Name      string    `json:"name"`
+	URL       string    `json:"url"`
+	Published time.Time `json:"published"`
+}
+
+// facet is the latest release: nil when there is none or it is not known yet (the freshness tells which).
+const facet snapshot.Facet[*Release] = "release"
+
+// Repo adds the latest release to a repository summary.
+func Repo(e *snapshot.RepoEntry, r *oapi.Repo) {
+	if rel, _ := facet.Get(e); rel != nil {
+		r.Release = &oapi.Release{Tag: rel.Tag, Url: rel.URL, PublishedAt: rel.Published.UTC()}
+	}
 }
 
 // Badges is the badges feature.
@@ -67,20 +82,21 @@ func (b *Badges) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 }
 
 func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
-	var rel *snapshot.Release
+	var rel *Release
 	if it.State == snapshot.StateOK {
-		rel = &snapshot.Release{}
+		rel = &Release{}
 		if json.Unmarshal(it.Payload, rel) != nil {
 			rel = nil
 		}
 	}
-	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { e.Release, e.ReleaseFresh = rel, fresh })
+	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, rel, fresh) })
 }
 
 // Handler serves GET /badges/repos/{owner}/{name}/{kind}.svg (last-commit, release, license, issues) and
-// GET /badges/groups/{group}/repos.svg from the viewer's view of the current snapshot.
-func Handler(current func(context.Context) *snapshot.Snapshot) http.Handler {
-	h := handler{current: current, now: time.Now}
+// GET /badges/groups/{group}/repos.svg from the viewer's view of the current snapshot. lastCommit gives a repository's newest commit
+// time (zero when there is none) and the freshness of its commits.
+func Handler(current func(context.Context) *snapshot.Snapshot, lastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)) http.Handler {
+	h := handler{current: current, lastCommit: lastCommit, now: time.Now}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /badges/repos/{owner}/{name}/{file}", h.repo)
 	mux.HandleFunc("GET /badges/groups/{group}/{file}", h.group)
@@ -89,8 +105,9 @@ func Handler(current func(context.Context) *snapshot.Snapshot) http.Handler {
 }
 
 type handler struct {
-	current func(context.Context) *snapshot.Snapshot // the viewer's view
-	now     func() time.Time
+	current    func(context.Context) *snapshot.Snapshot // the viewer's view
+	lastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)
+	now        func() time.Time
 }
 
 func unknown(label string) badge {
@@ -116,22 +133,23 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 	switch kind {
 	case "last-commit":
 		b.label = "last commit"
+		at, fresh := h.lastCommit(e)
 		switch {
-		case len(e.Commits) > 0:
-			msg, days := relativeDay(h.now(), e.Commits[0].CommittedAt)
+		case !at.IsZero():
+			msg, days := relativeDay(h.now(), at)
 			b.message, b.color = msg, ageColor(days)
-		case e.CommitsFresh.State == snapshot.StateOK || e.CommitsFresh.State == snapshot.StateNoContent ||
-			e.CommitsFresh.State == snapshot.StateNotFound:
+		case fresh.State == snapshot.StateOK || fresh.State == snapshot.StateNoContent || fresh.State == snapshot.StateNotFound:
 			b.message, b.color, data = "none", neutralColor, false
 		default:
 			b, data = unknown(b.label), false
 		}
 	case "release":
 		b.label = "release"
+		rel, fresh := facet.Get(e)
 		switch {
-		case e.Release != nil:
-			b.message, b.color = e.Release.Tag, infoColor
-		case e.ReleaseFresh.State == snapshot.StateNotFound:
+		case rel != nil:
+			b.message, b.color = rel.Tag, infoColor
+		case fresh.State == snapshot.StateNotFound:
 			b.message, b.color, data = "none", neutralColor, false
 		default:
 			b, data = unknown(b.label), false
@@ -212,7 +230,7 @@ func (h handler) write(w http.ResponseWriter, r *http.Request, b badge, status i
 		sum := sha256.Sum256(body)
 		etag := `"` + hex.EncodeToString(sum[:12]) + `"`
 		hd.Set("ETag", etag)
-		if r.Header.Get("If-None-Match") == etag {
+		if httpapi.Matches(r.Header.Get("If-None-Match"), etag) {
 			w.WriteHeader(http.StatusNotModified)
 			return
 		}

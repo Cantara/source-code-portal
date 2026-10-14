@@ -25,6 +25,7 @@ func newBuilder(cur *Snapshot) *Builder {
 		Aliases:    maps.Clone(cur.Aliases),
 		Groups:     slices.Clone(cur.Groups),
 		Sources:    slices.Clone(cur.Sources),
+		indexers:   cur.indexers,
 	}}
 }
 
@@ -84,16 +85,17 @@ func (b *Builder) UpdateRepo(key RepoKey, fn func(*RepoEntry)) bool {
 // Sources returns the builder's source statuses. Callers must not modify the slice.
 func (b *Builder) Sources() []SourceStatus { return b.s.Sources }
 
-// Mark records the digest of the published item at key, 0 when it is gone; the version is the sum of the digests.
-func (b *Builder) Mark(key string, digest uint64) {
+// Mark records the digest of the published item at key, of the repository repo ("" for a source's items), 0 when it is gone; the
+// version is the sum of the digests.
+func (b *Builder) Mark(key string, repo RepoKey, digest uint64) {
 	if b.s.marks == nil {
-		b.s.marks = map[string]uint64{}
+		b.s.marks = map[string]mark{}
 	}
-	b.s.sum -= b.s.marks[key]
+	b.s.sum -= b.s.marks[key].digest
 	if digest == 0 {
 		delete(b.s.marks, key)
 	} else {
-		b.s.marks[key] = digest
+		b.s.marks[key] = mark{repo: repo, digest: digest}
 	}
 	b.s.sum += digest
 }
@@ -113,7 +115,7 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 	return s
 }
 
-// index builds the derived lookups: group membership, commit feeds and the dependency indexes.
+// index builds the derived lookups: group membership, then every feature's index.
 func (s *Snapshot) index() {
 	s.groupsOf = map[RepoKey][]string{}
 	for _, g := range s.Groups {
@@ -121,13 +123,10 @@ func (s *Snapshot) index() {
 			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
 		}
 	}
-	keys := slices.Sorted(maps.Keys(s.Repos))
-	s.Latest = feed(s.Repos, keys)
-	s.latestByGroup = make(map[string][]CommitRef, len(s.Groups))
-	for _, g := range s.Groups {
-		s.latestByGroup[g.ID] = feed(s.Repos, g.Members)
+	s.indexes = make(map[string]any, len(s.indexers))
+	for _, ix := range s.indexers {
+		s.indexes[ix.name] = ix.build(s)
 	}
-	s.providers, s.usedBy = dependencies(s.Repos, keys)
 }
 
 // publicView is s without its private and internal repositories, or s itself when it has none.
@@ -135,7 +134,8 @@ func (s *Snapshot) publicView() *Snapshot {
 	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !e.Repo.Public() }) {
 		return s
 	}
-	p := &Snapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{}}
+	p := &Snapshot{BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{},
+		indexers: s.indexers}
 	count := map[string]int{}
 	for k, e := range s.Repos {
 		if e.Repo.Public() {
@@ -159,66 +159,16 @@ func (s *Snapshot) publicView() *Snapshot {
 		src.Repos = count[src.ID]
 		p.Sources = append(p.Sources, src)
 	}
+	var sum uint64
+	for _, m := range s.marks {
+		if e, _ := s.Repo(m.repo); e == nil || e.Repo.Public() {
+			sum += m.digest
+		}
+	}
+	p.Version = sum & (1<<53 - 1)
 	p.index()
 	p.public = p
 	return p
-}
-
-// dependencies indexes the package names the manifests of keys declare, and inverts the dependencies between the repositories.
-func dependencies(repos map[RepoKey]*RepoEntry, keys []RepoKey) (map[pkg][]RepoKey, map[RepoKey][]RepoKey) {
-	providers := map[pkg][]RepoKey{}
-	for _, k := range keys {
-		for _, m := range repos[k].Manifests {
-			if p := (pkg{m.Ecosystem, m.Name}); m.Name != "" && !slices.Contains(providers[p], k) {
-				providers[p] = append(providers[p], k)
-			}
-		}
-	}
-	users := map[RepoKey]map[RepoKey]bool{}
-	for _, k := range keys {
-		for _, m := range repos[k].Manifests {
-			for _, d := range m.Dependencies {
-				for _, p := range providers[pkg{m.Ecosystem, d.Name}] {
-					if p != k {
-						if users[p] == nil {
-							users[p] = map[RepoKey]bool{}
-						}
-						users[p][k] = true
-					}
-				}
-			}
-		}
-	}
-	usedBy := make(map[RepoKey][]RepoKey, len(users))
-	for p, us := range users {
-		usedBy[p] = slices.Sorted(maps.Keys(us))
-	}
-	return providers, usedBy
-}
-
-// feed merges the commits of keys, newest first.
-func feed(repos map[RepoKey]*RepoEntry, keys []RepoKey) []CommitRef {
-	var out []CommitRef
-	for _, k := range keys {
-		if e := repos[k]; e != nil {
-			for i := range e.Commits {
-				out = append(out, CommitRef{Repo: k, Commit: &e.Commits[i]})
-			}
-		}
-	}
-	slices.SortFunc(out, CompareRefs)
-	return out
-}
-
-// CompareRefs orders a feed: committedAt desc, repo asc, sha desc.
-func CompareRefs(a, b CommitRef) int {
-	if c := b.Commit.CommittedAt.Compare(a.Commit.CommittedAt); c != 0 {
-		return c
-	}
-	if c := strings.Compare(string(a.Repo), string(b.Repo)); c != 0 {
-		return c
-	}
-	return strings.Compare(b.Commit.SHA, a.Commit.SHA)
 }
 
 // Publisher owns the current snapshot. Updates are queued and applied in order at the next publish, which happens Debounce after
@@ -226,6 +176,7 @@ func CompareRefs(a, b CommitRef) int {
 type Publisher struct {
 	debounce, maxDelay time.Duration
 	log                *slog.Logger
+	indexers           []Indexer
 	cur                atomic.Pointer[Snapshot]
 	building           sync.Mutex // one build at a time: a build starts from the snapshot the previous one stored
 
@@ -237,10 +188,11 @@ type Publisher struct {
 	published chan struct{} // closed and replaced on every publish
 }
 
-// NewPublisher returns a publisher holding an empty version-0 snapshot.
-func NewPublisher(debounce, maxDelay time.Duration, log *slog.Logger) *Publisher {
-	p := &Publisher{debounce: debounce, maxDelay: maxDelay, log: log, published: make(chan struct{})}
-	p.cur.Store(&Snapshot{Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{}, groupsOf: map[RepoKey][]string{}})
+// NewPublisher returns a publisher holding an empty version-0 snapshot whose publishes build the features' indexes.
+func NewPublisher(debounce, maxDelay time.Duration, log *slog.Logger, indexers ...Indexer) *Publisher {
+	p := &Publisher{debounce: debounce, maxDelay: maxDelay, log: log, indexers: indexers, published: make(chan struct{})}
+	p.cur.Store(&Snapshot{Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{}, groupsOf: map[RepoKey][]string{},
+		indexers: indexers})
 	return p
 }
 
@@ -298,7 +250,7 @@ func (p *Publisher) publish() {
 	if len(batch) == 0 {
 		return
 	}
-	next, err := build(p.cur.Load(), batch)
+	next, err := build(p.cur.Load(), batch, p.log)
 	if err != nil {
 		p.log.Error("snapshot build failed; keeping the current snapshot", "err", err)
 		return
@@ -310,15 +262,26 @@ func (p *Publisher) publish() {
 	p.mu.Unlock()
 }
 
-func build(cur *Snapshot, batch []func(*Builder)) (s *Snapshot, err error) {
+// build applies the batch to a copy of cur. An update that panics is dropped alone (what it changed before the panic stays); a
+// panic while indexing fails the build.
+func build(cur *Snapshot, batch []func(*Builder), log *slog.Logger) (s *Snapshot, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic in snapshot update: %v", r)
+			err = fmt.Errorf("panic while indexing the snapshot: %v", r)
 		}
 	}()
 	b := newBuilder(cur)
 	for _, fn := range batch {
-		fn(b)
+		apply(b, fn, log)
 	}
 	return b.finish(time.Now()), nil
+}
+
+func apply(b *Builder, fn func(*Builder), log *slog.Logger) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("snapshot update panicked; dropped", "panic", fmt.Sprint(r))
+		}
+	}()
+	fn(b)
 }

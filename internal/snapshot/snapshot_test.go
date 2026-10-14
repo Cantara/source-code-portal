@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -89,23 +88,23 @@ func TestVersionFollowsTheItems(t *testing.T) {
 	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	defer p.Close()
 	publish := func(fn func(*Builder)) uint64 { p.Update(fn); p.Flush(); return p.Current().Version }
-	ab := publish(func(b *Builder) { b.Mark("a", 1<<60|7); b.Mark("b", 9) })
+	ab := publish(func(b *Builder) { b.Mark("a", "", 1<<60|7); b.Mark("b", "", 9) })
 	if ab == 0 || ab >= 1<<53 {
 		t.Fatalf("version %d, want nonzero within 53 bits", ab)
 	}
-	if v := publish(func(b *Builder) { b.Mark("b", 10) }); v == ab {
+	if v := publish(func(b *Builder) { b.Mark("b", "", 10) }); v == ab {
 		t.Error("a changed item kept the version")
 	}
-	if v := publish(func(b *Builder) { b.Mark("b", 9) }); v != ab {
+	if v := publish(func(b *Builder) { b.Mark("b", "", 9) }); v != ab {
 		t.Errorf("the same items give %d, want %d", v, ab)
 	}
-	if v := publish(func(b *Builder) { b.Mark("b", 0) }); v == ab {
+	if v := publish(func(b *Builder) { b.Mark("b", "", 0) }); v == ab {
 		t.Error("a dropped item kept the version")
 	}
 	q := NewPublisher(time.Hour, time.Hour, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	defer q.Close()
-	q.Update(func(b *Builder) { b.Mark("b", 9) })
-	q.Update(func(b *Builder) { b.Mark("a", 3); b.Mark("a", 1<<60|7) })
+	q.Update(func(b *Builder) { b.Mark("b", "", 9) })
+	q.Update(func(b *Builder) { b.Mark("a", "", 3); b.Mark("a", "", 1<<60|7) })
 	q.Flush()
 	if v := q.Current().Version; v != ab {
 		t.Errorf("the same items in another order give %d, want %d", v, ab)
@@ -140,47 +139,75 @@ func TestSnapshotsAreImmutable(t *testing.T) {
 	}
 }
 
-func TestPanicKeepsSnapshot(t *testing.T) {
-	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.NewTextHandler(io.Discard, nil)))
+func TestPanickingUpdateIsDroppedAlone(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
 	defer p.Close()
 	p.Update(func(b *Builder) { b.SetCatalogued() })
 	p.Update(func(*Builder) { panic("boom") })
 	p.Flush()
-	if got := p.Current(); !got.BuiltAt.IsZero() || got.Catalogued {
-		t.Fatal("a panicking batch was published")
+	if got := p.Current(); got.BuiltAt.IsZero() || !got.Catalogued {
+		t.Fatal("a panicking update took the other updates of its batch with it")
 	}
 }
 
-func TestFeedsAndUpdates(t *testing.T) {
-	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
-	at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+func TestPanickingIndexKeepsSnapshot(t *testing.T) {
+	const bad Index[int] = "bad"
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), bad.Build(func(*Snapshot) int { panic("boom") }))
+	defer p.Close()
+	p.Update(func(b *Builder) { b.SetCatalogued() })
+	p.Flush()
+	if got := p.Current(); !got.BuiltAt.IsZero() || got.Catalogued {
+		t.Fatal("a snapshot whose index panicked was published")
+	}
+}
+
+// notes and noteCount are a test feature's facet and index.
+const (
+	notes     Facet[[]string] = "notes"
+	noteCount Index[int]      = "notes"
+)
+
+func countNotes(s *Snapshot) int {
+	n := 0
+	for _, e := range s.Repos {
+		v, _ := notes.Get(e)
+		n += len(v)
+	}
+	return n
+}
+
+func TestFacetsAndIndexes(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
 	a := Repo{ID: RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "a"}
 	b := Repo{ID: RepoID{Source: "gh", GitHubID: 2}, Owner: "acme", Name: "b"}
+	fresh := Freshness{State: StateOK}
 	p.Update(func(bd *Builder) {
 		bd.ReplaceSource("gh", []*RepoEntry{{Repo: a}, {Repo: b}}, nil, SourceStatus{ID: "gh"})
-		bd.SetGroups([]Group{{ID: "only-b", Members: []RepoKey{"acme/b"}}})
-		bd.UpdateRepo("acme/a", func(e *RepoEntry) {
-			e.Commits = []Commit{{SHA: "a2", CommittedAt: at}, {SHA: "a1", CommittedAt: at.Add(-2 * time.Hour)}}
-		})
-		bd.UpdateRepo("acme/b", func(e *RepoEntry) { e.Commits = []Commit{{SHA: "b1", CommittedAt: at.Add(-time.Hour)}} })
+		bd.UpdateRepo("acme/a", func(e *RepoEntry) { notes.Set(e, []string{"x", "y"}, fresh) })
+		bd.UpdateRepo("acme/b", func(e *RepoEntry) { notes.Set(e, []string{"z"}, fresh) })
 		if bd.UpdateRepo("acme/missing", func(*RepoEntry) {}) {
 			t.Error("UpdateRepo of an unknown key reported true")
 		}
 	})
 	p.Flush()
 	s := p.Current()
-	var shas []string
-	for _, r := range s.Latest {
-		shas = append(shas, r.Commit.SHA)
+	if got := noteCount.Get(s); got != 3 {
+		t.Errorf("index = %d, want 3", got)
 	}
-	if strings.Join(shas, ",") != "a2,b1,a1" {
-		t.Errorf("Latest = %v", shas)
+	if v, f := notes.Get(s.Repos["acme/a"]); len(v) != 2 || f.State != StateOK {
+		t.Errorf("facet = %v %+v", v, f)
 	}
-	if f, ok := s.Feed("only-b"); !ok || len(f) != 1 || f[0].Repo != "acme/b" {
-		t.Errorf("group feed = %v", f)
+	for name, f := range s.Repos["acme/b"].Facets() {
+		if name != "notes" || f.State != StateOK {
+			t.Errorf("Facets yields %s %+v", name, f)
+		}
+	}
+	const other Facet[int] = "other"
+	if v, f := other.Get(s.Repos["acme/a"]); v != 0 || f.Derive(time.Now()) != StatusUnknown {
+		t.Errorf("an absent facet = %d %+v", v, f)
 	}
 
-	// A new listing keeps the commits of repositories that stay, and drops those of a repository whose identity changed.
+	// A new listing keeps the facets of repositories that stay, and drops those of a repository whose identity changed.
 	b2 := b
 	b2.ID.GitHubID = 3
 	p.Update(func(bd *Builder) {
@@ -188,52 +215,18 @@ func TestFeedsAndUpdates(t *testing.T) {
 	})
 	p.Flush()
 	s2 := p.Current()
-	if len(s2.Repos["acme/a"].Commits) != 2 || len(s2.Repos["acme/b"].Commits) != 0 {
-		t.Errorf("after relisting: a has %d commits, b %d", len(s2.Repos["acme/a"].Commits), len(s2.Repos["acme/b"].Commits))
+	va, _ := notes.Get(s2.Repos["acme/a"])
+	vb, _ := notes.Get(s2.Repos["acme/b"])
+	if len(va) != 2 || len(vb) != 0 || noteCount.Get(s2) != 2 {
+		t.Errorf("after relisting: a %v, b %v, index %d", va, vb, noteCount.Get(s2))
 	}
-	if len(s.Repos["acme/b"].Commits) != 1 {
+	if v, _ := notes.Get(s.Repos["acme/b"]); len(v) != 1 {
 		t.Error("the old snapshot changed")
 	}
 }
 
-func TestDependencyIndex(t *testing.T) {
-	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
-	p.Update(func(bd *Builder) {
-		bd.ReplaceSource("gh", []*RepoEntry{repo("gh", 1, "acme", "lib"), repo("gh", 2, "acme", "fork"), repo("gh", 3, "acme", "app")}, nil,
-			SourceStatus{ID: "gh"})
-		lib := []Manifest{{Ecosystem: "go", Name: "github.com/acme/lib", Dependencies: []Dependency{{Name: "github.com/acme/lib/v2"}}}}
-		bd.UpdateRepo("acme/lib", func(e *RepoEntry) { e.Manifests = lib })
-		bd.UpdateRepo("acme/fork", func(e *RepoEntry) {
-			e.Manifests = []Manifest{{Ecosystem: "go", Name: "github.com/acme/lib", Dependencies: []Dependency{{Name: "github.com/acme/lib"}}},
-				{Ecosystem: "npm", Name: "github.com/acme/lib"}}
-		})
-		bd.UpdateRepo("acme/app", func(e *RepoEntry) {
-			e.Manifests = []Manifest{{Ecosystem: "go", Name: "app", Dependencies: []Dependency{{Name: "github.com/acme/lib"}, {Name: "other"}}},
-				{Ecosystem: "maven", Dependencies: []Dependency{{Name: "github.com/acme/lib"}}}}
-		})
-	})
-	p.Flush()
-	s := p.Current()
-	if got := s.Providers("go", "github.com/acme/lib"); !slices.Equal(got, []RepoKey{"acme/fork", "acme/lib"}) {
-		t.Errorf("Providers = %v", got)
-	}
-	if got := s.Providers("maven", "github.com/acme/lib"); got != nil {
-		t.Errorf("a name in another ecosystem matches: %v", got)
-	}
-	// fork declares lib's name and depends on it: lib is used by fork, fork by itself is not counted.
-	if got := s.UsedBy("acme/lib"); !slices.Equal(got, []RepoKey{"acme/app", "acme/fork"}) {
-		t.Errorf("UsedBy(lib) = %v", got)
-	}
-	if got := s.UsedBy("acme/fork"); !slices.Equal(got, []RepoKey{"acme/app"}) {
-		t.Errorf("UsedBy(fork) = %v", got)
-	}
-	if got := s.UsedBy("acme/app"); got != nil {
-		t.Errorf("UsedBy(app) = %v", got)
-	}
-}
-
 func TestPublicView(t *testing.T) {
-	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
 	pub := repo("gh", 1, "acme", "open")
 	pub.Repo.Visibility = "public"
 	p.Update(func(b *Builder) {
@@ -249,39 +242,46 @@ func TestPublicView(t *testing.T) {
 	secret.Repo.Visibility = "private"
 	inner := repo("gh", 3, "acme", "inner")
 	inner.Repo.Visibility = "internal"
-	at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	p.Update(func(b *Builder) {
 		b.ReplaceSource("gh", []*RepoEntry{pub, secret, inner}, map[RepoKey]RepoKey{"acme/was-secret": "acme/secret", "acme/was-open": "acme/open"},
 			SourceStatus{ID: "gh", Repos: 3})
 		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/secret", Members: []RepoKey{"acme/inner", "acme/open", "acme/secret"}}})
-		b.UpdateRepo("acme/open", func(e *RepoEntry) {
-			e.Commits = []Commit{{SHA: "o", CommittedAt: at}}
-			e.Manifests = []Manifest{{Ecosystem: "go", Name: "open", Dependencies: []Dependency{{Name: "secret"}}}}
-		})
-		b.UpdateRepo("acme/secret", func(e *RepoEntry) {
-			e.Commits = []Commit{{SHA: "s", CommittedAt: at}}
-			e.Manifests = []Manifest{{Ecosystem: "go", Name: "secret", Dependencies: []Dependency{{Name: "open"}}}}
-		})
+		b.UpdateRepo("acme/open", func(e *RepoEntry) { notes.Set(e, []string{"o"}, Freshness{}) })
+		b.UpdateRepo("acme/secret", func(e *RepoEntry) { notes.Set(e, []string{"s"}, Freshness{}) })
+		b.Mark("notes/acme/open", "acme/open", 5)
+		b.Mark("notes/acme/secret", "acme/secret", 7)
 	})
 	p.Flush()
 	full := p.Current()
 	v := full.Public()
-	if len(full.Repos) != 3 || len(full.Latest) != 2 || len(full.UsedBy("acme/open")) != 1 {
-		t.Fatalf("full view: %d repos, %d commits, used by %v", len(full.Repos), len(full.Latest), full.UsedBy("acme/open"))
+	if len(full.Repos) != 3 || noteCount.Get(full) != 2 {
+		t.Fatalf("full view: %d repos, index %d", len(full.Repos), noteCount.Get(full))
 	}
 	g, _ := v.Group("all")
 	if len(v.Repos) != 1 || v.Repos["acme/open"] == nil || len(v.Aliases) != 1 || v.Aliases["acme/was-open"] != "acme/open" ||
 		!slices.Equal(g.Members, []RepoKey{"acme/open"}) || g.DefaultRepo != "" || g.DefaultMissing || v.Sources[0].Repos != 1 {
 		t.Errorf("public view: repos %v, aliases %v, group %+v, sources %+v", v.Repos, v.Aliases, g, v.Sources)
 	}
-	if f, _ := v.Feed("all"); len(v.Latest) != 1 || len(f) != 1 || v.Providers("go", "secret") != nil || v.UsedBy("acme/open") != nil {
-		t.Errorf("public view leaks: latest %d, feed %d, providers %v, usedBy %v", len(v.Latest), len(f), v.Providers("go", "secret"), v.UsedBy("acme/open"))
+	if noteCount.Get(v) != 1 {
+		t.Errorf("the public view's index counts %d notes, want its own 1", noteCount.Get(v))
 	}
-	if e, _ := v.Repo("acme/was-secret"); e != nil || v.Public() != v || v.Version != full.Version {
+	if e, _ := v.Repo("acme/was-secret"); e != nil || v.Public() != v {
 		t.Error("an alias to a private repository resolves, or the view is not its own public view")
 	}
 	if g, _ := full.Group("all"); len(g.Members) != 3 {
 		t.Errorf("the full view changed: %+v", g)
+	}
+
+	// A private item moves the full version only.
+	p.Update(func(b *Builder) { b.Mark("notes/acme/secret", "acme/secret", 8) })
+	p.Flush()
+	if next := p.Current(); next.Version == full.Version || next.Public().Version != v.Version {
+		t.Errorf("after a private change: full %d (was %d), public %d (was %d)", next.Version, full.Version, next.Public().Version, v.Version)
+	}
+	p.Update(func(b *Builder) { b.Mark("notes/acme/open", "acme/open", 6) })
+	p.Flush()
+	if next := p.Current(); next.Public().Version == v.Version {
+		t.Error("a public change kept the public version")
 	}
 }
 
@@ -299,7 +299,7 @@ func TestConcurrentPublishesKeepEveryUpdate(t *testing.T) {
 	for i := range n {
 		wg.Go(func() {
 			p.Update(func(b *Builder) {
-				b.UpdateRepo(RepoKey(fmt.Sprint("acme/r", i)), func(e *RepoEntry) { e.Commits = []Commit{{SHA: fmt.Sprint(i)}} })
+				b.UpdateRepo(RepoKey(fmt.Sprint("acme/r", i)), func(e *RepoEntry) { notes.Set(e, []string{fmt.Sprint(i)}, Freshness{}) })
 			})
 			p.Flush() // races the debounce timer's publish
 		})
@@ -307,7 +307,7 @@ func TestConcurrentPublishesKeepEveryUpdate(t *testing.T) {
 	wg.Wait()
 	p.Flush()
 	for k, e := range p.Current().Repos {
-		if len(e.Commits) != 1 {
+		if v, _ := notes.Get(e); len(v) != 1 {
 			t.Errorf("%s lost its update", k)
 		}
 	}

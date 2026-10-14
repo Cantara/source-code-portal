@@ -177,26 +177,14 @@ func TestETagCacheEvicts(t *testing.T) {
 	}
 }
 
-func TestCommitsTreesAndBlobs(t *testing.T) {
+func TestTreesAndBlobs(t *testing.T) {
 	srv := githubtest.New(t)
 	id := srv.AddRepo("acme", gh.Repository{Name: new("one")})
-	srv.AddRepo("acme", gh.Repository{Name: new("empty")})
-	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
-	srv.SetCommits(id, githubtest.Commit{SHA: strings.Repeat("b", 40), Message: "second\n\nbody", AuthorName: "Ann", AuthorLogin: "ann", Date: at},
-		githubtest.Commit{SHA: strings.Repeat("a", 40), Message: "first", AuthorName: "Bo", Date: at.Add(-time.Hour)})
+	srv.SetCommits(id, githubtest.Commit{SHA: strings.Repeat("a", 40), Message: "first", AuthorName: "Bo", Date: time.Now()})
 	srv.SetFile(id, ".github/scp.yaml", "schema: 1\n")
 	srv.SetFile(id, "README.md", "# one\n")
 	s := tokenSource(t, srv, "acme")
 	ctx := t.Context()
-
-	cs, err := s.Commits(ctx, "acme", "one", 30)
-	if err != nil || len(cs) != 2 || cs[0].Message != "second\n\nbody" || cs[0].AuthorLogin != "ann" || !cs[0].Date.Equal(at) ||
-		!strings.HasSuffix(cs[0].HTMLURL, "/commit/"+strings.Repeat("b", 40)) {
-		t.Fatalf("commits = %+v, %v", cs, err)
-	}
-	if _, err := s.Commits(ctx, "acme", "empty", 30); !IsNotFound(err) {
-		t.Errorf("empty repository: err = %v, want not found", err)
-	}
 
 	root, err := s.Tree(ctx, "acme", "one", "HEAD", false)
 	if err != nil || len(root) != 2 || root[0].Path != ".github" || root[0].Type != "tree" || root[1].Path != "README.md" {
@@ -213,21 +201,6 @@ func TestCommitsTreesAndBlobs(t *testing.T) {
 	all, err := s.Tree(ctx, "acme", "one", "HEAD", true)
 	if err != nil || len(all) != 3 || all[1].Path != ".github/scp.yaml" || all[1].SHA != sub[0].SHA {
 		t.Errorf("recursive = %+v, %v", all, err)
-	}
-}
-
-func TestLatestRelease(t *testing.T) {
-	srv := githubtest.New(t)
-	id := srv.AddRepo("acme", gh.Repository{Name: new("one")})
-	srv.AddRepo("acme", gh.Repository{Name: new("none")})
-	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
-	srv.SetRelease(id, "v1.2.0", "One two", at)
-	s := tokenSource(t, srv, "acme")
-	if r, err := s.LatestRelease(t.Context(), "acme", "one"); err != nil || r == nil || r.Tag != "v1.2.0" || !r.Published.Equal(at) {
-		t.Errorf("release = %+v, %v", r, err)
-	}
-	if r, err := s.LatestRelease(t.Context(), "acme", "none"); err != nil || r != nil {
-		t.Errorf("no release = %+v, %v", r, err)
 	}
 }
 

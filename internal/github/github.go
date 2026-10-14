@@ -225,6 +225,12 @@ func (s *Source) RefreshInstallations(ctx context.Context) error {
 	return nil
 }
 
+// REST returns the go-github client for owner's credential, for the calls only one feature makes; classify their failures with
+// Classify.
+func (s *Source) REST(ctx context.Context, owner string) (*gh.Client, error) {
+	return s.client(ctx, owner)
+}
+
 // client returns the client for owner, listing installations first when owner has none yet.
 func (s *Source) client(ctx context.Context, owner string) (*gh.Client, error) {
 	if c := s.credentialFor(owner); c != nil {
@@ -283,31 +289,6 @@ func (s *Source) Repo(ctx context.Context, owner, name string) (snapshot.Repo, e
 	return s.convert(r), nil
 }
 
-// CommitInfo is a commit as GitHub lists it; callers clean the fields.
-type CommitInfo struct {
-	SHA, Message, AuthorName, AuthorLogin, HTMLURL string
-	Date                                           time.Time // committer date
-}
-
-// Commits returns the latest n commits of the repository's default branch, newest first.
-func (s *Source) Commits(ctx context.Context, owner, name string, n int) ([]CommitInfo, error) {
-	c, err := s.client(ctx, owner)
-	if err != nil {
-		return nil, err
-	}
-	got, resp, err := c.Repositories.ListCommits(ctx, owner, name, &gh.CommitsListOptions{ListOptions: gh.ListOptions{PerPage: n}})
-	if err != nil {
-		return nil, classify(resp, err)
-	}
-	out := make([]CommitInfo, 0, len(got))
-	for _, rc := range got {
-		ci := CommitInfo{SHA: rc.GetSHA(), Message: rc.GetCommit().GetMessage(), AuthorName: rc.GetCommit().GetAuthor().GetName(),
-			AuthorLogin: rc.GetAuthor().GetLogin(), HTMLURL: rc.GetHTMLURL(), Date: rc.GetCommit().GetCommitter().GetDate().Time}
-		out = append(out, ci)
-	}
-	return out, nil
-}
-
 // TreeEntry is one entry of a git tree.
 type TreeEntry struct {
 	Path string // relative to the tree
@@ -332,22 +313,6 @@ func (s *Source) Tree(ctx context.Context, owner, name, ref string, recursive bo
 		out = append(out, TreeEntry{Path: e.GetPath(), Type: e.GetType(), SHA: e.GetSHA(), Size: int64(e.GetSize())})
 	}
 	return out, nil
-}
-
-// LatestRelease returns the latest published, non-prerelease release; nil when the repository has none.
-func (s *Source) LatestRelease(ctx context.Context, owner, name string) (*snapshot.Release, error) {
-	c, err := s.client(ctx, owner)
-	if err != nil {
-		return nil, err
-	}
-	r, resp, err := c.Repositories.GetLatestRelease(ctx, owner, name)
-	if err != nil {
-		if err := classify(resp, err); !IsNotFound(err) {
-			return nil, err
-		}
-		return nil, nil //nolint:nilnil // no release is not an error
-	}
-	return &snapshot.Release{Tag: r.GetTagName(), Name: r.GetName(), URL: r.GetHTMLURL(), Published: r.GetPublishedAt().UTC()}, nil
 }
 
 // WebURL is the web host of the source with a trailing slash: https://github.com/ for github.com, the GHES host otherwise.
@@ -427,6 +392,9 @@ func IsNotFound(err error) bool {
 	var e *Error
 	return errors.As(err, &e) && e.Kind == NotFound
 }
+
+// Classify turns the failure of a go-github call into an *Error (a cancelled context stays as it is).
+func Classify(resp *gh.Response, err error) error { return classify(resp, err) }
 
 func classify(resp *gh.Response, err error) error {
 	var rl *gh.RateLimitError

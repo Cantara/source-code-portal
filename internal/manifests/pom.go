@@ -10,8 +10,6 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
 const (
@@ -42,8 +40,8 @@ type pom struct {
 }
 
 // parsePOM reads a Maven pom.xml.
-func parsePOM(b []byte) snapshot.Manifest {
-	m := snapshot.Manifest{Ecosystem: "maven", Language: "Java", BuildTool: "Maven"}
+func parsePOM(b []byte) Manifest {
+	m := Manifest{Ecosystem: "maven", Language: "Java", BuildTool: "Maven"}
 	p, err := readPOM(b)
 	if err != nil {
 		var se *xml.SyntaxError
@@ -89,7 +87,7 @@ func parsePOM(b []byte) snapshot.Manifest {
 	m.Version = version(ver)
 	for _, k := range javaProperties {
 		if v := version(expand(p.properties[k])); v != "" {
-			m.Toolchain = append(m.Toolchain, snapshot.Toolchain{Name: "java", Version: v})
+			m.Toolchain = append(m.Toolchain, Toolchain{Name: "java", Version: v})
 			break
 		}
 	}

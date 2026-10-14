@@ -35,11 +35,6 @@ var (
 	loginPattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
 )
 
-// Fetcher lists a repository's latest commits; *github.Source implements it.
-type Fetcher interface {
-	Commits(ctx context.Context, owner, name string, n int) ([]github.CommitInfo, error)
-}
-
 // Commits is the commits feature.
 type Commits struct {
 	sources map[string]Fetcher
@@ -49,8 +44,8 @@ type Commits struct {
 func New(sources map[string]Fetcher) *Commits { return &Commits{sources: sources} }
 
 type payload struct {
-	Schema  int               `json:"schema"`
-	Commits []snapshot.Commit `json:"commits"`
+	Schema  int      `json:"schema"`
+	Commits []Commit `json:"commits"`
 }
 
 // Spec is the per-repository refresh job.
@@ -83,7 +78,7 @@ func (c *Commits) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	return sync.Result{State: state, Payload: b, Unchanged: j.Prev.State == state && bytes.Equal(b, j.Prev.Payload)}, nil
 }
 
-func decode(b []byte) []snapshot.Commit {
+func decode(b []byte) []Commit {
 	var p payload
 	if len(b) == 0 || json.Unmarshal(b, &p) != nil || p.Schema != payloadSchema {
 		return nil
@@ -93,13 +88,13 @@ func decode(b []byte) []snapshot.Commit {
 
 // normalise cleans GitHub's commits: valid SHAs only, one-line subject, bounded names, plausible dates, newest first, no duplicates.
 // A date more than a day ahead is clamped to the time the commit was first seen, which prev remembers.
-func normalise(in []github.CommitInfo, prev []snapshot.Commit, now time.Time) []snapshot.Commit {
+func normalise(in []CommitInfo, prev []Commit, now time.Time) []Commit {
 	firstSeen := map[string]time.Time{}
 	for _, c := range prev {
 		firstSeen[c.SHA] = c.CommittedAt
 	}
 	seen := map[string]bool{}
-	out := make([]snapshot.Commit, 0, len(in))
+	out := make([]Commit, 0, len(in))
 	for _, c := range in {
 		sha := strings.ToLower(c.SHA)
 		if !shaPattern.MatchString(sha) || seen[sha] || c.Date.IsZero() {
@@ -121,10 +116,10 @@ func normalise(in []github.CommitInfo, prev []snapshot.Commit, now time.Time) []
 		if !strings.HasPrefix(url, "https://") {
 			url = ""
 		}
-		out = append(out, snapshot.Commit{SHA: sha, Subject: untrusted.Text(untrusted.FirstLine(c.Message), maxSubject),
+		out = append(out, Commit{SHA: sha, Subject: untrusted.Text(untrusted.FirstLine(c.Message), maxSubject),
 			AuthorName: untrusted.Text(c.AuthorName, maxAuthor), AuthorLogin: login, URL: url, CommittedAt: at})
 	}
-	slices.SortStableFunc(out, func(a, b snapshot.Commit) int {
+	slices.SortStableFunc(out, func(a, b Commit) int {
 		if c := b.CommittedAt.Compare(a.CommittedAt); c != 0 {
 			return c
 		}
@@ -135,5 +130,5 @@ func normalise(in []github.CommitInfo, prev []snapshot.Commit, now time.Time) []
 
 func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 	cs := decode(it.Payload)
-	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { e.Commits, e.CommitsFresh = cs, fresh })
+	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, cs, fresh) })
 }

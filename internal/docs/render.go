@@ -54,9 +54,9 @@ const (
 type links struct {
 	web     string // https://github.com/
 	repo    snapshot.RepoKey
-	dir     string                    // the document's directory, "" at the root
-	indexed map[string]bool           // repository paths with a portal page
-	images  map[string]snapshot.Image // filled with the images the document shows, by id
+	dir     string           // the document's directory, "" at the root
+	indexed map[string]bool  // repository paths with a portal page
+	images  map[string]Image // filled with the images the document shows, by id
 }
 
 // rendered is the outcome of the pipeline for one file.
@@ -67,7 +67,7 @@ type rendered struct {
 	Format             string
 	HTML               safehtml.SafeHTML
 	Source             []byte
-	TOC                []snapshot.Heading
+	TOC                []Heading
 	State              snapshot.State
 }
 
@@ -204,7 +204,7 @@ func blockStart(t []byte) bool {
 }
 
 // markdown renders body to sanitised HTML and returns the first H1 text, the first paragraph text and the TOC.
-func (r *pipeline) markdown(body []byte, l links) (safehtml.SafeHTML, string, string, []snapshot.Heading, error) {
+func (r *pipeline) markdown(body []byte, l links) (safehtml.SafeHTML, string, string, []Heading, error) {
 	hl := &highlighter{deadline: time.Now().Add(highlightBudget)}
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM, extension.Footnote),
@@ -326,7 +326,7 @@ func (alerts) Transform(doc *ast.Document, reader text.Reader, _ parser.Context)
 type rewritten struct {
 	html               []byte
 	title, description string
-	toc                []snapshot.Heading
+	toc                []Heading
 }
 
 // rewrite resolves links and images, prefixes ids with doc-, drops what the policy would strip anyway in a way that keeps the text
@@ -381,7 +381,7 @@ func rewrite(in []byte, l links) (rewritten, error) {
 					out.description = untrusted.Text(capture.String(), maxDescription)
 				default:
 					if captureID != "" && t != "" {
-						out.toc = append(out.toc, snapshot.Heading{Level: int(captureTag[1] - '0'), ID: captureID, Text: untrusted.Text(t, maxTOCText)})
+						out.toc = append(out.toc, Heading{Level: int(captureTag[1] - '0'), ID: captureID, Text: untrusted.Text(t, maxTOCText)})
 					}
 				}
 				capture = nil
@@ -501,7 +501,7 @@ func (l links) link(href string) (string, bool) {
 // Anything else is "".
 func (l links) image(src string) string {
 	u, err := url.Parse(strings.TrimSpace(src))
-	var img snapshot.Image
+	var img Image
 	switch {
 	case err != nil || src == "":
 		return ""
@@ -524,7 +524,7 @@ func (l links) image(src string) string {
 }
 
 // imageID names an image within its repository: 16 bytes of SHA-256 over its path or URL, hex.
-func imageID(img snapshot.Image) string {
+func imageID(img Image) string {
 	ref := img.URL
 	if img.Path != "" {
 		ref = "path:" + img.Path

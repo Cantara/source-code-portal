@@ -28,6 +28,32 @@ var (
 	tagPattern   = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 )
 
+// Descriptor is the repository's own scp.yaml. It affects display only.
+type Descriptor struct {
+	Present     bool               `json:"present"`
+	File        string             `json:"file,omitempty"` // ".github/scp.yaml" etc.
+	Title       string             `json:"title,omitempty"`
+	Description string             `json:"description,omitempty"`
+	Lifecycle   string             `json:"lifecycle,omitempty"` // "" | experimental | production | deprecated
+	Owners      []string           `json:"owners,omitempty"`
+	Tags        []string           `json:"tags,omitempty"`
+	Links       []Link             `json:"links,omitempty"`
+	Problems    []snapshot.Problem `json:"problems,omitempty"`
+}
+
+// Link is a titled https link.
+type Link struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+const descriptorFacet snapshot.Facet[Descriptor] = "descriptor"
+
+// DescriptorOf returns the descriptor of e with its freshness.
+func DescriptorOf(e *snapshot.RepoEntry) (Descriptor, snapshot.Freshness) {
+	return descriptorFacet.Get(e)
+}
+
 // validLifecycle reports whether s is an accepted lifecycle.
 func validLifecycle(s string) bool {
 	return s == "experimental" || s == "production" || s == "deprecated"
@@ -37,9 +63,9 @@ func validLifecycle(s string) bool {
 // too deep or lacks schema: 1 is rejected whole with one problem. Otherwise each field is checked on its own: an invalid field or
 // item is dropped with a problem and its neighbours are kept; unknown keys are reported and ignored. Present is true when a
 // document was accepted.
-func ParseDescriptor(b []byte) snapshot.Descriptor {
-	reject := func(code, msg string) snapshot.Descriptor {
-		return snapshot.Descriptor{Problems: []snapshot.Problem{{Code: code, Message: msg}}}
+func ParseDescriptor(b []byte) Descriptor {
+	reject := func(code, msg string) Descriptor {
+		return Descriptor{Problems: []snapshot.Problem{{Code: code, Message: msg}}}
 	}
 	if len(b) > maxDescriptorBytes {
 		return reject("descriptor.too_large", fmt.Sprintf("the file is larger than %d bytes", maxDescriptorBytes))
@@ -79,7 +105,7 @@ func ParseDescriptor(b []byte) snapshot.Descriptor {
 		return reject("descriptor.schema", "schema: 1 is required")
 	}
 
-	d := snapshot.Descriptor{Present: true}
+	d := Descriptor{Present: true}
 	problem := func(key, msg string) {
 		d.Problems = append(d.Problems, snapshot.Problem{Pointer: "/" + key, Code: "field.invalid", Message: msg})
 	}
@@ -170,12 +196,12 @@ func stringList(n *yaml.Node, key string, pattern *regexp.Regexp, msg string, pr
 	return out
 }
 
-func links(n *yaml.Node, problems *[]snapshot.Problem) []snapshot.Link {
+func links(n *yaml.Node, problems *[]snapshot.Problem) []Link {
 	if n.Kind != yaml.SequenceNode {
 		*problems = append(*problems, snapshot.Problem{Pointer: "/links", Code: "field.invalid", Message: "links must be a list"})
 		return nil
 	}
-	var out []snapshot.Link
+	var out []Link
 	for i, item := range n.Content {
 		at := fmt.Sprintf("/links/%d", i)
 		if i >= maxListItems {
@@ -201,7 +227,7 @@ func links(n *yaml.Node, problems *[]snapshot.Problem) []snapshot.Link {
 			continue
 		}
 		u, _ := url.Parse(href) // checked by httpsOnly
-		out = append(out, snapshot.Link{Title: title, URL: u.String()})
+		out = append(out, Link{Title: title, URL: u.String()})
 	}
 	return out
 }

@@ -94,7 +94,7 @@ func TestEvents(t *testing.T) {
 		t.Fatalf("version at connect %d, want 0", v)
 	}
 
-	pub.Update(func(b *snapshot.Builder) { b.Mark("a", 42) })
+	pub.Update(func(b *snapshot.Builder) { b.Mark("a", "", 42) })
 	pub.Flush()
 	got := s.next(t)
 	for got == ": ping" {

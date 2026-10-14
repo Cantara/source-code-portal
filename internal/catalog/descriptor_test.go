@@ -12,7 +12,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/sync"
 )
 
-func codes(d snapshot.Descriptor) []string {
+func codes(d Descriptor) []string {
 	var out []string
 	for _, p := range d.Problems {
 		out = append(out, p.Code+p.Pointer)
@@ -115,7 +115,7 @@ func TestDescriptorJob(t *testing.T) {
 		spec.Publish(b, store.Item{Repo: "acme/a", State: res.State, Payload: res.Payload}, snapshot.Freshness{State: res.State})
 	})
 	p.Flush()
-	if d := p.Current().Repos["acme/a"].Descriptor; !d.Present || d.Title != "Root" || d.File != "scp.yaml" {
+	if d, _ := DescriptorOf(p.Current().Repos["acme/a"]); !d.Present || d.Title != "Root" || d.File != "scp.yaml" {
 		t.Errorf("published descriptor = %+v", d)
 	}
 }

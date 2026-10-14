@@ -68,7 +68,8 @@ func (h *images) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, http.StatusNotFound, "not-found", "No such repository.")
 		return
 	}
-	img, ok := findImage(e.Docs, id)
+	docs, _ := Of(e)
+	img, ok := findImage(docs, id)
 	if !ok || img.URL == "" && img.BlobSHA == "" {
 		httpapi.WriteProblem(w, http.StatusNotFound, "not-found", "No such image.")
 		return
@@ -101,7 +102,7 @@ func (h *images) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hd.Set("Content-Security-Policy", imageCSP)
 	hd.Set("Cache-Control", imageMaxAge)
 	hd.Set("ETag", it.etag)
-	if matches(r.Header.Get("If-None-Match"), it.etag) {
+	if httpapi.Matches(r.Header.Get("If-None-Match"), it.etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
@@ -111,7 +112,7 @@ func (h *images) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // findImage is the image with id among the documents.
-func findImage(docs []snapshot.Doc, id string) (snapshot.Image, bool) {
+func findImage(docs []Doc, id string) (Image, bool) {
 	for _, d := range docs {
 		for _, img := range d.Images {
 			if img.ID == id {
@@ -119,16 +120,7 @@ func findImage(docs []snapshot.Doc, id string) (snapshot.Image, bool) {
 			}
 		}
 	}
-	return snapshot.Image{}, false
-}
-
-func matches(inm, etag string) bool {
-	for t := range strings.SplitSeq(inm, ",") {
-		if t = strings.TrimSpace(t); t == "*" || strings.TrimPrefix(t, "W/") == etag {
-			return true
-		}
-	}
-	return false
+	return Image{}, false
 }
 
 // get answers from the cache or makes one fetch for all concurrent requests; ttl 0 keeps the answer until it is evicted.
@@ -149,7 +141,7 @@ func (h *images) get(key string, fetch func(context.Context) (item, time.Duratio
 	return v.(item) //nolint:forcetypeassert // the only type stored
 }
 
-func (h *images) blob(ctx context.Context, repo snapshot.Repo, img snapshot.Image) item {
+func (h *images) blob(ctx context.Context, repo snapshot.Repo, img Image) item {
 	gh := h.sources[repo.ID.Source]
 	if gh == nil {
 		return item{err: errNoImage}
@@ -167,13 +159,13 @@ func (h *images) blob(ctx context.Context, repo snapshot.Repo, img snapshot.Imag
 }
 
 func (h *images) external(ctx context.Context, url string) item {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil) //nolint:gosec // G704: the client dials through Guarded
 	if err != nil {
 		return item{err: errNoImage}
 	}
 	req.Header.Set("Accept", "image/*")
 	req.Header.Set("User-Agent", "source-code-portal (image proxy)")
-	resp, err := h.client.Do(req)
+	resp, err := h.client.Do(req) //nolint:gosec // G704: the client dials through Guarded
 	if err != nil {
 		return item{err: err}
 	}

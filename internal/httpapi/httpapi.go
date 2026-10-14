@@ -231,7 +231,7 @@ func conditional(w http.ResponseWriter, r *http.Request, next http.Handler) {
 	etag := `W/"` + hex.EncodeToString(sum[:12]) + `"`
 	h.Set("ETag", etag)
 	h.Set("Cache-Control", "no-cache")
-	if matches(r.Header.Get("If-None-Match"), etag) {
+	if Matches(r.Header.Get("If-None-Match"), etag) {
 		h.Del("Content-Type")
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -240,7 +240,8 @@ func conditional(w http.ResponseWriter, r *http.Request, next http.Handler) {
 	_, _ = w.Write(buf.body.Bytes())
 }
 
-func matches(inm, etag string) bool {
+// Matches reports whether an If-None-Match header names etag (the weak comparison of RFC 9110) or is "*".
+func Matches(inm, etag string) bool {
 	for t := range strings.SplitSeq(inm, ",") {
 		t = strings.TrimSpace(t)
 		if t == "*" || strings.TrimPrefix(t, "W/") == strings.TrimPrefix(etag, "W/") {

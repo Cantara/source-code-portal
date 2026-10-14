@@ -32,10 +32,11 @@ func (a API) GetManifests(ctx context.Context, req oapi.GetManifestsRequestObjec
 // view is the manifests answer for the entry e of s.
 func view(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.Manifests {
 	self := e.Repo.Key()
-	out := oapi.Manifests{Manifests: make([]oapi.Manifest, 0, len(e.Manifests)), Freshness: oapi.FreshnessOf(e.ManifestsFresh, now),
-		Technology: technology(e.Manifests), Uses: []oapi.RepoLink{}, UsedBy: []oapi.RepoLink{}}
+	ms, fresh := Of(e)
+	out := oapi.Manifests{Manifests: make([]oapi.Manifest, 0, len(ms)), Freshness: oapi.FreshnessOf(fresh, now),
+		Technology: technology(ms), Uses: []oapi.RepoLink{}, UsedBy: []oapi.RepoLink{}}
 	uses := map[snapshot.RepoKey][]string{}
-	for _, m := range e.Manifests {
+	for _, m := range ms {
 		om := oapi.Manifest{Path: m.Path, Ecosystem: oapi.ManifestEcosystem(m.Ecosystem), Name: m.Name, Version: m.Version, Language: m.Language,
 			BuildTool: m.BuildTool, Toolchain: make([]oapi.Toolchain, 0, len(m.Toolchain)), Dependencies: make([]oapi.Dependency, 0, len(m.Dependencies)),
 			Problems: make([]oapi.FileProblem, 0, len(m.Problems))}
@@ -44,7 +45,7 @@ func view(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.Manif
 		}
 		for _, d := range m.Dependencies {
 			repos := []string{}
-			for _, p := range s.Providers(m.Ecosystem, d.Name) {
+			for _, p := range providers(s, m.Ecosystem, d.Name) {
 				if p != self {
 					repos = append(repos, string(p))
 					if !slices.Contains(uses[p], d.Name) {
@@ -62,15 +63,16 @@ func view(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.Manif
 	for _, k := range slices.Sorted(maps.Keys(uses)) {
 		out.Uses = append(out.Uses, link(s, k, uses[k]))
 	}
-	for _, k := range s.UsedBy(self) {
+	for _, k := range usedBy(s, self) {
 		u, _ := s.Repo(k)
 		if u == nil {
 			continue
 		}
 		var via []string
-		for _, m := range u.Manifests {
+		ums, _ := Of(u)
+		for _, m := range ums {
 			for _, d := range m.Dependencies {
-				if slices.Contains(s.Providers(m.Ecosystem, d.Name), self) && !slices.Contains(via, d.Name) {
+				if slices.Contains(providers(s, m.Ecosystem, d.Name), self) && !slices.Contains(via, d.Name) {
 					via = append(via, d.Name)
 				}
 			}
@@ -90,7 +92,7 @@ func link(s *snapshot.Snapshot, k snapshot.RepoKey, via []string) oapi.RepoLink 
 }
 
 // technology sums up the languages, build tools and toolchain versions of the manifests, in order of first appearance.
-func technology(ms []snapshot.Manifest) oapi.Technology {
+func technology(ms []Manifest) oapi.Technology {
 	t := oapi.Technology{Languages: []string{}, BuildTools: []string{}, Toolchains: []oapi.ToolchainVersions{}}
 	for _, m := range ms {
 		if m.Language != "" && !slices.Contains(t.Languages, m.Language) {

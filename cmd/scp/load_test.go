@@ -18,7 +18,9 @@ import (
 
 	gogh "github.com/google/go-github/v92/github"
 
+	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/docs"
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -189,8 +191,12 @@ func complete(s *snapshot.Snapshot) bool {
 	}
 	now := time.Now()
 	for _, e := range s.Repos {
-		for _, f := range []snapshot.Freshness{e.CommitsFresh, e.DocsFresh, e.DescriptorFresh, e.ReleaseFresh} {
-			if f.Derive(now) != snapshot.StatusFresh {
+		fresh := map[string]bool{}
+		for kind, f := range e.Facets() {
+			fresh[kind] = f.Derive(now) == snapshot.StatusFresh
+		}
+		for _, kind := range []string{"commits", "docs", "descriptor", "release"} {
+			if !fresh[kind] {
 				return false
 			}
 		}
@@ -204,7 +210,9 @@ func loaded(s *snapshot.Snapshot) bool {
 		return false
 	}
 	for _, e := range s.Repos {
-		if len(e.Commits) != 3 || len(e.Docs) == 0 || !e.Docs[0].README {
+		cs, _ := commits.Of(e)
+		ds, _ := docs.Of(e)
+		if len(cs) != 3 || len(ds) == 0 || !ds[0].README {
 			return false
 		}
 	}

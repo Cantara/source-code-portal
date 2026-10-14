@@ -488,9 +488,9 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 // publish sets an item in the snapshot with its digest and drops the digests of the items that left.
 func publish(b *snapshot.Builder, spec *Spec, it store.Item, fresh snapshot.Freshness, removed []string) {
 	spec.Publish(b, it, fresh)
-	b.Mark(it.Key, digest(it))
+	b.Mark(it.Key, it.Repo, digest(it))
 	for _, k := range removed {
-		b.Mark(k, 0)
+		b.Mark(k, "", 0)
 	}
 }
 

@@ -83,14 +83,13 @@ func testSnapshot(t *testing.T) *snapshot.Snapshot {
 	t.Helper()
 	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
 	fresh := snapshot.Freshness{State: snapshot.StateOK}
+	x := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x", License: "Apache-2.0",
+		OpenIssues: 1234}}
+	facet.Set(x, &Release{Tag: "v1.2.3"}, fresh)
+	newRepo := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 2}, Owner: "acme", Name: "new"}}
+	facet.Set(newRepo, nil, snapshot.Freshness{State: snapshot.StateNotFound})
 	p.Update(func(b *snapshot.Builder) {
-		b.ReplaceSource("gh", []*snapshot.RepoEntry{
-			{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x", License: "Apache-2.0", OpenIssues: 1234},
-				Commits: []snapshot.Commit{{SHA: "a", CommittedAt: time.Now().Add(-3 * 24 * time.Hour)}}, CommitsFresh: fresh,
-				Release: &snapshot.Release{Tag: "v1.2.3"}, ReleaseFresh: fresh},
-			{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 2}, Owner: "acme", Name: "new"},
-				ReleaseFresh: snapshot.Freshness{State: snapshot.StateNotFound}},
-		}, map[snapshot.RepoKey]snapshot.RepoKey{"acme/old": "acme/x"}, snapshot.SourceStatus{ID: "gh"})
+		b.ReplaceSource("gh", []*snapshot.RepoEntry{x, newRepo}, map[snapshot.RepoKey]snapshot.RepoKey{"acme/old": "acme/x"}, snapshot.SourceStatus{ID: "gh"})
 		b.SetGroups([]snapshot.Group{{ID: "g", Members: []snapshot.RepoKey{"acme/new", "acme/x"}}})
 		b.SetCatalogued()
 	})
@@ -98,9 +97,17 @@ func testSnapshot(t *testing.T) *snapshot.Snapshot {
 	return p.Current()
 }
 
+// lastCommit stands in for the commits feature: acme/x was committed to three days ago, acme/new has no commits.
+func lastCommit(e *snapshot.RepoEntry) (time.Time, snapshot.Freshness) {
+	if e.Repo.Name == "x" {
+		return time.Now().Add(-3 * 24 * time.Hour), snapshot.Freshness{State: snapshot.StateOK}
+	}
+	return time.Time{}, snapshot.Freshness{}
+}
+
 func TestHandler(t *testing.T) {
 	s := testSnapshot(t)
-	h := Handler(func(context.Context) *snapshot.Snapshot { return s })
+	h := Handler(func(context.Context) *snapshot.Snapshot { return s }, lastCommit)
 	tests := []struct {
 		path, msg, cache string
 		status           int
@@ -150,7 +157,7 @@ func TestHandler(t *testing.T) {
 
 	starting := &snapshot.Snapshot{}
 	rec := httptest.NewRecorder()
-	Handler(func(context.Context) *snapshot.Snapshot { return starting }).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/badges/repos/a/b/issues.svg", nil))
+	Handler(func(context.Context) *snapshot.Snapshot { return starting }, lastCommit).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/badges/repos/a/b/issues.svg", nil))
 	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") != "15" || rec.Header().Get("Cache-Control") != "no-store" ||
 		!strings.Contains(rec.Body.String(), "starting") {
 		t.Errorf("starting: %d %v", rec.Code, rec.Header())
@@ -158,11 +165,11 @@ func TestHandler(t *testing.T) {
 }
 
 type releases struct {
-	rel *snapshot.Release
+	rel *Release
 	err error
 }
 
-func (r releases) LatestRelease(context.Context, string, string) (*snapshot.Release, error) {
+func (r releases) LatestRelease(context.Context, string, string) (*Release, error) {
 	return r.rel, r.err
 }
 
@@ -172,7 +179,7 @@ func TestReleaseJob(t *testing.T) {
 		state snapshot.State
 		err   bool
 	}{
-		"release": {releases{rel: &snapshot.Release{Tag: "v1"}}, snapshot.StateOK, false},
+		"release": {releases{rel: &Release{Tag: "v1"}}, snapshot.StateOK, false},
 		"none":    {releases{}, snapshot.StateNotFound, false},
 		"failing": {releases{err: errors.New("boom")}, "", true},
 	} {

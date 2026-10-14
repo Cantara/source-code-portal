@@ -26,7 +26,7 @@ func TestRender(t *testing.T) {
 		"<script>alert(1)</script>\n"
 	r := &pipeline{policy: safehtml.New()}
 	l := testLinks("")
-	l.images = map[string]snapshot.Image{}
+	l.images = map[string]Image{}
 	got := r.render("README.md", []byte(src), l)
 	h := got.HTML.String()
 	if len(l.images) != 3 || l.images["2b1558de6b38c18220eb77d05cf786e6"].Path != "img/logo.png" || l.images["4702d2316f48165aa2bf05493dbf6734"].URL != "https://e.org/a.png" {
@@ -61,7 +61,7 @@ func TestRender(t *testing.T) {
 		got.State != snapshot.StateOK || !strings.HasPrefix(string(got.Source), "---\ntitle") {
 		t.Errorf("render = %+v", got)
 	}
-	if len(got.TOC) != 2 || got.TOC[0] != (snapshot.Heading{Level: 2, ID: "doc-setup", Text: "Setup"}) {
+	if len(got.TOC) != 2 || got.TOC[0] != (Heading{Level: 2, ID: "doc-setup", Text: "Setup"}) {
 		t.Errorf("toc = %+v", got.TOC)
 	}
 	if testing.Verbose() {

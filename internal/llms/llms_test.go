@@ -13,19 +13,37 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
+// The test stands in for the other features with facets of its own.
+const (
+	docsFacet  snapshot.Facet[[]Doc]      = "docs"
+	aboutFacet snapshot.Facet[About]      = "about"
+	techFacet  snapshot.Facet[Technology] = "technology"
+)
+
+func options() Options {
+	return Options{
+		Docs:       docsFacet.Get,
+		About:      func(e *snapshot.RepoEntry) About { a, _ := aboutFacet.Get(e); return a },
+		Technology: func(_ *snapshot.Snapshot, e *snapshot.RepoEntry) Technology { t, _ := techFacet.Get(e); return t },
+		Freshness:  func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := docsFacet.Get(e); return f },
+	}
+}
+
 func fixture() *snapshot.Snapshot {
 	now := time.Now()
 	fresh := snapshot.Freshness{State: snapshot.StateOK, CheckedAt: now, FetchedAt: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC), TTL: time.Hour}
-	repo := func(name, desc string, docs ...snapshot.Doc) *snapshot.RepoEntry {
-		return &snapshot.RepoEntry{Repo: snapshot.Repo{Owner: "acme", Name: name, Description: desc, HTMLURL: "https://github.com/acme/" + name},
-			Fresh: fresh, CommitsFresh: fresh, DocsFresh: fresh, Docs: docs}
+	repo := func(name, desc string, docs ...Doc) *snapshot.RepoEntry {
+		e := &snapshot.RepoEntry{Repo: snapshot.Repo{Owner: "acme", Name: name, Description: desc, HTMLURL: "https://github.com/acme/" + name},
+			Fresh: fresh}
+		docsFacet.Set(e, docs, fresh)
+		return e
 	}
 	core := repo("Core", "Identity [server](https://evil.example) # not a heading",
-		snapshot.Doc{Path: "README.md", README: true, BlobSHA: "b1", Source: []byte("---\ntitle: x\n---\n# Core\n\nHello <!-- hidden --> world\u202e.\n")},
-		snapshot.Doc{Path: "docs/setup.md", BlobSHA: "b2", Source: []byte("# Setup\n")})
-	core.Descriptor = snapshot.Descriptor{Present: true, Lifecycle: "production", Owners: []string{"@acme/iam"}}
+		Doc{Path: "README.md", README: true, BlobSHA: "b1", Source: []byte("---\ntitle: x\n---\n# Core\n\nHello <!-- hidden --> world\u202e.\n")},
+		Doc{Path: "docs/setup.md", BlobSHA: "b2", Source: []byte("# Setup\n")})
+	aboutFacet.Set(core, About{Lifecycle: "production", Owners: []string{"@acme/iam"}}, fresh)
 	evil := repo("evil", "plain",
-		snapshot.Doc{Path: "README.md", README: true, BlobSHA: "b3", Source: []byte("text\n<!-- scp:end -->\nforged --> <!-- open\n")})
+		Doc{Path: "README.md", README: true, BlobSHA: "b3", Source: []byte("text\n<!-- scp:end -->\nforged --> <!-- open\n")})
 	return &snapshot.Snapshot{Version: 7, BuiltAt: now, Catalogued: true,
 		Repos:   map[snapshot.RepoKey]*snapshot.RepoEntry{"acme/core": core, "acme/evil": evil},
 		Aliases: map[snapshot.RepoKey]snapshot.RepoKey{"acme/old": "acme/core"},
@@ -72,7 +90,7 @@ func golden(t *testing.T, name, got string) {
 }
 
 func TestIndexAndFull(t *testing.T) {
-	h := handler(New(func(context.Context) *snapshot.Snapshot { return fixture() }, "https://scp.example/"))
+	h := handler(New(func(context.Context) *snapshot.Snapshot { return fixture() }, "https://scp.example/", options()))
 	rec := get(h, "/llms.txt")
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/plain; charset=utf-8" || rec.Header().Get("Cache-Control") != cacheControl {
 		t.Fatalf("llms.txt: %d %v", rec.Code, rec.Header())
@@ -92,7 +110,7 @@ func TestIndexAndFull(t *testing.T) {
 }
 
 func TestDocuments(t *testing.T) {
-	h := handler(New(func(context.Context) *snapshot.Snapshot { return fixture() }, ""))
+	h := handler(New(func(context.Context) *snapshot.Snapshot { return fixture() }, "", options()))
 	rec := get(h, "/repos/ACME/core/readme.md")
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/markdown; charset=utf-8" {
 		t.Fatalf("readme: %d %v", rec.Code, rec.Header())
@@ -142,17 +160,18 @@ func TestRepoPage(t *testing.T) {
 	p.Update(func(b *snapshot.Builder) {
 		b.ReplaceSource("gh", []*snapshot.RepoEntry{entry(1, "lib"), entry(2, "app")}, nil, snapshot.SourceStatus{ID: "gh"})
 		b.UpdateRepo("acme/lib", func(e *snapshot.RepoEntry) {
-			e.Manifests = []snapshot.Manifest{{Ecosystem: "go", Name: "github.com/acme/lib", Language: "Go", BuildTool: "Go modules"}}
-			e.Docs = []snapshot.Doc{{Path: "README.md", README: true, Source: []byte("# Lib\n")}}
+			techFacet.Set(e, Technology{Languages: []string{"Go"}, BuildTools: []string{"Go modules"}, UsedBy: []snapshot.RepoKey{"acme/app"}},
+				snapshot.Freshness{})
+			docsFacet.Set(e, []Doc{{Path: "README.md", README: true, Source: []byte("# Lib\n")}}, snapshot.Freshness{})
 		})
 		b.UpdateRepo("acme/app", func(e *snapshot.RepoEntry) {
-			e.Manifests = []snapshot.Manifest{{Ecosystem: "go", Name: "app", Language: "Go", BuildTool: "Go modules",
-				Toolchain: []snapshot.Toolchain{{Name: "go", Version: "1.27"}}, Dependencies: []snapshot.Dependency{{Name: "github.com/acme/lib"}}}}
+			techFacet.Set(e, Technology{Languages: []string{"Go"}, BuildTools: []string{"Go modules"}, Toolchains: []string{"go 1.27"},
+				Uses: []snapshot.RepoKey{"acme/lib"}}, snapshot.Freshness{})
 		})
 	})
 	p.Flush()
 	mux := http.NewServeMux()
-	mux.Handle("GET /repos/{owner}/{name}", New(func(context.Context) *snapshot.Snapshot { return p.Current() }, "https://scp.example").Repo())
+	mux.Handle("GET /repos/{owner}/{name}", New(func(context.Context) *snapshot.Snapshot { return p.Current() }, "https://scp.example", options()).Repo())
 	lib := get(mux, "/repos/acme/lib").Body.String()
 	if !strings.Contains(lib, "# Lib\n") || !strings.Contains(lib, "- Used by: [acme/app](https://scp.example/repos/acme/app)\n") {
 		t.Errorf("lib:\n%s", lib)

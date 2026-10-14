@@ -32,7 +32,7 @@ func problem(pointer, code, format string, args ...any) snapshot.Problem {
 
 // deps collects dependencies up to the bound, skipping empty names and repeats of a name in the same scope.
 type deps struct {
-	out  []snapshot.Dependency
+	out  []Dependency
 	seen map[[2]string]bool
 	cut  bool
 }
@@ -50,10 +50,10 @@ func (d *deps) add(n, v, scope string) {
 		d.seen = map[[2]string]bool{}
 	}
 	d.seen[[2]string{n, scope}] = true
-	d.out = append(d.out, snapshot.Dependency{Name: n, Version: v, Scope: scope})
+	d.out = append(d.out, Dependency{Name: n, Version: v, Scope: scope})
 }
 
-func (d *deps) finish(m *snapshot.Manifest) {
+func (d *deps) finish(m *Manifest) {
 	m.Dependencies = d.out
 	if d.cut {
 		m.Problems = append(m.Problems, problem("", "too-many-dependencies", "only the first %d dependencies are kept", maxDependencies))
@@ -61,8 +61,8 @@ func (d *deps) finish(m *snapshot.Manifest) {
 }
 
 // parseGoMod reads a go.mod file.
-func parseGoMod(b []byte) snapshot.Manifest {
-	m := snapshot.Manifest{Ecosystem: "go", Language: "Go", BuildTool: "Go modules"}
+func parseGoMod(b []byte) Manifest {
+	m := Manifest{Ecosystem: "go", Language: "Go", BuildTool: "Go modules"}
 	if !utf8.Valid(b) {
 		m.Problems = append(m.Problems, problem("", "encoding", "the file is not UTF-8"))
 		return m
@@ -84,11 +84,11 @@ func parseGoMod(b []byte) snapshot.Manifest {
 		m.Name = name(f.Module.Mod.Path)
 	}
 	if f.Go != nil {
-		m.Toolchain = append(m.Toolchain, snapshot.Toolchain{Name: "go", Version: version(f.Go.Version)})
+		m.Toolchain = append(m.Toolchain, Toolchain{Name: "go", Version: version(f.Go.Version)})
 	}
 	if f.Toolchain != nil && f.Toolchain.Name != "" {
 		if v := version(strings.TrimPrefix(f.Toolchain.Name, "go")); f.Go == nil || v != f.Go.Version {
-			m.Toolchain = append(m.Toolchain, snapshot.Toolchain{Name: "go", Version: v})
+			m.Toolchain = append(m.Toolchain, Toolchain{Name: "go", Version: v})
 		}
 	}
 	var d deps
@@ -124,8 +124,8 @@ var npmScopes = []struct{ field, scope string }{ //nolint:gochecknoglobals // fi
 	{"dependencies", "runtime"}, {"peerDependencies", "peer"}, {"optionalDependencies", "optional"}, {"devDependencies", "dev"}}
 
 // parsePackageJSON reads a package.json; beside reports whether a file sits in the same directory.
-func parsePackageJSON(b []byte, beside func(name string) bool) snapshot.Manifest {
-	m := snapshot.Manifest{Ecosystem: "npm", Language: "JavaScript", BuildTool: "npm"}
+func parsePackageJSON(b []byte, beside func(name string) bool) Manifest {
+	m := Manifest{Ecosystem: "npm", Language: "JavaScript", BuildTool: "npm"}
 	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(b, &top); err != nil {
@@ -173,7 +173,7 @@ func parsePackageJSON(b []byte, beside func(name string) bool) snapshot.Manifest
 		}
 	}
 	if node := obj("engines")["node"]; node != "" {
-		m.Toolchain = append(m.Toolchain, snapshot.Toolchain{Name: "node", Version: version(node)})
+		m.Toolchain = append(m.Toolchain, Toolchain{Name: "node", Version: version(node)})
 	}
 	var d deps
 	for _, s := range npmScopes {

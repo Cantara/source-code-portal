@@ -111,8 +111,8 @@ func (l *live) Collect(ch chan<- prometheus.Metric) {
 	}
 	counts := map[[2]string]int{}
 	for _, e := range s.Repos {
-		for kind, f := range map[string]snapshot.Freshness{"repo": e.Fresh, "commits": e.CommitsFresh, "docs": e.DocsFresh,
-			"descriptor": e.DescriptorFresh, "release": e.ReleaseFresh, "manifests": e.ManifestsFresh} {
+		counts[[2]string{"repo", e.Fresh.Derive(now).String()}]++
+		for kind, f := range e.Facets() {
 			counts[[2]string{kind, f.Derive(now).String()}]++
 		}
 	}

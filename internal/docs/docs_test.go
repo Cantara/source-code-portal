@@ -153,8 +153,8 @@ func TestPublishSanitisesStoredHTML(t *testing.T) {
 		d.publish(bd, store.Item{Repo: "acme/x", State: snapshot.StateOK, Payload: b}, snapshot.Freshness{})
 	})
 	p.Flush()
-	if got := p.Current().Repos["acme/x"].Docs[0].HTML.String(); got != "<p>x</p>" {
-		t.Errorf("published HTML = %s", got)
+	if docs, _ := Of(p.Current().Repos["acme/x"]); len(docs) != 1 || docs[0].HTML.String() != "<p>x</p>" {
+		t.Errorf("published = %+v", docs)
 	}
 }
 
@@ -167,7 +167,7 @@ func TestImagesFollowTheTree(t *testing.T) {
 	d := New(map[string]GitHub{"gh": r}, safehtml.New())
 	res, p := run(t, d, store.Item{})
 	imgs := p.Docs[0].Images
-	byPath := map[string]snapshot.Image{}
+	byPath := map[string]Image{}
 	for _, img := range imgs {
 		byPath[img.Path+img.URL] = img
 		if !strings.Contains(p.Docs[0].HTML, `src="/images/acme/x/`+img.ID+`"`) {
