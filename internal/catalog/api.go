@@ -27,7 +27,8 @@ func (a API) GetDashboard(ctx context.Context, _ oapi.GetDashboardRequestObject)
 	out := oapi.Dashboard{Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos),
 		Latest: make([]oapi.Commit, 0, dashboardCommits)}
 	for _, g := range s.Groups {
-		dg := oapi.DashboardGroup{Id: g.ID, Name: g.Name, Description: g.Description, RepoCount: len(g.Members)}
+		def, _ := defaultRepo(g)
+		dg := oapi.DashboardGroup{Id: g.ID, Name: g.Name, Description: g.Description, DefaultRepo: def, RepoCount: len(g.Members)}
 		if feed, _ := s.Feed(g.ID); len(feed) > 0 {
 			dg.LastActivity = oapi.TimeOrNil(feed[0].Commit.CommittedAt)
 		}

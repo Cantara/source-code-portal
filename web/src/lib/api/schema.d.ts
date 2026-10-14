@@ -313,6 +313,8 @@ export interface components {
       id: string
       name: string
       description: string
+      /** @description Address of the group's main repository */
+      defaultRepo: string | null
       repoCount: number
       /**
        * Format: date-time

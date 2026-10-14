@@ -101,3 +101,20 @@ test("static files are immutable and compressed; pages are not stored", async ({
   expect(asset.headers()["cache-control"]).toBe("public, max-age=31536000, immutable")
   expect(asset.headers()["content-encoding"]).toBe("gzip")
 })
+
+// Badges are a hard requirement: group cards, group tables and repository pages show them, and every one loads as an SVG.
+for (const [path, min] of [
+  ["/", 5],
+  ["/groups/whydah", 5],
+  ["/repos/acme/whydah-core", 4],
+] as const) {
+  test(`${path} shows its badges`, async ({ page }) => {
+    await page.goto(path)
+    const badges = page.locator('img[src^="/badges/"]')
+    await expect.poll(() => badges.count()).toBeGreaterThanOrEqual(min)
+    for (const img of await badges.all()) {
+      await img.scrollIntoViewIfNeeded()
+      await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
+    }
+  })
+}

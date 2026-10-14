@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Schemas } from "@/lib/api/client"
 import { count, plural } from "@/lib/format"
@@ -12,6 +11,7 @@ import { EmptyState } from "@/shared/empty-state"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
+import { GroupBadge, RepoBadges } from "@/shared/repo-badges"
 import { RelativeTime } from "@/shared/relative-time"
 import { dashboardQuery } from "./api"
 
@@ -60,9 +60,10 @@ export function DashboardView() {
                             {g.name}
                           </Link>
                         </h3>
-                        <Badge>{plural(g.repoCount, "repository", "repositories")}</Badge>
+                        <GroupBadge group={g.id} />
                       </div>
                       {g.description && <p className="mt-1 text-sm text-muted-foreground">{g.description}</p>}
+                      {g.defaultRepo && <RepoBadges address={g.defaultRepo} className="mt-3" />}
                       <p className="mt-2 text-xs text-muted-foreground">
                         Last activity <RelativeTime at={g.lastActivity} />
                       </p>

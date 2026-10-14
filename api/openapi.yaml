@@ -312,11 +312,12 @@ components:
         error: { type: integer }
     DashboardGroup:
       type: object
-      required: [id, name, description, repoCount, lastActivity]
+      required: [id, name, description, defaultRepo, repoCount, lastActivity]
       properties:
         id: { type: string }
         name: { type: string }
         description: { type: string }
+        defaultRepo: { type: [string, "null"], description: Address of the group's main repository, whose badges the dashboard shows }
         repoCount: { type: integer }
         lastActivity: { type: [string, "null"], format: date-time, description: Time of the group's newest commit }
     Dashboard:

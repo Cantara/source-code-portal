@@ -323,8 +323,10 @@ type Dashboard struct {
 
 // DashboardGroup defines model for DashboardGroup.
 type DashboardGroup struct {
-	Description string `json:"description"`
-	Id          string `json:"id"`
+	// DefaultRepo Address of the group's main repository
+	DefaultRepo *string `json:"defaultRepo"`
+	Description string  `json:"description"`
+	Id          string  `json:"id"`
 
 	// LastActivity Time of the group's newest commit
 	LastActivity *time.Time `json:"lastActivity"`

@@ -65,7 +65,16 @@ export const defaults = [
   http.get("/snapshot", ({ response }) => response(200).json(snapshot(1))),
   http.get("/dashboard", ({ response }) =>
     response(200).json({
-      groups: [{ id: "iam", name: "IAM", description: "Identity and access", repoCount: 2, lastActivity: at }],
+      groups: [
+        {
+          id: "iam",
+          name: "IAM",
+          description: "Identity and access",
+          defaultRepo: "acme/whydah",
+          repoCount: 2,
+          lastActivity: at,
+        },
+      ],
       repoCount: 3,
       ungroupedCount: 1,
       latest: [commit(1)],

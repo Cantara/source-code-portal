@@ -15,6 +15,7 @@ import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
+import { RepoBadges } from "@/shared/repo-badges"
 import { VisibilityBadge } from "@/shared/visibility-badge"
 import { groupCommitsQuery, groupQuery } from "./api"
 import { validateGroupSearch, type GroupSearch, type SortKey } from "./search"
@@ -104,6 +105,9 @@ export function GroupView({ group }: { group: string }) {
                       </th>
                       {header("pushed", "Last push")}
                       <th scope="col" className="p-2 text-left font-semibold">
+                        Badges
+                      </th>
+                      <th scope="col" className="p-2 text-left font-semibold">
                         Freshness
                       </th>
                     </tr>
@@ -122,6 +126,9 @@ export function GroupView({ group }: { group: string }) {
                         <td className="p-2 text-muted-foreground">{r.description}</td>
                         <td className="p-2 whitespace-nowrap">
                           <RelativeTime at={r.pushedAt} />
+                        </td>
+                        <td className="p-2">
+                          <RepoBadges address={r.address} lazy className="min-w-80" />
                         </td>
                         <td className="p-2">
                           <FreshnessBadge freshness={r.freshness} />

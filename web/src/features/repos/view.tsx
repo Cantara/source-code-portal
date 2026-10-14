@@ -16,11 +16,10 @@ import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { SafeHtml } from "@/shared/safe-html"
+import { RepoBadges } from "@/shared/repo-badges"
 import { VisibilityBadge } from "@/shared/visibility-badge"
 import { docListQuery, docQuery, repoQuery } from "./api"
 import { Dependencies, TechnologyCard } from "./manifests"
-
-const badges = ["last-commit", "release", "license", "issues"] as const
 
 /** RepoView is a repository: descriptor, badges, README, technology, dependencies, documents and the latest commits. */
 export function RepoView({ owner, name }: { owner: string; name: string }) {
@@ -49,17 +48,7 @@ export function RepoView({ owner, name }: { owner: string; name: string }) {
               <VisibilityBadge visibility={repo.visibility} />
               {repo.archived && <Badge variant="warn">Archived</Badge>}
             </p>
-            <p className="flex flex-wrap gap-2">
-              {badges.map((b) => (
-                <img
-                  key={b}
-                  src={`/badges/repos/${repo.address}/${b}.svg`}
-                  alt={`${b.replace("-", " ")} badge`}
-                  height={20}
-                  className="h-5"
-                />
-              ))}
-            </p>
+            <RepoBadges address={repo.address} />
           </>
         )}
       </PageHeader>
