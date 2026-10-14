@@ -1,6 +1,7 @@
 {
   "name": "scp-web",
   "private": true,
+  "license": "Apache-2.0",
   "version": "0.0.0",
   "type": "module",
   "packageManager": "pnpm@12.11.2",
