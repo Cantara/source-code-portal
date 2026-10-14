@@ -294,12 +294,13 @@ type Error struct {
 func (e *Error) Error() string { return fmt.Sprintf("github %s: %v", e.Code, e.Err) }
 func (e *Error) Unwrap() error { return e.Err }
 
-// RateLimitedUntil, AuthFailed, Permanent and IsNotFound let callers classify without importing this package.
+// RateLimitedUntil, AuthFailed, Permanent, IsNotFound and ErrorCode let callers classify without importing this package.
 
 func (e *Error) RateLimitedUntil() (time.Time, bool) { return e.RetryAt, e.Kind == RateLimited }
 func (e *Error) AuthFailed() bool                    { return e.Kind == Auth }
 func (e *Error) Permanent() bool                     { return e.Kind == Permanent }
 func (e *Error) IsNotFound() bool                    { return e.Kind == NotFound }
+func (e *Error) ErrorCode() string                   { return e.Code }
 
 // IsNotFound reports whether err is a NotFound classification.
 func IsNotFound(err error) bool {
