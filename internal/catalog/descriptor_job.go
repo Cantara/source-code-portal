@@ -64,7 +64,7 @@ func (c *Catalog) runDescriptor(ctx context.Context, j sync.Job) (sync.Result, e
 
 // locate finds the descriptor file. Both extensions in the winning location is a problem and no descriptor.
 func locate(ctx context.Context, gh GitHub, owner, name string) (string, *github.TreeEntry, snapshot.Descriptor, error) {
-	root, err := gh.Tree(ctx, owner, name, "HEAD")
+	root, err := gh.Tree(ctx, owner, name, "HEAD", false)
 	if err != nil {
 		return "", nil, snapshot.Descriptor{}, err
 	}
@@ -74,7 +74,7 @@ func locate(ctx context.Context, gh GitHub, owner, name string) (string, *github
 	}{{"", root}}
 	for _, e := range root {
 		if e.Path == ".github" && e.Type == "tree" {
-			sub, err := gh.Tree(ctx, owner, name, e.SHA)
+			sub, err := gh.Tree(ctx, owner, name, e.SHA, false)
 			if err != nil {
 				return "", nil, snapshot.Descriptor{}, err
 			}

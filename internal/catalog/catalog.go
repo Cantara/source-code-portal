@@ -27,7 +27,7 @@ const schema = 1
 // GitHub is what the catalogue reads from one source; *github.Source implements it.
 type GitHub interface {
 	ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error)
-	Tree(ctx context.Context, owner, name, ref string) ([]github.TreeEntry, error)
+	Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]github.TreeEntry, error)
 	Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
 }
 

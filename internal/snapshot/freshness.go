@@ -6,12 +6,13 @@ import "time"
 type State string
 
 const (
-	StateNever     State = "never"     // no fetch completed yet
-	StateOK        State = "ok"        // content present
-	StateNotFound  State = "not_found" // the thing does not exist (no README, no release)
-	StateTooLarge  State = "too_large" // present but over the size cap
-	StateNoContent State = "no_content"
-	StateError     State = "error" // the last attempt failed permanently
+	StateNever       State = "never"     // no fetch completed yet
+	StateOK          State = "ok"        // content present
+	StateNotFound    State = "not_found" // the thing does not exist (no README, no release)
+	StateTooLarge    State = "too_large" // present but over the size cap
+	StateNoContent   State = "no_content"
+	StateUnsupported State = "unsupported" // present in a form that cannot be shown
+	StateError       State = "error"       // the last attempt failed permanently
 )
 
 // Freshness is the fetch history of one item.

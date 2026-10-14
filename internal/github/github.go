@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -279,19 +280,20 @@ func (s *Source) Commits(ctx context.Context, owner, name string, n int) ([]Comm
 
 // TreeEntry is one entry of a git tree.
 type TreeEntry struct {
-	Path string // name within the tree
+	Path string // relative to the tree
 	Type string // blob | tree | commit
 	SHA  string
 	Size int64 // blobs only
 }
 
-// Tree returns the entries of one tree (not recursive). ref is a tree SHA or a branch name; "HEAD" is the default branch.
-func (s *Source) Tree(ctx context.Context, owner, name, ref string) ([]TreeEntry, error) {
+// Tree returns the entries of one tree; recursive includes every entry below it, with paths relative to it. ref is a tree SHA or a
+// branch name; "HEAD" is the default branch.
+func (s *Source) Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]TreeEntry, error) {
 	c, err := s.client(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
-	t, resp, err := c.Git.GetTree(ctx, owner, name, ref, false)
+	t, resp, err := c.Git.GetTree(ctx, owner, name, ref, recursive)
 	if err != nil {
 		return nil, classify(resp, err)
 	}
@@ -300,6 +302,15 @@ func (s *Source) Tree(ctx context.Context, owner, name, ref string) ([]TreeEntry
 		out = append(out, TreeEntry{Path: e.GetPath(), Type: e.GetType(), SHA: e.GetSHA(), Size: int64(e.GetSize())})
 	}
 	return out, nil
+}
+
+// WebURL is the web host of the source with a trailing slash: https://github.com/ for github.com, the GHES host otherwise.
+func (s *Source) WebURL() string {
+	if u, err := url.Parse(s.cfg.BaseURL); err == nil && u.Host != "api.github.com" {
+		u.Path = strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), "/api/v3") + "/"
+		return u.String()
+	}
+	return "https://github.com/"
 }
 
 // Blob returns the content of a blob.

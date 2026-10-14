@@ -110,6 +110,8 @@ func TestServeEndToEnd(t *testing.T) {
 	gh.SetCommits(tool, commit('f', 4))
 	gh.SetFile(core, ".github/scp.yaml", "schema: 1\ntitle: Whydah Core\nlifecycle: production\n")
 	gh.SetFile(core, "scp.yaml", "schema: 1\ntitle: loses to .github/\n")
+	gh.SetFile(core, "README.md", "# Whydah Core\n\nIdentity. See [setup](docs/setup.md).\n")
+	gh.SetFile(core, "docs/setup.md", "# Setup\n\n## Install\n\n<script>alert(1)</script>\n")
 	gh.AddRepo("acme", gogh.Repository{Name: new("secret"), Visibility: new("private")})
 
 	dir := t.TempDir()
@@ -190,9 +192,20 @@ catalog:
 		waitFor("commits and descriptors", func() bool {
 			var d oapi.Dashboard
 			var r oapi.RepoDetail
+			var l oapi.DocList
 			return fetch(public+"/api/v1/dashboard", &d) == http.StatusOK && d.Freshness.Fresh == 3 &&
-				fetch(public+"/api/v1/repos/acme/whydah-core", &r) == http.StatusOK && r.Descriptor.Present
+				fetch(public+"/api/v1/repos/acme/whydah-core", &r) == http.StatusOK && r.Descriptor.Present &&
+				fetch(public+"/api/v1/repos/acme/whydah-core/docs", &l) == http.StatusOK && len(l.Docs) == 2
 		})
+		var doc oapi.Doc
+		if code := fetch(public+"/api/v1/repos/acme/whydah-core/docs/docs%2Fsetup.md", &doc); code != http.StatusOK || doc.Title != "Setup" ||
+			len(doc.Toc) != 1 || doc.Toc[0].Id != "doc-install" || strings.Contains(doc.Html, "script") ||
+			!strings.HasSuffix(doc.SourceUrl, "/acme/Whydah-Core/blob/HEAD/docs/setup.md") {
+			t.Errorf("doc: %d %+v", code, doc)
+		}
+		if code := fetch(public+"/api/v1/repos/acme/whydah-core/docs/nope.md", nil); code != http.StatusNotFound {
+			t.Errorf("unknown document: %d", code)
+		}
 		var groups oapi.GroupList
 		if code := fetch(public+"/api/v1/groups", &groups); code != http.StatusOK || len(groups.Groups) != 2 {
 			t.Fatalf("groups: %d %+v", code, groups)

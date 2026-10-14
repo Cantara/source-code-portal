@@ -6,6 +6,8 @@ package snapshot
 import (
 	"strings"
 	"time"
+
+	"github.com/cantara/source-code-portal/internal/safehtml"
 )
 
 // RepoID is the identity of a repository: the numeric GitHub id survives renames and transfers.
@@ -104,6 +106,30 @@ type Problem struct {
 	Message string `json:"message"`
 }
 
+// Doc is one rendered document of a repository: the README or a Markdown file under docs/.
+type Doc struct {
+	Path        string // repository path
+	README      bool
+	Title       string
+	Description string
+	Order       int    // front matter order
+	Hidden      bool   // front matter hidden: left out of the document list
+	Format      string // markdown | text
+	HTML        safehtml.SafeHTML
+	Source      []byte    // the text after truncation, for the Markdown surface
+	TOC         []Heading // h2 and h3
+	BlobSHA     string
+	Truncated   bool  // the source was cut at the size cap
+	State       State // ok | too_large | unsupported
+}
+
+// Heading is a TOC entry.
+type Heading struct {
+	Level int
+	ID    string
+	Text  string
+}
+
 // RepoEntry is everything the snapshot holds about one repository. Entries are shared by pointer between snapshot versions and
 // never mutated after publish; Builder.UpdateRepo replaces them.
 type RepoEntry struct {
@@ -113,6 +139,8 @@ type RepoEntry struct {
 	CommitsFresh    Freshness
 	Descriptor      Descriptor
 	DescriptorFresh Freshness
+	Docs            []Doc // README first, then by order, then path
+	DocsFresh       Freshness
 }
 
 // Snapshot is the serving state. It is immutable after publish.

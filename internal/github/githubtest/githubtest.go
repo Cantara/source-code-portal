@@ -532,6 +532,24 @@ func (s *Server) tree(id int64, dir string) *gh.Tree {
 	return &gh.Tree{SHA: new(hex.EncodeToString(h.Sum(nil))[:40]), Entries: entries}
 }
 
+// flatten replaces the tree entries of t with everything below them, paths relative to t. Callers hold s.mu.
+func (s *Server) flatten(id int64, dir string, t *gh.Tree) *gh.Tree {
+	var entries []*gh.TreeEntry
+	for _, e := range t.Entries {
+		entries = append(entries, e)
+		if e.GetType() == "tree" {
+			sub := e.GetPath()
+			if dir != "" {
+				sub = dir + "/" + sub
+			}
+			for _, c := range s.flatten(id, sub, s.tree(id, sub)).Entries {
+				entries = append(entries, &gh.TreeEntry{Path: new(e.GetPath() + "/" + c.GetPath()), Type: c.Type, Mode: c.Mode, SHA: c.SHA, Size: c.Size})
+			}
+		}
+	}
+	return &gh.Tree{SHA: t.SHA, Entries: entries}
+}
+
 func blobSHA(content string) string {
 	sum := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(sum[:])[:40]
@@ -545,6 +563,7 @@ func (s *Server) getTree(w http.ResponseWriter, req *http.Request) {
 	s.mu.Lock()
 	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
 	var found *gh.Tree
+	foundDir := ""
 	empty := true
 	if r != nil {
 		id := r.GetID()
@@ -556,10 +575,13 @@ func (s *Server) getTree(w http.ResponseWriter, req *http.Request) {
 			for p := range s.files[id] {
 				for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
 					if t := s.tree(id, dir); t.GetSHA() == ref {
-						found = t
+						found, foundDir = t, dir
 					}
 				}
 			}
+		}
+		if found != nil && req.URL.Query().Get("recursive") != "" {
+			found = s.flatten(id, foundDir, found)
 		}
 	}
 	s.mu.Unlock()

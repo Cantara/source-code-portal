@@ -14,8 +14,10 @@ import (
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/docs"
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
+	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -58,9 +60,11 @@ func newServeCmd(opts *options) *cobra.Command {
 type (
 	catalogAPI = catalog.API
 	commitsAPI = commits.API
+	docsAPI    = docs.API
 	api        struct {
 		catalogAPI
 		commitsAPI
+		docsAPI
 		httpapi.SnapshotAPI
 	}
 )
@@ -89,9 +93,10 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 	}
 	sources := map[string]catalog.GitHub{}
 	fetchers := map[string]commits.Fetcher{}
+	trees := map[string]docs.GitHub{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
-		sources[s.ID], fetchers[s.ID] = gh.Source(s.ID), gh.Source(s.ID)
+		sources[s.ID], fetchers[s.ID], trees[s.ID] = gh.Source(s.ID), gh.Source(s.ID), gh.Source(s.ID)
 		ids = append(ids, s.ID)
 	}
 
@@ -110,14 +115,14 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 		return nil, err
 	}
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
-	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), cat.DescriptorSpec()} {
+	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), docs.New(trees, safehtml.New()).Spec(), cat.DescriptorSpec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
 	}
 
 	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
-	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current},
+	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
 		httpapi.SnapshotAPI{Current: s.pub.Current}}), log)
 	s.admin = newHTTPServer(httpapi.Admin(ready), log)
 	var lc net.ListenConfig

@@ -100,12 +100,43 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/RepoDetail" }
         "304": { $ref: "#/components/responses/NotModified" }
-        "308":
-          description: The repository was renamed or transferred
-          headers:
-            Location:
-              required: true
-              schema: { type: string }
+        "308": { $ref: "#/components/responses/Moved" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /repos/{owner}/{name}/docs:
+    get:
+      operationId: listDocs
+      summary: The repository's documents, README first, then docs/ in navigation order
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The documents
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocList" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "308": { $ref: "#/components/responses/Moved" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /repos/{owner}/{name}/docs/{docId}:
+    get:
+      operationId: getDoc
+      summary: One rendered document
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: docId, in: path, required: true, description: "The repository path, percent-encoded into one segment (docs%2Fsetup.md)",
+            schema: { type: string } }
+      responses:
+        "200":
+          description: The document
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Doc" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "308": { $ref: "#/components/responses/Moved" }
         "404": { $ref: "#/components/responses/NotFound" }
   /snapshot:
     get:
@@ -132,6 +163,12 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    Moved:
+      description: The repository was renamed or transferred
+      headers:
+        Location:
+          required: true
+          schema: { type: string }
     BadRequest:
       description: The parameters are not valid
       content:
@@ -255,6 +292,48 @@ components:
         ungroupedCount: { type: integer, description: Repositories in no group }
         latest: { type: array, items: { $ref: "#/components/schemas/Commit" } }
         freshness: { $ref: "#/components/schemas/FreshnessCounts" }
+    DocSummary:
+      type: object
+      required: [id, path, readme, title, description, format, state, truncated]
+      properties:
+        id: { type: string, description: Path parameter of the document }
+        path: { type: string }
+        readme: { type: boolean }
+        title: { type: string }
+        description: { type: string }
+        format: { type: string, enum: [markdown, text] }
+        state: { type: string, enum: [ok, too_large, unsupported], description: too_large and unsupported have no HTML }
+        truncated: { type: boolean, description: Only the first part of the file is rendered }
+    DocList:
+      type: object
+      required: [docs, freshness]
+      properties:
+        docs: { type: array, items: { $ref: "#/components/schemas/DocSummary" } }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    Heading:
+      type: object
+      required: [level, id, text]
+      properties:
+        level: { type: integer, minimum: 2, maximum: 3 }
+        id: { type: string }
+        text: { type: string }
+    Doc:
+      type: object
+      required: [id, path, readme, title, description, format, state, truncated, html, toc, blobSha, sourceUrl, freshness]
+      properties:
+        id: { type: string }
+        path: { type: string }
+        readme: { type: boolean }
+        title: { type: string }
+        description: { type: string }
+        format: { type: string, enum: [markdown, text] }
+        state: { type: string, enum: [ok, too_large, unsupported] }
+        truncated: { type: boolean }
+        html: { type: string, description: Sanitised HTML }
+        toc: { type: array, items: { $ref: "#/components/schemas/Heading" } }
+        blobSha: { type: string }
+        sourceUrl: { type: string, description: The file on GitHub }
+        freshness: { $ref: "#/components/schemas/Freshness" }
     RepoList:
       type: object
       required: [repos]

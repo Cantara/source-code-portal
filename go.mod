@@ -3,20 +3,26 @@ module github.com/cantara/source-code-portal
 go 1.27.2
 
 require (
+	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-github/v92 v92.0.0
+	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
+	github.com/yuin/goldmark v1.8.6
 	go.uber.org/goleak v1.3.0
 	go.yaml.in/yaml/v3 v3.0.4
+	golang.org/x/net v0.61.0
 	modernc.org/sqlite v1.60.1
 )
 
 require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -28,6 +34,7 @@ require (
 	github.com/google/go-github/v88 v88.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect

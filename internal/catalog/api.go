@@ -101,7 +101,7 @@ func (a API) GetRepo(_ context.Context, req oapi.GetRepoRequestObject) (oapi.Get
 	case e == nil:
 		return oapi.GetRepo404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: notFound("no such repository")}, nil
 	case moved:
-		return oapi.GetRepo308Response{Headers: oapi.GetRepo308ResponseHeaders{Location: "/api/v1/repos/" + string(e.Repo.Key())}}, nil
+		return oapi.GetRepo308Response{Headers: oapi.MovedResponseHeaders{Location: "/api/v1/repos/" + string(e.Repo.Key())}}, nil
 	}
 	return oapi.GetRepo200JSONResponse{Body: detail(s, e, time.Now())}, nil
 }

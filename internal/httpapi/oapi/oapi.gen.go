@@ -41,6 +41,84 @@ func (e DescriptorLifecycle) Valid() bool {
 	}
 }
 
+// Defines values for DocFormat.
+const (
+	DocFormatMarkdown DocFormat = "markdown"
+	DocFormatText     DocFormat = "text"
+)
+
+// Valid indicates whether the value is a known member of the DocFormat enum.
+func (e DocFormat) Valid() bool {
+	switch e {
+	case DocFormatMarkdown:
+		return true
+	case DocFormatText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DocState.
+const (
+	DocStateOk          DocState = "ok"
+	DocStateTooLarge    DocState = "too_large"
+	DocStateUnsupported DocState = "unsupported"
+)
+
+// Valid indicates whether the value is a known member of the DocState enum.
+func (e DocState) Valid() bool {
+	switch e {
+	case DocStateOk:
+		return true
+	case DocStateTooLarge:
+		return true
+	case DocStateUnsupported:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DocSummaryFormat.
+const (
+	DocSummaryFormatMarkdown DocSummaryFormat = "markdown"
+	DocSummaryFormatText     DocSummaryFormat = "text"
+)
+
+// Valid indicates whether the value is a known member of the DocSummaryFormat enum.
+func (e DocSummaryFormat) Valid() bool {
+	switch e {
+	case DocSummaryFormatMarkdown:
+		return true
+	case DocSummaryFormatText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DocSummaryState.
+const (
+	DocSummaryStateOk          DocSummaryState = "ok"
+	DocSummaryStateTooLarge    DocSummaryState = "too_large"
+	DocSummaryStateUnsupported DocSummaryState = "unsupported"
+)
+
+// Valid indicates whether the value is a known member of the DocSummaryState enum.
+func (e DocSummaryState) Valid() bool {
+	switch e {
+	case DocSummaryStateOk:
+		return true
+	case DocSummaryStateTooLarge:
+		return true
+	case DocSummaryStateUnsupported:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FreshnessStatus.
 const (
 	Error   FreshnessStatus = "error"
@@ -179,6 +257,63 @@ type DescriptorProblem struct {
 	Pointer string `json:"pointer"`
 }
 
+// Doc defines model for Doc.
+type Doc struct {
+	BlobSha     string    `json:"blobSha"`
+	Description string    `json:"description"`
+	Format      DocFormat `json:"format"`
+	Freshness   Freshness `json:"freshness"`
+
+	// Html Sanitised HTML
+	Html   string `json:"html"`
+	Id     string `json:"id"`
+	Path   string `json:"path"`
+	Readme bool   `json:"readme"`
+
+	// SourceUrl The file on GitHub
+	SourceUrl string    `json:"sourceUrl"`
+	State     DocState  `json:"state"`
+	Title     string    `json:"title"`
+	Toc       []Heading `json:"toc"`
+	Truncated bool      `json:"truncated"`
+}
+
+// DocFormat defines model for Doc.Format.
+type DocFormat string
+
+// DocState defines model for Doc.State.
+type DocState string
+
+// DocList defines model for DocList.
+type DocList struct {
+	Docs      []DocSummary `json:"docs"`
+	Freshness Freshness    `json:"freshness"`
+}
+
+// DocSummary defines model for DocSummary.
+type DocSummary struct {
+	Description string           `json:"description"`
+	Format      DocSummaryFormat `json:"format"`
+
+	// Id Path parameter of the document
+	Id     string `json:"id"`
+	Path   string `json:"path"`
+	Readme bool   `json:"readme"`
+
+	// State too_large and unsupported have no HTML
+	State DocSummaryState `json:"state"`
+	Title string          `json:"title"`
+
+	// Truncated Only the first part of the file is rendered
+	Truncated bool `json:"truncated"`
+}
+
+// DocSummaryFormat defines model for DocSummary.Format.
+type DocSummaryFormat string
+
+// DocSummaryState too_large and unsupported have no HTML
+type DocSummaryState string
+
 // Freshness defines model for Freshness.
 type Freshness struct {
 	// CheckedAt Last time the content was confirmed
@@ -232,6 +367,13 @@ type GroupSummary struct {
 
 // GroupSummaryDefaultRepoState defines model for GroupSummary.DefaultRepoState.
 type GroupSummaryDefaultRepoState string
+
+// Heading defines model for Heading.
+type Heading struct {
+	Id    string `json:"id"`
+	Level int    `json:"level"`
+	Text  string `json:"text"`
+}
 
 // Link defines model for Link.
 type Link struct {
@@ -361,6 +503,12 @@ type ServerInterface interface {
 	// GetRepo One repository; an old address redirects to the current one
 	// (GET /repos/{owner}/{name})
 	GetRepo(w http.ResponseWriter, r *http.Request, owner string, name string)
+	// ListDocs The repository's documents, README first, then docs/ in navigation order
+	// (GET /repos/{owner}/{name}/docs)
+	ListDocs(w http.ResponseWriter, r *http.Request, owner string, name string)
+	// GetDoc One rendered document
+	// (GET /repos/{owner}/{name}/docs/{docId})
+	GetDoc(w http.ResponseWriter, r *http.Request, owner string, name string, docId string)
 	// GetSnapshot Data health; the web UI polls it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(w http.ResponseWriter, r *http.Request)
@@ -569,6 +717,85 @@ func (siw *ServerInterfaceWrapper) GetRepo(w http.ResponseWriter, r *http.Reques
 	handler.ServeHTTP(w, r)
 }
 
+// ListDocs operation middleware
+func (siw *ServerInterfaceWrapper) ListDocs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", r.PathValue("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "owner", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDocs(w, r, owner, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDoc operation middleware
+func (siw *ServerInterfaceWrapper) GetDoc(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", r.PathValue("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "owner", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "docId" -------------
+	var docId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "docId", r.PathValue("docId"), &docId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "docId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDoc(w, r, owner, name, docId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSnapshot operation middleware
 func (siw *ServerInterfaceWrapper) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 
@@ -709,12 +936,21 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group}", wrapper.GetGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos", wrapper.ListRepos)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}", wrapper.GetRepo)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/docs", wrapper.ListDocs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/docs/{docId}", wrapper.GetDoc)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 
 	return m
 }
 
 type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type MovedResponseHeaders struct {
+	Location string
+}
+type MovedResponse struct {
+	Headers MovedResponseHeaders
+}
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
@@ -1018,13 +1254,7 @@ func (response GetRepo304Response) VisitGetRepoResponse(w http.ResponseWriter) e
 	return nil
 }
 
-type GetRepo308ResponseHeaders struct {
-	Location string
-}
-
-type GetRepo308Response struct {
-	Headers GetRepo308ResponseHeaders
-}
+type GetRepo308Response = MovedResponse
 
 func (response GetRepo308Response) VisitGetRepoResponse(w http.ResponseWriter) error {
 	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
@@ -1037,6 +1267,135 @@ type GetRepo404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetRepo404ApplicationProblemPlusJSONResponse) VisitGetRepoResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDocsRequestObject struct {
+	Owner string `json:"owner"`
+	Name  string `json:"name"`
+}
+
+type ListDocsResponseObject interface {
+	VisitListDocsResponse(w http.ResponseWriter) error
+}
+
+type ListDocs200ResponseHeaders struct {
+	ETag *string
+}
+
+type ListDocs200JSONResponse struct {
+	Body    DocList
+	Headers ListDocs200ResponseHeaders
+}
+
+func (response ListDocs200JSONResponse) VisitListDocsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDocs304Response = NotModifiedResponse
+
+func (response ListDocs304Response) VisitListDocsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type ListDocs308Response = MovedResponse
+
+func (response ListDocs308Response) VisitListDocsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.WriteHeader(308)
+	return nil
+}
+
+type ListDocs404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListDocs404ApplicationProblemPlusJSONResponse) VisitListDocsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDocRequestObject struct {
+	Owner string `json:"owner"`
+	Name  string `json:"name"`
+	DocId string `json:"docId"`
+}
+
+type GetDocResponseObject interface {
+	VisitGetDocResponse(w http.ResponseWriter) error
+}
+
+type GetDoc200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetDoc200JSONResponse struct {
+	Body    Doc
+	Headers GetDoc200ResponseHeaders
+}
+
+func (response GetDoc200JSONResponse) VisitGetDocResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDoc304Response = NotModifiedResponse
+
+func (response GetDoc304Response) VisitGetDocResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetDoc308Response = MovedResponse
+
+func (response GetDoc308Response) VisitGetDocResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.WriteHeader(308)
+	return nil
+}
+
+type GetDoc404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetDoc404ApplicationProblemPlusJSONResponse) VisitGetDocResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1106,6 +1465,12 @@ type StrictServerInterface interface {
 	// GetRepo One repository; an old address redirects to the current one
 	// (GET /repos/{owner}/{name})
 	GetRepo(ctx context.Context, request GetRepoRequestObject) (GetRepoResponseObject, error)
+	// ListDocs The repository's documents, README first, then docs/ in navigation order
+	// (GET /repos/{owner}/{name}/docs)
+	ListDocs(ctx context.Context, request ListDocsRequestObject) (ListDocsResponseObject, error)
+	// GetDoc One rendered document
+	// (GET /repos/{owner}/{name}/docs/{docId})
+	GetDoc(ctx context.Context, request GetDocRequestObject) (GetDocResponseObject, error)
 	// GetSnapshot Data health; the web UI polls it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(ctx context.Context, request GetSnapshotRequestObject) (GetSnapshotResponseObject, error)
@@ -1296,6 +1661,61 @@ func (sh *strictHandler) GetRepo(w http.ResponseWriter, r *http.Request, owner s
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetRepoResponseObject); ok {
 		if err := validResponse.VisitGetRepoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDocs operation middleware
+func (sh *strictHandler) ListDocs(w http.ResponseWriter, r *http.Request, owner string, name string) {
+	var request ListDocsRequestObject
+
+	request.Owner = owner
+	request.Name = name
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDocs(ctx, request.(ListDocsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDocs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDocsResponseObject); ok {
+		if err := validResponse.VisitListDocsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDoc operation middleware
+func (sh *strictHandler) GetDoc(w http.ResponseWriter, r *http.Request, owner string, name string, docId string) {
+	var request GetDocRequestObject
+
+	request.Owner = owner
+	request.Name = name
+	request.DocId = docId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDoc(ctx, request.(GetDocRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDoc")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDocResponseObject); ok {
+		if err := validResponse.VisitGetDocResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

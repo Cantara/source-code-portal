@@ -6,8 +6,7 @@ Guidance for Claude Code in this repository.
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`) is the
 home of the Go rewrite of Source Code Portal (SCP). **M0 (skeleton), M1 (catalogue and sync) and M2 (read API for the pages) are done;
-next is M3.** Coding
-instructions for the repository itself are in the root `AGENTS.md`.
+M3 (docs, badges, webhooks, freshness) is in progress.** Coding instructions for the repository itself are in the root `AGENTS.md`.
 
 - **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M6. Read it first.
 - `.claude/work/README.md`: index of the development package.
@@ -46,16 +45,18 @@ only in `cmd/scp`. Untrusted bytes pass through bounded parsers and one sanitise
 |---|---|
 | `cmd/scp` | Cobra CLI (`serve`, `config check`, `version`); `serve.go` wires everything; `boundary_test.go` enforces feature isolation; `run_test.go` holds the end-to-end test against the fake GitHub |
 | `internal/config` | Viper loading with `UnmarshalExact`; all validation; `Secret` (redacted). Required: `github.sources`. Keys: `server.*`, `log.*`, `store.path`, `sync.concurrency`, `github.sources[]`, `catalog.reconcile_interval`, `catalog.groups[]` |
-| `internal/github` | go-github v92 client per source (App via ghinstallation, or token): listings, commits, trees, blobs; `transport.go`: ETag replay of 304 as 200, rate book, in-flight limit; errors classified (`Error.Kind`; 409 is `NotFound` with code `empty`) |
+| `internal/github` | go-github v92 client per source (App via ghinstallation, or token): listings, commits, trees (optionally recursive), blobs, `WebURL`; `transport.go`: ETag replay of 304 as 200, rate book, in-flight limit; errors classified (`Error.Kind`; 409 is `NotFound` with code `empty`) |
 | `internal/github/githubtest` | Fake GitHub: App JWT check, installations, tokens, org listings with pagination, commits, trees and blobs (`SetCommits`, `SetFile`), ETags/304, rate limits, fault injection, ledger |
 | `internal/snapshot` | Shared value types (`Repo`, `Group`, `Freshness`, `Commit`, `Descriptor`), the immutable `Snapshot` with per-repository entries and merged commit feeds (`Feed`), `Builder` (`ReplaceSource`, `UpdateRepo`) and debounced `Publisher` |
 | `internal/store` | SQLite (modernc) last-good cache: `repo` and `item` tables, quarantine on doubt, `Apply` in one transaction |
 | `internal/sync` | Job engine: one entry per key with a due time, priorities, concurrency, pace, budget reserves, backoff, source pauses, `Notify`, warm start (a stored due time is capped at now + TTL) |
+| `internal/safehtml` | `SafeHTML` and the one sanitiser policy (bluemonday, `PolicyVersion`); `Sanitize` and `Text` are the only constructors |
 | `internal/untrusted` | Cleaning of repository-authored text: control, bidi and invisible characters stripped, whitespace collapsed, bounded length |
 | `internal/catalog` | Feature: per-source listing job (`catalog.reconcile`, notifies `EventPush` when `pushed_at` changed), `Plan` (admission, aliases, two-miss removal), group matchers, the `scp.yaml` descriptor job (`catalog.descriptor`, bounded field-by-field parser), the dashboard, groups and repos API |
+| `internal/docs` | Feature: README (`.github/`, root, `docs/`) and Markdown under `docs/` per repository (`docs` job; blobs fetched only when their SHA changed); the pipeline in `render.go` (decode, front matter, truncation, shape guard, goldmark, alerts, chroma classes, link and image rewrite on the HTML, sanitise; `pipelineVersion` pinned by `TestPipelineLock`); stored HTML is sanitised again at publish; the docs API |
 | `internal/commits` | Feature: latest 30 default-branch commits per repository (`commits` job, cleaned and bounded), the paged `/commits` API with filter-bound keyset cursors |
 | `internal/httpapi` | Public and admin handlers, SPA serving, problems, weak ETag/304, `/readyz`, `getSnapshot`; `oapi/` is generated from `api/openapi.yaml` (plus hand-written `convert.go`) |
-| `api/openapi.yaml` | The `/api/v1` contract (OpenAPI 3.1): dashboard, commits, groups, repos (detail with descriptor and commits), snapshot; `make gen` regenerates `internal/httpapi/oapi/oapi.gen.go` |
+| `api/openapi.yaml` | The `/api/v1` contract (OpenAPI 3.1): dashboard, commits, groups, repos (detail with descriptor and commits), docs, snapshot; `make gen` regenerates `internal/httpapi/oapi/oapi.gen.go` |
 | `web/` | React SPA shell (M0); the real UI comes in M5 from the Claude Design work |
 | `deploy/` | Dockerfile, `config.example.yaml` |
 

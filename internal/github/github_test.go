@@ -198,16 +198,36 @@ func TestCommitsTreesAndBlobs(t *testing.T) {
 		t.Errorf("empty repository: err = %v, want not found", err)
 	}
 
-	root, err := s.Tree(ctx, "acme", "one", "HEAD")
+	root, err := s.Tree(ctx, "acme", "one", "HEAD", false)
 	if err != nil || len(root) != 2 || root[0].Path != ".github" || root[0].Type != "tree" || root[1].Path != "README.md" {
 		t.Fatalf("root = %+v, %v", root, err)
 	}
-	sub, err := s.Tree(ctx, "acme", "one", root[0].SHA)
+	sub, err := s.Tree(ctx, "acme", "one", root[0].SHA, false)
 	if err != nil || len(sub) != 1 || sub[0].Path != "scp.yaml" || sub[0].Size != 10 {
 		t.Fatalf(".github = %+v, %v", sub, err)
 	}
 	b, err := s.Blob(ctx, "acme", "one", sub[0].SHA)
 	if err != nil || string(b) != "schema: 1\n" {
 		t.Errorf("blob = %q, %v", b, err)
+	}
+	all, err := s.Tree(ctx, "acme", "one", "HEAD", true)
+	if err != nil || len(all) != 3 || all[1].Path != ".github/scp.yaml" || all[1].SHA != sub[0].SHA {
+		t.Errorf("recursive = %+v, %v", all, err)
+	}
+}
+
+func TestWebURL(t *testing.T) {
+	for base, want := range map[string]string{
+		"https://api.github.com/":         "https://github.com/",
+		"https://ghe.example.com/api/v3/": "https://ghe.example.com/",
+	} {
+		c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: base, Orgs: []string{"acme"},
+			Token: config.NewSecret([]byte("t"))}}}, nil, slog.New(slog.DiscardHandler))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := c.Source("gh").WebURL(); got != want {
+			t.Errorf("WebURL(%s) = %s, want %s", base, got, want)
+		}
 	}
 }
