@@ -33,6 +33,7 @@ type Catalog struct {
 	groups   *Groups
 	sources  map[string]source
 	interval time.Duration
+	notify   func(sync.Event, snapshot.RepoKey)
 	log      *slog.Logger
 }
 
@@ -48,8 +49,10 @@ type state struct {
 	Repos  []Tracked `json:"repos"`
 }
 
-// New builds the catalogue for the configured sources. listers has one Lister per source id.
-func New(cfg config.Catalog, sources []config.Source, listers map[string]Lister, log *slog.Logger) (*Catalog, error) {
+// New builds the catalogue for the configured sources. listers has one Lister per source id. notify (may be nil) receives
+// EventPush for every tracked repository whose pushed_at changed in a listing; *sync.Engine's Notify fits.
+func New(cfg config.Catalog, sources []config.Source, listers map[string]Lister, notify func(sync.Event, snapshot.RepoKey),
+	log *slog.Logger) (*Catalog, error) {
 	groups, findings := Compile(cfg.Groups)
 	for _, f := range findings {
 		if !f.Error {
@@ -59,7 +62,10 @@ func New(cfg config.Catalog, sources []config.Source, listers map[string]Lister,
 	if groups == nil {
 		return nil, findingsError(findings)
 	}
-	c := &Catalog{groups: groups, sources: map[string]source{}, interval: cfg.ReconcileInterval, log: log}
+	if notify == nil {
+		notify = func(sync.Event, snapshot.RepoKey) {}
+	}
+	c := &Catalog{groups: groups, sources: map[string]source{}, interval: cfg.ReconcileInterval, notify: notify, log: log}
 	for _, s := range sources {
 		l := listers[s.ID]
 		if l == nil {
@@ -110,6 +116,15 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		listed[i].ID.Source = j.Source
 	}
 	next := state{Schema: schema, Repos: Plan(listed, prev.Repos, src.filter)}
+	pushed := map[int64]time.Time{}
+	for _, t := range prev.Repos {
+		pushed[t.Repo.ID.GitHubID] = t.Repo.PushedAt
+	}
+	for _, t := range next.Repos {
+		if at, was := pushed[t.Repo.ID.GitHubID]; was && !at.Equal(t.Repo.PushedAt) {
+			c.notify(sync.EventPush, t.Repo.Key())
+		}
+	}
 	payload, err := json.Marshal(next)
 	if err != nil {
 		return sync.Result{}, err

@@ -27,7 +27,7 @@ func newCatalog(t *testing.T, l Lister) *Catalog {
 	c, err := New(config.Catalog{ReconcileInterval: 5 * time.Minute, Groups: []config.Group{
 		{ID: "whydah", Name: "Whydah", DefaultRepo: "Whydah-Core", Match: []config.Match{{Prefix: "whydah-"}}},
 		{ID: "other", Name: "Other", DefaultRepo: "x", Match: []config.Match{{CatchAll: true}}},
-	}}, []config.Source{{ID: "gh", Orgs: []string{"acme", "beta"}}}, map[string]Lister{"gh": l}, slog.New(slog.DiscardHandler))
+	}}, []config.Source{{ID: "gh", Orgs: []string{"acme", "beta"}}}, map[string]Lister{"gh": l}, nil, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,5 +107,33 @@ func TestReconcileListingErrorFails(t *testing.T) {
 	}
 	if p.Current().Catalogued {
 		t.Error("catalogued without a listing")
+	}
+}
+
+func TestPushedAtNotifies(t *testing.T) {
+	l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a"), pub(2, "b")}}}
+	var pushed []snapshot.RepoKey
+	c, err := New(config.Catalog{ReconcileInterval: 5 * time.Minute, Groups: []config.Group{
+		{ID: "all", Name: "All", DefaultRepo: "a", Match: []config.Match{{CatchAll: true}}},
+	}}, []config.Source{{ID: "gh", Orgs: []string{"acme"}}}, map[string]Lister{"gh": l},
+		func(ev sync.Event, k snapshot.RepoKey) {
+			if ev == sync.EventPush {
+				pushed = append(pushed, k)
+			}
+		}, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	it, _, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+	if err != nil || len(pushed) != 0 {
+		t.Fatalf("first listing: pushed %v, err %v (new repositories are backfilled, not notified)", pushed, err)
+	}
+	if _, _, err := runAndPublish(t, c, p, it); err != nil || len(pushed) != 0 {
+		t.Fatalf("unchanged sweep notified %v", pushed)
+	}
+	l.repos["acme"][1].PushedAt = time.Now()
+	if _, _, err := runAndPublish(t, c, p, it); err != nil || len(pushed) != 1 || pushed[0] != "acme/b" {
+		t.Errorf("after a push to b: notified %v, err %v", pushed, err)
 	}
 }
