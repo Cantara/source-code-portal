@@ -1,3 +1,6 @@
-# The design package's recorded fixtures and golden files are stored byte-exact.
-.claude/**/testdata/**                  -text
-.claude/**/fixtures/**                  -text
+* text=auto eol=lf
+# Golden files and fixtures are compared byte for byte.
+**/testdata/** -text
+.claude/**/fixtures/** -text
+web/pnpm-lock.yaml linguist-generated=true
+.claude/** linguist-documentation=true

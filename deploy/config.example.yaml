@@ -1,0 +1,10 @@
+# Example configuration for `scp serve --config deploy/config.example.yaml`.
+# Every key can also be set as SCP_<KEY> with dots as underscores, for example SCP_SERVER_PUBLIC_ADDR.
+# `scp config check --config <file>` prints the effective settings.
+server:
+  public_addr: ":9090"
+  admin_addr: ":9091"
+  shutdown_grace: 20s
+log:
+  level: info
+  format: text

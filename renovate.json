@@ -1,0 +1,44 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", "docker:pinDigests", ":semanticCommitTypeAll(chore)"],
+  "timezone": "Europe/Oslo",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "7 days",
+  "ignorePaths": [".claude/**"],
+  "postUpdateOptions": ["gomodTidy"],
+  "vulnerabilityAlerts": { "schedule": ["at any time"] },
+  "packageRules": [
+    {
+      "description": "One toolchain update: the Go image with go.mod",
+      "matchPackageNames": ["go", "golang"],
+      "groupName": "go toolchain"
+    },
+    {
+      "description": "One toolchain update: the Node image with web/.node-version",
+      "matchPackageNames": ["node"],
+      "groupName": "node toolchain"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Tool versions in the Makefile and CI",
+      "managerFilePatterns": ["/^Makefile$/", "/^\\.github/workflows/ci\\.yml$/", "/^deploy/Dockerfile$/"],
+      "matchStrings": [
+        "GOLANGCI_LINT_VERSION := (?<currentValue>\\S+)",
+        "golangci-lint-action@\\S+ # \\S+\\n\\s+with:\\n\\s+version: v(?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "pnpm version in CI, the Dockerfile and package.json",
+      "managerFilePatterns": ["/^\\.github/workflows/ci\\.yml$/", "/^deploy/Dockerfile$/"],
+      "matchStrings": ["PNPM_VERSION[:=] ?(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "pnpm",
+      "datasourceTemplate": "npm"
+    }
+  ]
+}

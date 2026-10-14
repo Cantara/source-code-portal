@@ -1,0 +1,13 @@
+# Allow-list: only what the image build reads.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!web/
+!LICENSE
+web/node_modules
+web/dist
+**/*_test.go
+**/testdata
+**/.DS_Store

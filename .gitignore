@@ -1,3 +1,13 @@
+# Build output
+/bin/
+/dist/
+/web/dist/
+node_modules/
+# Local configuration and data
+/scp.yaml
+*.db
+*.db-shm
+*.db-wal
 # Editors and OS
 .DS_Store
 .idea/

@@ -1,0 +1,53 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - forbidigo
+    - gochecknoglobals
+    - gochecknoinits
+    - gocritic
+    - gosec
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - unconvert
+    - usestdlibvars
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: ^http\.(Get|Head|Post|PostForm)$
+          msg: use a client with a timeout and a context
+        - pattern: ^http\.DefaultClient$
+          msg: use a client with a timeout
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: cmd/scp/buildinfo\.go
+        linters: [gochecknoglobals]
+        text: (version|build) is a global
+      - path: _test\.go
+        linters: [gosec, noctx]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/cantara/source-code-portal

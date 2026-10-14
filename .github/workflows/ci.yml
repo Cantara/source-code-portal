@@ -1,0 +1,88 @@
+# One required status check protects main: "gate". Actions are pinned by commit SHA (Renovate updates SHA and comment together);
+# the token is read-only.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOFLAGS: -mod=readonly
+  GOTOOLCHAIN: local
+  PNPM_VERSION: 12.11.2
+
+jobs:
+  go:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: modules verified and tidy
+        run: go mod verify && go mod tidy -diff
+      - name: generated code is current
+        run: go generate ./... && git diff --exit-code
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+          install-mode: binary
+      - run: go vet ./...
+      - run: go test -race -count=1 -timeout 10m ./...
+      - run: go tool govulncheck ./...
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: web/.node-version
+      - run: npm install --global --ignore-scripts pnpm@${PNPM_VERSION}
+      - run: pnpm -C web install --frozen-lockfile
+      - run: pnpm -C web lint
+      - run: pnpm -C web typecheck
+      - run: pnpm -C web format:check
+      - run: pnpm -C web test
+      - run: pnpm -C web build
+
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: build
+        run: make image VERSION=ci BUILD_ID=${{ github.sha }}
+      - name: smoke
+        run: docker run --rm --read-only --cap-drop=ALL scp:dev version
+
+  gate:
+    if: always()
+    needs: [go, web, image]
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: all jobs succeeded
+        run: test "${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}" = true
