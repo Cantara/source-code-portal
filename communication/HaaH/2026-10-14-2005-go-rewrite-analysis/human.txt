@@ -1,0 +1,64 @@
+From: Totto (via ExoCortex)
+To: Ove Ranheim
+Date: 2026-10-14 20:05 CEST
+Re: Analysis of the Go rewrite of Source Code Portal (main @ a9a2506)
+
+Hi Ove,
+
+I had the Go rewrite analysed today: code, .claude/work/, and a comparison
+with the Java app. The details for you and your agents are in
+agent-details.md next to this file. Short version:
+
+WHAT IS GOOD
+- Better than the speed suggests. 71 Go files, ~10k LOC + 4k test LOC,
+  enforced package boundaries, race + goleak + fuzz seeds, a 1,000-repo
+  synctest load test that found a real dispatcher spin, generated OpenAPI
+  handlers and types, CSP/HSTS, HMAC-SHA256 webhooks, SHA-pinned Actions,
+  digest-pinned images, keyless cosign with self-verification.
+- decisions.md makes the whole experiment auditable. That is the best
+  artefact of the day.
+
+WHERE "NO HUMAN DECISIONS" BROKE
+Inside each milestone the agent's judgement was good. It went wrong at four
+boundaries the agent cannot see from inside the repo:
+ 1. Users: the P-2 scope cut. The Confluence wiki and branch-per-group were
+    dropped with no decision row.
+ 2. The world outside the repo: P-9 "nothing to keep". Cantara has a live
+    config.json with 11 groups and badge URLs embedded in other repos' READMEs.
+ 3. What you wanted to see first: P-8 (design first) became P-10 (agent builds
+    without it) three hours later, because the gate had no deadline.
+ 4. Actions that leave the repo: v1.0.0-rc.1 was published to Releases and
+    ghcr.io before the version was decided.
+
+PROPOSAL: a small gate between milestones, rest stays autonomous
+- One "done when" line per milestone, written by you before it starts.
+- A live read-only run against the Cantara org with the converted config.json,
+  producing a membership/README/badge diff against the Java portal.
+- Always stop before: dropping a Java feature, tag/release/publish/delete,
+  config or schema changes after the first live run.
+- Milestone close also writes docs/MIGRATION.md and files deferred items as
+  issues.
+
+FIX FIRST (about an hour)
+ 1. The 30 MB `scp` binary committed at the repo root (de8c8ca). .gitignore
+    only covers /scp.yaml.
+ 2. "recorded fixtures" in AGENTS.md / .claude/CLAUDE.md / plan.md: none exist.
+ 3. ci.yml:1 claims a required status check that a private free-plan repo
+    cannot enforce. And .claude/CLAUDE.md:20 hard-codes a path on your Mac.
+ 4. Wall-clock test bounds (render_test.go:121, load_test.go p99) will flake on
+    busy runners.
+ 5. No request rate limiting on the public listener or the webhook.
+ 6. Use draft-then-promote releases.
+
+BIGGEST OPEN RISK
+Nothing has run against real GitHub or real Cantara data, and there is no
+parity check against the Java app. Java matches repo patterns with find()
+(contains); the Go regexp matcher is whole-name. A naive config.json port
+would silently change group membership. Details and a conversion rule are in
+agent-details.md.
+
+I can take the config.json converter and the 308 redirects for old badge/page
+URLs if you want. About an afternoon. Tell me, or tell your agent to pick it
+up from agent-details.md.
+
+Totto
