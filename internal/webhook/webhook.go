@@ -38,7 +38,7 @@ var (
 	deliveryPattern  = regexp.MustCompile(`^[0-9A-Za-z-]{1,64}$`)
 	ownerPattern     = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
 	namePattern      = regexp.MustCompile(`^[A-Za-z0-9._-]{1,100}$`)
-	eventPattern     = regexp.MustCompile(`^[a-z_]{1,40}$`) // event names as metric labels
+	eventPattern     = regexp.MustCompile(`^[a-z_]{1,40}$`) // GitHub event names; also metric labels
 )
 
 // Sink receives normalised events. name is empty for events about an owner's set of repositories.
@@ -218,7 +218,9 @@ var sourceActions = map[string]bool{ //nolint:gochecknoglobals // lookup table
 	"renamed": true, "transferred": true, "edited": true,
 }
 
-// Normalise maps a verified delivery to a sync event; ok is false for events v1 does not act on.
+// Normalise maps a verified delivery to a sync event; ok is false for deliveries the portal does not act on. Pushes, releases,
+// repository and installation events map to the engine's events; any other delivery about a repository passes as its GitHub event
+// name, for the specs that subscribe to it.
 func Normalise(event string, body []byte) (_ Normalised, ok bool) {
 	var p payload
 	if json.Unmarshal(body, &p) != nil {
@@ -255,7 +257,10 @@ func Normalise(event string, body []byte) (_ Normalised, ok bool) {
 		}
 		n = Normalised{Event: sync.EventSourceChanged, Owner: p.Installation.Account.Login}
 	default:
-		return Normalised{}, false
+		if p.Repository == nil || !eventPattern.MatchString(event) {
+			return Normalised{}, false
+		}
+		n = Normalised{Event: sync.Event(event), Owner: p.Repository.Owner.Login, Name: p.Repository.Name}
 	}
 	if !ownerPattern.MatchString(n.Owner) || n.Name != "" && (!namePattern.MatchString(n.Name) || strings.Trim(n.Name, ".") == "") {
 		return Normalised{}, false

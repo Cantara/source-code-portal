@@ -144,6 +144,10 @@ func TestNormalise(t *testing.T) {
 		{"push", `{"ref":"refs/heads/main","repository":{"name":"../x","default_branch":"main","owner":{"login":"acme"}}}`, Normalised{}, false},
 		{"push", `{"ref":"refs/heads/","repository":{"name":"x","default_branch":"","owner":{"login":"acme"}}}`, Normalised{}, false},
 		{"installation", `{}`, Normalised{}, false},
+		// Any other delivery about a repository passes by its GitHub event name.
+		{"check_suite", `{"action":"completed",` + repo + `}`, Normalised{sync.Event("check_suite"), "acme", "core"}, true},
+		{"check_suite", `{"action":"completed"}`, Normalised{}, false},
+		{"Bad-Name", `{` + repo + `}`, Normalised{}, false},
 	} {
 		got, ok := Normalise(tc.event, []byte(tc.body))
 		if got != tc.want || ok != tc.ok {

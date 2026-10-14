@@ -12,8 +12,11 @@ import (
 	"testing"
 )
 
-// features are the packages under internal/ that never import each other; core packages import none of them.
-var features = []string{"catalog", "commits", "docs", "badges", "webhook", "llms", "manifests"} //nolint:gochecknoglobals // test table
+// core are the shared packages under internal/. Every other package there is a feature: features never import each other and core
+// packages import none of them, so a new package is a feature unless it is added here.
+var core = []string{ //nolint:gochecknoglobals // test table
+	"cluster", "config", "github", "httpapi", "safehtml", "snapshot", "store", "sync", "untrusted", "webui",
+}
 
 const internalPrefix = "github.com/cantara/source-code-portal/internal/"
 
@@ -38,7 +41,7 @@ func boundaryViolations(t *testing.T, root string) []string {
 				continue
 			}
 			target, _, _ := strings.Cut(rest, "/")
-			if target != own && slices.Contains(features, target) {
+			if target != own && !slices.Contains(core, target) {
 				out = append(out, filepath.ToSlash(rel)+" imports "+path)
 			}
 		}
@@ -72,8 +75,11 @@ func TestBoundaryCheckFindsViolation(t *testing.T) {
 	write("docs/docs.go", "package docs\nimport _ \""+internalPrefix+"catalog\"\n")
 	write("docs/render/r.go", "package render\nimport _ \""+internalPrefix+"docs\"\n")
 	write("sync/sync.go", "package sync\nimport _ \""+internalPrefix+"snapshot\"\n")
+	write("ci/ci.go", "package ci\nimport _ \""+internalPrefix+"sync\"\n")          // a new feature on core: fine
+	write("snapshot/s.go", "package snapshot\nimport _ \""+internalPrefix+"ci\"\n") // core on a new feature
 	got := boundaryViolations(t, root)
-	if len(got) != 1 || !strings.HasPrefix(got[0], "docs/docs.go imports") {
-		t.Errorf("violations = %q, want exactly docs/docs.go importing catalog", got)
+	slices.Sort(got)
+	if len(got) != 2 || !strings.HasPrefix(got[0], "docs/docs.go imports") || !strings.HasPrefix(got[1], "snapshot/s.go imports") {
+		t.Errorf("violations = %q, want docs/docs.go importing catalog and snapshot/s.go importing ci", got)
 	}
 }

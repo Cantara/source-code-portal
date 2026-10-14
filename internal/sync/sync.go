@@ -56,13 +56,14 @@ func (p Priority) reserve() float64 {
 	}
 }
 
-// Event is a reason to run a job before its TTL.
-type Event uint8
+// Event is a reason to run a job before its TTL. It is a name, stable on the wire between instances: the engine's own below, and
+// for any other GitHub delivery about a repository its GitHub event name (webhook.Normalise), so a spec subscribes to it by name.
+type Event string
 
 const (
-	EventPush          Event = iota + 1 // new commits in a repository
-	EventSourceChanged                  // repositories were added, removed or renamed in a source
-	EventTag                            // a tag was pushed to a repository
+	EventPush          Event = "push"   // new commits on a repository's default branch, or a changed pushed_at
+	EventSourceChanged Event = "source" // repositories were added, removed or renamed in a source
+	EventTag           Event = "tag"    // a tag was pushed or a release published
 )
 
 // Job is what a Spec's Run receives.
