@@ -112,7 +112,8 @@ contrast in both themes. The header shows whether the live stream is open (`Live
   the CSS 25 KB, or any font is present. `web/bundle` is platform-independent JavaScript (`sharp` is not traced).
 - `web.dir` (the bundle directory) and `web.node` (default `node`): `scp serve` starts `node server.js` with `PORT` (a free loopback
   port), `HOSTNAME=127.0.0.1`, `NODE_ENV=production`, `SCP_API` and nothing else from its environment; output goes to the log
-  (`component=web`). It restarts the child after an exit (1 s doubling to 30 s), stops it at shutdown after the listeners drained,
+  (`component=web`). It restarts the child after an exit (1 s doubling to 30 s) and at once when the bundle is replaced (its `.next/BUILD_ID`
+  changes, checked every 2 s: a running server cannot load another build's files), stops it at shutdown after the listeners drained,
   and `/readyz` waits for the child's first answer. Without `web.dir` page paths answer 503 with a short text naming `/llms.txt` and
   the API.
 - Proxy (`httpapi.Pages`): `httputil.ReverseProxy` to the child; it sets the CSP and `Permissions-Policy`, the `X-Scp-*` headers and

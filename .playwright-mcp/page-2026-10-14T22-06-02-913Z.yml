@@ -1,0 +1,650 @@
+- generic [active] [ref=f1e1]:
+  - link "Skip to content" [ref=f1e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - link "Source Code PortalMission control" [ref=f1e5] [cursor=pointer]:
+        - /url: /
+      - navigation "Main" [ref=f1e13]:
+        - link "Dashboard" [ref=f1e14] [cursor=pointer]:
+          - /url: /
+        - link "Commits" [ref=f1e15] [cursor=pointer]:
+          - /url: /commits
+      - generic [ref=f1e16]:
+        - generic "Checking for new data every 30 seconds" [ref=f1e17]: Polling
+        - generic [ref=f1e20]:
+          - generic [ref=f1e21]: Theme
+          - combobox "Theme" [ref=f1e22]:
+            - option "System" [selected]
+            - option "Light"
+            - option "Dark"
+  - main [ref=f1e23]:
+    - generic [ref=f1e24]:
+      - heading "Commits" [level=1] [ref=f1e26]
+      - form "Filter commits" [ref=f1e27]:
+        - generic [ref=f1e28]:
+          - text: Group
+          - combobox "Group" [ref=f1e29]:
+            - option "All groups" [selected]
+            - option "Whydah IAM and SSO Platform"
+            - option "Source Code Portal"
+            - option "The ConfigService and JAU Toolchain"
+            - option "Cantara IoT platform projects"
+            - option "ValueReporter Toolchain"
+            - option "Cantara Flow"
+            - option "Cantara Baseline Codebases"
+            - option "Dropwizard examples"
+            - option "Ratpack examples"
+            - option "Awesome Competence System"
+            - option "All Cantara repositories"
+        - generic [ref=f1e30]:
+          - text: Repository (owner/name)
+          - textbox "Repository (owner/name)" [ref=f1e31]
+        - button "Apply" [ref=f1e32]
+    - region "Commit log" [ref=f1e33]:
+      - generic "Checked Oct 14, 2026, 9:25 PM UTC" [ref=f1e35]:
+        - generic [aria-hidden] [ref=f1e36]: ✓
+        - text: Up to date
+      - list [ref=f1e37]:
+        - listitem [ref=f1e38]:
+          - generic [aria-hidden] [ref=f1e39]: OR
+          - generic [ref=f1e40]:
+            - paragraph [ref=f1e41]:
+              - 'link "docs(plan): M12 search engines, planned from the krantho study" [ref=f1e42] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/02a41eca40b482492f6f292175defa19c55977ea
+            - paragraph [ref=f1e43]:
+              - link "cantara/source-code-portal" [ref=f1e44] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e45]: 3 minutes ago
+              - text: · 02a41ec
+        - listitem [ref=f1e46]:
+          - generic [aria-hidden] [ref=f1e47]: OR
+          - generic [ref=f1e48]:
+            - paragraph [ref=f1e49]:
+              - 'link "docs: latest-of-class dependency rule (P-17)" [ref=f1e50] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/0e5286363fd0f73ef21b23808403261d0ef44314
+            - paragraph [ref=f1e51]:
+              - link "cantara/source-code-portal" [ref=f1e52] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e53]: 4 minutes ago
+              - text: · 0e52863
+        - listitem [ref=f1e54]:
+          - generic [aria-hidden] [ref=f1e55]: OR
+          - generic [ref=f1e56]:
+            - paragraph [ref=f1e57]:
+              - 'link "chore(web): TypeScript 7 as tsc, Playwright 1.64 and the latest test libraries" [ref=f1e58] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/c624dde0a17c16d80a997442a6a8b36f1023188d
+            - paragraph [ref=f1e59]:
+              - link "cantara/source-code-portal" [ref=f1e60] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e61]: 4 minutes ago
+              - text: · c624dde
+        - listitem [ref=f1e62]:
+          - generic [aria-hidden] [ref=f1e63]: OR
+          - generic [ref=f1e64]:
+            - paragraph [ref=f1e65]:
+              - 'link "fix(web): the activity light in the group table is decorative" [ref=f1e66] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/dbee07179687f7e267a00eb25f8a28bacbabf5e4
+            - paragraph [ref=f1e67]:
+              - link "cantara/source-code-portal" [ref=f1e68] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e69]: 22 minutes ago
+              - text: · dbee071
+        - listitem [ref=f1e70]:
+          - generic [aria-hidden] [ref=f1e71]: OR
+          - generic [ref=f1e72]:
+            - paragraph [ref=f1e73]:
+              - 'link "docs(design): web UI design brief with screenshots of v1 and the redesign" [ref=f1e74] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/944330e5dd57476664c587d84b3a13c3c2aa9e87
+            - paragraph [ref=f1e75]:
+              - link "cantara/source-code-portal" [ref=f1e76] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e77]: 26 minutes ago
+              - text: · 944330e
+        - listitem [ref=f1e78]:
+          - generic [aria-hidden] [ref=f1e79]: OR
+          - generic [ref=f1e80]:
+            - paragraph [ref=f1e81]:
+              - 'link "chore(web): remove a local screenshot script" [ref=f1e82] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/0156ebcc68e5b9573958c1417d70f6507ca668d7
+            - paragraph [ref=f1e83]:
+              - link "cantara/source-code-portal" [ref=f1e84] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e85]: 27 minutes ago
+              - text: · 0156ebc
+        - listitem [ref=f1e86]:
+          - generic [aria-hidden] [ref=f1e87]: OR
+          - generic [ref=f1e88]:
+            - paragraph [ref=f1e89]:
+              - 'link "feat(web): mission-control dashboard with every repository and its health badges per product" [ref=f1e90] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/ca42dd17d13136a596dcd9084bfc5e50b875116e
+            - paragraph [ref=f1e91]:
+              - link "cantara/source-code-portal" [ref=f1e92] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e93]: 27 minutes ago
+              - text: · ca42dd1
+        - listitem [ref=f1e94]:
+          - generic [aria-hidden] [ref=f1e95]: OR
+          - generic [ref=f1e96]:
+            - paragraph [ref=f1e97]:
+              - 'link "feat(web): badges on the dashboard cards and in the group table" [ref=f1e98] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/fca175761efcf7e006b12096f2f57fa380eed0d9
+            - paragraph [ref=f1e99]:
+              - link "cantara/source-code-portal" [ref=f1e100] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e101]: 36 minutes ago
+              - text: · fca1757
+        - listitem [ref=f1e102]:
+          - generic [aria-hidden] [ref=f1e103]: OR
+          - generic [ref=f1e104]:
+            - paragraph [ref=f1e105]:
+              - 'link "chore(release): prepare 2.1.0 and drop the stray scp binary from the tree" [ref=f1e106] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/fe846e605eef45291b1577b32968fe2b9b35ae5d
+            - paragraph [ref=f1e107]:
+              - link "cantara/source-code-portal" [ref=f1e108] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e109]: 43 minutes ago
+              - text: · fe846e6
+        - listitem [ref=f1e110]:
+          - generic [aria-hidden] [ref=f1e111]: OR
+          - generic [ref=f1e112]:
+            - paragraph [ref=f1e113]:
+              - 'link "docs(decisions): licence stays Apache-2.0 (P-15)" [ref=f1e114] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/86274aab56e6f7058ae96b41e2d8bc06c961d703
+            - paragraph [ref=f1e115]:
+              - link "cantara/source-code-portal" [ref=f1e116] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e117]: 48 minutes ago
+              - text: · 86274aa
+        - listitem [ref=f1e118]:
+          - generic [aria-hidden] [ref=f1e119]: OR
+          - generic [ref=f1e120]:
+            - paragraph [ref=f1e121]:
+              - 'link "chore(web): declare the Apache-2.0 licence in package.json" [ref=f1e122] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/5b5898dd98e1251d70ad26d419e0b282eadb42cf
+            - paragraph [ref=f1e123]:
+              - link "cantara/source-code-portal" [ref=f1e124] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e125]: 49 minutes ago
+              - text: · 5b5898d
+        - listitem [ref=f1e126]:
+          - generic [aria-hidden] [ref=f1e127]: OR
+          - generic [ref=f1e128]:
+            - paragraph [ref=f1e129]:
+              - 'link "feat(web): server-rendered web UI on Next.js, supervised and proxied by scp serve" [ref=f1e130] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/30fe93762ab58e61f5770d29d542d87f9cd576d2
+            - paragraph [ref=f1e131]:
+              - link "cantara/source-code-portal" [ref=f1e132] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e133]: 58 minutes ago
+              - text: · 30fe937
+        - listitem [ref=f1e134]:
+          - generic [aria-hidden] [ref=f1e135]: R
+          - generic [ref=f1e136]:
+            - paragraph [ref=f1e137]:
+              - link "Update module github.com/aws/aws-sdk-go-v2/service/ec2 to v1.339.0 (#1012)" [ref=f1e138] [cursor=pointer]:
+                - /url: https://github.com/Cantara/nerthus/commit/42fa4ff285b366bde2a9e802d6db72a3aa5644a3
+            - paragraph [ref=f1e139]:
+              - link "cantara/nerthus" [ref=f1e140] [cursor=pointer]:
+                - /url: /repos/cantara/nerthus
+              - text: · renovate[bot] ·
+              - time [ref=f1e141]: 1 hour ago
+              - text: · 42fa4ff
+        - listitem [ref=f1e142]:
+          - generic [aria-hidden] [ref=f1e143]: OR
+          - generic [ref=f1e144]:
+            - paragraph [ref=f1e145]:
+              - 'link "feat(live): image proxy for document images, server-sent snapshot events and a content-derived snapshot version" [ref=f1e146] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/dc2b9552a0a8e9df4a5a4e304730a6359bb52c7c
+            - paragraph [ref=f1e147]:
+              - link "cantara/source-code-portal" [ref=f1e148] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e149]: 1 hour ago
+              - text: · dc2b955
+        - listitem [ref=f1e150]:
+          - generic [aria-hidden] [ref=f1e151]: R
+          - generic [ref=f1e152]:
+            - paragraph [ref=f1e153]:
+              - link "Update dependency no.cantara.realestate:typelib-java to v0.9.1 (#468)" [ref=f1e154] [cursor=pointer]:
+                - /url: https://github.com/Cantara/realestate-cloudconnector-agent/commit/a13c88da21fae5399968ac2b5033f6647000a7ac
+            - paragraph [ref=f1e155]:
+              - link "cantara/realestate-cloudconnector-agent" [ref=f1e156] [cursor=pointer]:
+                - /url: /repos/cantara/realestate-cloudconnector-agent
+              - text: · renovate[bot] ·
+              - time [ref=f1e157]: 1 hour ago
+              - text: · a13c88d
+        - listitem [ref=f1e158]:
+          - generic [aria-hidden] [ref=f1e159]: R
+          - generic [ref=f1e160]:
+            - paragraph [ref=f1e161]:
+              - 'link "fix(deps): update dependency no.cantara.realestate:typelib-java to v0.9.1 (#245)" [ref=f1e162] [cursor=pointer]':
+                - /url: https://github.com/Cantara/realestate-api-java/commit/6160ffcdc4275792edd0265e161c86ada8249073
+            - paragraph [ref=f1e163]:
+              - link "cantara/realestate-api-java" [ref=f1e164] [cursor=pointer]:
+                - /url: /repos/cantara/realestate-api-java
+              - text: · renovate[bot] ·
+              - time [ref=f1e165]: 2 hours ago
+              - text: · 6160ffc
+        - listitem [ref=f1e166]:
+          - generic [aria-hidden] [ref=f1e167]: R
+          - generic [ref=f1e168]:
+            - paragraph [ref=f1e169]:
+              - link "Update module github.com/aws/aws-sdk-go-v2/service/ec2 to v1.339.0 (#731)" [ref=f1e170] [cursor=pointer]:
+                - /url: https://github.com/Cantara/nerthus2/commit/afdda8e6a1271f0f09d25a29e143875fd44ba842
+            - paragraph [ref=f1e171]:
+              - link "cantara/nerthus2" [ref=f1e172] [cursor=pointer]:
+                - /url: /repos/cantara/nerthus2
+              - text: · renovate[bot] ·
+              - time [ref=f1e173]: 2 hours ago
+              - text: · afdda8e
+        - listitem [ref=f1e174]:
+          - generic [aria-hidden] [ref=f1e175]: R
+          - generic [ref=f1e176]:
+            - paragraph [ref=f1e177]:
+              - link "Update dependency no.cantara.realestate:typelib-java to v0.9.1 (#482)" [ref=f1e178] [cursor=pointer]:
+                - /url: https://github.com/Cantara/realestate-azure-client-lib/commit/eede3e55e2761de0b9f081cea1b86dd219378627
+            - paragraph [ref=f1e179]:
+              - link "cantara/realestate-azure-client-lib" [ref=f1e180] [cursor=pointer]:
+                - /url: /repos/cantara/realestate-azure-client-lib
+              - text: · renovate[bot] ·
+              - time [ref=f1e181]: 2 hours ago
+              - text: · eede3e5
+        - listitem [ref=f1e182]:
+          - generic [aria-hidden] [ref=f1e183]: R
+          - generic [ref=f1e184]:
+            - paragraph [ref=f1e185]:
+              - link "Update dependency no.cantara.realestate:typelib-java to v0.9.1 (#305)" [ref=f1e186] [cursor=pointer]:
+                - /url: https://github.com/Cantara/realestate-desigo-plugin/commit/99c7ac03b09da0c6d364d1caa991380161dd0e92
+            - paragraph [ref=f1e187]:
+              - link "cantara/realestate-desigo-plugin" [ref=f1e188] [cursor=pointer]:
+                - /url: /repos/cantara/realestate-desigo-plugin
+              - text: · renovate[bot] ·
+              - time [ref=f1e189]: 2 hours ago
+              - text: · 99c7ac0
+        - listitem [ref=f1e190]:
+          - generic [aria-hidden] [ref=f1e191]: OR
+          - generic [ref=f1e192]:
+            - paragraph [ref=f1e193]:
+              - 'link "docs(decisions): M9 binary growth measured on the stripped release build" [ref=f1e194] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/c3dc8781f1ab35a28c936d4a0214f872e7fa8089
+            - paragraph [ref=f1e195]:
+              - link "cantara/source-code-portal" [ref=f1e196] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e197]: 2 hours ago
+              - text: · c3dc878
+        - listitem [ref=f1e198]:
+          - generic [aria-hidden] [ref=f1e199]: OR
+          - generic [ref=f1e200]:
+            - paragraph [ref=f1e201]:
+              - 'link "feat(cluster): several instances on Hazelcast with one leader, shared outcomes and webhook de-duplication" [ref=f1e202] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/e5200f653dd4f236ecdbbf4018023b1e981be003
+            - paragraph [ref=f1e203]:
+              - link "cantara/source-code-portal" [ref=f1e204] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e205]: 2 hours ago
+              - text: · e5200f6
+        - listitem [ref=f1e206]:
+          - generic [aria-hidden] [ref=f1e207]: OR
+          - generic [ref=f1e208]:
+            - paragraph [ref=f1e209]:
+              - 'link "docs(plan): one v1 scope with M7..M11; Next.js is M11 after M10" [ref=f1e210] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/9742d9c40dc52832d1f954e370a62b12d95bf344
+            - paragraph [ref=f1e211]:
+              - link "cantara/source-code-portal" [ref=f1e212] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e213]: 2 hours ago
+              - text: · 9742d9c
+        - listitem [ref=f1e214]:
+          - generic [aria-hidden] [ref=f1e215]: OR
+          - generic [ref=f1e216]:
+            - paragraph [ref=f1e217]:
+              - 'link "docs(plan): keep v1.1 as planned; Next.js queued after M10" [ref=f1e218] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/e2adbb3a7df086b7169f618fe2ad53b1f3694627
+            - paragraph [ref=f1e219]:
+              - link "cantara/source-code-portal" [ref=f1e220] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e221]: 3 hours ago
+              - text: · e2adbb3
+        - listitem [ref=f1e222]:
+          - generic [aria-hidden] [ref=f1e223]: OR
+          - generic [ref=f1e224]:
+            - paragraph [ref=f1e225]:
+              - 'link "docs(plan): web UI on Next.js with server-side rendering as M9 (owner decision)" [ref=f1e226] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/e81cde21070953b361ded33f025d9c40d46178a4
+            - paragraph [ref=f1e227]:
+              - link "cantara/source-code-portal" [ref=f1e228] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e229]: 3 hours ago
+              - text: · e81cde2
+        - listitem [ref=f1e230]:
+          - generic [aria-hidden] [ref=f1e231]: OR
+          - generic [ref=f1e232]:
+            - paragraph [ref=f1e233]:
+              - 'link "feat(access): private repositories for permitted groups behind a trusted authenticating proxy" [ref=f1e234] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/afd3cd745217e9f4aed968a81a7acd6df3306307
+            - paragraph [ref=f1e235]:
+              - link "cantara/source-code-portal" [ref=f1e236] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e237]: 3 hours ago
+              - text: · afd3cd7
+        - listitem [ref=f1e238]:
+          - generic [aria-hidden] [ref=f1e239]: OR
+          - generic [ref=f1e240]:
+            - paragraph [ref=f1e241]:
+              - 'link "feat(manifests): go.mod, package.json and pom.xml per repository with technology, dependencies and internal links" [ref=f1e242] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/a6e75ff8d9793f80fd1a3ca0d51195eddf354fa5
+            - paragraph [ref=f1e243]:
+              - link "cantara/source-code-portal" [ref=f1e244] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e245]: 3 hours ago
+              - text: · a6e75ff
+        - listitem [ref=f1e246]:
+          - generic [aria-hidden] [ref=f1e247]: OR
+          - generic [ref=f1e248]:
+            - paragraph [ref=f1e249]:
+              - 'link "docs(plan): v1.1 milestones M7..M10 and the manifests design note" [ref=f1e250] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/a01f09cc5efbf7d4817ca37de901b54669347236
+            - paragraph [ref=f1e251]:
+              - link "cantara/source-code-portal" [ref=f1e252] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e253]: 3 hours ago
+              - text: · a01f09c
+        - listitem [ref=f1e254]:
+          - generic [aria-hidden] [ref=f1e255]: OR
+          - generic [ref=f1e256]:
+            - paragraph [ref=f1e257]:
+              - 'link "docs(claude): M6 done with v2.0.0; next is the v1.1 scope" [ref=f1e258] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/a9a25064d975aa8f73fca58dee6c04b9758dd7c5
+            - paragraph [ref=f1e259]:
+              - link "cantara/source-code-portal" [ref=f1e260] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e261]: 4 hours ago
+              - text: · a9a2506
+        - listitem [ref=f1e262]:
+          - generic [aria-hidden] [ref=f1e263]: OR
+          - generic [ref=f1e264]:
+            - paragraph [ref=f1e265]:
+              - 'link "docs: number the release 2.0.0 and keep it there for the greenfield streams" [ref=f1e266] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/580dcaea490b320290f83b10f9ab9951fd8c199b
+            - paragraph [ref=f1e267]:
+              - link "cantara/source-code-portal" [ref=f1e268] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e269]: 4 hours ago
+              - text: · 580dcae
+        - listitem [ref=f1e270]:
+          - generic [aria-hidden] [ref=f1e271]: OR
+          - generic [ref=f1e272]:
+            - paragraph [ref=f1e273]:
+              - 'link "build(release): GoReleaser, signed multi-platform image and the release workflow; operator, repository and API guides" [ref=f1e274] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/f4a35d90d4d1d844271c9672cc1c831823d555c5
+            - paragraph [ref=f1e275]:
+              - link "cantara/source-code-portal" [ref=f1e276] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e277]: 4 hours ago
+              - text: · f4a35d9
+        - listitem [ref=f1e278]:
+          - generic [aria-hidden] [ref=f1e279]: J
+          - generic [ref=f1e280]:
+            - paragraph [ref=f1e281]:
+              - link "[maven-release-plugin] prepare for next development iteration" [ref=f1e282] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-StatisticsService/commit/b2629cad010da3ebf5b261f2f3161e1be48454bf
+            - paragraph [ref=f1e283]:
+              - link "cantara/whydah-statisticsservice" [ref=f1e284] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsservice
+              - text: · Jenkins ·
+              - time [ref=f1e285]: 5 hours ago
+              - text: · b2629ca
+        - listitem [ref=f1e286]:
+          - generic [aria-hidden] [ref=f1e287]: J
+          - generic [ref=f1e288]:
+            - paragraph [ref=f1e289]:
+              - link "[maven-release-plugin] prepare release Whydah-StatisticsService-2.31.25" [ref=f1e290] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-StatisticsService/commit/d0351bb77e585b84c4d3707a914d77706fdff478
+            - paragraph [ref=f1e291]:
+              - link "cantara/whydah-statisticsservice" [ref=f1e292] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsservice
+              - text: · Jenkins ·
+              - time [ref=f1e293]: 5 hours ago
+              - text: · d0351bb
+        - listitem [ref=f1e294]:
+          - generic [aria-hidden] [ref=f1e295]: OR
+          - generic [ref=f1e296]:
+            - paragraph [ref=f1e297]:
+              - 'link "feat(web): dashboard, group, repository, docs and commit pages with snapshot sync, Playwright smoke, axe and CSP gate" [ref=f1e298] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/2b6ec328658c6b9e889672295f8d5bc74ba8cf68
+            - paragraph [ref=f1e299]:
+              - link "cantara/source-code-portal" [ref=f1e300] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e301]: 5 hours ago
+              - text: · 2b6ec32
+        - listitem [ref=f1e302]:
+          - generic [aria-hidden] [ref=f1e303]: OR
+          - generic [ref=f1e304]:
+            - paragraph [ref=f1e305]:
+              - 'link "fix(image): include api/ in the build context for the embedded contract" [ref=f1e306] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/87049377a120310559feacbcf8a514b973a8e6b6
+            - paragraph [ref=f1e307]:
+              - link "cantara/source-code-portal" [ref=f1e308] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e309]: 5 hours ago
+              - text: · 8704937
+        - listitem [ref=f1e310]:
+          - generic [aria-hidden] [ref=f1e311]: OR
+          - generic [ref=f1e312]:
+            - paragraph [ref=f1e313]:
+              - 'link "test(load): 1,000 repositories cold and warm on the fake GitHub with p99 bounds; fix a dispatcher spin at the rate-limit reset instant" [ref=f1e314] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/dd42183ec0c84d880ec4b1402ebc65890c82ee75
+            - paragraph [ref=f1e315]:
+              - link "cantara/source-code-portal" [ref=f1e316] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e317]: 5 hours ago
+              - text: · dd42183
+        - listitem [ref=f1e318]:
+          - generic [aria-hidden] [ref=f1e319]: OR
+          - generic [ref=f1e320]:
+            - paragraph [ref=f1e321]:
+              - 'link "feat(llms): llms.txt, llms-full.txt, raw Markdown with scp front matter and Markdown answers to pages on Accept" [ref=f1e322] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/9df6a3f864559cf4b53b6058d22a56c80ad6ff48
+            - paragraph [ref=f1e323]:
+              - link "cantara/source-code-portal" [ref=f1e324] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e325]: 6 hours ago
+              - text: · 9df6a3f
+        - listitem [ref=f1e326]:
+          - generic [aria-hidden] [ref=f1e327]: OR
+          - generic [ref=f1e328]:
+            - paragraph [ref=f1e329]:
+              - 'link "feat(ops): Prometheus metrics, operator status, dispatcher heartbeat for /livez, optional pprof on the admin listener" [ref=f1e330] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/de8c8ca1c42ea58efe1248f02e0a22eec109ac4a
+            - paragraph [ref=f1e331]:
+              - link "cantara/source-code-portal" [ref=f1e332] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e333]: 6 hours ago
+              - text: · de8c8ca
+        - listitem [ref=f1e334]:
+          - generic [aria-hidden] [ref=f1e335]: OR
+          - generic [ref=f1e336]:
+            - paragraph [ref=f1e337]:
+              - 'link "feat(httpapi): middleware chain, CSP per response class, SPA fallback shapes, API negotiation and problems; public_url and trusted_proxies" [ref=f1e338] [cursor=pointer]':
+                - /url: https://github.com/Cantara/source-code-portal/commit/edad2164ae7a3dc604a63e9bd8a631bf71611528
+            - paragraph [ref=f1e339]:
+              - link "cantara/source-code-portal" [ref=f1e340] [cursor=pointer]:
+                - /url: /repos/cantara/source-code-portal
+              - text: · Ove Ranheim ·
+              - time [ref=f1e341]: 6 hours ago
+              - text: · edad216
+        - listitem [ref=f1e342]:
+          - generic [aria-hidden] [ref=f1e343]: J
+          - generic [ref=f1e344]:
+            - paragraph [ref=f1e345]:
+              - link "[maven-release-plugin] prepare for next development iteration" [ref=f1e346] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-UserStateService/commit/c8e59f8643cc000660fc85618f4e5604800a61c1
+            - paragraph [ref=f1e347]:
+              - link "cantara/whydah-userstateservice" [ref=f1e348] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-userstateservice
+              - text: · Jenkins ·
+              - time [ref=f1e349]: 7 hours ago
+              - text: · c8e59f8
+        - listitem [ref=f1e350]:
+          - generic [aria-hidden] [ref=f1e351]: J
+          - generic [ref=f1e352]:
+            - paragraph [ref=f1e353]:
+              - link "[maven-release-plugin] prepare release v1.20.17" [ref=f1e354] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-UserStateService/commit/b0439dbe6bbb208100dd825fccb6211cafa85455
+            - paragraph [ref=f1e355]:
+              - link "cantara/whydah-userstateservice" [ref=f1e356] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-userstateservice
+              - text: · Jenkins ·
+              - time [ref=f1e357]: 7 hours ago
+              - text: · b0439db
+        - listitem [ref=f1e358]:
+          - generic [aria-hidden] [ref=f1e359]: M
+          - generic [ref=f1e360]:
+            - paragraph [ref=f1e361]:
+              - 'link "feat(api): read one user''s login status (creation and last login time)" [ref=f1e362] [cursor=pointer]':
+                - /url: https://github.com/Cantara/Whydah-UserStateService/commit/f46b2a1fcfc4dd7a2d12b232eb80180ec578e9c2
+            - paragraph [ref=f1e363]:
+              - link "cantara/whydah-userstateservice" [ref=f1e364] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-userstateservice
+              - text: · misterhuydo ·
+              - time [ref=f1e365]: 7 hours ago
+              - text: · f46b2a1
+        - listitem [ref=f1e366]:
+          - generic [aria-hidden] [ref=f1e367]: J
+          - generic [ref=f1e368]:
+            - paragraph [ref=f1e369]:
+              - link "[maven-release-plugin] prepare for next development iteration" [ref=f1e370] [cursor=pointer]:
+                - /url: https://github.com/Cantara/realestate-typelib-java/commit/412502f6221f579702801eb507dbaf2452cb4d44
+            - paragraph [ref=f1e371]:
+              - link "cantara/realestate-typelib-java" [ref=f1e372] [cursor=pointer]:
+                - /url: /repos/cantara/realestate-typelib-java
+              - text: · Jenkins ·
+              - time [ref=f1e373]: 8 hours ago
+              - text: · 412502f
+        - listitem [ref=f1e374]:
+          - generic [aria-hidden] [ref=f1e375]: J
+          - generic [ref=f1e376]:
+            - paragraph [ref=f1e377]:
+              - link "[maven-release-plugin] prepare release v0.9.1" [ref=f1e378] [cursor=pointer]:
+                - /url: https://github.com/Cantara/realestate-typelib-java/commit/1b9b50d0c22d40062c7df344d0bbdabd6628dea0
+            - paragraph [ref=f1e379]:
+              - link "cantara/realestate-typelib-java" [ref=f1e380] [cursor=pointer]:
+                - /url: /repos/cantara/realestate-typelib-java
+              - text: · Jenkins ·
+              - time [ref=f1e381]: 8 hours ago
+              - text: · 1b9b50d
+        - listitem [ref=f1e382]:
+          - generic [aria-hidden] [ref=f1e383]: B
+          - generic [ref=f1e384]:
+            - paragraph [ref=f1e385]:
+              - link "Do not write headers if append to existing csv file" [ref=f1e386] [cursor=pointer]:
+                - /url: https://github.com/Cantara/realestate-typelib-java/commit/43fa7d69c1d10a938eaa7ca62f1c0e7dfed80a5a
+            - paragraph [ref=f1e387]:
+              - link "cantara/realestate-typelib-java" [ref=f1e388] [cursor=pointer]:
+                - /url: /repos/cantara/realestate-typelib-java
+              - text: · baardl ·
+              - time [ref=f1e389]: 8 hours ago
+              - text: · 43fa7d6
+        - listitem [ref=f1e390]:
+          - generic [aria-hidden] [ref=f1e391]: J
+          - generic [ref=f1e392]:
+            - paragraph [ref=f1e393]:
+              - link "[maven-release-plugin] prepare for next development iteration" [ref=f1e394] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-StatisticsDashboard/commit/5fc5eac85d66694d83dbc221b0bc89cee1b982ba
+            - paragraph [ref=f1e395]:
+              - link "cantara/whydah-statisticsdashboard" [ref=f1e396] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsdashboard
+              - text: · Jenkins ·
+              - time [ref=f1e397]: 9 hours ago
+              - text: · 5fc5eac
+        - listitem [ref=f1e398]:
+          - generic [aria-hidden] [ref=f1e399]: J
+          - generic [ref=f1e400]:
+            - paragraph [ref=f1e401]:
+              - link "[maven-release-plugin] prepare release v2.31.40" [ref=f1e402] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-StatisticsDashboard/commit/fb216817152c1a2c8faeff3a3cfb60bcfc606bf0
+            - paragraph [ref=f1e403]:
+              - link "cantara/whydah-statisticsdashboard" [ref=f1e404] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsdashboard
+              - text: · Jenkins ·
+              - time [ref=f1e405]: 9 hours ago
+              - text: · fb21681
+        - listitem [ref=f1e406]:
+          - generic [aria-hidden] [ref=f1e407]: M
+          - generic [ref=f1e408]:
+            - paragraph [ref=f1e409]:
+              - 'link "fix(stats): catch up the usersession poll in 30-minute windows" [ref=f1e410] [cursor=pointer]':
+                - /url: https://github.com/Cantara/Whydah-StatisticsDashboard/commit/1c780bd185217088b102afe9b08070cfb58b2508
+            - paragraph [ref=f1e411]:
+              - link "cantara/whydah-statisticsdashboard" [ref=f1e412] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsdashboard
+              - text: · misterhuydo ·
+              - time [ref=f1e413]: 9 hours ago
+              - text: · 1c780bd
+        - listitem [ref=f1e414]:
+          - generic [aria-hidden] [ref=f1e415]: J
+          - generic [ref=f1e416]:
+            - paragraph [ref=f1e417]:
+              - link "[maven-release-plugin] prepare for next development iteration" [ref=f1e418] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-StatisticsDashboard/commit/3cbeb7173c489ece63761363721c773f54e2d3c5
+            - paragraph [ref=f1e419]:
+              - link "cantara/whydah-statisticsdashboard" [ref=f1e420] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsdashboard
+              - text: · Jenkins ·
+              - time [ref=f1e421]: 9 hours ago
+              - text: · 3cbeb71
+        - listitem [ref=f1e422]:
+          - generic [aria-hidden] [ref=f1e423]: J
+          - generic [ref=f1e424]:
+            - paragraph [ref=f1e425]:
+              - link "[maven-release-plugin] prepare release v2.31.39" [ref=f1e426] [cursor=pointer]:
+                - /url: https://github.com/Cantara/Whydah-StatisticsDashboard/commit/39e27ef5783186ff6b8521ce61e3b659d02a3a05
+            - paragraph [ref=f1e427]:
+              - link "cantara/whydah-statisticsdashboard" [ref=f1e428] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsdashboard
+              - text: · Jenkins ·
+              - time [ref=f1e429]: 9 hours ago
+              - text: · 39e27ef
+        - listitem [ref=f1e430]:
+          - generic [aria-hidden] [ref=f1e431]: M
+          - generic [ref=f1e432]:
+            - paragraph [ref=f1e433]:
+              - 'link "fix(build): no double dash inside pom XML comment" [ref=f1e434] [cursor=pointer]':
+                - /url: https://github.com/Cantara/Whydah-StatisticsDashboard/commit/f91207de12a1b3baf091df7fa79fd810a163a61c
+            - paragraph [ref=f1e435]:
+              - link "cantara/whydah-statisticsdashboard" [ref=f1e436] [cursor=pointer]:
+                - /url: /repos/cantara/whydah-statisticsdashboard
+              - text: · misterhuydo ·
+              - time [ref=f1e437]: 9 hours ago
+              - text: · f91207d
+      - button "Load more" [ref=f1e438]
+  - alert [ref=f1e439]

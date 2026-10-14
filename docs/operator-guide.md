@@ -156,7 +156,7 @@ tar xzf scp_2.1.0_linux_amd64.tar.gz && tar xzf scp-web_2.1.0.tar.gz   # the bun
 ```
 
 `scp serve` starts the bundle's server (`node server.js`) on a free loopback port, passes it nothing from its own environment,
-restarts it when it exits and stops it at shutdown; its output appears in the log with `component=web`. Every page goes through `scp`,
+restarts it when it exits or when the bundle is replaced (so a new bundle can be unpacked in place), and stops it at shutdown; its output appears in the log with `component=web`. Every page goes through `scp`,
 so the public listener stays the one address to expose.
 
 **Container.** The image `ghcr.io/cantara/source-code-portal` (linux/amd64 and linux/arm64) holds `scp`, Node.js and the bundle

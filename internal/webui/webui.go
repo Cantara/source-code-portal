@@ -1,5 +1,5 @@
 // Package webui runs the web UI's server, the Next.js standalone build in web.dir, as a child process on a loopback port: started
-// with the portal, restarted when it exits, stopped at shutdown. httpapi.Options.Pages proxies the pages to it.
+// with the portal, restarted when it exits or its bundle is replaced, stopped at shutdown. httpapi.Options.Pages proxies the pages to it.
 package webui
 
 import (
@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -24,7 +25,11 @@ const (
 	steady     = time.Minute     // a child that ran this long restarts after minBackoff again
 	stopGrace  = 5 * time.Second // SIGTERM to SIGKILL at shutdown
 	probeEvery = 100 * time.Millisecond
+	buildEvery = 2 * time.Second // how often the bundle's build id is compared
 )
+
+// errReplaced ends a run whose bundle was replaced: the next one starts at once from the new files.
+var errReplaced = errors.New("bundle replaced")
 
 // Server is the supervised web UI server.
 type Server struct {
@@ -51,7 +56,8 @@ func (s *Server) URL() *url.URL { return &url.URL{Scheme: "http", Host: s.addr} 
 // Ready reports whether the server accepts connections.
 func (s *Server) Ready() bool { return s.ready.Load() }
 
-// Run starts the server and restarts it after every exit (1 s doubling to 30 s) until ctx ends, then stops it: SIGTERM, and
+// Run starts the server and restarts it after every exit (1 s doubling to 30 s), and at once when the bundle is replaced (its
+// .next/BUILD_ID changes: a running server cannot load the files of another build), until ctx ends, then stops it: SIGTERM, and
 // SIGKILL after 5 s. api is the portal's API base the server calls (SCP_API, for example http://127.0.0.1:9090).
 func (s *Server) Run(ctx context.Context, api string) error {
 	backoff := minBackoff
@@ -60,6 +66,11 @@ func (s *Server) Run(ctx context.Context, api string) error {
 		err := s.once(ctx, api)
 		if ctx.Err() != nil {
 			return nil
+		}
+		if errors.Is(err, errReplaced) {
+			s.log.Info("web UI bundle replaced; restarting")
+			backoff = minBackoff
+			continue
 		}
 		if time.Since(start) > steady {
 			backoff = minBackoff
@@ -78,7 +89,10 @@ func (s *Server) Run(ctx context.Context, api string) error {
 func (s *Server) once(ctx context.Context, api string) error {
 	_, port, _ := net.SplitHostPort(s.addr)
 	out := &lines{log: s.log}
-	cmd := exec.CommandContext(ctx, s.node, "server.js") //nolint:gosec // G204: the operator's web.node runs the operator's web.dir
+	run, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
+	build := s.build()
+	cmd := exec.CommandContext(run, s.node, "server.js") //nolint:gosec // G204: the operator's web.node runs the operator's web.dir
 	cmd.Dir = s.dir
 	// Only what the server needs: the portal's own environment can hold its configuration.
 	cmd.Env = []string{"PORT=" + port, "HOSTNAME=127.0.0.1", "NODE_ENV=production", "NEXT_TELEMETRY_DISABLED=1", "SCP_API=" + api,
@@ -91,15 +105,42 @@ func (s *Server) once(ctx context.Context, api string) error {
 	}
 	s.log.Info("web UI server started", "pid", cmd.Process.Pid, "addr", s.addr)
 	done := make(chan struct{})
-	go s.probe(ctx, done)
+	go s.probe(run, done)
+	go s.watch(build, done, stop)
 	err := cmd.Wait()
 	close(done)
+	if errors.Is(context.Cause(run), errReplaced) {
+		err = errReplaced
+	}
 	s.ready.Store(false)
 	out.flush()
 	if err == nil {
 		err = errors.New("exit status 0")
 	}
 	return err
+}
+
+// build is the bundle's build id; empty when it cannot be read.
+func (s *Server) build() string {
+	b, _ := os.ReadFile(filepath.Join(s.dir, ".next", "BUILD_ID")) //nolint:gosec // G703: the operator's web.dir
+	return string(bytes.TrimSpace(b))
+}
+
+// watch ends the run when the build id changes from build (a new bundle has been written in place).
+func (s *Server) watch(build string, done <-chan struct{}, stop context.CancelCauseFunc) {
+	t := time.NewTicker(buildEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-t.C:
+		}
+		if now := s.build(); now != build && now != "" {
+			stop(errReplaced)
+			return
+		}
+	}
 }
 
 // probe marks the server ready once it accepts a connection.
