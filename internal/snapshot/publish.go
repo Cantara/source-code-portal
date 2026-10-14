@@ -59,6 +59,9 @@ func (b *Builder) ReplaceSource(source string, repos []*RepoEntry, aliases map[R
 	}
 }
 
+// Sources returns the builder's source statuses. Callers must not modify the slice.
+func (b *Builder) Sources() []SourceStatus { return b.s.Sources }
+
 // SetGroups replaces the groups (config order).
 func (b *Builder) SetGroups(groups []Group) { b.s.Groups = groups }
 

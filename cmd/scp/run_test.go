@@ -80,6 +80,14 @@ func TestConfigCheckPrintsEffectiveSettings(t *testing.T) {
 	}
 }
 
+func TestConfigCheckRefusesBadGroups(t *testing.T) {
+	path := configFile(t, "catalog:\n  groups:\n    - {id: a, name: A, default_repo: other, match: [{prefix: whydah-}]}\n")
+	code, _, stderr := execute(t, "config", "check", "-c", path)
+	if code != exitUsage || !strings.Contains(stderr, "not selected") {
+		t.Errorf("exit %d, stderr %q; want refused with the group problem", code, stderr)
+	}
+}
+
 func TestServeAndShutdown(t *testing.T) {
 	cfg, _, err := config.Load(configFile(t, ""), nil)
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 
+	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/config"
 )
 
@@ -64,14 +65,30 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	return root
 }
 
-// loadConfig loads the configuration for cmd; an unreadable file is a runtime failure.
+// loadConfig loads the configuration for cmd and checks the groups; an unreadable file is a runtime failure. Group warnings go to
+// stderr.
 func loadConfig(cmd *cobra.Command, opts *options) (config.Config, map[string]any, error) {
 	cfg, settings, err := config.Load(opts.configPath, cmd.Flags())
 	var inv *config.Invalid
-	if err != nil && !errors.As(err, &inv) {
-		err = failure{err}
+	if err != nil {
+		if !errors.As(err, &inv) {
+			err = failure{err}
+		}
+		return cfg, settings, err
 	}
-	return cfg, settings, err
+	_, findings := catalog.Compile(cfg.Catalog.Groups)
+	var problems []string
+	for _, f := range findings {
+		if f.Error {
+			problems = append(problems, f.Message)
+		} else {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "scp: warning:", f.Message)
+		}
+	}
+	if len(problems) > 0 {
+		return cfg, settings, &config.Invalid{Problems: problems}
+	}
+	return cfg, settings, nil
 }
 
 func newLogger(c config.Log, w io.Writer) *slog.Logger {
