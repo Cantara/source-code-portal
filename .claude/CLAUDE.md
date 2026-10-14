@@ -25,7 +25,9 @@ never modify it, push to it or open issues or pull requests on it.
 - **Greenfield**: nothing is released and no data needs keeping. Change code, contract, config keys, the store schema
   (`internal/store/migrations/0001_init.sql`) and documents in place; no compatibility layers, shims, deprecations or extra migrations.
   Commit directly to `main` (small Conventional Commits, CI green) and push.
-- Decide and record (`decisions.md`); do not leave open questions in documents and do not ask the owner.
+- **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
+  for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
+  `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
 - Dependencies must be current (release within 18 months), widely used and pure Go; `bluemonday` is the one exception (`plan.md` section 4).
 - Planning and design live under `.claude/work/`; `docs/` is user documentation only. Documents describe what is built, not what is not.
