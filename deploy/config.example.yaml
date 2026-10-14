@@ -8,3 +8,32 @@ server:
 log:
   level: info
   format: text
+store:
+  path: /data/scp.db
+sync:
+  concurrency: 4
+github:
+  sources:
+    - id: github
+      orgs: [Cantara]
+      # A GitHub App (preferred) or a token file; not both.
+      app:
+        id: 123456
+        private_key_file: /run/secrets/scp-app.pem
+      # token_file: /run/secrets/github-token
+      include_forks: false
+      include_archived: true
+catalog:
+  reconcile_interval: 5m
+  groups:
+    - id: core
+      name: Core
+      description: The portal itself
+      default_repo: source-code-portal
+      match:
+        - prefix: source-code-
+    - id: other
+      name: Other
+      default_repo: whydah
+      match:
+        - catch_all: true

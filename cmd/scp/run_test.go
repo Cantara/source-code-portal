@@ -27,19 +27,34 @@ func execute(t *testing.T, args ...string) (code int, stdout, stderr string) {
 	return code, out.String(), errOut.String()
 }
 
+// configFile writes a valid configuration (one token source) followed by extra YAML and returns its path.
+func configFile(t *testing.T, extra string) string {
+	t.Helper()
+	dir := t.TempDir()
+	token := filepath.Join(dir, "token")
+	path := filepath.Join(dir, "scp.yaml")
+	body := "github:\n  sources:\n    - {id: gh, orgs: [acme], token_file: " + token + "}\n" + extra
+	if os.WriteFile(token, []byte("ghp_test"), 0o600) != nil || os.WriteFile(path, []byte(body), 0o600) != nil {
+		t.Fatal("write config")
+	}
+	return path
+}
+
 func TestExitCodes(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "absent.yaml")
+	valid := configFile(t, "")
 	tests := []struct {
 		args []string
 		code int
 	}{
 		{[]string{"version"}, exitOK},
 		{[]string{"--help"}, exitOK},
-		{[]string{"config", "check"}, exitOK},
+		{[]string{"config", "check", "-c", valid}, exitOK},
+		{[]string{"config", "check"}, exitUsage}, // no sources
 		{[]string{"bogus"}, exitUsage},
 		{[]string{"version", "extra"}, exitUsage},
 		{[]string{"serve", "--no-such-flag"}, exitUsage},
-		{[]string{"config", "check", "--log-level", "loud"}, exitUsage},
+		{[]string{"config", "check", "-c", valid, "--log-level", "loud"}, exitUsage},
 		{[]string{"config", "check", "--config", missing}, exitFail},
 	}
 	for _, tc := range tests {
@@ -58,10 +73,7 @@ func TestVersionJSON(t *testing.T) {
 }
 
 func TestConfigCheckPrintsEffectiveSettings(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "scp.yaml")
-	if err := os.WriteFile(path, []byte("server:\n  public_addr: \":8080\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	path := configFile(t, "server:\n  public_addr: \":8080\"\n")
 	code, stdout, stderr := execute(t, "config", "check", "-c", path)
 	if code != exitOK || !strings.Contains(stdout, `public_addr: :8080`) || !strings.Contains(stdout, "admin_addr: :9091") {
 		t.Fatalf("config check: exit %d, stdout %q, stderr %q", code, stdout, stderr)
@@ -69,7 +81,7 @@ func TestConfigCheckPrintsEffectiveSettings(t *testing.T) {
 }
 
 func TestServeAndShutdown(t *testing.T) {
-	cfg, _, err := config.Load("", nil)
+	cfg, _, err := config.Load(configFile(t, ""), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

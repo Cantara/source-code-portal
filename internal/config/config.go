@@ -17,8 +17,12 @@ import (
 
 // Config is the typed configuration. A key is added here together with the code that reads it.
 type Config struct {
-	Server Server `mapstructure:"server"`
-	Log    Log    `mapstructure:"log"`
+	Server  Server  `mapstructure:"server"`
+	Log     Log     `mapstructure:"log"`
+	Store   Store   `mapstructure:"store"`
+	Sync    Sync    `mapstructure:"sync"`
+	GitHub  GitHub  `mapstructure:"github"`
+	Catalog Catalog `mapstructure:"catalog"`
 }
 
 // Server configures the two listeners.
@@ -37,11 +41,14 @@ type Log struct {
 // defaults holds every key with its built-in value; it is also the list of keys the environment may set.
 func defaults() map[string]any {
 	return map[string]any{
-		"server.public_addr":    ":9090",
-		"server.admin_addr":     ":9091",
-		"server.shutdown_grace": "20s",
-		"log.level":             "info",
-		"log.format":            "json",
+		"server.public_addr":         ":9090",
+		"server.admin_addr":          ":9091",
+		"server.shutdown_grace":      "20s",
+		"log.level":                  "info",
+		"log.format":                 "json",
+		"store.path":                 "/data/scp.db",
+		"sync.concurrency":           4,
+		"catalog.reconcile_interval": "5m",
 	}
 }
 
@@ -102,7 +109,9 @@ func Load(path string, flags *pflag.FlagSet) (Config, map[string]any, error) {
 	if err := v.UnmarshalExact(&cfg); err != nil {
 		problems = append(problems, err.Error())
 	} else {
+		cfg.normalise()
 		problems = append(problems, cfg.validate()...)
+		problems = append(problems, cfg.readSecrets()...)
 	}
 	if len(problems) > 0 {
 		return Config{}, nil, &Invalid{Problems: problems}
@@ -146,6 +155,14 @@ func (c Config) validate() []string {
 	if !slices.Contains([]string{"json", "text"}, c.Log.Format) {
 		p = append(p, fmt.Sprintf("log.format: %q is not one of json, text", c.Log.Format))
 	}
+	if c.Store.Path == "" {
+		p = append(p, "store.path: required")
+	}
+	if c.Sync.Concurrency < 1 || c.Sync.Concurrency > 64 {
+		p = append(p, "sync.concurrency: must be 1..64")
+	}
+	p = append(p, c.GitHub.validate()...)
+	p = append(p, c.Catalog.validate(c.GitHub)...)
 	slices.Sort(p)
 	return p
 }

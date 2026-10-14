@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,31 +12,48 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func writeFile(t *testing.T, body string) string {
+// minimal is the smallest valid configuration; %s is the token file path.
+const minimal = "github:\n  sources:\n    - id: gh\n      orgs: [Cantara]\n      token_file: %s\n"
+
+func write(t *testing.T, name, body string) string {
 	t.Helper()
-	p := filepath.Join(t.TempDir(), "scp.yaml")
+	p := filepath.Join(t.TempDir(), name)
 	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return p
 }
 
+// file writes a config file: the minimal configuration plus extra YAML.
+func file(t *testing.T, extra string) string {
+	t.Helper()
+	token := write(t, "token", "ghp_test\n")
+	return write(t, "scp.yaml", strings.Replace(minimal, "%s", token, 1)+extra)
+}
+
 func TestDefaults(t *testing.T) {
-	cfg, _, err := Load("", nil)
+	cfg, _, err := Load(file(t, ""), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Config{
 		Server: Server{PublicAddr: ":9090", AdminAddr: ":9091", ShutdownGrace: 20 * time.Second},
 		Log:    Log{Level: "info", Format: "json"},
+		Store:  Store{Path: "/data/scp.db"},
+		Sync:   Sync{Concurrency: 4},
+		GitHub: GitHub{Sources: []Source{{
+			ID: "gh", BaseURL: DefaultBaseURL, Orgs: []string{"Cantara"}, TokenFile: cfg.GitHub.Sources[0].TokenFile,
+			IncludeArchived: true, Token: NewSecret([]byte("ghp_test")),
+		}}},
+		Catalog: Catalog{ReconcileInterval: 5 * time.Minute},
 	}
-	if diff := cmp.Diff(want, cfg); diff != "" {
+	if diff := cmp.Diff(want, cfg, cmp.Comparer(func(a, b Secret) bool { return string(a.v) == string(b.v) })); diff != "" {
 		t.Errorf("defaults (-want +got):\n%s", diff)
 	}
 }
 
 func TestPrecedence(t *testing.T) {
-	path := writeFile(t, "server:\n  public_addr: \":8000\"\n  admin_addr: \":8001\"\nlog:\n  level: warn\n")
+	path := file(t, "server:\n  public_addr: \":8000\"\n  admin_addr: \":8001\"\nlog:\n  level: warn\n")
 	t.Setenv("SCP_SERVER_ADMIN_ADDR", ":8002")
 	t.Setenv("SCP_LOG_LEVEL", "error")
 	flags := pflag.NewFlagSet("test", pflag.ContinueOnError)
@@ -59,34 +77,56 @@ func TestPrecedence(t *testing.T) {
 }
 
 func TestRefused(t *testing.T) {
+	group := func(match string) string {
+		return "catalog:\n  groups:\n    - id: core\n      name: Core\n      default_repo: x\n      match: " + match + "\n"
+	}
 	tests := map[string]struct {
-		file string
+		file string // replaces the minimal configuration when it starts with "!"
 		env  map[string]string
+		want string // part of one problem
 	}{
-		"unknown file key":   {file: "server:\n  public_adr: \":1\"\n"},
-		"unknown section":    {file: "sever:\n  x: 1\n"},
-		"wrong type":         {file: "server:\n  shutdown_grace: soon\n"},
-		"bad yaml":           {file: "server: [\n"},
-		"unknown env":        {env: map[string]string{"SCP_SERVER_PUBLIC_ADR": ":1"}},
-		"bad level":          {env: map[string]string{"SCP_LOG_LEVEL": "loud"}},
-		"bad address":        {env: map[string]string{"SCP_SERVER_PUBLIC_ADDR": "9090"}},
-		"same addresses":     {env: map[string]string{"SCP_SERVER_ADMIN_ADDR": ":9090"}},
-		"non-positive grace": {env: map[string]string{"SCP_SERVER_SHUTDOWN_GRACE": "0s"}},
-		"unknown log format": {env: map[string]string{"SCP_LOG_FORMAT": "xml"}},
+		"unknown file key":       {file: "server:\n  public_adr: \":1\"\n", want: "public_adr"},
+		"unknown section":        {file: "sever:\n  x: 1\n", want: "sever"},
+		"unknown source key":     {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, colour: red}\n", want: "colour"},
+		"wrong type":             {file: "server:\n  shutdown_grace: soon\n", want: "shutdown_grace"},
+		"bad yaml":               {file: "server: [\n", want: "yaml"},
+		"unknown env":            {env: map[string]string{"SCP_SERVER_PUBLIC_ADR": ":1"}, want: "SCP_SERVER_PUBLIC_ADR"},
+		"bad level":              {env: map[string]string{"SCP_LOG_LEVEL": "loud"}, want: "log.level"},
+		"bad address":            {env: map[string]string{"SCP_SERVER_PUBLIC_ADDR": "9090"}, want: "not host:port"},
+		"same addresses":         {env: map[string]string{"SCP_SERVER_ADMIN_ADDR": ":9090"}, want: "must differ"},
+		"non-positive grace":     {env: map[string]string{"SCP_SERVER_SHUTDOWN_GRACE": "0s"}, want: "must be positive"},
+		"unknown log format":     {env: map[string]string{"SCP_LOG_FORMAT": "xml"}, want: "log.format"},
+		"no sources":             {file: "!log:\n  level: info\n", want: "at least one source"},
+		"app and token":          {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, app: {id: 1, private_key_file: /y}}\n", want: "not both"},
+		"neither app nor token":  {file: "!github:\n  sources:\n    - {id: gh, orgs: [a]}\n", want: "set app or token_file"},
+		"missing token file":     {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: /does/not/exist}\n", want: "token_file"},
+		"base url without slash": {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, base_url: \"https://ghe.example/api/v3\"}\n", want: "ending in /"},
+		"org in two sources":     {file: "!github:\n  sources:\n    - {id: a, orgs: [Cantara], token_file: TOKEN}\n    - {id: b, orgs: [cantara], token_file: TOKEN}\n", want: "belongs to one source"},
+		"reconcile too often":    {env: map[string]string{"SCP_CATALOG_RECONCILE_INTERVAL": "10s"}, want: "reconcile_interval"},
+		"two matcher kinds":      {file: group("[{prefix: a, glob: 'b*'}]"), want: "exactly one of"},
+		"no matcher kind":        {file: group("[{catch_all: false}]"), want: "exactly one of"},
+		"unknown matcher":        {file: group("[{suffix: a}]"), want: "suffix"},
+		"bare matcher":           {file: group("[prefix]"), want: "match"},
+		"bad group id":           {file: "catalog:\n  groups:\n    - {id: Core, name: Core, default_repo: x, match: [{catch_all: true}]}\n", want: "must match"},
+		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			for k, v := range tc.env {
 				t.Setenv(k, v)
 			}
-			path := ""
-			if tc.file != "" {
-				path = writeFile(t, tc.file)
+			token := write(t, "token", "ghp_test")
+			path := file(t, tc.file)
+			if body, ok := strings.CutPrefix(tc.file, "!"); ok {
+				path = write(t, "scp.yaml", strings.ReplaceAll(body, "TOKEN", token))
 			}
 			_, _, err := Load(path, nil)
 			var inv *Invalid
 			if !errors.As(err, &inv) {
 				t.Fatalf("err = %v, want *Invalid", err)
+			}
+			if !strings.Contains(inv.Error(), tc.want) {
+				t.Errorf("problems %q do not mention %q", inv.Problems, tc.want)
 			}
 		})
 	}
@@ -95,7 +135,7 @@ func TestRefused(t *testing.T) {
 func TestAllProblemsReported(t *testing.T) {
 	t.Setenv("SCP_LOG_LEVEL", "loud")
 	t.Setenv("SCP_LOG_FORMAT", "xml")
-	_, _, err := Load("", nil)
+	_, _, err := Load(file(t, ""), nil)
 	var inv *Invalid
 	if !errors.As(err, &inv) || len(inv.Problems) != 2 {
 		t.Fatalf("err = %v, want two problems", err)
@@ -107,5 +147,26 @@ func TestMissingFile(t *testing.T) {
 	var inv *Invalid
 	if err == nil || errors.As(err, &inv) {
 		t.Fatalf("err = %v, want a read error", err)
+	}
+}
+
+func TestSecretRedacted(t *testing.T) {
+	s := NewSecret([]byte("ghp_supersecret"))
+	for _, got := range []string{s.String(), s.GoString(), s.LogValue().String()} {
+		if strings.Contains(got, "supersecret") {
+			t.Errorf("secret leaked: %q", got)
+		}
+	}
+	cfg, settings, err := Load(file(t, ""), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(cfg.GitHub.Sources[0].Token.Reveal()) != "ghp_test" {
+		t.Errorf("token not read")
+	}
+	for k, v := range settings {
+		if strings.Contains(strings.ToLower(k), "token") && !strings.Contains(k, "file") {
+			t.Errorf("settings expose %s = %v", k, v)
+		}
 	}
 }
