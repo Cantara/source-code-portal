@@ -1,5 +1,5 @@
 # Private repositories
-Status: v1.1 design note (M8), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+Status: v1 design note (M8), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
 
 ## Scope
 - Private and internal repositories in the catalogue, per source (`github.sources[].include_private`).

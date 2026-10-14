@@ -8,11 +8,11 @@ detailed design package in `reference/detailed-design/` as the binding document 
 
 An organisational dashboard for GitHub: repositories grouped into systems, with their latest commits, rendered README and docs, status badges
 and an API that scripts and LLM agents can read. One static Go binary with the web UI embedded. Kept fresh by webhooks plus scheduled sync.
-Target: up to 1,000 repositories, one instance.
+Target: up to 1,000 repositories, one instance or several sharing state through Hazelcast.
 
 ## 2. Scope
 
-**v1 (the first release)**
+**v1 (the target: everything below, built as milestones M0..M11)**
 
 - Sources: one or more GitHub organisations through a GitHub App (a token as fallback); repository discovery and periodic reconcile.
 - Groups: systems defined in config by matchers (exact, prefix, glob, regexp, topic); a repository may be in several groups.
@@ -26,14 +26,13 @@ Target: up to 1,000 repositories, one instance.
 - Operations: `/livez`, `/readyz`, Prometheus `/metrics` on a separate admin port; structured logs; one YAML config with `SCP_*` overrides;
   container image (distroless, non-root, read-only).
 
-**v1.1**
-
 - Package-manifest intelligence: Go, npm, Maven first (technology and dependency panel per repository, internal dependency list).
 - Private repositories behind a trusted authenticating proxy.
 - Multiple instances, with Hazelcast for shared state (A-35).
 - Image proxy for external README images; live updates by server-sent events.
+- Web UI on Next.js with server-side rendering, so pages arrive as complete HTML for search engines (owner decision P-13).
 
-**Later (v1.2+), only on demand**
+**Later, only on demand**
 
 More manifest ecosystems, org-wide dependency graph and CycloneDX export, Jenkins and Snyk status, AsciiDoc, OpenTelemetry tracing.
 
@@ -96,7 +95,7 @@ Rule: every dependency is current (a release within the last 18 months, supports
 | Storage | `modernc.org/sqlite` v1.60 |
 | Markdown | `yuin/goldmark` v1.8, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` (exception above) |
 | Metrics | `prometheus/client_golang` v1.25 |
-| Distributed state (v1.1) | `hazelcast/hazelcast-go-client` v1.6 |
+| Distributed state | `hazelcast/hazelcast-go-client` v1.6 |
 | Tests | stdlib `testing` + `testing/synctest`, `google/go-cmp`, `go.uber.org/goleak` |
 | Web | React 19, TypeScript, Vite, Tailwind 4 (shadcn-style components), TanStack Router and Query, Vitest, Playwright; pnpm |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, Renovate |
@@ -104,8 +103,7 @@ Rule: every dependency is current (a release within the last 18 months, supports
 
 ## 5. Milestones
 
-Each milestone ends with working software on `main`, CI green. M1 to M4 build the backend and API, and M5 builds the
-UI from `design/web.md`.
+Each milestone ends with working software on `main`, CI green, and is done only when its "Done when" holds, shown by a test in CI.
 
 | M | Delivers | Done when |
 |---|---|---|
@@ -116,18 +114,13 @@ UI from `design/web.md`.
 | M4 | `/llms.txt`, raw Markdown, metrics, readiness, hardening (CSP, limits) | security and load checks pass for 1,000 repositories |
 | M5 | Web UI: dashboard, group, repository, docs and commit pages | every page renders a real org; Playwright smoke, axe and CSP checks pass |
 | M6 | Release 2.0.0: docs for operators, GoReleaser, image published | `ghcr.io/cantara/source-code-portal:2.0.0` runs from the operator guide |
-
-v1.1, one milestone per bullet of section 2; each starts with its design note:
-
-| M | Delivers | Done when |
-|---|---|---|
 | M7 | Package manifests (`design/manifests.md`): `go.mod`, `package.json` and `pom.xml` per repository, technology and dependency panel, internal dependencies between catalogued repositories | a repository page shows its technologies and dependencies and the catalogued repositories it uses and is used by |
 | M8 | Private repositories behind a trusted authenticating proxy | anonymous requests see public repositories only on every surface (pages, API, badges, Markdown, feeds); a request from the proxy with a permitted group sees the private ones |
 | M9 | Multiple instances with Hazelcast | two instances on one Hazelcast cluster make each GitHub call once, share webhook de-duplication and serve the same data |
 | M10 | Image proxy for external README images; live updates by server-sent events | README images load from the portal under `img-src 'self'`; a push reaches an open page without polling |
+| M11 | Web UI on Next.js with server-side rendering, replacing the SPA; started only when M10 is done | every page is complete HTML from the server (content readable without JavaScript) with its own title, description and canonical URL, plus a sitemap; Playwright smoke, axe and CSP checks pass |
 
-Queued after v1.1 (owner decision P-13), planned only when M10 is done: the web UI on Next.js with server-side rendering, so pages
-arrive as complete HTML for search engines. It does not change the v1.1 milestones.
+M7 to M11 each start with their design note. The version stays 2.0.0 until M11 is done (P-11).
 
 ## 6. How we work
 

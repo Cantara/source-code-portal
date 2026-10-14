@@ -4,7 +4,7 @@ Everything needed to build Source Code Portal v1 in Go. Binding order: `plan.md`
 
 | File | What it holds |
 |---|---|
-| `plan.md` | What SCP is, scope (v1, v1.1, later), architecture, stack, milestones M0..M10. Read first. |
+| `plan.md` | What SCP is, scope (v1, later), architecture, stack, milestones M0..M11. Read first. |
 | `decisions.md` | Every decision, dated, with where it is recorded. |
 | `design/principles.md` | The 18 principles every change keeps, each with its check. |
 | `design/build-ops.md` | Repository layout, Cobra CLI, Viper config, runtime, Makefile, CI, image, release, test strategy. M0. |

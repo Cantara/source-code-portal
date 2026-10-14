@@ -1,5 +1,5 @@
 # Package manifests
-Status: v1.1 design note (M7), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
+Status: v1 design note (M7), 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
 
 ## Scope
 - `internal/manifests` (feature): per repository, the `go.mod`, `package.json` and `pom.xml` files read as untrusted input, the

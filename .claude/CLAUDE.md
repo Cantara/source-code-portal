@@ -8,7 +8,7 @@ This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`,
 home of the Go rewrite of Source Code Portal (SCP). **M0 (skeleton), M1 (catalogue and sync), M2 (read API for the pages), M3 (docs,
 badges, webhooks, freshness), M4 (LLM surface, metrics, hardening), M5 (web UI), M6 (release `v2.0.0`), M7 (package manifests) and M8 (private repositories) are done; next is M9 (multiple instances with Hazelcast).** Coding instructions for the repository itself are in the root `AGENTS.md`.
 
-- **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M10. Read it first.
+- **`.claude/work/plan.md` is the binding plan**: scope (v1, later), architecture, stack, milestones M0..M11. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: short design notes per area (GitHub, sync/snapshot/store, catalog, content, manifests, HTTP/API, web, build/ops,
   principles). Binding below `plan.md`.
@@ -73,8 +73,8 @@ Test idioms: engine tests run in `testing/synctest` bubbles with a real store in
 
 ## Next: M9
 
-`v2.0.0` is released (GitHub release with signed archives; image `ghcr.io/cantara/source-code-portal:2.0.0` and `:latest`). The v1.1
-stream is M7..M10 in `plan.md` section 5; each milestone starts with its design note. M9 is multiple instances with Hazelcast (write
-`design/cluster.md` first), then M10. The Next.js stream (P-13) is queued after M10 and must not influence v1.1. The version stays
-2.0.0 until the greenfield streams are complete. Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is
+`v2.0.0` is released (GitHub release with signed archives; image `ghcr.io/cantara/source-code-portal:2.0.0` and `:latest`). Everything is v1
+(P-14): M7..M11 in `plan.md` section 5, each starting with its design note. M9 is multiple instances with Hazelcast (write
+`design/cluster.md` first), then M10, then M11 (Next.js with server-side rendering), which must not influence M9 and M10. The version
+stays 2.0.0 until M11 is done. Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is
 older; `make e2e` needs `pnpm -C web exec playwright install chromium`.
