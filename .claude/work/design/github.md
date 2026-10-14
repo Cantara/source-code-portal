@@ -29,7 +29,6 @@ package github
 type Kind uint8 // Transient | RateLimited | Auth | NotFound | Permanent
 type Error struct { Kind Kind; RetryAt time.Time; Code string; Err error } // RetryAt from Retry-After or reset; zero when absent
 type TreeEntry struct { Path, Type, SHA string; Size int64 }
-type CommitInfo struct { SHA, Message, AuthorName, AuthorLogin, HTMLURL string; Date time.Time }
 type Client struct{ /* sources by id */ }
 func (c *Client) Source(id string) *Source
 func (c *Client) Remaining(source, owner string) (frac float64, reset time.Time) // sync.Budget
@@ -39,13 +38,15 @@ func (c *Client) Observe(fn func(source string, status int))                    
 func (s *Source) RefreshInstallations(ctx context.Context) error                          // App mode; nothing in token mode
 func (s *Source) ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error)    // complete listing, newest push first, or an error
 func (s *Source) Repo(ctx context.Context, owner, name string) (snapshot.Repo, error)
-func (s *Source) Commits(ctx context.Context, owner, name string, n int) ([]CommitInfo, error)
 func (s *Source) Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]TreeEntry, error) // "HEAD" = default branch
 func (s *Source) Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
-func (s *Source) LatestRelease(ctx context.Context, owner, name string) (*snapshot.Release, error) // nil, nil = no release
 func (s *Source) WebURL() string // https://github.com/ or the GHES host
+func (s *Source) REST(ctx context.Context, owner string) (*gh.Client, error) // owner's client, for calls only one feature makes
+func Classify(resp *gh.Response, err error) error                            // a failed go-github call as an *Error
 ```
-Consumers declare their own narrow interfaces over these methods.
+Consumers declare their own narrow interfaces over these methods. The calls shared by several features (listings, trees, blobs) are
+methods here; a call only one feature makes lives in that feature over `REST` and `Classify`: the commits listing in `commits`
+(`FromGitHub`), the latest release in `badges` (`FromGitHub`).
 
 | Need | go-github v92 call | Auth | Endpoint |
 |---|---|---|---|
@@ -92,12 +93,12 @@ API version header, conditional cache, rate observer), then `http.Transport`. `s
    later page while the listing runs. The listing is returned as GitHub sends it; `catalog` admits.
 7. **Removal** follows `catalog.md` behaviour 4-5.
 8. **Calls per job** (jobs are owned by features):
-   - `commits` (content.md): `Commits(30)`.
+   - `commits` (content.md): `Repositories.ListCommits` with 30 per page, in `commits`.
    - `docs` (content.md): the `HEAD` tree, the `.github` tree and the recursive `docs` tree; `Blob` for the README and documents whose
      SHA changed; recursive trees of at most 5 other top-level directories that hold referenced images.
    - `catalog.descriptor` (catalog.md): the `HEAD` tree (and `.github` when needed), `Blob` when the descriptor SHA changed.
    - `manifests` (manifests.md): one recursive `HEAD` tree, `Blob` for manifests whose SHA changed.
-   - `badges.release` (content.md): `LatestRelease`; 404 means "no release".
+   - `badges.release` (content.md): `Repositories.GetLatestRelease`, in `badges`; 404 means "no release".
 9. **Webhook events handled** (verified and deduplicated first, `http-api.md` behaviour 4; `webhook.Normalise` maps them, the `cmd/scp`
    sink calls `Notify` for a repository or `NotifySource` for an owner):
 
@@ -108,6 +109,7 @@ API version header, conditional cache, rate observer), then `http.Transport`. `s
     | `push` to other branches, or `deleted: true` | none (202) |
     | `repository` `created`, `deleted`, `publicized`, `privatized`, `archived`, `unarchived`, `renamed`, `transferred`, `edited` | `EventSourceChanged` |
     | `installation`, `installation_repositories` | `EventSourceChanged` (re-list installations and repositories) |
+    | any other event with a repository | its GitHub event name (`[a-z_]{1,40}`) for the specs that subscribe to it |
     | `ping`, anything else | none (202) |
 10. **Multi-org and GHES.** Each source has its own host, credential, transports and installations; sources share nothing. A GHES source
     sets `base_url` (`https://host/api/v3/`): go-github uses `WithURLs`, ghinstallation uses `BaseURL`; `WebURL` derives the web host. GHES
@@ -132,7 +134,7 @@ repositories, commits, files (trees and blobs) and releases (`AddRepo`, `Update`
 checks the App JWT, mints installation tokens, sends `x-ratelimit-*` per credential, answers ETags with 304 and records every request in a
 ledger (`Ledger`, `Count`). Faults: `Fail` (status, times, `Retry-After`), `Exhaust` (rate limit), `Heal`.
 - `internal/github`: `TestListReposPaginatesAndConverts`, `TestConditionalRequestsAreFree`, `TestAppMode`, `TestClassify`,
-  `TestCanceledIsNotClassified`, `TestETagCacheEvicts`, `TestCommitsTreesAndBlobs`, `TestLatestRelease`, `TestWebURL`,
+  `TestCanceledIsNotClassified`, `TestETagCacheEvicts`, `TestTreesAndBlobs`, `TestWebURL`,
   `TestRateBookResetInstant`.
 - `cmd/scp` `TestLoad1000`: the cold start of 1,000 repositories through an in-memory transport; `TestServeEndToEnd`: pushes, outage and
   signed webhook deliveries against the fake.

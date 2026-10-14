@@ -12,8 +12,7 @@ updates and the test strategy, for one instance serving up to 1,000 repositories
 - Secrets come from files (`*_file` keys) into a `config.Secret` type that redacts in `String`, `GoString`, `LogValue` and `MarshalText`.
 - Exit codes: 0 ok, 1 runtime failure (unreadable file, bind error, unclean shutdown), 2 refused input (bad flag, invalid config);
   `run` returns the code.
-- Logs: stdlib `log/slog`, JSON (or text) to stderr; one `*slog.Logger` passed down, `slog.SetDefault` in `serve` so library logs share
-  the format.
+- Logs: stdlib `log/slog`, JSON (or text) to stderr; one `*slog.Logger` passed down, never set as the slog default.
 - Public `:9090` serves the pages (through the Next.js server `scp serve` supervises, web.md), `/api/v1`, badges, llms and the webhook;
   admin `:9091` (internal) serves `/livez`, `/readyz`, `/metrics`, `/debug/pprof` and `/api/v1/status` (http-api.md Routes).
 - `/readyz` stays 200 from its first success until shutdown: a single replica keeps serving last good data through a GitHub outage.

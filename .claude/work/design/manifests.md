@@ -43,7 +43,8 @@ type Manifest struct {
 }
 type Toolchain struct{ Name, Version string }
 type Dependency struct{ Name, Version, Scope string } // runtime dev peer optional provided test indirect tool parent import
-// RepoEntry gains Manifests []Manifest (by path) and ManifestsFresh; Snapshot gains Providers(eco, name) and UsedBy(key).
+// The manifests are the facet "manifests" (by path, Of(e)); the index "manifests" (Graph(), passed to NewPublisher) holds who
+// declares a package name and who depends on whom. Repo(e, *oapi.Repo) adds the language to a summary; Summarise(s, e) feeds llms.
 ```
 
 API `GET /api/v1/repos/{owner}/{name}/manifests`: `technology` (languages, build tools, toolchains with their versions), `manifests`

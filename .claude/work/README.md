@@ -18,7 +18,6 @@ What Source Code Portal is, how it is built, and the work in progress. Binding o
 | `design/cluster.md` | Several instances on Hazelcast. |
 | `design/images-events.md` | The image proxy, server-sent events, the content-derived snapshot version. |
 | `design/web.md` | The Next.js web UI. |
-| `design/feature-modules.md` | M12, in progress: features own their data, routes and panels. |
 | `design/seo.md` | M13, queued: search engines. |
 | `history/` | Finished work: the M0..M11 plan and decision log, the earlier detailed design, the UI brief and screenshots. Not kept in sync. |
 

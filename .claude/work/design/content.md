@@ -118,7 +118,7 @@ each with its freshness (sync-snapshot-store.md). The merged feeds are `Latest` 
 
 ### Badges
 1. Routes: `GET /badges/repos/{owner}/{name}/{kind}.svg` (`last-commit`, `release`, `license`, `issues`) and `GET /badges/groups/{group}/repos.svg`.
-2. Job `badges.release` per repository: TTL 24 h, plus `EventTag`; `LatestRelease`, 404 means "no release" (`not_found`).
+2. Job `badges.release` per repository: TTL 24 h, plus `EventTag`; the latest release (`badges.FromGitHub`), 404 means "no release" (`not_found`).
 3. Messages: `last-commit` `today`/`yesterday`/`N days ago` (2..13)/`N weeks ago`/`N months ago`/`N years ago` by UTC calendar days, green up
    to 90 days, blue to 365, amber beyond; `release` tag name; `license` SPDX id (`NOASSERTION`/`OTHER` -> `other`); `issues` `{n} open`
    (green at 0); `repos` member count. Counts: 0..999, then `1.2k`, `12k`, `1.2M` (truncated).

@@ -94,12 +94,13 @@ contrast in both themes. The header shows whether the live stream is open (`Live
    different `version` (equality) invalidates every other query; active ones refetch. Readiness `warming` shows a banner.
 3. Commit logs page with "Load more" (cursor, 50 rows); the server renders the first page. With more than one page loaded a snapshot
    change leaves the log as it is; a "New commits" button refetches and moves focus to the first row.
-4. Freshness: every view shows a `FreshnessBadge` (icon plus text). Relative ages re-render on one 30 s ticker, paused while hidden; the
-   server renders them against its clock and `<time>` suppresses the hydration difference.
+4. Freshness: every view shows a `FreshnessBadge` (icon plus text). Relative ages re-render on one 30 s ticker, paused while hidden. The
+   server passes its instant (`renderedAt`, on the 30 s grid) to `NowProvider`, so hydration renders against the same clock; then the
+   ticker takes over. A view reads the clock once (`useNow`) and hands `now` to the entity components.
 5. Failure is data: a failed refetch keeps the data on screen; one polite banner says "Cannot refresh right now. Showing the last data
    that loaded." after network, 429 or 5xx failures and clears on the next success.
-6. Problems: `ProblemAlert` titles come from `code` and always show the request id. Each independent panel has its own error boundary;
-   `error.tsx` catches the rest.
+6. Problems: `ProblemAlert` titles come from `code` and always show the request id. Each independent panel has its own error boundary
+   (`PanelBoundary`, with Retry); `error.tsx` catches the rest and `global-error.tsx` a failing layout.
 7. Deploy skew: `X-SCP-Build` on an API response differing from the bundle's build id shows "A new version is available" with Reload;
    Next.js's `deploymentId` (the build id) makes a navigation across a deployment a full load.
 8. `SafeHtml` sets the API field `html` with `dangerouslySetInnerHTML`, memoised on the string. Lint allows it in this component only.
@@ -111,7 +112,8 @@ contrast in both themes. The header shows whether the live stream is open (`Live
 11. Accessibility (WCAG 2.2 AA): skip link to `#main`, landmarks, one `h1` per page, focus to `h1` after a client navigation (Next.js
     announces the title), visible focus ring, targets >= 24 px, real `<table>`s with keyboard sortable headers, reflow at 320 px,
     `prefers-reduced-motion` honoured.
-12. URLs are state: filters and sort live in search params (the server renders them too); repositories are `{owner}/{name}`, doc paths
+12. URLs are state: filters and sort live in search params (the server renders them too), written with `history.replaceState` (no
+    server round trip) and read back from the URL by the inputs; repositories are `{owner}/{name}`, doc paths
     a catch-all encoded per segment (`lib/paths.ts`).
 
 ## Build and serve

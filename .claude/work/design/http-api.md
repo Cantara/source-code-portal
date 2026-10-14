@@ -71,6 +71,7 @@ every other path is a page, proxied to the web UI server (behaviour 3).
      (keyset by value, bound to the filter); response `page {nextCursor|null, limit}`.
    - Conditional GET: every 200 under `/api/` (except streams) is buffered and gets a weak `ETag` over the body (SHA-256, 12 bytes), so a
      change of a derived status changes it; `If-None-Match` match -> 304 with the same `ETag`. `Cache-Control: no-cache`.
+     `httpapi.Matches` (weak comparison, `*`) is the one matcher; badges, images and llms use it for their strong ETags.
    - Errors: RFC 9457 `application/problem+json`, `Cache-Control: no-store`, members `type` (`urn:scp:problem:<code>`), `title`,
      `status`, `detail` (fixed text), `instance` (`urn:scp:request:<id>`), `code`. Codes: `not-found`, `method-not-allowed`,
      `validation-failed`, `invalid-cursor`, `not-acceptable`, `internal`, `too-many-streams`, `image-unavailable`, and on the webhook

@@ -41,21 +41,27 @@ type Snapshot struct {               // immutable after publish; handlers read o
 	Aliases map[RepoKey]RepoKey      // old address -> current (308)
 	Groups  []Group                  // config order, membership resolved by catalog
 	Sources []SourceStatus           // last listing per source
-	Latest  []CommitRef              // merged feed; per group through Feed(id)
-	/* groupsOf, latestByGroup, providers, usedBy, public view, item digests */
+	/* groupsOf, the indexers and what they built, public view, item digests */
 }
-type RepoEntry struct {
-	Repo Repo; Fresh Freshness
-	Commits []Commit; CommitsFresh Freshness; Descriptor Descriptor; DescriptorFresh Freshness
-	Docs []Doc; DocsFresh Freshness; Release *Release; ReleaseFresh Freshness; Manifests []Manifest; ManifestsFresh Freshness
-} // types: catalog.md, content.md, manifests.md
+type RepoEntry struct { Repo Repo; Fresh Freshness; /* facets by name */ }
 func (s *Snapshot) Repo(k RepoKey) (e *RepoEntry, moved bool) // follows aliases
-func (s *Snapshot) Feed(group string) ([]CommitRef, bool); Public() *Snapshot; Providers(eco, name string) []RepoKey; UsedBy(k RepoKey) []RepoKey
+func (s *Snapshot) Public() *Snapshot; Group(id string) (Group, bool); GroupsOf(k RepoKey) []string
+
+// A feature's data on an entry is a facet, declared as a constant of the feature: const facet snapshot.Facet[[]Commit] = "commits".
+type Facet[T any] string
+func (f Facet[T]) Get(e *RepoEntry) (T, Freshness)       // zero values until the feature contributes
+func (f Facet[T]) Set(e *RepoEntry, v T, fresh Freshness) // inside UpdateRepo, on the copy; copies the facet map
+func (e *RepoEntry) Facets() iter.Seq2[string, Freshness] // name and freshness of every facet, for the metrics
+// What a feature derives from every repository is an index, built at every publish and again for the public view.
+type Index[T any] string
+func (i Index[T]) Get(s *Snapshot) T
+func (i Index[T]) Build(fn func(*Snapshot) T) Indexer     // passed to NewPublisher
 type Builder struct{ /* copy-on-write over the current Snapshot */ }
 func (b *Builder) ReplaceSource(source string, repos []*RepoEntry, aliases map[RepoKey]RepoKey, st SourceStatus)
 func (b *Builder) UpdateRepo(k RepoKey, fn func(*RepoEntry)) bool // false if not in the catalogue
-func (b *Builder) Mark(itemKey string, digest uint64)              // the item's part of Version
+func (b *Builder) Mark(itemKey string, repo RepoKey, digest uint64) // the item's part of Version; repo "" for a source's items
 type Publisher struct{ /* atomic pointer, pending updates, debounce timer */ }
+func NewPublisher(debounce, maxDelay time.Duration, log *slog.Logger, indexers ...Indexer) *Publisher
 func (p *Publisher) Current() *Snapshot
 func (p *Publisher) Update(fn func(*Builder)) // queued; applied in order at the next debounced publish
 func (p *Publisher) Published() <-chan struct{} // closed at the next publish (events.go)
@@ -63,7 +69,7 @@ func (p *Publisher) Published() <-chan struct{} // closed at the next publish (e
 ```go
 package sync
 type Priority uint8 // PrioEvent=1, PrioScheduled=2, PrioBackfill=3; lower runs first
-type Event uint8    // EventPush, EventSourceChanged, EventTag (mapping: github.md behaviour 9)
+type Event string   // a name: EventPush "push", EventTag "tag", EventSourceChanged "source", or another GitHub event name (github.md behaviour 9)
 type Job struct { Key, Source string; Repo snapshot.RepoKey; Prev store.Item } // key "<kind>/<owner>/<name>" or "<kind>/<source>"
 type Result struct { State snapshot.State; Unchanged bool; ContentSHA string; Payload []byte; Catalogue []store.Repo } // Catalogue: listing jobs
 type Spec struct {
@@ -117,9 +123,10 @@ CREATE TABLE item (key TEXT PRIMARY KEY, kind TEXT NOT NULL,
    of those repositories, adds entries for new ones and clears their digests from the snapshot. A result arriving for a repository no
    longer catalogued writes nothing.
 7. **Snapshot build**: `Update` mutations are queued; the publisher applies them in order to a builder over the current snapshot 200 ms
-   after the last update or 1 s after the first pending one, derives the group memberships per repository, the feeds, the dependency
-   indexes and the public view (access.md), sets `Version` from the item digests (images-events.md) and stores the atomic pointer. A
-   panic in a mutation drops that batch, keeps the old snapshot and is logged.
+   after the last update or 1 s after the first pending one, one build at a time; it derives the group memberships per repository,
+   runs the features' indexers (the commit feeds, the dependency graph) and builds the public view (access.md) with its own indexes,
+   sets `Version` from the item digests (images-events.md) and stores the atomic pointer. A mutation that panics is dropped alone and
+   logged; a panic while indexing keeps the old snapshot.
 8. **Store open**: pragmas `journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`, `foreign_keys=1`, `temp_store=MEMORY`, one
    connection, `quick_check`, migrate. Failed check, failed migration or `user_version` newer than the binary -> rename the file and its
    `-wal`/`-shm` to `<path>.quarantine-<UTC>` (keep 2) and start empty. Close runs `PRAGMA optimize` and `wal_checkpoint(TRUNCATE)`.
@@ -152,7 +159,7 @@ are constants in `internal/sync` and `cmd/scp`.
   `TestWarmStartHonoursAShorterTTL`, `TestBackoffBounds`, `TestRegisterRefuses`, `TestNotifySource`, `TestObserveDepthAlive`; the
   cluster side in `share_test.go`; `goleak`.
 - `internal/snapshot`: `TestDerive` (including the 1.5 x TTL boundary), `TestDebounce`, `TestVersionFollowsTheItems`,
-  `TestSnapshotsAreImmutable`, `TestPanicKeepsSnapshot`, `TestFeedsAndUpdates`, `TestDependencyIndex`, `TestPublicView`,
+  `TestSnapshotsAreImmutable`, `TestPanickingUpdateIsDroppedAlone`, `TestPanickingIndexKeepsSnapshot`, `TestFacetsAndIndexes`, `TestPublicView`,
   `TestConcurrentPublishesKeepEveryUpdate`.
 - `internal/store`: `TestRoundTrip`, `TestCatalogueReplace` (rename and cascade), `TestRetainSources`, `TestQuarantine`.
 - `cmd/scp` `TestLoad1000`: cold start of 1,000 repositories, warm start, p99 per page; `TestServeEndToEnd`: warm start, outage served

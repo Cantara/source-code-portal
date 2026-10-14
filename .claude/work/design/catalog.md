@@ -26,29 +26,37 @@ aliases to the snapshot. It owns the removal rule; the listing every `catalog.re
 
 ## Shapes
 ```go
-// internal/snapshot (core): shared value types; catalog builds them.
+// internal/snapshot (core): the catalogue's value types; catalog builds them.
 type Repo struct {
     ID RepoID; Owner, Name string                    // Key() RepoKey = lower(owner/name)
     Description, HTMLURL, Homepage, DefaultBranch, License, Visibility string
     Topics []string; Archived, Fork bool; Stars, OpenIssues int; PushedAt time.Time
 }
 type Group struct{ ID, Name, Description string; DefaultRepo RepoKey; DefaultMissing bool; Members []RepoKey } // members sorted
-type Descriptor struct {
-    Present bool; File string                        // ".github/scp.yaml" etc.
-    Title, Description, Lifecycle string             // Lifecycle: "" | experimental | production | deprecated
-    Owners, Tags []string; Links []Link; Problems []Problem
-}
-type Link struct{ Title, URL string }
-type Problem struct{ Pointer, Code, Message string }
+type Problem struct{ Pointer, Code, Message string } // a finding in a repository file, shared with manifests
 
 // internal/catalog
+type Descriptor struct {                             // the facet "descriptor"; DescriptorOf(e) reads it
+    Present bool; File string                        // ".github/scp.yaml" etc.
+    Title, Description, Lifecycle string             // Lifecycle: "" | experimental | production | deprecated
+    Owners, Tags []string; Links []Link; Problems []snapshot.Problem
+}
+type Link struct{ Title, URL string }
+// API serves the dashboard, groups and repositories; what other features show there they add through hooks wired in cmd/scp
+// (commits: the latest commits, activity and freshness counts, commits on the detail; badges: the release; manifests: the language).
+type API struct {
+    Current   func(context.Context) *snapshot.Snapshot
+    Dashboard []func(*snapshot.Snapshot, *oapi.Dashboard)
+    Repo      []func(*snapshot.RepoEntry, *oapi.Repo)
+    Detail    []func(*snapshot.RepoEntry, *oapi.RepoDetail)
+}
 type Tracked struct{ Repo snapshot.Repo; Aliases []snapshot.RepoKey; Misses int } // the listing item's payload
 type Filter struct{ IncludeForks, IncludeArchived, IncludePrivate bool }
 type Finding struct{ Error bool; Message string }
 func Compile(groups []config.Group) (*Groups, []Finding)                  // nil Groups when any finding is an error
 func (gs *Groups) Resolve(repos map[snapshot.RepoKey]*snapshot.RepoEntry) []snapshot.Group
 func Plan(listed []snapshot.Repo, current []Tracked, f Filter) []Tracked   // pure, order independent, sorted by address
-func ParseDescriptor(b []byte) snapshot.Descriptor                         // pure, bounded, total
+func ParseDescriptor(b []byte) Descriptor                                  // pure, bounded, total
 ```
 
 ## Behaviour

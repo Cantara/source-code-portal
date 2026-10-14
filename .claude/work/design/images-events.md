@@ -47,9 +47,11 @@ Status: as built. Binding order: ../plan.md > this note.
 
 ## Shapes
 ```go
-// internal/snapshot
+// internal/docs
 type Image struct{ ID, Path, URL, BlobSHA string } // Doc.Images; Path for repository files, URL for external images
-func (b *Builder) Mark(key string, digest uint64)  // the item's digest; 0 drops it
+// internal/snapshot
+func (b *Builder) Mark(key string, repo RepoKey, digest uint64) // the item's digest; 0 drops it. The public view sums only the items of
+                                                                // public repositories and of the sources
 // internal/sync: digest(store.Item) uint64 over the item fields, marked at every publish
 
 // internal/docs

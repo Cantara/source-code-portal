@@ -44,8 +44,8 @@ Rules (checked as described in `design/principles.md`):
 
 1. Request handlers read only the current immutable snapshot. Sync jobs are the only code that writes SQLite; they and the image
    proxy (document images, cached) are the only code that talks to GitHub.
-2. Features do not import features. Each feature owns its data on the snapshot and its jobs; a consumer declares the small function it
-   needs and `cmd/scp` wires it. `cmd/scp/boundary_test.go` enforces the imports. The web UI keeps the same rule for `web/src/features`.
+2. Features do not import features. Each feature owns its data on the snapshot (typed facets on the repository entries, indexes over
+   all of them), its jobs and its feature-only GitHub calls; a consumer declares the small function it needs and `cmd/scp` wires it. `cmd/scp/boundary_test.go` enforces the imports. The web UI keeps the same rule for `web/src/features`.
 3. Failure is data: each item carries its freshness; the last good state is served.
 4. Untrusted input (README, descriptor, manifests, webhook bodies) goes through bounded parsers and one sanitiser producing `SafeHTML`.
 5. SQLite is a rebuildable cache: deleting it costs a resync, never data.
@@ -76,10 +76,9 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 
 | M | Delivers | Done when | State |
 |---|---|---|---|
-| M12 | Feature modules (`design/feature-modules.md`): each Go feature owns its snapshot data, GitHub calls and events; web route modules, shared query keys, panels; the review's correctness fixes | adding a feature touches only its own package (Go) or folder (web) plus one wiring line, shown by the boundary tests; `make check` green | in progress |
 | M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | queued |
 
-`v2.1.0` is tagged when M12 is done. Each milestone starts with its design note and lands as small commits on `main`, CI green.
+`v2.1.0` is the release with the feature modules. Each milestone starts with its design note and lands as small commits on `main`, CI green.
 
 ## 5. How we work
 
