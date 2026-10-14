@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"net/http"
 	"slices"
 	"time"
 
@@ -14,9 +15,43 @@ type API struct {
 	Current func() *snapshot.Snapshot
 }
 
+// dashboardCommits is how many of the latest commits the dashboard shows.
+const dashboardCommits = 10
+
 func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {
-	return oapi.NotFoundApplicationProblemPlusJSONResponse{Type: "urn:scp:problem:not-found", Title: "Not Found", Status: 404,
-		Code: "not-found", Detail: &detail}
+	return oapi.NotFoundApplicationProblemPlusJSONResponse(oapi.NewProblem(http.StatusNotFound, "not-found", "Not Found", detail))
+}
+
+func (a API) GetDashboard(context.Context, oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
+	s, now := a.Current(), time.Now()
+	out := oapi.Dashboard{Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos),
+		Latest: make([]oapi.Commit, 0, dashboardCommits)}
+	for _, g := range s.Groups {
+		dg := oapi.DashboardGroup{Id: g.ID, Name: g.Name, Description: g.Description, RepoCount: len(g.Members)}
+		if feed, _ := s.Feed(g.ID); len(feed) > 0 {
+			dg.LastActivity = oapi.TimeOrNil(feed[0].Commit.CommittedAt)
+		}
+		out.Groups = append(out.Groups, dg)
+	}
+	for k, e := range s.Repos {
+		if len(s.GroupsOf(k)) == 0 {
+			out.UngroupedCount++
+		}
+		switch e.CommitsFresh.Derive(now) {
+		case snapshot.StatusFresh:
+			out.Freshness.Fresh++
+		case snapshot.StatusStale:
+			out.Freshness.Stale++
+		case snapshot.StatusError:
+			out.Freshness.Error++
+		default:
+			out.Freshness.Unknown++
+		}
+	}
+	for _, r := range s.Latest[:min(dashboardCommits, len(s.Latest))] {
+		out.Latest = append(out.Latest, oapi.CommitOf(r.Repo, r.Commit))
+	}
+	return oapi.GetDashboard200JSONResponse{Body: out}, nil
 }
 
 func (a API) ListGroups(context.Context, oapi.ListGroupsRequestObject) (oapi.ListGroupsResponseObject, error) {
@@ -68,7 +103,31 @@ func (a API) GetRepo(_ context.Context, req oapi.GetRepoRequestObject) (oapi.Get
 	case moved:
 		return oapi.GetRepo308Response{Headers: oapi.GetRepo308ResponseHeaders{Location: "/api/v1/repos/" + string(e.Repo.Key())}}, nil
 	}
-	return oapi.GetRepo200JSONResponse{Body: repo(s, e, time.Now())}, nil
+	return oapi.GetRepo200JSONResponse{Body: detail(s, e, time.Now())}, nil
+}
+
+func detail(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.RepoDetail {
+	d := e.Descriptor
+	out := oapi.RepoDetail{Repo: repo(s, e, now), Title: e.Repo.Name, Commits: make([]oapi.Commit, 0, len(e.Commits)),
+		CommitsFreshness: oapi.FreshnessOf(e.CommitsFresh, now),
+		Descriptor: oapi.Descriptor{Present: d.Present, File: d.File, Title: d.Title, Description: d.Description,
+			Lifecycle: oapi.DescriptorLifecycle(d.Lifecycle), Owners: nonNil(d.Owners), Tags: nonNil(d.Tags),
+			Links: make([]oapi.Link, 0, len(d.Links)), Problems: make([]oapi.DescriptorProblem, 0, len(d.Problems)),
+			Freshness: oapi.FreshnessOf(e.DescriptorFresh, now)}}
+	if d.Title != "" {
+		out.Title = d.Title
+	}
+	for _, l := range d.Links {
+		out.Descriptor.Links = append(out.Descriptor.Links, oapi.Link{Title: l.Title, Url: l.URL})
+	}
+	for _, p := range d.Problems {
+		out.Descriptor.Problems = append(out.Descriptor.Problems, oapi.DescriptorProblem{Pointer: p.Pointer, Code: p.Code, Message: p.Message})
+	}
+	key := e.Repo.Key()
+	for i := range e.Commits {
+		out.Commits = append(out.Commits, oapi.CommitOf(key, &e.Commits[i]))
+	}
+	return out
 }
 
 func defaultRepo(g snapshot.Group) (*string, string) {

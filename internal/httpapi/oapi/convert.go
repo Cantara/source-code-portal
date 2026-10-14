@@ -19,3 +19,14 @@ func TimeOrNil(t time.Time) *time.Time {
 	t = t.UTC()
 	return &t
 }
+
+// CommitOf converts a commit of the repository at repo to its API form.
+func CommitOf(repo snapshot.RepoKey, c *snapshot.Commit) Commit {
+	return Commit{Repo: string(repo), Sha: c.SHA, Subject: c.Subject, AuthorName: c.AuthorName, AuthorLogin: c.AuthorLogin, Url: c.URL,
+		CommittedAt: c.CommittedAt.UTC()}
+}
+
+// NewProblem returns an RFC 9457 problem with the portal's type URN for code.
+func NewProblem(status int, code, title, detail string) Problem {
+	return Problem{Type: "urn:scp:problem:" + code, Title: title, Status: status, Code: code, Detail: &detail}
+}

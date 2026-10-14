@@ -408,3 +408,28 @@ func TestRegisterRefuses(t *testing.T) {
 		}
 	}
 }
+
+func TestWarmStartHonoursAShorterTTL(t *testing.T) {
+	dir := t.TempDir()
+	synctest.Test(t, func(t *testing.T) {
+		c := &counter{}
+		r := newRig(t, dir, nil, 1, sourceSpec(c, time.Hour))
+		r.run()
+		time.Sleep(time.Second)
+		r.stop()
+	})
+	synctest.Test(t, func(t *testing.T) {
+		c := &counter{}
+		r := newRig(t, dir, nil, 1, sourceSpec(c, time.Minute))
+		r.run()
+		time.Sleep(30 * time.Second)
+		if c.n.Load() != 0 {
+			t.Errorf("ran %d times before the new TTL", c.n.Load())
+		}
+		time.Sleep(2 * time.Minute)
+		if c.n.Load() == 0 {
+			t.Error("the stored schedule of the longer TTL held")
+		}
+		r.stop()
+	})
+}

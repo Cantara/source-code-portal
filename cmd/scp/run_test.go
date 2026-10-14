@@ -91,14 +91,25 @@ func TestConfigCheckRefusesBadGroups(t *testing.T) {
 	}
 }
 
-// TestServeEndToEnd is the M1 acceptance test: a test organisation on a fake GitHub shows in /api/v1/groups, and a restart serves it
-// from the store before any GitHub call.
+// TestServeEndToEnd is the M1 and M2 acceptance test: a test organisation on a fake GitHub shows in /api/v1/groups, with commits,
+// descriptors, the dashboard and paged feeds; a restart serves it from the store before any GitHub call; a changed pushed_at
+// refetches the commits of just that repository.
 func TestServeEndToEnd(t *testing.T) {
 	gh := githubtest.New(t)
 	gh.AddToken("ghp_test")
-	gh.AddRepo("acme", gogh.Repository{Name: new("Whydah-Core"), Visibility: new("public"), Topics: []string{"iam"}})
-	gh.AddRepo("acme", gogh.Repository{Name: new("whydah-sso"), Visibility: new("public")})
-	gh.AddRepo("acme", gogh.Repository{Name: new("tool"), Visibility: new("public")})
+	core := gh.AddRepo("acme", gogh.Repository{Name: new("Whydah-Core"), Visibility: new("public"), Topics: []string{"iam"}})
+	sso := gh.AddRepo("acme", gogh.Repository{Name: new("whydah-sso"), Visibility: new("public")})
+	tool := gh.AddRepo("acme", gogh.Repository{Name: new("tool"), Visibility: new("public")})
+	at := func(h int) time.Time { return time.Date(2026, 10, 1, h, 0, 0, 0, time.UTC) }
+	commit := func(c byte, h int) githubtest.Commit {
+		return githubtest.Commit{SHA: strings.Repeat(string(c), 40), Message: "change " + string(c) + "\n\nbody", AuthorName: "Ann",
+			AuthorLogin: "ann", Date: at(h)}
+	}
+	gh.SetCommits(core, commit('a', 9), commit('b', 7), commit('c', 5))
+	gh.SetCommits(sso, commit('d', 8), commit('e', 6))
+	gh.SetCommits(tool, commit('f', 4))
+	gh.SetFile(core, ".github/scp.yaml", "schema: 1\ntitle: Whydah Core\nlifecycle: production\n")
+	gh.SetFile(core, "scp.yaml", "schema: 1\ntitle: loses to .github/\n")
 	gh.AddRepo("acme", gogh.Repository{Name: new("secret"), Visibility: new("private")})
 
 	dir := t.TempDir()
@@ -165,8 +176,23 @@ catalog:
 			time.Sleep(20 * time.Millisecond)
 		}
 	}
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for deadline := time.Now().Add(10 * time.Second); !ok(); {
+			if time.Now().After(deadline) {
+				t.Fatalf("%s: not within 10s", what)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
 	check := func(public string) {
 		t.Helper()
+		waitFor("commits and descriptors", func() bool {
+			var d oapi.Dashboard
+			var r oapi.RepoDetail
+			return fetch(public+"/api/v1/dashboard", &d) == http.StatusOK && d.Freshness.Fresh == 3 &&
+				fetch(public+"/api/v1/repos/acme/whydah-core", &r) == http.StatusOK && r.Descriptor.Present
+		})
 		var groups oapi.GroupList
 		if code := fetch(public+"/api/v1/groups", &groups); code != http.StatusOK || len(groups.Groups) != 2 {
 			t.Fatalf("groups: %d %+v", code, groups)
@@ -177,10 +203,41 @@ catalog:
 		if o := groups.Groups[1]; o.RepoCount != 3 {
 			t.Errorf("other has %d repositories, want 3 (the private one is not admitted)", o.RepoCount)
 		}
-		var repo oapi.Repo
-		if code := fetch(public+"/api/v1/repos/ACME/whydah-core", &repo); code != http.StatusOK || repo.Name != "Whydah-Core" ||
-			repo.Freshness.Status != "fresh" || strings.Join(repo.Groups, ",") != "whydah,other" {
-			t.Errorf("repo: %d %+v", code, repo)
+		var repo oapi.RepoDetail
+		if code := fetch(public+"/api/v1/repos/ACME/whydah-core", &repo); code != http.StatusOK || repo.Repo.Name != "Whydah-Core" ||
+			repo.Repo.Freshness.Status != "fresh" || strings.Join(repo.Repo.Groups, ",") != "whydah,other" {
+			t.Errorf("repo: %d %+v", code, repo.Repo)
+		}
+		if repo.Title != "Whydah Core" || repo.Descriptor.File != ".github/scp.yaml" || repo.Descriptor.Lifecycle != "production" ||
+			len(repo.Commits) != 3 || repo.Commits[0].Subject != "change a" || repo.CommitsFreshness.Status != "fresh" {
+			t.Errorf("repo detail: title %q, descriptor %+v, commits %+v", repo.Title, repo.Descriptor, repo.Commits)
+		}
+		var dash oapi.Dashboard
+		if code := fetch(public+"/api/v1/dashboard", &dash); code != http.StatusOK || dash.RepoCount != 3 || len(dash.Latest) != 6 ||
+			dash.Latest[0].Sha != strings.Repeat("a", 40) || len(dash.Groups) != 2 || dash.Groups[0].LastActivity == nil ||
+			!dash.Groups[0].LastActivity.Equal(at(9)) {
+			t.Errorf("dashboard: %d %+v", code, dash)
+		}
+		var shas []string
+		url := public + "/api/v1/commits?group=whydah&limit=2"
+		for pages := 0; ; pages++ {
+			var page oapi.CommitPage
+			if code := fetch(url, &page); code != http.StatusOK || pages > 3 || page.Freshness.Status != "fresh" {
+				t.Fatalf("commit page %d: %d %+v", pages, code, page)
+			}
+			for _, c := range page.Commits {
+				shas = append(shas, c.Sha[:1])
+			}
+			if page.Page.NextCursor == nil {
+				break
+			}
+			url = public + "/api/v1/commits?group=whydah&limit=2&cursor=" + *page.Page.NextCursor
+		}
+		if got := strings.Join(shas, ""); got != "adbec" {
+			t.Errorf("whydah feed = %s, want adbec", got)
+		}
+		if code := fetch(public+"/api/v1/commits?group=other&cursor=eyJrIjoieCIsInMiOiJ5IiwidCI6MH0", nil); code != http.StatusBadRequest {
+			t.Errorf("a cursor of another filter: %d, want 400", code)
 		}
 		if code := fetch(public+"/api/v1/repos/acme/secret", nil); code != http.StatusNotFound {
 			t.Errorf("private repository: %d, want 404", code)
@@ -202,5 +259,23 @@ catalog:
 	stop()
 	if got := gh.Count("GET /orgs/acme/repos"); got != listings {
 		t.Errorf("the warm start listed again: %d listings, want %d", got, listings)
+	}
+
+	coreFetches, toolFetches := gh.Count("GET /repos/acme/whydah-core/commits"), gh.Count("GET /repos/acme/tool/commits")
+	gh.SetCommits(tool, commit('9', 10), commit('f', 4))
+	gh.Update(tool, func(r *gogh.Repository) { r.PushedAt = &gogh.Timestamp{Time: at(10)} })
+	cfg.Catalog.ReconcileInterval = 100 * time.Millisecond
+	stop, public, admin = serve()
+	waitReady(admin)
+	waitFor("the pushed repository's new commit", func() bool {
+		var r oapi.RepoDetail
+		return fetch(public+"/api/v1/repos/acme/tool", &r) == http.StatusOK && len(r.Commits) == 2
+	})
+	stop()
+	if got := gh.Count("GET /repos/acme/tool/commits"); got != toolFetches+1 {
+		t.Errorf("tool commits fetched %d times after the push, want 1", got-toolFetches)
+	}
+	if got := gh.Count("GET /repos/acme/whydah-core/commits"); got != coreFetches {
+		t.Errorf("an untouched repository's commits were fetched again: %d", got-coreFetches)
 	}
 }

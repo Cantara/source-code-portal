@@ -54,11 +54,16 @@ func newServeCmd(opts *options) *cobra.Command {
 	return cmd
 }
 
-// api composes the strict server from the features that implement its methods.
-type api struct {
-	catalog.API
-	httpapi.SnapshotAPI
-}
+// api composes the strict server from the features that implement its methods. The aliases give the embedded fields distinct names.
+type (
+	catalogAPI = catalog.API
+	commitsAPI = commits.API
+	api        struct {
+		catalogAPI
+		commitsAPI
+		httpapi.SnapshotAPI
+	}
+)
 
 // server owns the store, the snapshot, the sync engine and the two listeners.
 type server struct {
@@ -112,7 +117,8 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 	}
 
 	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
-	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, httpapi.SnapshotAPI{Current: s.pub.Current}}), log)
+	s.public = newHTTPServer(httpapi.Public(spa, api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current},
+		httpapi.SnapshotAPI{Current: s.pub.Current}}), log)
 	s.admin = newHTTPServer(httpapi.Admin(ready), log)
 	var lc net.ListenConfig
 	if s.publicLn, err = lc.Listen(ctx, "tcp", cfg.Server.PublicAddr); err != nil {

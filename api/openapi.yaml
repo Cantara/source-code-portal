@@ -3,11 +3,46 @@ info:
   title: Source Code Portal API
   version: "1"
   description: |
-    Read API over the portal's snapshot. Every list is returned whole. Every 200 response carries a weak ETag; send it back in
+    Read API over the portal's snapshot. Lists are returned whole, except commits, which page by cursor. Every 200 response carries a weak ETag; send it back in
     If-None-Match to get 304 Not Modified. Errors are RFC 9457 problems.
 servers:
   - url: /api/v1
 paths:
+  /dashboard:
+    get:
+      operationId: getDashboard
+      summary: Groups with counts and latest activity, the latest commits and data health
+      responses:
+        "200":
+          description: The dashboard
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+        "304": { $ref: "#/components/responses/NotModified" }
+  /commits:
+    get:
+      operationId: listCommits
+      summary: Default-branch commits merged across repositories, newest first, one page at a time
+      description: |
+        Order is committedAt descending, then repository address, then SHA. `group` and `repo` intersect. Pass `page.nextCursor`
+        as `cursor` for the next page; a cursor is bound to its filter and stays valid when new commits arrive. The freshness covers
+        every repository in scope: fresh when all are fresh, stale otherwise, with the oldest times.
+      parameters:
+        - { name: group, in: query, required: false, schema: { type: string } }
+        - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: One page of commits
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommitPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /groups:
     get:
       operationId: listGroups
@@ -63,7 +98,7 @@ paths:
           headers: { ETag: { $ref: "#/components/headers/ETag" } }
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Repo" }
+              schema: { $ref: "#/components/schemas/RepoDetail" }
         "304": { $ref: "#/components/responses/NotModified" }
         "308":
           description: The repository was renamed or transferred
@@ -97,6 +132,11 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    BadRequest:
+      description: The parameters are not valid
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
   schemas:
     Freshness:
       type: object
@@ -127,6 +167,94 @@ components:
         pushedAt: { type: string, format: date-time }
         groups: { type: array, items: { type: string }, description: Group ids in configuration order }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    RepoDetail:
+      type: object
+      required: [repo, title, descriptor, commits, commitsFreshness]
+      properties:
+        repo: { $ref: "#/components/schemas/Repo" }
+        title: { type: string, description: The descriptor title, else the repository name }
+        descriptor: { $ref: "#/components/schemas/Descriptor" }
+        commits: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: The latest default-branch commits }
+        commitsFreshness: { $ref: "#/components/schemas/Freshness" }
+    Descriptor:
+      type: object
+      description: The repository's own scp.yaml. It changes display only.
+      required: [present, file, title, description, lifecycle, owners, tags, links, problems, freshness]
+      properties:
+        present: { type: boolean }
+        file: { type: string, description: Path of the file read; empty when none }
+        title: { type: string }
+        description: { type: string }
+        lifecycle: { type: string, enum: ["", experimental, production, deprecated] }
+        owners: { type: array, items: { type: string }, description: Claimed owners, "@user or @org/team" }
+        tags: { type: array, items: { type: string } }
+        links: { type: array, items: { $ref: "#/components/schemas/Link" } }
+        problems: { type: array, items: { $ref: "#/components/schemas/DescriptorProblem" } }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    Link:
+      type: object
+      required: [title, url]
+      properties:
+        title: { type: string }
+        url: { type: string }
+    DescriptorProblem:
+      type: object
+      required: [pointer, code, message]
+      properties:
+        pointer: { type: string, description: JSON pointer into the file; empty for the whole file }
+        code: { type: string }
+        message: { type: string }
+    Commit:
+      type: object
+      required: [repo, sha, subject, authorName, authorLogin, url, committedAt]
+      properties:
+        repo: { type: string, description: Repository address }
+        sha: { type: string }
+        subject: { type: string, description: First line of the message }
+        authorName: { type: string }
+        authorLogin: { type: string, description: GitHub login; empty when unknown }
+        url: { type: string, description: Commit page; empty when unknown }
+        committedAt: { type: string, format: date-time }
+    CommitPage:
+      type: object
+      required: [commits, page, freshness]
+      properties:
+        commits: { type: array, items: { $ref: "#/components/schemas/Commit" } }
+        page: { $ref: "#/components/schemas/Page" }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    Page:
+      type: object
+      required: [nextCursor, limit]
+      properties:
+        nextCursor: { type: [string, "null"] }
+        limit: { type: integer }
+    FreshnessCounts:
+      type: object
+      description: Repositories by the freshness of their commits
+      required: [fresh, stale, unknown, error]
+      properties:
+        fresh: { type: integer }
+        stale: { type: integer }
+        unknown: { type: integer }
+        error: { type: integer }
+    DashboardGroup:
+      type: object
+      required: [id, name, description, repoCount, lastActivity]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        repoCount: { type: integer }
+        lastActivity: { type: [string, "null"], format: date-time, description: Time of the group's newest commit }
+    Dashboard:
+      type: object
+      required: [groups, repoCount, ungroupedCount, latest, freshness]
+      properties:
+        groups: { type: array, items: { $ref: "#/components/schemas/DashboardGroup" } }
+        repoCount: { type: integer }
+        ungroupedCount: { type: integer, description: Repositories in no group }
+        latest: { type: array, items: { $ref: "#/components/schemas/Commit" } }
+        freshness: { $ref: "#/components/schemas/FreshnessCounts" }
     RepoList:
       type: object
       required: [repos]

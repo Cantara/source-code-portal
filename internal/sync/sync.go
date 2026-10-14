@@ -527,6 +527,9 @@ func (e *Engine) newEntry(s *Spec, key, source string, repo snapshot.RepoKey, it
 	if !it.NextDue.IsZero() && it.NextDue.After(now) {
 		en.due = it.NextDue
 		en.backoff = it.Attempts > 0
+		if limit := now.Add(s.TTL); !en.backoff && en.due.After(limit) {
+			en.due = limit // the TTL was shortened since the schedule was stored
+		}
 	}
 	return en
 }

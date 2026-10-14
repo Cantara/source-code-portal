@@ -17,6 +17,30 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for DescriptorLifecycle.
+const (
+	Deprecated   DescriptorLifecycle = "deprecated"
+	Empty        DescriptorLifecycle = ""
+	Experimental DescriptorLifecycle = "experimental"
+	Production   DescriptorLifecycle = "production"
+)
+
+// Valid indicates whether the value is a known member of the DescriptorLifecycle enum.
+func (e DescriptorLifecycle) Valid() bool {
+	switch e {
+	case Deprecated:
+		return true
+	case Empty:
+		return true
+	case Experimental:
+		return true
+	case Production:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FreshnessStatus.
 const (
 	Error   FreshnessStatus = "error"
@@ -77,6 +101,84 @@ func (e GroupSummaryDefaultRepoState) Valid() bool {
 	}
 }
 
+// Commit defines model for Commit.
+type Commit struct {
+	// AuthorLogin GitHub login; empty when unknown
+	AuthorLogin string    `json:"authorLogin"`
+	AuthorName  string    `json:"authorName"`
+	CommittedAt time.Time `json:"committedAt"`
+
+	// Repo Repository address
+	Repo string `json:"repo"`
+	Sha  string `json:"sha"`
+
+	// Subject First line of the message
+	Subject string `json:"subject"`
+
+	// Url Commit page; empty when unknown
+	Url string `json:"url"`
+}
+
+// CommitPage defines model for CommitPage.
+type CommitPage struct {
+	Commits   []Commit  `json:"commits"`
+	Freshness Freshness `json:"freshness"`
+	Page      Page      `json:"page"`
+}
+
+// Dashboard defines model for Dashboard.
+type Dashboard struct {
+	// Freshness Repositories by the freshness of their commits
+	Freshness FreshnessCounts  `json:"freshness"`
+	Groups    []DashboardGroup `json:"groups"`
+	Latest    []Commit         `json:"latest"`
+	RepoCount int              `json:"repoCount"`
+
+	// UngroupedCount Repositories in no group
+	UngroupedCount int `json:"ungroupedCount"`
+}
+
+// DashboardGroup defines model for DashboardGroup.
+type DashboardGroup struct {
+	Description string `json:"description"`
+	Id          string `json:"id"`
+
+	// LastActivity Time of the group's newest commit
+	LastActivity *time.Time `json:"lastActivity"`
+	Name         string     `json:"name"`
+	RepoCount    int        `json:"repoCount"`
+}
+
+// Descriptor The repository's own scp.yaml. It changes display only.
+type Descriptor struct {
+	Description string `json:"description"`
+
+	// File Path of the file read; empty when none
+	File      string              `json:"file"`
+	Freshness Freshness           `json:"freshness"`
+	Lifecycle DescriptorLifecycle `json:"lifecycle"`
+	Links     []Link              `json:"links"`
+
+	// Owners Claimed owners
+	Owners   []string            `json:"owners"`
+	Present  bool                `json:"present"`
+	Problems []DescriptorProblem `json:"problems"`
+	Tags     []string            `json:"tags"`
+	Title    string              `json:"title"`
+}
+
+// DescriptorLifecycle defines model for Descriptor.Lifecycle.
+type DescriptorLifecycle string
+
+// DescriptorProblem defines model for DescriptorProblem.
+type DescriptorProblem struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+
+	// Pointer JSON pointer into the file; empty for the whole file
+	Pointer string `json:"pointer"`
+}
+
 // Freshness defines model for Freshness.
 type Freshness struct {
 	// CheckedAt Last time the content was confirmed
@@ -89,6 +191,14 @@ type Freshness struct {
 
 // FreshnessStatus defines model for Freshness.Status.
 type FreshnessStatus string
+
+// FreshnessCounts Repositories by the freshness of their commits
+type FreshnessCounts struct {
+	Error   int `json:"error"`
+	Fresh   int `json:"fresh"`
+	Stale   int `json:"stale"`
+	Unknown int `json:"unknown"`
+}
 
 // Group defines model for Group.
 type Group struct {
@@ -122,6 +232,18 @@ type GroupSummary struct {
 
 // GroupSummaryDefaultRepoState defines model for GroupSummary.DefaultRepoState.
 type GroupSummaryDefaultRepoState string
+
+// Link defines model for Link.
+type Link struct {
+	Title string `json:"title"`
+	Url   string `json:"url"`
+}
+
+// Page defines model for Page.
+type Page struct {
+	Limit      int     `json:"limit"`
+	NextCursor *string `json:"nextCursor"`
+}
 
 // Problem defines model for Problem.
 type Problem struct {
@@ -162,6 +284,20 @@ type Repo struct {
 	Visibility string    `json:"visibility"`
 }
 
+// RepoDetail defines model for RepoDetail.
+type RepoDetail struct {
+	// Commits The latest default-branch commits
+	Commits          []Commit  `json:"commits"`
+	CommitsFreshness Freshness `json:"commitsFreshness"`
+
+	// Descriptor The repository's own scp.yaml. It changes display only.
+	Descriptor Descriptor `json:"descriptor"`
+	Repo       Repo       `json:"repo"`
+
+	// Title The descriptor title
+	Title string `json:"title"`
+}
+
 // RepoList defines model for RepoList.
 type RepoList struct {
 	Repos []Repo `json:"repos"`
@@ -184,8 +320,21 @@ type SourceInfo struct {
 	Repos     int       `json:"repos"`
 }
 
+// BadRequest defines model for BadRequest.
+type BadRequest = Problem
+
 // NotFound defines model for NotFound.
 type NotFound = Problem
+
+// ListCommitsParams defines parameters for ListCommits.
+type ListCommitsParams struct {
+	Group *string `form:"group,omitempty" json:"group,omitempty"`
+
+	// Repo owner/name
+	Repo   *string `form:"repo,omitempty" json:"repo,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
 
 // ListReposParams defines parameters for ListRepos.
 type ListReposParams struct {
@@ -194,6 +343,12 @@ type ListReposParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListCommits Default-branch commits merged across repositories, newest first, one page at a time
+	// (GET /commits)
+	ListCommits(w http.ResponseWriter, r *http.Request, params ListCommitsParams)
+	// GetDashboard Groups with counts and latest activity, the latest commits and data health
+	// (GET /dashboard)
+	GetDashboard(w http.ResponseWriter, r *http.Request)
 	// ListGroups All groups in configuration order, with member counts
 	// (GET /groups)
 	ListGroups(w http.ResponseWriter, r *http.Request)
@@ -219,6 +374,92 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListCommits operation middleware
+func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCommitsParams
+
+	// ------------- Optional query parameter "group" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group", r.URL.Query(), &params.Group, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "repo" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "repo", r.URL.Query(), &params.Repo, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "repo"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repo", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCommits(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDashboard operation middleware
+func (siw *ServerInterfaceWrapper) GetDashboard(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDashboard(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListGroups operation middleware
 func (siw *ServerInterfaceWrapper) ListGroups(w http.ResponseWriter, r *http.Request) {
@@ -462,6 +703,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/dashboard", wrapper.GetDashboard)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commits", wrapper.ListCommits)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group}", wrapper.GetGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos", wrapper.ListRepos)
@@ -471,9 +714,120 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
 type NotModifiedResponse struct {
+}
+
+type ListCommitsRequestObject struct {
+	Params ListCommitsParams
+}
+
+type ListCommitsResponseObject interface {
+	VisitListCommitsResponse(w http.ResponseWriter) error
+}
+
+type ListCommits200ResponseHeaders struct {
+	ETag *string
+}
+
+type ListCommits200JSONResponse struct {
+	Body    CommitPage
+	Headers ListCommits200ResponseHeaders
+}
+
+func (response ListCommits200JSONResponse) VisitListCommitsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCommits304Response = NotModifiedResponse
+
+func (response ListCommits304Response) VisitListCommitsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type ListCommits400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListCommits400ApplicationProblemPlusJSONResponse) VisitListCommitsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCommits404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListCommits404ApplicationProblemPlusJSONResponse) VisitListCommitsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDashboardRequestObject struct {
+}
+
+type GetDashboardResponseObject interface {
+	VisitGetDashboardResponse(w http.ResponseWriter) error
+}
+
+type GetDashboard200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetDashboard200JSONResponse struct {
+	Body    Dashboard
+	Headers GetDashboard200ResponseHeaders
+}
+
+func (response GetDashboard200JSONResponse) VisitGetDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDashboard304Response = NotModifiedResponse
+
+func (response GetDashboard304Response) VisitGetDashboardResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
 }
 
 type ListGroupsRequestObject struct {
@@ -638,7 +992,7 @@ type GetRepo200ResponseHeaders struct {
 }
 
 type GetRepo200JSONResponse struct {
-	Body    Repo
+	Body    RepoDetail
 	Headers GetRepo200ResponseHeaders
 }
 
@@ -734,6 +1088,12 @@ func (response GetSnapshot304Response) VisitGetSnapshotResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListCommits Default-branch commits merged across repositories, newest first, one page at a time
+	// (GET /commits)
+	ListCommits(ctx context.Context, request ListCommitsRequestObject) (ListCommitsResponseObject, error)
+	// GetDashboard Groups with counts and latest activity, the latest commits and data health
+	// (GET /dashboard)
+	GetDashboard(ctx context.Context, request GetDashboardRequestObject) (GetDashboardResponseObject, error)
 	// ListGroups All groups in configuration order, with member counts
 	// (GET /groups)
 	ListGroups(ctx context.Context, request ListGroupsRequestObject) (ListGroupsResponseObject, error)
@@ -788,6 +1148,56 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListCommits operation middleware
+func (sh *strictHandler) ListCommits(w http.ResponseWriter, r *http.Request, params ListCommitsParams) {
+	var request ListCommitsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCommits(ctx, request.(ListCommitsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCommits")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCommitsResponseObject); ok {
+		if err := validResponse.VisitListCommitsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDashboard operation middleware
+func (sh *strictHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
+	var request GetDashboardRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDashboard(ctx, request.(GetDashboardRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDashboard")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDashboardResponseObject); ok {
+		if err := validResponse.VisitGetDashboardResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListGroups operation middleware
