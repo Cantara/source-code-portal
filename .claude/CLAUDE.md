@@ -7,10 +7,13 @@ Guidance for Claude Code in this repository.
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`) is the
 home of the Go rewrite of Source Code Portal (SCP). No product code yet; the next step is milestone M0.
 
-- **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later, out), architecture, stack, milestones M0..M5. Read it first.
+- **`.claude/work/plan.md` is the binding plan**: scope (v1, v1.1, later), architecture, stack, milestones M0..M5. Read it first.
+- `.claude/work/README.md`: index of the development package.
+- `.claude/work/design/`: short v1 design notes per area (GitHub, sync/snapshot/store, catalog, content, HTTP/API, web, build/ops,
+  principles). Binding below `plan.md`.
 - `.claude/work/decisions.md`: every decision taken, with where it is recorded.
-- `.claude/work/plans/`: the earlier detailed design package (about 1,900 files). **Reference only**: consult it when building a part,
-  copy what helps, ignore what `plan.md` dropped. It is not kept in sync; when it disagrees with `plan.md`, `plan.md` wins.
+- `.claude/work/reference/detailed-design/`: the earlier detailed design package (about 1,900 files). **Reference only**: consult it
+  when building a part, copy what helps. It is not kept in sync; `plan.md` and `design/` win.
 
 The Java product (`Cantara/SourceCodePortal`, checked out at `/Users/overanheim/Code/descoped/SourceCodePortal`) is read-only reference;
 never modify it, push to it or open issues or pull requests on it.
@@ -32,5 +35,5 @@ only in `cmd/scp`. Untrusted bytes pass through bounded parsers and one sanitise
 
 ## M0 starting point
 
-`.claude/work/plans/50-repo-seed/` holds a validated repository seed (Makefile, CI, Dockerfiles, archtest, web scaffold). It was built for
-the detailed design; at M0, take what fits `plan.md` and trim the rest (for example its 76 pre-created packages and generated import tables).
+`.claude/work/design/build-ops.md` says what M0 builds and lists the files it copies from the archived seed
+(`.claude/work/reference/detailed-design/50-repo-seed/repo/`).

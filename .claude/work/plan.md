@@ -1,8 +1,8 @@
 # SCP plan (binding baseline)
 
 Source Code Portal (SCP), rewritten in Go. This file is the plan: short and coarse on purpose. Written 2026-10-14; it replaces the
-detailed design package in `plans/` as the binding document (see "The reference package" at the end). Decisions taken while writing it are in
-`decisions.md`. When this file and anything under `plans/` disagree, this file wins.
+detailed design package in `reference/detailed-design/` as the binding document (see "The reference package" at the end). Decisions taken while writing it are in
+`decisions.md`. When this file and anything under `reference/detailed-design/` disagree, this file wins.
 
 ## 1. What SCP is
 
@@ -37,8 +37,6 @@ Target: up to 1,000 repositories, one instance.
 
 More manifest ecosystems, org-wide dependency graph and CycloneDX export, Jenkins and Snyk status, AsciiDoc, OpenTelemetry tracing.
 
-**Out**: non-GitHub providers, user accounts and stored user data, a plug-in system, server-side rendering.
-
 ## 3. Architecture
 
 ```
@@ -70,7 +68,7 @@ More manifest ecosystems, org-wide dependency graph and CycloneDX export, Jenkin
  Browser / LLM / badge ──▶ handlers ──┘ read the current snapshot only (never GitHub, never SQLite)
 ```
 
-Rules that carry the design (from the reference package, kept because they are cheap and prevent real bugs):
+Rules that carry the design (detailed in `design/principles.md`):
 
 1. Request handlers read only the current immutable snapshot. Sync jobs are the only code that talks to GitHub or writes SQLite.
 2. Features do not import features; they share data through the snapshot and small interfaces declared by the consumer. Wiring happens
@@ -103,10 +101,6 @@ Rule: every dependency is current (a release within the last 18 months, supports
 | Web | React 19, TypeScript, Vite, Tailwind 4, shadcn/ui, TanStack Router and Query, Vitest, Playwright; pnpm |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, Renovate |
 
-Changed from the reference package to cut code and moving parts: `go-github` + `ghinstallation` instead of an own GitHub client and JWT
-encoder; Prometheus client directly instead of the OpenTelemetry SDK (tracing is later); no runtime OpenAPI request validation
-(`kin-openapi`), the generated strict server already types the input; no i18n framework (English only); no circuit-breaker or backoff
-libraries (a small retry loop in `sync`); no generated import-rule tables or rank proofs.
 
 ## 5. Milestones
 
@@ -132,8 +126,7 @@ v1.1 follows the same pattern, one milestone per bullet of section 2.
 
 ## 7. The reference package
 
-`plans/` (about 1,900 files) is the earlier, detailed design: decisions, architecture, ADRs, 18 unit designs with tested reference code,
+`reference/detailed-design/` (about 1,900 files) is the earlier, detailed design: decisions, architecture, ADRs, 18 unit designs with tested reference code,
 reviews, a 370-key config catalogue and a repository seed. It is **reference material**: consult it when building a part (for example
-`plans/20-design/05-github-adapter.md` for GitHub rate limits and webhook details, `plans/02-do-not-inherit.md` for mistakes of the Java
-version), copy what is useful, ignore what this plan has dropped. It is not kept in sync and not updated further. Its repository seed
-(`plans/50-repo-seed/`) is a starting point for M0, trimmed to this plan.
+`reference/detailed-design/20-design/05-github-adapter.md` for GitHub rate limits and webhook details, `reference/detailed-design/02-design-guardrails.md` for background on `design/principles.md`), copy what is useful. It is not kept in sync and not updated further. Its repository seed
+(`reference/detailed-design/50-repo-seed/`) is a starting point for M0, trimmed to this plan.
