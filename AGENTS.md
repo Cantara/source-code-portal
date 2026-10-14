@@ -8,7 +8,7 @@ Instructions for coding agents working in this repository (Source Code Portal, G
 - Layout: `cmd/scp` (Cobra CLI and all wiring), `internal/<package>` (created with its first code), `api/openapi.yaml` (the `/api/v1`
   contract), `web/` (React SPA, embedded with the `spa` build tag), `deploy/` (Dockerfile, example config), `docs/` (user documentation).
 - Greenfield: change code, contract, config keys and the store schema in place; no compatibility layers or extra migrations.
-- Rules: features (`catalog`, `commits`, `docs`, `badges`, `webhook`, `llms`) never import each other, enforced by
+- Rules: features (`catalog`, `commits`, `docs`, `badges`, `webhook`, `llms`, `manifests`) never import each other, enforced by
   `cmd/scp/boundary_test.go`; request handlers read only the current snapshot; no globals or `init()`; config keys, metrics and
   packages arrive with the code that uses them.
 - Gate: `make check` (needs golangci-lint 2.14.0, Go 1.27.2, Node 24, pnpm 12 and the Playwright Chromium: `pnpm -C web exec playwright install chromium`). Single test: `go test -race -run TestName ./internal/<pkg>/`.

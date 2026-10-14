@@ -13,6 +13,7 @@ from a repository and how to describe it.
 | Latest commits | the 30 newest commits of the default branch |
 | Release badge | the latest GitHub release |
 | Title, owners, lifecycle, tags, links | the optional `scp.yaml` descriptor (below) |
+| Technology and dependencies | up to 30 package manifests: `go.mod`, `package.json` and `pom.xml`, at most four directories deep, outside `node_modules`, `vendor`, `test`, `tests`, `testdata`, `example`, `examples`, `fixtures` and hidden directories |
 
 A document's front matter may set `title`, `order` (a number; lower comes first) and `hidden: true` (rendered and linkable, but not
 listed):
@@ -28,6 +29,14 @@ Documents render as GitHub-flavoured Markdown: tables, task lists, footnotes, al
 `[!WARNING]`, `[!CAUTION]`) and highlighted code blocks. Relative links to other documents stay in the portal; relative images load from
 `raw.githubusercontent.com`. Scripts, styles, forms and embedded frames are removed. A very large document shows its first part with a
 link to the full file on GitHub.
+
+Manifests are read, never run: the portal shows what they declare. From `go.mod` the module path, the `go` and `toolchain` versions,
+`require` (`// indirect` shown as indirect) and `tool`; from `package.json` the name, version, `engines.node`, `packageManager` (or the
+lockfile beside it) and the four dependency fields; from `pom.xml` the coordinates (inherited from `parent`), the parent, the
+dependencies with their scopes, BOM imports and the Java version from `maven.compiler.release` (or `target`, `source`, `java.version`),
+with `${property}` references replaced from the POM's own properties. A dependency whose name another catalogued repository declares
+(Go module path, npm package name, Maven `groupId:artifactId`) links the two repositories: each page lists what it uses and what uses it.
+A file over 512 KiB, or one that does not parse, is listed with the problem.
 
 Changes show within seconds when the organisation webhook is set up, otherwise after the next scheduled check (a push is noticed within
 the listing interval, five minutes by default).

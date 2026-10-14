@@ -71,6 +71,17 @@ test("the README renders with highlighting and no script", async ({ page }) => {
   await expect(page.locator(".doc script")).toHaveCount(0)
 })
 
+test("a repository shows its technology and the repositories that use it", async ({ page }) => {
+  await page.goto("/repos/acme/whydah-core")
+  const tech = page.getByRole("region", { name: "Technology" })
+  await expect(tech.getByText("java 21")).toBeVisible()
+  await tech.getByRole("link", { name: "acme/whydah-sso" }).click()
+  await expect(page.getByRole("heading", { level: 1, name: "whydah-sso" })).toBeVisible()
+  await expect(
+    page.getByRole("region", { name: "Dependencies" }).getByRole("link", { name: "no.acme:whydah-core" }),
+  ).toBeVisible()
+})
+
 test("a stored dark theme paints dark from the first frame", async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem("scp-theme", "dark"))
   await page.goto("/", { waitUntil: "domcontentloaded" })

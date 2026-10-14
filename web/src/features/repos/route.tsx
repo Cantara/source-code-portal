@@ -14,6 +14,7 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { SafeHtml } from "@/shared/safe-html"
 import { docListQuery, docQuery, repoQuery } from "./api"
+import { Dependencies, TechnologyCard } from "./manifests"
 
 export const repoRoute = createLazyRoute("/repos/$owner/$name")({ component: RepoPage })
 
@@ -71,9 +72,15 @@ function RepoPage() {
             <PanelBoundary>
               <Readme owner={owner} name={name} />
             </PanelBoundary>
+            <PanelBoundary>
+              <Dependencies owner={owner} name={name} />
+            </PanelBoundary>
           </div>
           <div className="flex min-w-0 flex-col gap-6">
             {data.descriptor.present && <DescriptorCard d={data.descriptor} />}
+            <PanelBoundary>
+              <TechnologyCard owner={owner} name={name} />
+            </PanelBoundary>
             <PanelBoundary>
               <DocsCard owner={owner} name={name} />
             </PanelBoundary>

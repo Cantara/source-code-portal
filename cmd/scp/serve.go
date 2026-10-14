@@ -22,6 +22,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/llms"
+	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
@@ -64,13 +65,15 @@ func newServeCmd(opts *options) *cobra.Command {
 
 // api composes the strict server from the features that implement its methods. The aliases give the embedded fields distinct names.
 type (
-	catalogAPI = catalog.API
-	commitsAPI = commits.API
-	docsAPI    = docs.API
-	api        struct {
+	catalogAPI   = catalog.API
+	commitsAPI   = commits.API
+	docsAPI      = docs.API
+	manifestsAPI = manifests.API
+	api          struct {
 		catalogAPI
 		commitsAPI
 		docsAPI
+		manifestsAPI
 		httpapi.SnapshotAPI
 	}
 )
@@ -100,11 +103,12 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 	sources := map[string]catalog.GitHub{}
 	fetchers := map[string]commits.Fetcher{}
 	trees := map[string]docs.GitHub{}
+	manifestTrees := map[string]manifests.GitHub{}
 	releases := map[string]badges.Releases{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
 		src := gh.Source(s.ID)
-		sources[s.ID], fetchers[s.ID], trees[s.ID], releases[s.ID] = src, src, src, src
+		sources[s.ID], fetchers[s.ID], trees[s.ID], manifestTrees[s.ID], releases[s.ID] = src, src, src, src, src
 		ids = append(ids, s.ID)
 	}
 
@@ -124,7 +128,7 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 	}
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
 	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), docs.New(trees, safehtml.New()).Spec(), cat.DescriptorSpec(),
-		badges.New(releases).ReleaseSpec()} {
+		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
@@ -141,7 +145,7 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
-		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Readme(), Markdown: true},
+		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}}
 	if cfg.Webhook.Secret.IsSet() {
@@ -152,7 +156,7 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 	opts := httpapi.Options{Log: log, Build: build, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies,
 		Observe: m.request}
 	features := api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
-		httpapi.SnapshotAPI{Current: s.pub.Current}}
+		manifests.API{Current: s.pub.Current}, httpapi.SnapshotAPI{Current: s.pub.Current}}
 	s.public = httpapi.Server(httpapi.Public(opts, spa, contract.OpenAPI, features, routes...), log)
 	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
 	if cfg.Ops.Pprof {

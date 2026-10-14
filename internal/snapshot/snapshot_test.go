@@ -3,6 +3,7 @@ package snapshot
 import (
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -164,5 +165,41 @@ func TestFeedsAndUpdates(t *testing.T) {
 	}
 	if len(s.Repos["acme/b"].Commits) != 1 {
 		t.Error("the old snapshot changed")
+	}
+}
+
+func TestDependencyIndex(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	p.Update(func(bd *Builder) {
+		bd.ReplaceSource("gh", []*RepoEntry{repo("gh", 1, "acme", "lib"), repo("gh", 2, "acme", "fork"), repo("gh", 3, "acme", "app")}, nil,
+			SourceStatus{ID: "gh"})
+		lib := []Manifest{{Ecosystem: "go", Name: "github.com/acme/lib", Dependencies: []Dependency{{Name: "github.com/acme/lib/v2"}}}}
+		bd.UpdateRepo("acme/lib", func(e *RepoEntry) { e.Manifests = lib })
+		bd.UpdateRepo("acme/fork", func(e *RepoEntry) {
+			e.Manifests = []Manifest{{Ecosystem: "go", Name: "github.com/acme/lib", Dependencies: []Dependency{{Name: "github.com/acme/lib"}}},
+				{Ecosystem: "npm", Name: "github.com/acme/lib"}}
+		})
+		bd.UpdateRepo("acme/app", func(e *RepoEntry) {
+			e.Manifests = []Manifest{{Ecosystem: "go", Name: "app", Dependencies: []Dependency{{Name: "github.com/acme/lib"}, {Name: "other"}}},
+				{Ecosystem: "maven", Dependencies: []Dependency{{Name: "github.com/acme/lib"}}}}
+		})
+	})
+	p.Flush()
+	s := p.Current()
+	if got := s.Providers("go", "github.com/acme/lib"); !slices.Equal(got, []RepoKey{"acme/fork", "acme/lib"}) {
+		t.Errorf("Providers = %v", got)
+	}
+	if got := s.Providers("maven", "github.com/acme/lib"); got != nil {
+		t.Errorf("a name in another ecosystem matches: %v", got)
+	}
+	// fork declares lib's name and depends on it: lib is used by fork, fork by itself is not counted.
+	if got := s.UsedBy("acme/lib"); !slices.Equal(got, []RepoKey{"acme/app", "acme/fork"}) {
+		t.Errorf("UsedBy(lib) = %v", got)
+	}
+	if got := s.UsedBy("acme/fork"); !slices.Equal(got, []RepoKey{"acme/app"}) {
+		t.Errorf("UsedBy(fork) = %v", got)
+	}
+	if got := s.UsedBy("acme/app"); got != nil {
+		t.Errorf("UsedBy(app) = %v", got)
 	}
 }

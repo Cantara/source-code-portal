@@ -138,6 +138,32 @@ type Heading struct {
 	Text  string
 }
 
+// Manifest is one package manifest of a repository (go.mod, package.json, pom.xml) with what it declares.
+type Manifest struct {
+	Path         string       `json:"path"`
+	Ecosystem    string       `json:"ecosystem"` // go | npm | maven
+	Name         string       `json:"name"`      // Go module path, npm package name, Maven groupId:artifactId
+	Version      string       `json:"version,omitempty"`
+	Language     string       `json:"language"`
+	BuildTool    string       `json:"buildTool"`
+	Toolchain    []Toolchain  `json:"toolchain,omitempty"`
+	Dependencies []Dependency `json:"dependencies,omitempty"`
+	Problems     []Problem    `json:"problems,omitempty"`
+}
+
+// Toolchain is a toolchain version a manifest states.
+type Toolchain struct {
+	Name    string `json:"name"` // go | node | java
+	Version string `json:"version"`
+}
+
+// Dependency is one declared dependency.
+type Dependency struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"` // the requirement as written
+	Scope   string `json:"scope"`             // runtime dev peer optional provided test indirect tool parent import
+}
+
 // RepoEntry is everything the snapshot holds about one repository. Entries are shared by pointer between snapshot versions and
 // never mutated after publish; Builder.UpdateRepo replaces them.
 type RepoEntry struct {
@@ -151,6 +177,8 @@ type RepoEntry struct {
 	DocsFresh       Freshness
 	Release         *Release // nil when there is none or it is not known yet (ReleaseFresh.State tells which)
 	ReleaseFresh    Freshness
+	Manifests       []Manifest // by path
+	ManifestsFresh  Freshness
 }
 
 // Snapshot is the serving state. It is immutable after publish.
@@ -167,7 +195,12 @@ type Snapshot struct {
 	Latest        []CommitRef
 	groupsOf      map[RepoKey][]string
 	latestByGroup map[string][]CommitRef
+	providers     map[pkg][]RepoKey // sorted
+	usedBy        map[RepoKey][]RepoKey
 }
+
+// pkg is a package name within its ecosystem.
+type pkg struct{ ecosystem, name string }
 
 // Feed returns the merged commits of the group with id, or of every repository when id is empty.
 func (s *Snapshot) Feed(id string) ([]CommitRef, bool) {
@@ -201,3 +234,11 @@ func (s *Snapshot) Group(id string) (Group, bool) {
 
 // GroupsOf returns the ids of the groups that contain key, in config order.
 func (s *Snapshot) GroupsOf(key RepoKey) []string { return s.groupsOf[key] }
+
+// Providers returns the repositories with a manifest that declares the package name in ecosystem, sorted.
+func (s *Snapshot) Providers(ecosystem, name string) []RepoKey {
+	return s.providers[pkg{ecosystem, name}]
+}
+
+// UsedBy returns the repositories that declare a dependency on a package key provides, sorted.
+func (s *Snapshot) UsedBy(key RepoKey) []RepoKey { return s.usedBy[key] }

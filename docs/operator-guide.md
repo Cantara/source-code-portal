@@ -23,7 +23,7 @@ seconds, add an organisation webhook (Settings, Webhooks) with content type `app
 *Releases* and *Repositories*.
 
 Without a webhook the portal still refreshes: it lists every organisation every five minutes and notices pushes from that listing;
-commits, documents and descriptors are also re-read on their own schedule.
+commits, documents, descriptors and manifests are also re-read on their own schedule.
 
 ## 2. Configure
 
@@ -175,7 +175,7 @@ Expose only the `public` port through your ingress. The ingress must pass `X-For
 
 **Start.** A start loads the cache and serves it at once, then lists every organisation. On the first start (empty cache) the pages
 say the portal is loading and fill in as data arrives; `/readyz` turns 200 once every source has a complete listing. A cold start of
-1,000 repositories needs about 4,500 GitHub requests; with a token it can wait for the hourly rate-limit reset to finish.
+1,000 repositories needs about 5,500 GitHub requests; with a token it can wait for the hourly rate-limit reset to finish.
 
 **GitHub outages.** When GitHub fails or the rate limit runs out, the portal keeps serving the last good data, marks the affected
 items *Delayed* or *Update failing*, and retries with backoff. `/readyz` stays 200.

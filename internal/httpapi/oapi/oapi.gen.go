@@ -17,6 +17,48 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for DependencyScope.
+const (
+	Dev      DependencyScope = "dev"
+	Import   DependencyScope = "import"
+	Indirect DependencyScope = "indirect"
+	Optional DependencyScope = "optional"
+	Parent   DependencyScope = "parent"
+	Peer     DependencyScope = "peer"
+	Provided DependencyScope = "provided"
+	Runtime  DependencyScope = "runtime"
+	Test     DependencyScope = "test"
+	Tool     DependencyScope = "tool"
+)
+
+// Valid indicates whether the value is a known member of the DependencyScope enum.
+func (e DependencyScope) Valid() bool {
+	switch e {
+	case Dev:
+		return true
+	case Import:
+		return true
+	case Indirect:
+		return true
+	case Optional:
+		return true
+	case Parent:
+		return true
+	case Peer:
+		return true
+	case Provided:
+		return true
+	case Runtime:
+		return true
+	case Test:
+		return true
+	case Tool:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DescriptorLifecycle.
 const (
 	Deprecated   DescriptorLifecycle = "deprecated"
@@ -179,6 +221,69 @@ func (e GroupSummaryDefaultRepoState) Valid() bool {
 	}
 }
 
+// Defines values for ManifestEcosystem.
+const (
+	ManifestEcosystemGo    ManifestEcosystem = "go"
+	ManifestEcosystemMaven ManifestEcosystem = "maven"
+	ManifestEcosystemNpm   ManifestEcosystem = "npm"
+)
+
+// Valid indicates whether the value is a known member of the ManifestEcosystem enum.
+func (e ManifestEcosystem) Valid() bool {
+	switch e {
+	case ManifestEcosystemGo:
+		return true
+	case ManifestEcosystemMaven:
+		return true
+	case ManifestEcosystemNpm:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToolchainName.
+const (
+	ToolchainNameGo   ToolchainName = "go"
+	ToolchainNameJava ToolchainName = "java"
+	ToolchainNameNode ToolchainName = "node"
+)
+
+// Valid indicates whether the value is a known member of the ToolchainName enum.
+func (e ToolchainName) Valid() bool {
+	switch e {
+	case ToolchainNameGo:
+		return true
+	case ToolchainNameJava:
+		return true
+	case ToolchainNameNode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToolchainVersionsName.
+const (
+	ToolchainVersionsNameGo   ToolchainVersionsName = "go"
+	ToolchainVersionsNameJava ToolchainVersionsName = "java"
+	ToolchainVersionsNameNode ToolchainVersionsName = "node"
+)
+
+// Valid indicates whether the value is a known member of the ToolchainVersionsName enum.
+func (e ToolchainVersionsName) Valid() bool {
+	switch e {
+	case ToolchainVersionsNameGo:
+		return true
+	case ToolchainVersionsNameJava:
+		return true
+	case ToolchainVersionsNameNode:
+		return true
+	default:
+		return false
+	}
+}
+
 // Commit defines model for Commit.
 type Commit struct {
 	// AuthorLogin GitHub login; empty when unknown
@@ -227,6 +332,21 @@ type DashboardGroup struct {
 	RepoCount    int        `json:"repoCount"`
 }
 
+// Dependency defines model for Dependency.
+type Dependency struct {
+	Name string `json:"name"`
+
+	// Repos Addresses of the catalogued repositories that declare this name
+	Repos []string        `json:"repos"`
+	Scope DependencyScope `json:"scope"`
+
+	// Version The requirement as written; empty when none
+	Version string `json:"version"`
+}
+
+// DependencyScope defines model for Dependency.Scope.
+type DependencyScope string
+
 // Descriptor The repository's own scp.yaml. It changes display only.
 type Descriptor struct {
 	Description string `json:"description"`
@@ -238,24 +358,15 @@ type Descriptor struct {
 	Links     []Link              `json:"links"`
 
 	// Owners Claimed owners
-	Owners   []string            `json:"owners"`
-	Present  bool                `json:"present"`
-	Problems []DescriptorProblem `json:"problems"`
-	Tags     []string            `json:"tags"`
-	Title    string              `json:"title"`
+	Owners   []string      `json:"owners"`
+	Present  bool          `json:"present"`
+	Problems []FileProblem `json:"problems"`
+	Tags     []string      `json:"tags"`
+	Title    string        `json:"title"`
 }
 
 // DescriptorLifecycle defines model for Descriptor.Lifecycle.
 type DescriptorLifecycle string
-
-// DescriptorProblem defines model for DescriptorProblem.
-type DescriptorProblem struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-
-	// Pointer JSON pointer into the file; empty for the whole file
-	Pointer string `json:"pointer"`
-}
 
 // Doc defines model for Doc.
 type Doc struct {
@@ -313,6 +424,15 @@ type DocSummaryFormat string
 
 // DocSummaryState too_large and unsupported have no HTML
 type DocSummaryState string
+
+// FileProblem defines model for FileProblem.
+type FileProblem struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+
+	// Pointer JSON pointer into the file, /line/12 for a line; empty for the whole file
+	Pointer string `json:"pointer"`
+}
 
 // Freshness defines model for Freshness.
 type Freshness struct {
@@ -381,6 +501,39 @@ type Link struct {
 	Url   string `json:"url"`
 }
 
+// Manifest defines model for Manifest.
+type Manifest struct {
+	BuildTool    string            `json:"buildTool"`
+	Dependencies []Dependency      `json:"dependencies"`
+	Ecosystem    ManifestEcosystem `json:"ecosystem"`
+	Language     string            `json:"language"`
+
+	// Name Go module path, npm package name or Maven groupId:artifactId; empty when the file names none
+	Name      string        `json:"name"`
+	Path      string        `json:"path"`
+	Problems  []FileProblem `json:"problems"`
+	Toolchain []Toolchain   `json:"toolchain"`
+	Version   string        `json:"version"`
+}
+
+// ManifestEcosystem defines model for Manifest.Ecosystem.
+type ManifestEcosystem string
+
+// Manifests defines model for Manifests.
+type Manifests struct {
+	Freshness Freshness `json:"freshness"`
+
+	// Manifests By path
+	Manifests  []Manifest `json:"manifests"`
+	Technology Technology `json:"technology"`
+
+	// UsedBy Catalogued repositories that depend on this one
+	UsedBy []RepoLink `json:"usedBy"`
+
+	// Uses Catalogued repositories this one depends on
+	Uses []RepoLink `json:"uses"`
+}
+
 // Page defines model for Page.
 type Page struct {
 	Limit      int     `json:"limit"`
@@ -443,6 +596,16 @@ type RepoDetail struct {
 	Title string `json:"title"`
 }
 
+// RepoLink defines model for RepoLink.
+type RepoLink struct {
+	Address string `json:"address"`
+	Name    string `json:"name"`
+	Owner   string `json:"owner"`
+
+	// Via The dependency names that link the two repositories
+	Via []string `json:"via"`
+}
+
 // RepoList defines model for RepoList.
 type RepoList struct {
 	Repos []Repo `json:"repos"`
@@ -464,6 +627,33 @@ type SourceInfo struct {
 	Id        string    `json:"id"`
 	Repos     int       `json:"repos"`
 }
+
+// Technology defines model for Technology.
+type Technology struct {
+	BuildTools []string            `json:"buildTools"`
+	Languages  []string            `json:"languages"`
+	Toolchains []ToolchainVersions `json:"toolchains"`
+}
+
+// Toolchain defines model for Toolchain.
+type Toolchain struct {
+	Name    ToolchainName `json:"name"`
+	Version string        `json:"version"`
+}
+
+// ToolchainName defines model for Toolchain.Name.
+type ToolchainName string
+
+// ToolchainVersions defines model for ToolchainVersions.
+type ToolchainVersions struct {
+	Name ToolchainVersionsName `json:"name"`
+
+	// Versions Every version the manifests state
+	Versions []string `json:"versions"`
+}
+
+// ToolchainVersionsName defines model for ToolchainVersions.Name.
+type ToolchainVersionsName string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Problem
@@ -512,6 +702,9 @@ type ServerInterface interface {
 	// GetDoc One rendered document
 	// (GET /repos/{owner}/{name}/docs/{docId})
 	GetDoc(w http.ResponseWriter, r *http.Request, owner string, name string, docId string)
+	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
+	// (GET /repos/{owner}/{name}/manifests)
+	GetManifests(w http.ResponseWriter, r *http.Request, owner string, name string)
 	// GetSnapshot Data health; the web UI polls it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(w http.ResponseWriter, r *http.Request)
@@ -799,6 +992,41 @@ func (siw *ServerInterfaceWrapper) GetDoc(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// GetManifests operation middleware
+func (siw *ServerInterfaceWrapper) GetManifests(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", r.PathValue("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "owner", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetManifests(w, r, owner, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSnapshot operation middleware
 func (siw *ServerInterfaceWrapper) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 
@@ -941,6 +1169,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}", wrapper.GetRepo)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/docs", wrapper.ListDocs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/docs/{docId}", wrapper.GetDoc)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/manifests", wrapper.GetManifests)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 
 	return m
@@ -1410,6 +1639,70 @@ func (response GetDoc404ApplicationProblemPlusJSONResponse) VisitGetDocResponse(
 	return err
 }
 
+type GetManifestsRequestObject struct {
+	Owner string `json:"owner"`
+	Name  string `json:"name"`
+}
+
+type GetManifestsResponseObject interface {
+	VisitGetManifestsResponse(w http.ResponseWriter) error
+}
+
+type GetManifests200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetManifests200JSONResponse struct {
+	Body    Manifests
+	Headers GetManifests200ResponseHeaders
+}
+
+func (response GetManifests200JSONResponse) VisitGetManifestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetManifests304Response = NotModifiedResponse
+
+func (response GetManifests304Response) VisitGetManifestsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetManifests308Response = MovedResponse
+
+func (response GetManifests308Response) VisitGetManifestsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.WriteHeader(308)
+	return nil
+}
+
+type GetManifests404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetManifests404ApplicationProblemPlusJSONResponse) VisitGetManifestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSnapshotRequestObject struct {
 }
 
@@ -1474,6 +1767,9 @@ type StrictServerInterface interface {
 	// GetDoc One rendered document
 	// (GET /repos/{owner}/{name}/docs/{docId})
 	GetDoc(ctx context.Context, request GetDocRequestObject) (GetDocResponseObject, error)
+	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
+	// (GET /repos/{owner}/{name}/manifests)
+	GetManifests(ctx context.Context, request GetManifestsRequestObject) (GetManifestsResponseObject, error)
 	// GetSnapshot Data health; the web UI polls it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(ctx context.Context, request GetSnapshotRequestObject) (GetSnapshotResponseObject, error)
@@ -1719,6 +2015,33 @@ func (sh *strictHandler) GetDoc(w http.ResponseWriter, r *http.Request, owner st
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetDocResponseObject); ok {
 		if err := validResponse.VisitGetDocResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetManifests operation middleware
+func (sh *strictHandler) GetManifests(w http.ResponseWriter, r *http.Request, owner string, name string) {
+	var request GetManifestsRequestObject
+
+	request.Owner = owner
+	request.Name = name
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetManifests(ctx, request.(GetManifestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetManifests")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetManifestsResponseObject); ok {
+		if err := validResponse.VisitGetManifestsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

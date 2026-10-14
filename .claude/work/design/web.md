@@ -50,7 +50,7 @@ lazy chunk.
 | `/` | dashboard | groups as cards (count badge, freshness), latest commits across the org |
 | `/groups/{group}` | groups | group header, repository table (filter by name, sort), latest commits |
 | `/groups/{group}/commits` | commits | commit log scoped to the group |
-| `/repos/{owner}/{name}` | repos | descriptor (title, owners, lifecycle, tags, links), badges, rendered README, latest commits |
+| `/repos/{owner}/{name}` | repos | descriptor (title, owners, lifecycle, tags, links), badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
 | `/repos/{owner}/{name}/commits` | commits | commit log of the default branch |
 | `/repos/{owner}/{name}/docs/{path}` | docs | rendered doc with a file list and heading outline; `{path}` is the repository path without its extension |
 | `/commits` | commits | commit log across all repositories, filter by group or repository |

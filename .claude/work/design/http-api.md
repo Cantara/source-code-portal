@@ -34,7 +34,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/commits` | httpapi | SPA shell (commit log across repositories) |
 | P | GET | `/groups/{group}` | httpapi + llms | SPA shell; `Accept: text/markdown` gets the group as Markdown |
 | P | GET | `/groups/{group}/commits` | httpapi | SPA shell (group commit log) |
-| P | GET | `/repos/{o}/{n}` | httpapi + llms | SPA shell; `Accept: text/markdown` gets the README Markdown |
+| P | GET | `/repos/{o}/{n}` | httpapi + llms | SPA shell; `Accept: text/markdown` gets the README Markdown with the technology and internal dependencies |
 | P | GET | `/repos/{o}/{n}/commits` | httpapi | SPA shell (commit log) |
 | P | GET | `/repos/{o}/{n}/docs/{path...}` | docs | path ends `.md`: raw Markdown; else SPA shell (negotiated like above) |
 | P | GET | `/repos/{o}/{n}/readme.md` | docs | raw README Markdown with `scp:` front matter |
@@ -47,6 +47,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/api/v1/repos/{o}/{n}` | catalog | repository facts, descriptor, groups, freshness |
 | P | GET | `/api/v1/repos/{o}/{n}/docs` | docs | document list (README first, then `docs/` in navigation order) |
 | P | GET | `/api/v1/repos/{o}/{n}/docs/{docId}` | docs | one document: `SafeHTML`, title, blob SHA, freshness |
+| P | GET | `/api/v1/repos/{o}/{n}/manifests` | manifests | manifests with dependencies, technology, uses and used by (`manifests.md`) |
 | P | GET | `/api/v1/commits` | commits | merged default-branch commits; `?group=`, `?repo=owner/name`, cursor-paginated |
 | P | GET | `/api/v1/snapshot` | httpapi | data health: snapshot version, builtAt, ready flag, freshness counts; the SPA polls it |
 | P | GET | `/api/v1/openapi.yaml` | httpapi | the embedded contract |

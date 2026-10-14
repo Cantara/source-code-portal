@@ -13,7 +13,7 @@ import (
 )
 
 // features are the packages under internal/ that never import each other; core packages import none of them.
-var features = []string{"catalog", "commits", "docs", "badges", "webhook", "llms"} //nolint:gochecknoglobals // test table
+var features = []string{"catalog", "commits", "docs", "badges", "webhook", "llms", "manifests"} //nolint:gochecknoglobals // test table
 
 const internalPrefix = "github.com/cantara/source-code-portal/internal/"
 

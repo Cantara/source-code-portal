@@ -45,6 +45,11 @@ func TestServeForPlaywright(t *testing.T) {
 		"```go\nfunc main() { println(\"hi\") }\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")
 	gh.SetFile(core, "docs/setup.md", "# Setup\n\n## Install\n\nRun it.\n\n## Configure\n\n<script>alert(1)</script>\n")
 	gh.SetFile(sso, "README.md", "# SSO\n")
+	gh.SetFile(core, "pom.xml", "<project><groupId>no.acme</groupId><artifactId>whydah-core</artifactId><version>1.0</version>"+
+		"<properties><maven.compiler.release>21</maven.compiler.release></properties><dependencies>"+
+		"<dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId><version>2.0.17</version></dependency></dependencies></project>")
+	gh.SetFile(sso, "pom.xml", "<project><groupId>no.acme</groupId><artifactId>whydah-sso</artifactId><dependencies>"+
+		"<dependency><groupId>no.acme</groupId><artifactId>whydah-core</artifactId><version>1.0</version></dependency></dependencies></project>")
 	gh.SetRelease(core, "v1.2.0", "1.2.0", start)
 
 	dir := t.TempDir()

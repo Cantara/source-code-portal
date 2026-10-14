@@ -56,6 +56,18 @@ describe("pages", () => {
     expect(await screen.findByRole("link", { name: "Setup" })).toHaveAttribute("href", "/repos/acme/core/docs/docs/setup")
   })
 
+  it("shows a repository's technology, dependencies and internal links", async () => {
+    render(<App initialPath="/repos/acme/core" queryClient={client()} />)
+    const tech = await screen.findByRole("region", { name: "Technology" })
+    expect(await within(tech).findByText("Maven")).toBeInTheDocument()
+    expect(within(tech).getByText("java 21")).toBeInTheDocument()
+    expect(within(tech).getByRole("link", { name: "acme/lib" })).toHaveAttribute("href", "/repos/acme/lib")
+    expect(within(tech).getByRole("link", { name: "acme/sso" })).toHaveAttribute("href", "/repos/acme/sso")
+    const deps = screen.getByRole("region", { name: "Dependencies" })
+    expect(within(deps).getByRole("link", { name: "no.acme:lib" })).toHaveAttribute("href", "/repos/acme/lib")
+    expect(within(deps).getByText("org.junit.jupiter:junit-jupiter")).toBeInTheDocument()
+  })
+
   it("renders a document with its outline", async () => {
     render(<App initialPath="/repos/acme/core/docs/docs/setup.md" queryClient={client()} />)
     expect(await screen.findByRole("heading", { level: 1, name: "Setup" })).toBeInTheDocument()

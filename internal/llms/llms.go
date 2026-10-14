@@ -79,6 +79,82 @@ func (l *LLMs) Readme() http.Handler {
 	})
 }
 
+// Repo serves the negotiated repository page: the README as Markdown, followed by the technology and internal dependencies that
+// the repository's manifests declare.
+func (l *LLMs) Repo() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		e, ok := l.repo(w, r)
+		if !ok {
+			return
+		}
+		var b bytes.Buffer
+		if i := slices.IndexFunc(e.Docs, func(d snapshot.Doc) bool { return d.README }); i >= 0 {
+			b.Write(l.document(e, e.Docs[i]))
+		} else {
+			fmt.Fprintf(&b, "---\nscp:\n  repo: %s\n---\n\n# %s\n", quote(string(e.Repo.Key())), line(e.Repo.Owner+"/"+e.Repo.Name, maxDescription))
+		}
+		b.WriteString(l.technology(l.current(), e))
+		serve(w, r, "text/markdown; charset=utf-8", b.Bytes())
+	})
+}
+
+// technology is the portal's section on what the manifests of e declare; empty when there is nothing to say.
+func (l *LLMs) technology(s *snapshot.Snapshot, e *snapshot.RepoEntry) string {
+	self := e.Repo.Key()
+	var langs, tools, chains []string
+	uses := map[snapshot.RepoKey]bool{}
+	for _, m := range e.Manifests {
+		langs, tools = appendNew(langs, m.Language), appendNew(tools, m.BuildTool)
+		for _, t := range m.Toolchain {
+			chains = appendNew(chains, t.Name+" "+t.Version)
+		}
+		for _, d := range m.Dependencies {
+			for _, p := range s.Providers(m.Ecosystem, d.Name) {
+				uses[p] = p != self
+			}
+		}
+	}
+	var b strings.Builder
+	for _, f := range []struct {
+		label string
+		vals  []string
+	}{{"Languages", langs}, {"Build tools", tools}, {"Toolchains", chains}} {
+		if len(f.vals) > 0 {
+			fmt.Fprintf(&b, "- %s: %s\n", f.label, line(strings.Join(f.vals, ", "), maxSummary))
+		}
+	}
+	links := func(label string, keys []snapshot.RepoKey) {
+		if len(keys) == 0 {
+			return
+		}
+		out := make([]string, 0, len(keys))
+		for _, k := range keys {
+			out = append(out, fmt.Sprintf("[%s](%s)", line(string(k), maxDescription), l.url("/repos/"+string(k))))
+		}
+		fmt.Fprintf(&b, "- %s: %s\n", label, strings.Join(out, ", "))
+	}
+	var used []snapshot.RepoKey
+	for k, ok := range uses {
+		if ok {
+			used = append(used, k)
+		}
+	}
+	slices.Sort(used)
+	links("Uses", used)
+	links("Used by", s.UsedBy(self))
+	if b.Len() == 0 {
+		return ""
+	}
+	return "\n## Technology and dependencies\n\nRead by the portal from the repository's package manifests.\n\n" + b.String()
+}
+
+func appendNew(vals []string, v string) []string {
+	if v == "" || slices.Contains(vals, v) {
+		return vals
+	}
+	return append(vals, v)
+}
+
 // Doc serves /repos/{owner}/{name}/docs/{path...}: the document whose path without its extension is path (an .md suffix on the
 // request is dropped first).
 func (l *LLMs) Doc() http.Handler {

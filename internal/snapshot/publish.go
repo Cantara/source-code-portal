@@ -105,7 +105,40 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 	for _, g := range s.Groups {
 		s.latestByGroup[g.ID] = feed(s.Repos, g.Members)
 	}
+	s.providers, s.usedBy = dependencies(s.Repos, keys)
 	return s
+}
+
+// dependencies indexes the package names the manifests of keys declare, and inverts the dependencies between the repositories.
+func dependencies(repos map[RepoKey]*RepoEntry, keys []RepoKey) (map[pkg][]RepoKey, map[RepoKey][]RepoKey) {
+	providers := map[pkg][]RepoKey{}
+	for _, k := range keys {
+		for _, m := range repos[k].Manifests {
+			if p := (pkg{m.Ecosystem, m.Name}); m.Name != "" && !slices.Contains(providers[p], k) {
+				providers[p] = append(providers[p], k)
+			}
+		}
+	}
+	users := map[RepoKey]map[RepoKey]bool{}
+	for _, k := range keys {
+		for _, m := range repos[k].Manifests {
+			for _, d := range m.Dependencies {
+				for _, p := range providers[pkg{m.Ecosystem, d.Name}] {
+					if p != k {
+						if users[p] == nil {
+							users[p] = map[RepoKey]bool{}
+						}
+						users[p][k] = true
+					}
+				}
+			}
+		}
+	}
+	usedBy := make(map[RepoKey][]RepoKey, len(users))
+	for p, us := range users {
+		usedBy[p] = slices.Sorted(maps.Keys(us))
+	}
+	return providers, usedBy
 }
 
 // feed merges the commits of keys, newest first.

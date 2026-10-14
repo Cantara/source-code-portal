@@ -138,6 +138,23 @@ paths:
         "304": { $ref: "#/components/responses/NotModified" }
         "308": { $ref: "#/components/responses/Moved" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /repos/{owner}/{name}/manifests:
+    get:
+      operationId: getManifests
+      summary: The repository's package manifests, the technology they state and its internal dependencies
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The manifests
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Manifests" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "308": { $ref: "#/components/responses/Moved" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /snapshot:
     get:
       operationId: getSnapshot
@@ -226,7 +243,7 @@ components:
         owners: { type: array, items: { type: string }, description: Claimed owners, "@user or @org/team" }
         tags: { type: array, items: { type: string } }
         links: { type: array, items: { $ref: "#/components/schemas/Link" } }
-        problems: { type: array, items: { $ref: "#/components/schemas/DescriptorProblem" } }
+        problems: { type: array, items: { $ref: "#/components/schemas/FileProblem" } }
         freshness: { $ref: "#/components/schemas/Freshness" }
     Link:
       type: object
@@ -234,11 +251,11 @@ components:
       properties:
         title: { type: string }
         url: { type: string }
-    DescriptorProblem:
+    FileProblem:
       type: object
       required: [pointer, code, message]
       properties:
-        pointer: { type: string, description: JSON pointer into the file; empty for the whole file }
+        pointer: { type: string, description: "JSON pointer into the file, /line/12 for a line; empty for the whole file" }
         code: { type: string }
         message: { type: string }
     Commit:
@@ -334,6 +351,63 @@ components:
         blobSha: { type: string }
         sourceUrl: { type: string, description: The file on GitHub }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    Manifests:
+      type: object
+      required: [technology, manifests, uses, usedBy, freshness]
+      properties:
+        technology: { $ref: "#/components/schemas/Technology" }
+        manifests: { type: array, items: { $ref: "#/components/schemas/Manifest" }, description: By path }
+        uses: { type: array, items: { $ref: "#/components/schemas/RepoLink" }, description: Catalogued repositories this one depends on }
+        usedBy: { type: array, items: { $ref: "#/components/schemas/RepoLink" }, description: Catalogued repositories that depend on this one }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    Technology:
+      type: object
+      required: [languages, buildTools, toolchains]
+      properties:
+        languages: { type: array, items: { type: string } }
+        buildTools: { type: array, items: { type: string } }
+        toolchains: { type: array, items: { $ref: "#/components/schemas/ToolchainVersions" } }
+    ToolchainVersions:
+      type: object
+      required: [name, versions]
+      properties:
+        name: { type: string, enum: [go, node, java] }
+        versions: { type: array, items: { type: string }, description: Every version the manifests state }
+    Manifest:
+      type: object
+      required: [path, ecosystem, name, version, language, buildTool, toolchain, dependencies, problems]
+      properties:
+        path: { type: string }
+        ecosystem: { type: string, enum: [go, npm, maven] }
+        name: { type: string, description: "Go module path, npm package name or Maven groupId:artifactId; empty when the file names none" }
+        version: { type: string }
+        language: { type: string }
+        buildTool: { type: string }
+        toolchain: { type: array, items: { $ref: "#/components/schemas/Toolchain" } }
+        dependencies: { type: array, items: { $ref: "#/components/schemas/Dependency" } }
+        problems: { type: array, items: { $ref: "#/components/schemas/FileProblem" } }
+    Toolchain:
+      type: object
+      required: [name, version]
+      properties:
+        name: { type: string, enum: [go, node, java] }
+        version: { type: string }
+    Dependency:
+      type: object
+      required: [name, version, scope, repos]
+      properties:
+        name: { type: string }
+        version: { type: string, description: The requirement as written; empty when none }
+        scope: { type: string, enum: [runtime, dev, peer, optional, provided, test, indirect, tool, parent, import] }
+        repos: { type: array, items: { type: string }, description: Addresses of the catalogued repositories that declare this name }
+    RepoLink:
+      type: object
+      required: [address, owner, name, via]
+      properties:
+        address: { type: string }
+        owner: { type: string }
+        name: { type: string }
+        via: { type: array, items: { type: string }, description: The dependency names that link the two repositories }
     RepoList:
       type: object
       required: [repos]

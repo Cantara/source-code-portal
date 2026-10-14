@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +117,9 @@ func TestServeEndToEnd(t *testing.T) {
 	gh.SetRelease(core, "v2.0.0", "Two", at(3))
 	gh.SetFile(core, "README.md", "# Whydah Core\n\nIdentity. See [setup](docs/setup.md).\n")
 	gh.SetFile(core, "docs/setup.md", "# Setup\n\n## Install\n\n<script>alert(1)</script>\n")
+	gh.SetFile(core, "pom.xml", "<project><groupId>no.acme</groupId><artifactId>whydah-core</artifactId><version>1</version></project>")
+	gh.SetFile(sso, "pom.xml", "<project><groupId>no.acme</groupId><artifactId>sso</artifactId><dependencies><dependency>"+
+		"<groupId>no.acme</groupId><artifactId>whydah-core</artifactId></dependency></dependencies></project>")
 	gh.AddRepo("acme", gogh.Repository{Name: new("secret"), Visibility: new("private")})
 
 	dir := t.TempDir()
@@ -210,6 +214,12 @@ catalog:
 			return fetch(public+"/api/v1/dashboard", &d) == http.StatusOK && d.Freshness.Fresh == 3 &&
 				fetch(public+"/api/v1/repos/acme/whydah-core", &r) == http.StatusOK && r.Descriptor.Present &&
 				fetch(public+"/api/v1/repos/acme/whydah-core/docs", &l) == http.StatusOK && len(l.Docs) == 2
+		})
+		waitFor("manifests", func() bool {
+			var m oapi.Manifests
+			return fetch(public+"/api/v1/repos/acme/whydah-core/manifests", &m) == http.StatusOK && len(m.UsedBy) == 1 &&
+				m.UsedBy[0].Address == "acme/whydah-sso" && slices.Equal(m.UsedBy[0].Via, []string{"no.acme:whydah-core"}) &&
+				slices.Equal(m.Technology.BuildTools, []string{"Maven"})
 		})
 		var doc oapi.Doc
 		if code := fetch(public+"/api/v1/repos/acme/whydah-core/docs/docs%2Fsetup.md", &doc); code != http.StatusOK || doc.Title != "Setup" ||

@@ -1,6 +1,7 @@
 package llms
 
 import (
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -129,4 +130,36 @@ func FuzzDelimit(f *testing.F) {
 			t.Errorf("%q gave %q", src, out)
 		}
 	})
+}
+
+func TestRepoPage(t *testing.T) {
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	defer p.Close()
+	entry := func(id int64, name string) *snapshot.RepoEntry {
+		return &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: id}, Owner: "acme", Name: name}}
+	}
+	p.Update(func(b *snapshot.Builder) {
+		b.ReplaceSource("gh", []*snapshot.RepoEntry{entry(1, "lib"), entry(2, "app")}, nil, snapshot.SourceStatus{ID: "gh"})
+		b.UpdateRepo("acme/lib", func(e *snapshot.RepoEntry) {
+			e.Manifests = []snapshot.Manifest{{Ecosystem: "go", Name: "github.com/acme/lib", Language: "Go", BuildTool: "Go modules"}}
+			e.Docs = []snapshot.Doc{{Path: "README.md", README: true, Source: []byte("# Lib\n")}}
+		})
+		b.UpdateRepo("acme/app", func(e *snapshot.RepoEntry) {
+			e.Manifests = []snapshot.Manifest{{Ecosystem: "go", Name: "app", Language: "Go", BuildTool: "Go modules",
+				Toolchain: []snapshot.Toolchain{{Name: "go", Version: "1.27"}}, Dependencies: []snapshot.Dependency{{Name: "github.com/acme/lib"}}}}
+		})
+	})
+	p.Flush()
+	mux := http.NewServeMux()
+	mux.Handle("GET /repos/{owner}/{name}", New(p.Current, "https://scp.example").Repo())
+	lib := get(mux, "/repos/acme/lib").Body.String()
+	if !strings.Contains(lib, "# Lib\n") || !strings.Contains(lib, "- Used by: [acme/app](https://scp.example/repos/acme/app)\n") {
+		t.Errorf("lib:\n%s", lib)
+	}
+	app := get(mux, "/repos/acme/app").Body.String()
+	for _, want := range []string{`repo: "acme/app"`, "- Toolchains: go 1.27\n", "- Uses: [acme/lib](https://scp.example/repos/acme/lib)\n"} {
+		if !strings.Contains(app, want) {
+			t.Errorf("app misses %q:\n%s", want, app)
+		}
+	}
 }

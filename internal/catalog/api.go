@@ -112,7 +112,7 @@ func detail(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.Rep
 		CommitsFreshness: oapi.FreshnessOf(e.CommitsFresh, now),
 		Descriptor: oapi.Descriptor{Present: d.Present, File: d.File, Title: d.Title, Description: d.Description,
 			Lifecycle: oapi.DescriptorLifecycle(d.Lifecycle), Owners: nonNil(d.Owners), Tags: nonNil(d.Tags),
-			Links: make([]oapi.Link, 0, len(d.Links)), Problems: make([]oapi.DescriptorProblem, 0, len(d.Problems)),
+			Links: make([]oapi.Link, 0, len(d.Links)), Problems: make([]oapi.FileProblem, 0, len(d.Problems)),
 			Freshness: oapi.FreshnessOf(e.DescriptorFresh, now)}}
 	if d.Title != "" {
 		out.Title = d.Title
@@ -121,7 +121,7 @@ func detail(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.Rep
 		out.Descriptor.Links = append(out.Descriptor.Links, oapi.Link{Title: l.Title, Url: l.URL})
 	}
 	for _, p := range d.Problems {
-		out.Descriptor.Problems = append(out.Descriptor.Problems, oapi.DescriptorProblem{Pointer: p.Pointer, Code: p.Code, Message: p.Message})
+		out.Descriptor.Problems = append(out.Descriptor.Problems, oapi.FileProblem{Pointer: p.Pointer, Code: p.Code, Message: p.Message})
 	}
 	key := e.Repo.Key()
 	for i := range e.Commits {

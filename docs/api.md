@@ -16,6 +16,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/repos/{owner}/{name}` | one repository with its `scp.yaml` descriptor and latest commits |
 | `GET /api/v1/repos/{owner}/{name}/docs` | the repository's documents, README first |
 | `GET /api/v1/repos/{owner}/{name}/docs/{docId}` | one rendered document; `docId` is its path, percent-encoded into one segment (`docs%2Fsetup.md`); the path without its extension also matches |
+| `GET /api/v1/repos/{owner}/{name}/manifests` | the repository's `go.mod`, `package.json` and `pom.xml` files with their dependencies, the technology they state, and the catalogued repositories it uses and is used by |
 | `GET /api/v1/commits[?group=][&repo=owner/name][&limit=][&cursor=]` | commits newest first, a page at a time |
 | `GET /api/v1/snapshot` | the version and time of the data being served, and readiness |
 
@@ -77,7 +78,7 @@ Badges are cached for five minutes (one minute while the value is not known yet)
 | `GET /llms-full.txt` | every README in one file, each between `<!-- scp:begin repo=… -->` and `<!-- scp:end -->` |
 | `GET /repos/{owner}/{name}/readme.md` | the README as Markdown |
 | `GET /repos/{owner}/{name}/docs/{path}.md` | a document as Markdown, at its page address plus `.md` |
-| a repository, document or group page with `Accept: text/markdown` | the page as Markdown instead of HTML |
+| a repository, document or group page with `Accept: text/markdown` | the page as Markdown instead of HTML; a repository page is its README followed by its technology and internal dependencies |
 
 Each document starts with YAML front matter under `scp:` naming the repository, path, blob SHA, source URL, fetch time and freshness:
 

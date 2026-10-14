@@ -19,3 +19,9 @@ export const docQuery = (owner: string, name: string, docId: string) =>
     queryFn: ({ signal }) =>
       unwrap(api.GET("/repos/{owner}/{name}/docs/{docId}", { params: { path: { owner, name, docId } }, signal })),
   })
+
+export const manifestsQuery = (owner: string, name: string) =>
+  queryOptions({
+    queryKey: ["manifests", owner.toLowerCase(), name.toLowerCase()],
+    queryFn: ({ signal }) => unwrap(api.GET("/repos/{owner}/{name}/manifests", { params: { path: { owner, name } }, signal })),
+  })

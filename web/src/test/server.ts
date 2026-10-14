@@ -154,6 +154,34 @@ export const defaults = [
       freshness: fresh,
     }),
   ),
+  http.get("/repos/{owner}/{name}/manifests", ({ response }) =>
+    response(200).json({
+      technology: {
+        languages: ["Java"],
+        buildTools: ["Maven"],
+        toolchains: [{ name: "java", versions: ["21"] }],
+      },
+      manifests: [
+        {
+          path: "pom.xml",
+          ecosystem: "maven",
+          name: "no.acme:core",
+          version: "1.0",
+          language: "Java",
+          buildTool: "Maven",
+          toolchain: [{ name: "java", version: "21" }],
+          dependencies: [
+            { name: "no.acme:lib", version: "2.0", scope: "runtime", repos: ["acme/lib"] },
+            { name: "org.junit.jupiter:junit-jupiter", version: "5.12", scope: "test", repos: [] },
+          ],
+          problems: [],
+        },
+      ],
+      uses: [{ address: "acme/lib", owner: "acme", name: "lib", via: ["no.acme:lib"] }],
+      usedBy: [{ address: "acme/sso", owner: "acme", name: "sso", via: ["no.acme:core"] }],
+      freshness: fresh,
+    }),
+  ),
   http.get("/commits", ({ response }) =>
     response(200).json({ commits: [commit(1)], page: { nextCursor: null, limit: 50 }, freshness: fresh }),
   ),

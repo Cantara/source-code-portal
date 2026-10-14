@@ -145,6 +145,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/repos/{owner}/{name}/manifests": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The repository's package manifests, the technology they state and its internal dependencies */
+    get: operations["getManifests"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/snapshot": {
     parameters: {
       query?: never
@@ -227,15 +244,15 @@ export interface components {
       owners: string[]
       tags: string[]
       links: components["schemas"]["Link"][]
-      problems: components["schemas"]["DescriptorProblem"][]
+      problems: components["schemas"]["FileProblem"][]
       freshness: components["schemas"]["Freshness"]
     }
     Link: {
       title: string
       url: string
     }
-    DescriptorProblem: {
-      /** @description JSON pointer into the file; empty for the whole file */
+    FileProblem: {
+      /** @description JSON pointer into the file, /line/12 for a line; empty for the whole file */
       pointer: string
       code: string
       message: string
@@ -333,6 +350,61 @@ export interface components {
       /** @description The file on GitHub */
       sourceUrl: string
       freshness: components["schemas"]["Freshness"]
+    }
+    Manifests: {
+      technology: components["schemas"]["Technology"]
+      /** @description By path */
+      manifests: components["schemas"]["Manifest"][]
+      /** @description Catalogued repositories this one depends on */
+      uses: components["schemas"]["RepoLink"][]
+      /** @description Catalogued repositories that depend on this one */
+      usedBy: components["schemas"]["RepoLink"][]
+      freshness: components["schemas"]["Freshness"]
+    }
+    Technology: {
+      languages: string[]
+      buildTools: string[]
+      toolchains: components["schemas"]["ToolchainVersions"][]
+    }
+    ToolchainVersions: {
+      /** @enum {string} */
+      name: "go" | "node" | "java"
+      /** @description Every version the manifests state */
+      versions: string[]
+    }
+    Manifest: {
+      path: string
+      /** @enum {string} */
+      ecosystem: "go" | "npm" | "maven"
+      /** @description Go module path, npm package name or Maven groupId:artifactId; empty when the file names none */
+      name: string
+      version: string
+      language: string
+      buildTool: string
+      toolchain: components["schemas"]["Toolchain"][]
+      dependencies: components["schemas"]["Dependency"][]
+      problems: components["schemas"]["FileProblem"][]
+    }
+    Toolchain: {
+      /** @enum {string} */
+      name: "go" | "node" | "java"
+      version: string
+    }
+    Dependency: {
+      name: string
+      /** @description The requirement as written; empty when none */
+      version: string
+      /** @enum {string} */
+      scope: "runtime" | "dev" | "peer" | "optional" | "provided" | "test" | "indirect" | "tool" | "parent" | "import"
+      /** @description Addresses of the catalogued repositories that declare this name */
+      repos: string[]
+    }
+    RepoLink: {
+      address: string
+      owner: string
+      name: string
+      /** @description The dependency names that link the two repositories */
+      via: string[]
     }
     RepoList: {
       repos: components["schemas"]["Repo"][]
@@ -629,6 +701,33 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["Doc"]
+        }
+      }
+      304: components["responses"]["NotModified"]
+      308: components["responses"]["Moved"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  getManifests: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        owner: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The manifests */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Manifests"]
         }
       }
       304: components["responses"]["NotModified"]

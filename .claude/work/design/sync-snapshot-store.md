@@ -41,7 +41,7 @@ type Snapshot struct {               // immutable after publish; handlers call C
 	Latest  []CommitRef; LatestByGroup map[string][]CommitRef // feeds, derived at build time
 	Sources []SourceStatus           // last listing per source
 }
-type RepoEntry struct { Repo Repo; Commits Value[[]Commit]; Docs Value[[]Doc]; Release Value[*Release] } // types: catalog.md, content.md
+type RepoEntry struct { Repo Repo; Commits Value[[]Commit]; Docs Value[[]Doc]; Release Value[*Release]; Manifests Value[[]Manifest] } // types: catalog.md, content.md, manifests.md
 type Builder struct{ /* copy-on-write over the current Snapshot */ }
 func (b *Builder) Repo(k RepoKey) (*RepoEntry, bool) // a private copy to mutate; false if not in the catalogue
 type Publisher struct{ cur atomic.Pointer[Snapshot] /* + pending mutations, debounce timer */ }
