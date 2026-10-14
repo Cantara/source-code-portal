@@ -71,10 +71,11 @@ only in `cmd/scp`. Untrusted bytes pass through bounded parsers and one sanitise
 
 Test idioms: engine tests run in `testing/synctest` bubbles with a real store in a temp dir; every package with goroutines uses `goleak`.
 
-## Next: M8
+## Next: M9
 
 `v2.0.0` is released (GitHub release with signed archives; image `ghcr.io/cantara/source-code-portal:2.0.0` and `:latest`). The v1.1
-stream is M7..M10 in `plan.md` section 5; each milestone starts with its design note. M8 is private repositories behind a trusted
-authenticating proxy: write its design note first (`design/access.md`). The version stays 2.0.0 until the greenfield streams are
-complete. Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs `pnpm -C web exec
-playwright install chromium`.
+stream is M7..M11 in `plan.md` section 5; each milestone starts with its design note. M9 moves the web UI to Next.js with
+server-side rendering for search engines (owner decision P-13): rewrite `design/web.md` first, then update `plan.md` sections 1, 3
+and 4 and `design/build-ops.md` to the two-server image. The version stays 2.0.0 until the greenfield streams are complete. Local web
+commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs `pnpm -C web exec playwright install
+chromium`.
