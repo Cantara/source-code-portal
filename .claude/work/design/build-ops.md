@@ -167,7 +167,7 @@ M0 copies these files from `reference/detailed-design/50-repo-seed/repo/` and ed
   changelog; `IMAGE_REPO` set to `ghcr.io/cantara/source-code-portal`), `renovate.json`.
 - `web/`: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` (supply-chain policy), `.node-version`, `tsconfig.json`,
   `tsconfig.app.json`, `tsconfig.node.json`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js`,
-  `.prettierrc.json`, `.prettierignore`, `.gitignore`, `components.json`, `index.html`, `public/`, `src/main.tsx`, `src/app/`,
+  `.prettierrc.json`, `.prettierignore`, `.gitignore`, `index.html`, `public/`, `src/main.tsx`, `src/app/`,
   `src/styles/index.css`, `src/test/setup.ts`, `src/test/render.tsx`, `web.go`, `embed_spa.go`, `embed_placeholder.go`; scripts in
   `package.json` set to `dev`, `build`, `test`, `lint`, `typecheck`, `format:check`, `gen`, and the lockfile refreshed.
 - `cmd/scp/buildinfo.go`; `cmd/scp/main.go` and `run.go` as the base for the Cobra version.

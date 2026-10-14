@@ -50,7 +50,7 @@ func public(cur *snapshot.Snapshot) http.Handler {
 }
 
 func testOptions() Options {
-	return Options{Log: slog.New(slog.DiscardHandler), HSTS: true, TrustedProxies: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}}
+	return Options{Log: slog.New(slog.DiscardHandler), Build: "b1", HSTS: true, TrustedProxies: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}}
 }
 
 func get(h http.Handler, path string, hdr ...string) *httptest.ResponseRecorder {
@@ -186,7 +186,7 @@ func TestHeaders(t *testing.T) {
 		hd := rec.Header()
 		if hd.Get("Content-Security-Policy") != tc.csp || hd.Get("X-Content-Type-Options") != "nosniff" ||
 			hd.Get("Referrer-Policy") != "strict-origin-when-cross-origin" || hd.Get("Strict-Transport-Security") == "" ||
-			hd.Get("X-Request-Id") != "req-1" || hd.Get("Access-Control-Allow-Origin") != "" {
+			hd.Get("X-Request-Id") != "req-1" || hd.Get("X-SCP-Build") != "b1" || hd.Get("Access-Control-Allow-Origin") != "" {
 			t.Errorf("%s: headers %v", tc.path, hd)
 		}
 	}

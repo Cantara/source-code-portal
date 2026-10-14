@@ -149,7 +149,7 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
-	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies,
+	opts := httpapi.Options{Log: log, Build: build, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies,
 		Observe: m.request}
 	features := api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
 		httpapi.SnapshotAPI{Current: s.pub.Current}}

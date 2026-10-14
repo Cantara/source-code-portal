@@ -35,6 +35,7 @@ var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 // Options configures what both listeners share.
 type Options struct {
 	Log            *slog.Logger
+	Build          string         // sent as X-SCP-Build on every response, so the web UI notices a new deployment
 	HSTS           bool           // the public URL is https
 	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For is believed
 	// Observe, when set, receives every request: listener, matched pattern ("unmatched" when none), method, status, duration.
@@ -52,6 +53,9 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		}
 		h := w.Header()
 		h.Set("X-Request-Id", id)
+		if o.Build != "" {
+			h.Set("X-SCP-Build", o.Build)
+		}
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Content-Security-Policy", cspDefault)

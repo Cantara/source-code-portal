@@ -98,14 +98,14 @@ Rule: every dependency is current (a release within the last 18 months, supports
 | Metrics | `prometheus/client_golang` v1.25 |
 | Distributed state (v1.1) | `hazelcast/hazelcast-go-client` v1.6 |
 | Tests | stdlib `testing` + `testing/synctest`, `google/go-cmp`, `go.uber.org/goleak` |
-| Web | React 19, TypeScript, Vite, Tailwind 4, shadcn/ui, TanStack Router and Query, Vitest, Playwright; pnpm |
+| Web | React 19, TypeScript, Vite, Tailwind 4 (shadcn-style components), TanStack Router and Query, Vitest, Playwright; pnpm |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, Renovate |
 
 
 ## 5. Milestones
 
-Each milestone ends with working software on `main`, CI green. The web UI is designed in Claude Design first; M1 to M4 build
-the backend and API, and M5 builds the UI from that design.
+Each milestone ends with working software on `main`, CI green. M1 to M4 build the backend and API, and M5 builds the
+UI from `design/web.md`.
 
 | M | Delivers | Done when |
 |---|---|---|
@@ -114,7 +114,7 @@ the backend and API, and M5 builds the UI from that design.
 | M2 | Read API for the pages: dashboard, groups, repositories, commits | the API serves a real org end to end (fake GitHub in tests) |
 | M3 | Docs, badges, webhooks, freshness | a push updates the page within seconds; a GitHub outage serves stale data |
 | M4 | `/llms.txt`, raw Markdown, metrics, readiness, hardening (CSP, limits) | security and load checks pass for 1,000 repositories |
-| M5 | Web UI built from the Claude Design work: dashboard, group, repository, docs and commit pages | every page renders a real org; Playwright smoke, axe and CSP checks pass |
+| M5 | Web UI: dashboard, group, repository, docs and commit pages | every page renders a real org; Playwright smoke, axe and CSP checks pass |
 | M6 | Release v1.0: docs for operators, GoReleaser, image published | `ghcr.io/cantara/source-code-portal:1.0.0` runs from the operator guide |
 
 v1.1 follows the same pattern, one milestone per bullet of section 2.

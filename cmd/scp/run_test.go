@@ -217,6 +217,9 @@ catalog:
 			!strings.HasSuffix(doc.SourceUrl, "/acme/Whydah-Core/blob/HEAD/docs/setup.md") {
 			t.Errorf("doc: %d %+v", code, doc)
 		}
+		if code := fetch(public+"/api/v1/repos/acme/whydah-core/docs/docs%2Fsetup", &doc); code != http.StatusOK || doc.Path != "docs/setup.md" {
+			t.Errorf("document by its link address: %d %q", code, doc.Path)
+		}
 		if code := fetch(public+"/api/v1/repos/acme/whydah-core/docs/nope.md", nil); code != http.StatusNotFound {
 			t.Errorf("unknown document: %d", code)
 		}

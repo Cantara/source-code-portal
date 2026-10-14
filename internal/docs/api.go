@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -46,10 +48,7 @@ func (a API) GetDoc(_ context.Context, req oapi.GetDocRequestObject) (oapi.GetDo
 		return oapi.GetDoc308Response{Headers: oapi.MovedResponseHeaders{
 			Location: "/api/v1/repos/" + string(e.Repo.Key()) + "/docs/" + url.PathEscape(req.DocId)}}, nil
 	}
-	for _, d := range e.Docs {
-		if d.Path != req.DocId {
-			continue
-		}
+	if d, ok := find(e.Docs, req.DocId); ok {
 		toc := make([]oapi.Heading, 0, len(d.TOC))
 		for _, h := range d.TOC {
 			toc = append(toc, oapi.Heading{Level: h.Level, Id: h.ID, Text: h.Text})
@@ -60,4 +59,19 @@ func (a API) GetDoc(_ context.Context, req oapi.GetDocRequestObject) (oapi.GetDo
 			Freshness: oapi.FreshnessOf(e.DocsFresh, time.Now())}}, nil
 	}
 	return oapi.GetDoc404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: notFound("no such document")}, nil
+}
+
+// find is the document at id, or else the one whose path without its extension is id (the address rendered links use).
+func find(docs []snapshot.Doc, id string) (snapshot.Doc, bool) {
+	for _, d := range docs {
+		if d.Path == id {
+			return d, true
+		}
+	}
+	for _, d := range docs {
+		if strings.TrimSuffix(d.Path, path.Ext(d.Path)) == id {
+			return d, true
+		}
+	}
+	return snapshot.Doc{}, false
 }

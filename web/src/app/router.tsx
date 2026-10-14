@@ -1,50 +1,70 @@
 import type { QueryClient } from "@tanstack/react-query"
-import { createMemoryHistory, createRootRouteWithContext, createRoute, createRouter, Link, Outlet } from "@tanstack/react-router"
+import { createMemoryHistory, createRootRouteWithContext, createRoute, createRouter, notFound } from "@tanstack/react-router"
+import { docQuery } from "@/features/docs/api"
+import { groupQuery } from "@/features/groups/api"
+import { validateGroupSearch } from "@/features/groups/search"
+import { repoQuery } from "@/features/repos/api"
+import { ProblemError } from "@/lib/api/client"
+import { NotFound } from "./not-found"
+import { Root } from "./root"
 
 export interface RouterContext {
   queryClient: QueryClient
 }
 
-function Shell() {
-  return (
-    <>
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-2">
-        Skip to content
-      </a>
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center gap-x-4 p-3">
-          <Link to="/" className="font-semibold">
-            Source Code Portal
-          </Link>
-        </div>
-      </header>
-      <main id="main" className="mx-auto max-w-6xl p-4">
-        <Outlet />
-      </main>
-    </>
-  )
+/** ensure loads a page's main query; a 404 problem becomes the not-found page, other failures show in the page itself. */
+async function ensure(load: Promise<unknown>) {
+  try {
+    await load
+  } catch (e) {
+    if (e instanceof ProblemError && e.status === 404) throw notFound()
+  }
 }
 
-function Dashboard() {
-  return <h1 className="text-2xl font-semibold">Dashboard</h1>
+function validateCommitSearch(s: Record<string, unknown>): { group?: string; repo?: string } {
+  const out: { group?: string; repo?: string } = {}
+  if (typeof s.group === "string" && s.group !== "") out.group = s.group
+  if (typeof s.repo === "string" && s.repo !== "") out.repo = s.repo
+  return out
 }
 
-function NotFound() {
-  return (
-    <section>
-      <h1 className="text-2xl font-semibold">Page not found</h1>
-      <p>
-        <Link to="/" className="underline">
-          Back to the dashboard
-        </Link>
-      </p>
-    </section>
-  )
-}
+const rootRoute = createRootRouteWithContext<RouterContext>()({ component: Root, notFoundComponent: NotFound })
 
-const rootRoute = createRootRouteWithContext<RouterContext>()({ component: Shell, notFoundComponent: NotFound })
-const dashboardRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Dashboard })
-const routeTree = rootRoute.addChildren([dashboardRoute])
+const dashboard = createRoute({ getParentRoute: () => rootRoute, path: "/" }).lazy(() =>
+  import("@/features/dashboard/route").then((m) => m.dashboardRoute),
+)
+const commits = createRoute({ getParentRoute: () => rootRoute, path: "/commits", validateSearch: validateCommitSearch }).lazy(
+  () => import("@/features/commits/route").then((m) => m.allCommitsRoute),
+)
+const group = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/groups/$group",
+  validateSearch: validateGroupSearch,
+  loader: ({ context, params }) => ensure(context.queryClient.ensureQueryData(groupQuery(params.group))),
+}).lazy(() => import("@/features/groups/route").then((m) => m.groupRoute))
+const groupCommits = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/groups/$group/commits",
+  loader: ({ context, params }) => ensure(context.queryClient.ensureQueryData(groupQuery(params.group))),
+}).lazy(() => import("@/features/commits/route").then((m) => m.groupCommitsRoute))
+const repo = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/repos/$owner/$name",
+  loader: ({ context, params }) => ensure(context.queryClient.ensureQueryData(repoQuery(params.owner, params.name))),
+}).lazy(() => import("@/features/repos/route").then((m) => m.repoRoute))
+const repoCommits = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/repos/$owner/$name/commits",
+  loader: ({ context, params }) => ensure(context.queryClient.ensureQueryData(repoQuery(params.owner, params.name))),
+}).lazy(() => import("@/features/commits/route").then((m) => m.repoCommitsRoute))
+const doc = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/repos/$owner/$name/docs/$",
+  loader: ({ context, params }) =>
+    ensure(context.queryClient.ensureQueryData(docQuery(params.owner, params.name, params._splat ?? ""))),
+}).lazy(() => import("@/features/docs/route").then((m) => m.docRoute))
+
+export const routeTree = rootRoute.addChildren([dashboard, commits, group, groupCommits, repo, repoCommits, doc])
 
 // createAppRouter builds the router; initialPath selects an in-memory history for tests.
 export function createAppRouter(queryClient: QueryClient, initialPath?: string) {
@@ -52,6 +72,8 @@ export function createAppRouter(queryClient: QueryClient, initialPath?: string) 
     routeTree,
     context: { queryClient },
     defaultPreload: "intent",
+    defaultPreloadStaleTime: 0,
+    scrollRestoration: true,
     ...(initialPath ? { history: createMemoryHistory({ initialEntries: [initialPath] }) } : {}),
   })
 }

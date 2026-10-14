@@ -11,6 +11,6 @@ Instructions for coding agents working in this repository (Source Code Portal, G
 - Rules: features (`catalog`, `commits`, `docs`, `badges`, `webhook`, `llms`) never import each other, enforced by
   `cmd/scp/boundary_test.go`; request handlers read only the current snapshot; no globals or `init()`; config keys, metrics and
   packages arrive with the code that uses them.
-- Gate: `make check` (needs golangci-lint 2.14.0, Go 1.27.2, Node 24, pnpm 12). Single test: `go test -race -run TestName ./internal/<pkg>/`.
+- Gate: `make check` (needs golangci-lint 2.14.0, Go 1.27.2, Node 24, pnpm 12 and the Playwright Chromium: `pnpm -C web exec playwright install chromium`). Single test: `go test -race -run TestName ./internal/<pkg>/`.
 - Tests never touch the network: loopback listeners only, the fake GitHub in `internal/github/githubtest` and recorded fixtures.
 - Commits: Conventional Commits, directly on `main`. Generated files are regenerated with `make gen`, never edited by hand.

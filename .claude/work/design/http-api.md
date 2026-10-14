@@ -80,7 +80,7 @@ Reserved prefixes always answer plain: `/api/`, `/assets/`, `/badges/`, `/webhoo
      `ETag`/`Content-Encoding`. Under `/api/` the mux's plain-text 404/405 are rewritten to problems.
    - `Accept` under `/api/` excluding JSON/problem/YAML -> 406. Human URLs answer HTML or Markdown: Markdown when `text/markdown` has a
      strictly higher q than `text/html`; those responses set `Vary: Accept` and `Link: </llms.txt>; rel="describedby"`.
-   - Caching elsewhere: shell `no-cache`; hashed assets `public, max-age=31536000, immutable` (precompressed `.br`/`.gz` served);
+   - Caching elsewhere: shell `no-cache`; hashed assets `public, max-age=31536000, immutable` (gzip on the fly);
      badges per content.md; llms `public, max-age=300` with strong ETag; probes `no-store`.
 2. **Middleware** (outermost first, `internal/httpapi`): request id (accept `X-Request-Id` matching `[A-Za-z0-9-]{1,64}`, else generate;
    echoed) -> recover (500 `internal` problem, stack logged) -> access log (`slog` JSON after the handler: listener, `r.Pattern`, method,
@@ -93,7 +93,7 @@ Reserved prefixes always answer plain: `/api/`, `/assets/`, `/badges/`, `/webhoo
    `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https:; font-src 'self'; connect-src 'self';
    manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`, plus `Permissions-Policy`
    denying camera, microphone, geolocation, payment, usb. The SPA side that makes it hold is in web.md (external `/theme-init.js`,
-   shadcn/Base UI with `disableStyleElements`, one `SafeHtml` component). API, llms and `.md`: `default-src 'none'; frame-ancestors 'none';
+   class-only components, one `SafeHtml` component). API, llms and `.md`: `default-src 'none'; frame-ancestors 'none';
    sandbox`. Badges: content.md. A Playwright test loads every page with the enforced CSP and fails on any violation.
 4. **Webhook receiver** (`POST /webhooks/github`; order is the security argument: size -> signature -> parse -> act).
    1. `Content-Type` not `application/json` -> 415. `X-Hub-Signature-256` not `sha256=` + 64 hex -> 401. `Content-Length` > max -> 413.

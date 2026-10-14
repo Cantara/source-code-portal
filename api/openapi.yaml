@@ -126,7 +126,7 @@ paths:
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
-        - { name: docId, in: path, required: true, description: "The repository path, percent-encoded into one segment (docs%2Fsetup.md)",
+        - { name: docId, in: path, required: true, description: "The repository path, percent-encoded into one segment (docs%2Fsetup.md); the path without its extension also matches",
             schema: { type: string } }
       responses:
         "200":

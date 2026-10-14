@@ -9,7 +9,8 @@ WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 COPY web/ ./
-RUN pnpm build
+ARG BUILD_ID=dev
+RUN BUILD_ID=${BUILD_ID} pnpm build
 
 FROM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS go
 WORKDIR /src

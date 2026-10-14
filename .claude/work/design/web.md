@@ -1,14 +1,14 @@
 # Web UI
 Status: v1 design note, 2026-10-14. Binding order: ../plan.md > this note > ../reference/.
-The visual design (layout, components, page composition) comes from the Claude Design work before M5; this note fixes the
-technical frame the design is built in.
+This note fixes the technical frame of the UI and, with the route table below, its page composition.
 
 ## Scope (v1)
 A read-only React SPA for the pages of plan.md section 2: dashboard, group, repository (README), docs viewer, commit logs (all, group,
 repository) and a 404 page. It reads only `/api/v1`, shows freshness everywhere and is embedded in the Go binary.
 
 ## Decisions (bullets with one-line reasons)
-- Stack as plan.md: React 19, TypeScript, Vite, Tailwind 4, shadcn/ui (Base UI), TanStack Router + Query, Vitest, Playwright, pnpm.
+- Stack as plan.md: React 19, TypeScript, Vite, Tailwind 4, TanStack Router + Query, Vitest, Playwright, pnpm. The few components
+  (button, card, badge, alert) are written in `components/ui/` in the shadcn style on the same tokens: plain elements, no runtime styles.
 - Code-based TanStack Router tree in `src/app/router.tsx`, each page lazy: typed links and params straight from code.
 - Client: `openapi-typescript` generates `web/src/lib/api/schema.d.ts` from `api/openapi.yaml` (committed, drift-checked);
   `openapi-fetch` is the thin typed fetch wrapper; one `unwrap()` turns every failure into a `ProblemError`: every request is typed.
@@ -24,24 +24,26 @@ repository) and a 404 page. It reads only `/api/v1`, shows freshness everywhere 
 ## Structure and routes
 ```
 web/
-  package.json pnpm-lock.yaml pnpm-workspace.yaml   pins; pnpm policy: 7-day minimumReleaseAge, frozen lockfile in CI
-  index.html vite.config.ts vitest.config.ts playwright.config.ts tsconfig.json eslint.config.js components.json
+  package.json pnpm-lock.yaml                      exact pins, frozen lockfile in CI; Renovate waits 7 days for a release
+  index.html vite.config.ts playwright.config.ts tsconfig.json eslint.config.js
   web.go embed_spa.go embed_placeholder.go placeholder/index.html     go:embed (Build and embed)
   public/theme-init.js favicon.svg                  copied verbatim to dist/
-  scripts/precompress.ts budget.ts
-  e2e/fixtures.ts smoke.spec.ts
+  scripts/budget.ts
+  e2e/global-setup.ts fixtures.ts smoke.spec.ts       against cmd/scp/e2e_test.go (fake GitHub plus the server)
   src/
     main.tsx                                        createRoot, providers, stale-chunk reload handler
-    app/       root.tsx (shell: skip link, header, nav, theme toggle, <main>), router.tsx, providers.tsx, not-found.tsx
+    app/       root.tsx (shell: skip link, header, nav, theme select, status banners, <main>), router.tsx, app.tsx, not-found.tsx
     features/  dashboard/ groups/ repos/ commits/ docs/ status/      each: route.tsx, api.ts, components, *.test.tsx
-    components/ui/                                  shadcn generated (button, card, table, badge, alert, select, ...)
-    shared/    safe-html freshness-badge relative-time page-header problem-alert empty-state initials-avatar
-    lib/       api/{schema.d.ts,client.ts,query-keys.ts}  theme.ts  format.ts  build.ts
+    components/ui/                                  button card badge alert
+    shared/    safe-html freshness-badge relative-time page-header problem-alert empty-state initials-avatar panel-boundary commit-list
+    lib/       api/{schema.d.ts,client.ts,snapshot.ts}  query.ts connection.ts clock.ts theme.ts format.ts build.ts docs.ts cn.ts
     styles/    index.css (tokens, light and dark)  docs.css (prose and Chroma classes for both themes)
     test/      setup.ts server.ts (MSW, unmocked request fails the test)
 ```
-`api.ts` holds the feature's `queryOptions` factories and is the only place that knows endpoint paths. `status/` owns the shell's
-snapshot sync hook and the connection banner; it has no route.
+`api.ts` holds the feature's `queryOptions` factories and is the only place that knows endpoint paths (the snapshot query is in
+`lib/api/snapshot.ts`, shared by the shell and the commit log). `status/` owns the shell's snapshot sync hook and the banners; it has no
+route. Each route's loader (in `router.tsx`) loads the page's main query so a 404 problem shows the not-found page; the page itself is a
+lazy chunk.
 
 | Path | Feature | Shows |
 |---|---|---|
@@ -50,11 +52,12 @@ snapshot sync hook and the connection banner; it has no route.
 | `/groups/{group}/commits` | commits | commit log scoped to the group |
 | `/repos/{owner}/{name}` | repos | descriptor (title, owners, lifecycle, tags, links), badges, rendered README, latest commits |
 | `/repos/{owner}/{name}/commits` | commits | commit log of the default branch |
-| `/repos/{owner}/{name}/docs/{path}` | docs | rendered doc from `docs/` with a file list and heading outline |
+| `/repos/{owner}/{name}/docs/{path}` | docs | rendered doc with a file list and heading outline; `{path}` is the repository path without its extension |
 | `/commits` | commits | commit log across all repositories, filter by group or repository |
 | anything else | app | 404 page (also for an unknown group or repository from a 404 problem) |
 
-The server's SPA shapes (http-api.md Routes) equal this table; the Playwright smoke pins both sides.
+The server's SPA shapes (http-api.md Routes) equal this table; a Vitest test pins the route tree and the Playwright smoke pins the server.
+A document's own leading `h1` is dropped on the page, whose `h1` already names it.
 
 ## Behaviour (numbered)
 1. Queries: `staleTime` 10 s, `gcTime` 5 min, retry network/429/5xx at most twice (honour `Retry-After`), refetch on window focus,
@@ -78,8 +81,8 @@ The server's SPA shapes (http-api.md Routes) equal this table; the Playwright sm
 9. Theme: `system | light | dark` in `localStorage` key `scp-theme`. The blocking external `/theme-init.js` in `<head>` sets the `dark`
    class and `colorScheme` before first paint; `<meta name="color-scheme" content="light dark">`. `lib/theme.ts` resolves the same
    way; a unit test runs the script for every stored value and compares. Blocked storage falls back to `system`.
-10. CSP: the shell policy of http-api.md behaviour 3 (`img-src 'self' https:`, everything else `'self'` or `'none'`). shadcn/Base UI runs
-    with `CSPProvider disableStyleElements`; runtime styles go through the CSSOM.
+10. CSP: the shell policy of http-api.md behaviour 3 (`img-src 'self' https:`, everything else `'self'` or `'none'`). Components use classes
+    only; avatar colours come from a fixed palette of classes.
 11. Accessibility (WCAG 2.2 AA): skip link to `#main`, landmarks, one `h1` per page, focus to `h1` and title announced after client
     navigation, visible focus ring (token contrast >= 3:1, text >= 4.5:1 in both themes), targets >= 24 px, real `<table>`s with keyboard
     sortable headers, reflow at 320 px, `prefers-reduced-motion` honoured, `<noscript>` pointing to `/llms.txt` and the OpenAPI document.
@@ -88,18 +91,18 @@ The server's SPA shapes (http-api.md Routes) equal this table; the Playwright sm
 
 ## Build and embed
 - `pnpm build`: `vite build` (assets `assets/<name>-<8 hex>.<ext>`, no source maps, `assetsInlineLimit: 0` so every asset is a file, system
-  font stack), then `precompress.ts` (brotli and gzip siblings for files >= 1 KiB, kept when smaller), then `budget.ts` (fails the build).
+  font stack), then `budget.ts` (fails the build).
 - Budget (gzip, cold load): initial JS <= 200 KB, initial CSS <= 25 KB, any lazy route chunk <= 60 KB, fonts 0. The report names the offender.
 - `BUILD_ID` (git SHA, `dev` locally) goes to Vite's `define` and to `go build -ldflags -X main.build=...`.
 - `web/embed_spa.go` (`//go:build spa`, `//go:embed all:dist`); `web/embed_placeholder.go` (`!spa`, `//go:embed placeholder`) so
   `go test ./...` runs with Go alone. `make build` = `pnpm -C web build` then `CGO_ENABLED=0 go build -tags spa`.
 - Serving (`httpapi`): GET/HEAD; `assets/*` `public, max-age=31536000, immutable`; `index.html`, `theme-init.js`, `favicon.svg`
-  `no-cache` + ETag from the build id; `.br`/`.gz` chosen by `Accept-Encoding`; `X-SCP-Build` on every response. `index.html` answers 200
+  `no-cache` + ETag from the build id; gzip on the fly (http-api.md); `X-SCP-Build` on every response. `index.html` answers 200
   for the SPA shapes above and 404 for other extensionless paths outside the reserved prefixes (http-api.md Routes); a missing file with an
   extension is a plain 404.
 - Dev: `make dev` runs `scp serve` on :9090 (against a test org or the fake GitHub) and Vite on 127.0.0.1:5173, which proxies `/api`,
   `/badges`, `/llms.txt` and `^/(repos|groups)/.+\.(md|txt)$` to `SCP_DEV_API` (default `http://127.0.0.1:9090`). The e2e job enforces
-  the CSP. `make gen` regenerates `schema.d.ts`; CI fails on drift.
+  the CSP. `make gen` regenerates `schema.d.ts` and `styles/chroma.css`; CI fails on drift. `make e2e` runs Playwright.
 
 ## Tests
 - Vitest + Testing Library (jsdom) + MSW typed from `paths` (`openapi-msw`), any unmocked request fails: components, hooks, `unwrap`,
@@ -119,5 +122,5 @@ The server's SPA shapes (http-api.md Routes) equal this table; the Playwright sm
 - `../reference/detailed-design/11-adr/ADR-010-*` (embedding, fallback, CSP), `ADR-019-*`.
 - `../reference/detailed-design/10-architecture.md` section 12 (structure, data, budgets, build loop).
 - `../reference/detailed-design/50-repo-seed/repo/web/`: `vite.config.ts` (build options, proxy), `pnpm-workspace.yaml`,
-  `public/theme-init.js`, `embed_*.go` + `placeholder/`, `e2e/fixtures.ts` (CSP gate), `scripts/precompress.ts`, `scripts/budget.ts`,
+  `public/theme-init.js`, `embed_*.go` + `placeholder/`, `e2e/fixtures.ts` (CSP gate), `scripts/budget.ts`,
   `src/lib/stale-chunk.ts`, `src/test/`, and the pins of `package.json` for the stack above.

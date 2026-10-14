@@ -1,3 +1,6 @@
 dist
 placeholder
 pnpm-lock.yaml
+src/styles/chroma.css
+playwright-report
+test-results

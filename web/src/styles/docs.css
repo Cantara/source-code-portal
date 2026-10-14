@@ -1,0 +1,127 @@
+@import "./chroma.css";
+
+/* Rendered documents: the server's HTML carries elements and classes only, never inline styles. */
+.doc {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.doc > :first-child {
+  margin-top: 0;
+}
+.doc h1,
+.doc h2,
+.doc h3,
+.doc h4,
+.doc h5,
+.doc h6 {
+  margin: 1.5em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.25;
+  scroll-margin-top: 1rem;
+}
+.doc h1 {
+  font-size: 1.75rem;
+}
+.doc h2 {
+  font-size: 1.4rem;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--border);
+}
+.doc h3 {
+  font-size: 1.2rem;
+}
+.doc p,
+.doc ul,
+.doc ol,
+.doc pre,
+.doc table,
+.doc blockquote {
+  margin: 0 0 1em;
+}
+.doc ul {
+  list-style: disc;
+  padding-left: 1.5em;
+}
+.doc ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+}
+.doc li + li {
+  margin-top: 0.25em;
+}
+.doc a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.doc img {
+  display: inline;
+  max-width: 100%;
+  height: auto;
+}
+.doc code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 0.1em 0.3em;
+  border-radius: 0.25rem;
+  background: var(--muted);
+}
+.doc pre {
+  overflow-x: auto;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+.doc pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+.doc blockquote {
+  padding-left: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.doc table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.doc th,
+.doc td {
+  padding: 0.35em 0.75em;
+  border: 1px solid var(--border);
+}
+.doc th {
+  font-weight: 600;
+  background: var(--muted);
+}
+.doc hr {
+  margin: 1.5em 0;
+  border-color: var(--border);
+}
+.doc .md-alert {
+  color: inherit;
+  border-left-width: 4px;
+  padding: 0.5em 1em;
+  border-radius: 0.25rem;
+}
+.doc .md-alert-title {
+  font-weight: 600;
+  margin-bottom: 0.25em;
+}
+.doc .md-alert-note {
+  border-left-color: #0969da;
+}
+.doc .md-alert-tip {
+  border-left-color: #1a7f37;
+}
+.doc .md-alert-important {
+  border-left-color: #8250df;
+}
+.doc .md-alert-warning {
+  border-left-color: #9a6700;
+}
+.doc .md-alert-caution {
+  border-left-color: #cf222e;
+}
