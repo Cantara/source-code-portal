@@ -6,5 +6,5 @@
 // Additional imports allowed in _test.go files: internal/store/storetest.
 // Third-party libraries owned here: modernc.org/sqlite, modernc.org/libc (owner), otel API.
 //
-// Design: docs/design/20-design/03-readmodel-store.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/03-readmodel-store.md; architecture sections 4 and 5.2.
 package sqlite

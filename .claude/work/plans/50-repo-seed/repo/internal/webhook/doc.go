@@ -7,5 +7,5 @@
 // Note: 04 D1 (freshness) was WITHDRAWN by unit 04's verification: webhook stays inside the architecture row (cross-design review
 // CD-DM-04).
 //
-// Design: docs/design/20-design/04-refresh-webhook.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/04-refresh-webhook.md; architecture sections 4 and 5.2.
 package webhook

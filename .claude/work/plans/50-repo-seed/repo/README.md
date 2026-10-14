@@ -5,7 +5,7 @@ AsciiDoc), commit logs, local status badges, package-manifest and dependency int
 OpenAPI). One static Go binary with the React single-page application embedded; state is a read-only snapshot refreshed in the
 background and persisted in an embedded SQLite file.
 
-The design is complete and lives in [`docs/design/`](docs/design/README.md);
+The design is complete and lives in [`.claude/work/plans/`](.claude/work/plans/README.md) (map from document to code: [`design-map.md`](.claude/work/plans/50-repo-seed/design-map.md));
 this repository is built from it.
 
 ## Status
@@ -27,7 +27,7 @@ Requirements: Go 1.27.2, GNU make, golangci-lint v2.14.0 (binary), Node 24.21 an
 
 `cmd/scp` composition root and CLI, `internal/` packages by feature (each has a `doc.go` with its responsibility and allowed imports),
 `internal/archtest` the architecture test, `web/` the SPA (and the Go `embed` package), `api/` the OpenAPI contract, `deploy/` Dockerfiles and
-examples, `tools/` pinned dev tools (a nested module), `docs/` documentation. Start with [`AGENTS.md`](AGENTS.md).
+examples, `tools/` pinned dev tools (a nested module), `docs/` user documentation, `.claude/work/` the design package and planning. Start with [`AGENTS.md`](AGENTS.md).
 
 ## Licence
 

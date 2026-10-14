@@ -19,5 +19,5 @@ What becomes easier, what becomes harder, what must change elsewhere (tests, CI,
 the decision has one.
 
 ## Evidence
-Measurements, prototypes, verified facts with the verification date, links to `docs/design/` sections or issues. Nothing here is recalled
+Measurements, prototypes, verified facts with the verification date, links to `.claude/work/plans/` sections or issues. Nothing here is recalled
 from memory for fast-moving libraries.

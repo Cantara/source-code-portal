@@ -14,5 +14,5 @@ the release notes (design 16 section 4.9.4).
 ## Scope and posture
 
 Trust boundaries, threats and the structural controls (SSRF-guarded outbound clients, `safehtml.SafeHTML`, visibility enforcement, webhook
-signature verification, static CSP, read-only root filesystem and non-root image) are described in `docs/design/10-architecture.md`
+signature verification, static CSP, read-only root filesystem and non-root image) are described in `.claude/work/plans/10-architecture.md`
 section 17 and ADR-025.

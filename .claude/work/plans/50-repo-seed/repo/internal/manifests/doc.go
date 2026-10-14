@@ -8,5 +8,5 @@
 // Additional imports allowed in _test.go files: internal/httpapi/apitest, internal/manifests/parsertest.
 // Third-party libraries owned here: x/sync, cyclonedx-go (export boundary), otel API.
 //
-// Design: docs/design/20-design/11-manifests-core.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/11-manifests-core.md; architecture sections 4 and 5.2.
 package manifests

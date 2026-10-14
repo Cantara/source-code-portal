@@ -146,17 +146,17 @@ func ReadInputs(dir string) error {
 	})
 }
 
-// skipDir says which directories no rule looks into: dependencies and VCS data anywhere, test data anywhere, and three places by
-// exact path: the nested tools module (its own go.mod; outside go list ./...), the mirror of the design documents docs/design (a nested module
-// by its own go.mod; its reference assets are not product code), and the build outputs web/dist and dist. Matching
+// skipDir says which directories no rule looks into: dependencies, VCS data and the design package (.claude/, whose reference assets
+// are not product code; go list ./... skips dot directories too) anywhere, test data anywhere, and by exact path the nested tools
+// module (its own go.mod; outside go list ./...) and the build outputs web/dist and dist. Matching
 // the BASENAME "tools" or "dist" anywhere would hide a product package of that name from the source rules.
 func skipDir(rel string) bool {
 	switch path.Base(rel) {
-	case "node_modules", ".git", "testdata":
+	case "node_modules", ".git", ".claude", "testdata":
 		return true
 	}
 	switch rel {
-	case "tools", "dist", "web/dist", ".dev", "bin", "docs/design":
+	case "tools", "dist", "web/dist", ".dev", "bin":
 		return true
 	}
 	return false

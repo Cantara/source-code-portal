@@ -640,7 +640,7 @@ A test that fails and then passes on retry is a defect. CI never retries tests. 
 
 ## 14. Traceability matrix
 
-How to read: each row maps a design guardrail (GR-nn from `02-design-guardrails.md`) to the tests and mechanisms that fail if the guardrail is violated. A name followed by (new) is introduced by this plan; other names are quoted from the unit designs or from the guardrail's own test list. "Layer" uses L0-L5 of section 2. Where the mechanism is not a test it is named as in architecture section 20: AT (architecture test in `internal/archtest`), LINT, TYPE, CI, DESIGN. The rule for completeness is `TestTraceabilityComplete` (new, in `internal/archtest`): it parses the GR ids from the copied guardrails document (`docs/design/02-design-guardrails.md`) and this table's machine-readable twin `docs/test-traceability.csv` (generated from this section, see appendix B) and fails when an id has no row or a named test does not exist (`go test -list` output compared).
+How to read: each row maps a design guardrail (GR-nn from `02-design-guardrails.md`) to the tests and mechanisms that fail if the guardrail is violated. A name followed by (new) is introduced by this plan; other names are quoted from the unit designs or from the guardrail's own test list. "Layer" uses L0-L5 of section 2. Where the mechanism is not a test it is named as in architecture section 20: AT (architecture test in `internal/archtest`), LINT, TYPE, CI, DESIGN. The rule for completeness is `TestTraceabilityComplete` (new, in `internal/archtest`): it parses the GR ids from the copied guardrails document (`.claude/work/plans/02-design-guardrails.md`) and this table's machine-readable twin `.claude/work/plans/41-test-traceability.csv` (generated from this section, see appendix B) and fails when an id has no row or a named test does not exist (`go test -list` output compared).
 
 ### 14.1 Design guardrails
 
@@ -829,6 +829,6 @@ SCP_TEST_SEED=123 go test ./path -run TestName  # reproduce a property or chaos 
 | Artefact | Generated from | Checked by |
 |---|---|---|
 | Fuzz target list (counts per package) | `make fuzz-list` | `TestFuzzInventory` compares with section 5.2 counts (tolerance: exact per package once M-Test-3 is reached) |
-| Traceability CSV (`docs/test-traceability.csv`) | section 14.1 of this file | `TestTraceabilityComplete` verifies that each GR id has a row and that each named test exists in `go test -list` or the Vitest/Playwright listings (`vitest list`, `playwright test --list`) |
+| Traceability CSV (`.claude/work/plans/41-test-traceability.csv`) | section 14.1 of this file | `TestTraceabilityComplete` verifies that each GR id has a row and that each named test exists in `go test -list` or the Vitest/Playwright listings (`vitest list`, `playwright test --list`) |
 | Capability coverage CSV | capability list of architecture section 21 | `TestCapabilitiesCovered` |
 | CI summary | `go test -json`, Vitest and Playwright JSON reporters, benchstat output | printed in the job summary (P13) |

@@ -1,23 +1,23 @@
-# Design documents (mirror)
+# Design map: from design document to code
 
-This directory is a verbatim mirror of the design package (its root directory at the time of the seed, 2026-10-14; the workspace `README.md` is mirrored as `INDEX.md` so that this map keeps the name README.md). It is **binding**, read-mostly, and
-refreshed only by a deliberate change recorded in an ADR. `bootstrap.sh` created it with `bootstrap.sh --design <path-to-design-package>`; if it is
-missing, re-run that. Do not edit documents here to make a change true: change the code, or propose the change (`docs/adr/`).
+The design package lives in this repository at `.claude/work/plans/` (owner layout rule, 2026-10-14: planning and design under
+`.claude/work/`, `docs/` for user documentation only). It is **binding** and changes only by a deliberate, reviewed change: do not edit a
+document to make a change true; change the code, or propose the change (a new ADR in `11-adr/`, or a "Deviations" section).
+Paths in this file are relative to `.claude/work/plans/`.
 
 Precedence when documents disagree: `04-decisions.md` (section 7 amendments win over section 4) > `10-architecture.md` > `11-adr/` >
 `20-design/NN-*.md` > background. `20-design/93-deviations-and-open-questions.md` and `30-verification/cross-design-consistency.md` record the
 cross-unit conflicts that were found and how they were settled.
 
-Read `INDEX.md` first: it is the index and user guide of the design package (what it is, reading orders for engineers, reviewers and agents,
+Read `README.md` first: it is the index and user guide of the design package (what it is, reading orders for engineers, reviewers and agents,
 glossary, the owner confirmations with the defaults that ship). `llms.txt` is the same
-index in the llms.txt format. This file is the map written for this repository: where each document lands in the code.
+index in the llms.txt format. This file is the map from each document to where it lands in the code.
 
 ## Map
 
-| Mirror path | What it is | Use it when |
+| Path | What it is | Use it when |
 |---|---|---|
-| `INDEX.md`, `llms.txt` | Index, user guide and glossary of the design package | first |
-| `MIRROR.txt`, `MANIFEST.sha256` | Where and when this mirror was taken; checksums of every mirrored file (`shasum -a 256 -c MANIFEST.sha256 --quiet`) | proving the mirror is unmodified |
+| `README.md`, `llms.txt` | Index, user guide and glossary of the design package | first |
 | `02-design-guardrails.md` | The design guardrails `GR-01`..`GR-45`: principle, rationale, scope and enforcing test of each | reviewing any change; tracing why a rule exists |
 | `04-decisions.md` | Product scope and the binding decisions D-01..D-17, amendments A-nn in section 7 | any decision question |
 | `05-research/` | Dated web research per area, with throw-away prototypes (`*.assets`, `*-prototypes`) | re-verifying a library or standard |
@@ -62,5 +62,5 @@ Implementation order follows design 16 section 4.12 and 13 (bootstrap steps and 
 
 ## Where the seed differs from the design files
 
-`docs/seed-notes.md` lists every change the seed made against `20-design/16-seed-files/` and the unit 17 prototype, each with its reason and
+`.claude/work/plans/50-repo-seed/seed-notes.md` lists every change the seed made against `20-design/16-seed-files/` and the unit 17 prototype, each with its reason and
 the open items it leaves (staged CI, `BUILD_ID`, the A-30 matrix cells, the route-table allowance, placeholders, the web shell).

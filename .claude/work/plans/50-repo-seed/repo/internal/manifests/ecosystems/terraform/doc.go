@@ -7,5 +7,5 @@
 // Additional imports allowed in _test.go files: internal/manifests/parsertest.
 // Third-party libraries owned here: hashicorp/hcl/v2.
 //
-// Design: docs/design/20-design/13-manifests-ecosystems-b.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/13-manifests-ecosystems-b.md; architecture sections 4 and 5.2.
 package terraform

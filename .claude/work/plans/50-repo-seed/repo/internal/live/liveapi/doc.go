@@ -5,5 +5,5 @@
 // Allowed internal imports: internal/httpapi/openapi.
 // Third-party libraries owned here: oapi-codegen/runtime (generated code only).
 //
-// Design: docs/design/20-design/07-openapi-contract.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/07-openapi-contract.md; architecture sections 4 and 5.2.
 package liveapi

@@ -7,5 +7,5 @@
 // Additional imports allowed in _test.go files: internal/github/githubtest.
 // Third-party libraries owned here: sony/gobreaker/v2 (owner), x/sync/singleflight, x/time/rate, otelhttp, otel API.
 //
-// Design: docs/design/20-design/05-github-adapter.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/05-github-adapter.md; architecture sections 4 and 5.2.
 package github

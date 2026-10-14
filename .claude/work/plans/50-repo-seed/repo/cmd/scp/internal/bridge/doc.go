@@ -9,5 +9,5 @@
 // Third-party libraries owned here: none.
 // Note: reactor (01 section 9.1, the reactor metrics bridge) and github (05 D-3, RateGate and the ops bridges) added.
 //
-// Design: docs/design/20-design/16-cmd-build-release.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/16-cmd-build-release.md; architecture sections 4 and 5.2.
 package bridge

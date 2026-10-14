@@ -5,5 +5,5 @@
 // Allowed internal imports: internal/job, internal/freshness, internal/platform/logx.
 // Third-party libraries owned here: x/sync, x/time/rate, otel API.
 //
-// Design: docs/design/20-design/04-refresh-webhook.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/04-refresh-webhook.md; architecture sections 4 and 5.2.
 package refresh

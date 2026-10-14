@@ -7,5 +7,5 @@
 // Additional imports allowed in _test.go files: internal/httpapi/apitest.
 // Third-party libraries owned here: otel API.
 //
-// Design: docs/design/20-design/10-docs-pages-media.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/10-docs-pages-media.md; architecture sections 4 and 5.2.
 package media

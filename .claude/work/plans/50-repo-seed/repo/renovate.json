@@ -16,7 +16,7 @@
     "dependencies"
   ],
   "ignorePaths": [
-    "docs/design/**"
+    ".claude/**"
   ],
   "prConcurrentLimit": 8,
   "prHourlyLimit": 4,

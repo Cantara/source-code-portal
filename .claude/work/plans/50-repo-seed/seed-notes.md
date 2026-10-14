@@ -3,7 +3,7 @@
 What the repository seed (bootstrap step 1 of design 16 section 4.12) contains, where it differs from the design files it was derived from,
 and what it deliberately leaves open. Written 2026-10-14. The design documents are binding; every difference below is a proposal with evidence
 (the "Deviations proposed" form of design 16 section 14), kept small, and each is easy to revert by replacing the file from
-`docs/design/20-design/16-seed-files/` or the unit 17 assets.
+`.claude/work/plans/20-design/16-seed-files/` or the unit 17 assets.
 
 ## Contents by bootstrap step
 
@@ -29,13 +29,13 @@ and what it deliberately leaves open. Written 2026-10-14. The design documents a
 | S-8 | `LICENSE` exists at step 1 and `go.sum` is an empty file | `make licenses` fails without a LICENSE (`go-licenses: Did not find license for library 'github.com/cantara/source-code-portal/cmd/scp'`, reproduced); `deploy/Dockerfile` runs `COPY go.mod go.sum` | none needed |
 | S-9 | `renovate.json` also covers `.github/workflow-stages/*.yml` and sets `github-actions.managerFilePatterns` | otherwise the SHAs in the inactive workflows age until activated. The file validates against `renovate-schema.json` (fetched 2026-10-14); `renovate-config-validator` itself was not run | drop the two edits; re-pin by hand at activation |
 | S-10 | `web/pnpm-workspace.yaml` merges the 16 comments with the 17 keys (`trustPolicyIgnoreAfter`, `allowBuilds: {unrs-resolver: false}`) | with `strictDepBuilds: true` and the 16 file (`allowBuilds: {}`), `pnpm install --frozen-lockfile` stops with `ERR_PNPM_IGNORED_BUILDS: unrs-resolver@1.12.2` (reproduced) | use the 17 file |
-| S-11 | `cmd/scp` is a minimal command (`version`, `help`, exit-code table, build info) instead of the 16 skeleton | the 16 skeleton imports `internal/platform/*` of unit 02 and stand-ins; it is copied at task B-2 when those exist (`docs/design/20-design/16-cmd-build-release.assets/cmd/scp`) | copy the 16 skeleton together with unit 02 |
-| S-12 | `docs/design/INDEX.md` is the workspace `README.md` of the design package (`bootstrap.sh` renames it); `docs/design/README.md` is the map for this repository | the workspace README.md and the required `docs/design/README.md` cannot both keep the name | rename |
+| S-11 | `cmd/scp` is a minimal command (`version`, `help`, exit-code table, build info) instead of the 16 skeleton | the 16 skeleton imports `internal/platform/*` of unit 02 and stand-ins; it is copied at task B-2 when those exist (`.claude/work/plans/20-design/16-cmd-build-release.assets/cmd/scp`) | copy the 16 skeleton together with unit 02 |
+| S-12 | **Superseded 2026-10-14 by the owner's layout rule** (planning and design under `.claude/work/`, `docs/` user documentation only). The design package is no longer mirrored into `docs/design/`: it stays at `.claude/work/plans/` in this repository; the map is `50-repo-seed/design-map.md`, these notes are `50-repo-seed/seed-notes.md`, new ADRs go to `11-adr/` (template `ADR-000-template.md`). `bootstrap.sh` lays the seed into this existing repository and refuses to overwrite a differing file | owner decision; re-validation in `50-repo-seed/README.md` | none (owner decision) |
 | S-13 | `TestDocGoStatesTheRow` (new): the "Allowed internal imports" sentence of every `doc.go` must equal the Allow list of its row | mutation: removing `platform/secret` from `internal/commits/doc.go` fails the test | delete the test; comments may then drift |
 
 ## Left open (not decided by the seed)
 
-- Owner confirmations of `docs/design/INDEX.md` section 9 (image namespace `ghcr.io/cantara/source-code-portal`, Node 24 until 2026-10-28, merge queue, shutdown 44 s, ...) keep their shipped defaults.
+- Owner confirmations of `.claude/work/plans/README.md` section 9 (image namespace `ghcr.io/cantara/source-code-portal`, Node 24 until 2026-10-28, merge queue, shutdown 44 s, ...) keep their shipped defaults.
 - Unit 17 prototype `vite.config.ts` proxy list versus the 16 `web/vite.proxy.snippet.ts` list (`/webhooks`, `/.well-known`, `/livez`, `/readyz` versus `/csp-reports` and the regular expression for `*.md`/`*.txt`): the seed uses the 17 list, which its Playwright run verified; the seam test of task B-7 ("the Vite proxy list equals the route table's reserved prefixes") decides.
 - `@redocly/cli` is pinned 2.59.0 (unit 17; 2.63.0 is one day old on 2026-10-14 and the seven-day cooldown applies); units 06 and 07 quote 2.63.0 (unit 17 Q12).
 - Default branch: decided `main` by the owner on 2026-10-14 (the repository is `git@github.com:Cantara/source-code-portal.git`). Design 16 (4.7.3, `ci.yml`, `release.yml`), the workflow seeds and `bootstrap.sh` (`git init -b main`) were switched from `master`; `40-implementation-plan.md` M0 exit criterion 3 already said `main`.

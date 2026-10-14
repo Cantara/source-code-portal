@@ -4,5 +4,5 @@
 // Allowed internal imports: none.
 // Third-party libraries owned here: none (embed only).
 //
-// Design: docs/design/20-design/10-docs-pages-media.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/10-docs-pages-media.md; architecture sections 4 and 5.2.
 package schema

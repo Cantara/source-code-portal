@@ -5,5 +5,5 @@
 // Allowed internal imports: none.
 // Third-party libraries owned here: package-url/packageurl-go.
 //
-// Design: docs/design/20-design/11-manifests-core.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/11-manifests-core.md; architecture sections 4 and 5.2.
 package purl

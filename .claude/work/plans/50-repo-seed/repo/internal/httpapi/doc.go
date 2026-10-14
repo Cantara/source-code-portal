@@ -5,5 +5,5 @@
 // Allowed internal imports: internal/routes, internal/platform/logx, internal/httpapi/openapi.
 // Third-party libraries owned here: none.
 //
-// Design: docs/design/20-design/06-httpapi.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/06-httpapi.md; architecture sections 4 and 5.2.
 package httpapi

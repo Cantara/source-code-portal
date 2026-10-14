@@ -10,5 +10,5 @@
 // Third-party libraries owned here: otel API.
 // Note: A-30: httpapi/openapi added (shared generated schemas; design 07 alias files make this removable).
 //
-// Design: docs/design/20-design/15-live-ops-overview.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/15-live-ops-overview.md; architecture sections 4 and 5.2.
 package overview

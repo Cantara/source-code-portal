@@ -7,5 +7,5 @@
 // Additional imports allowed in _test.go files: internal/manifests/parsertest.
 // Third-party libraries owned here: go-toml/v2.
 //
-// Design: docs/design/20-design/12-manifests-ecosystems-a.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/12-manifests-ecosystems-a.md; architecture sections 4 and 5.2.
 package cargo

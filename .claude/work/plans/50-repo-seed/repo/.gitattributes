@@ -9,5 +9,8 @@ web/pnpm-lock.yaml                      linguist-generated=true
 THIRD_PARTY.md                          linguist-generated=true
 docs/reference/*                        linguist-generated=true
 
-# Vendored design documents are documentation, not source of this repository.
-docs/design/**                          linguist-documentation=true
+# The design package and planning (.claude/work/) are documentation, not source of this repository; its recorded fixtures
+# and golden files are stored byte-exact.
+.claude/**                              linguist-documentation=true
+.claude/**/testdata/**                  -text
+.claude/**/fixtures/**                  -text

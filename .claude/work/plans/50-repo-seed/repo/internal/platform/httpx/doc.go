@@ -6,5 +6,5 @@
 // Third-party libraries owned here: x/time/rate, otelhttp.
 // Note: platform/secret added: 02-platform deviation D2.
 //
-// Design: docs/design/20-design/02-platform.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/02-platform.md; architecture sections 4 and 5.2.
 package httpx

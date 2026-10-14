@@ -8,19 +8,26 @@ caches (`~/Library/pnpm`, the Go module and build caches, the golangci-lint cach
 ## Use
 
 ```
-50-repo-seed/bootstrap.sh ~/Code/descoped/scp --commit --install   # run from the design package root; new empty directory
-cd ~/Code/descoped/scp && make check
+.claude/work/plans/50-repo-seed/bootstrap.sh --commit --install   # from the repository root (git@github.com:Cantara/source-code-portal.git)
+make check
 ```
 
-`bootstrap.sh <dir> [--design DIR] [--no-design] [--git|--commit] [--install] [--verify]` copies `repo/` into the empty `<dir>`, mirrors the
-design workspace into `docs/design/` (renaming the workspace `README.md` to `INDEX.md`; writes `MIRROR.txt` and `MANIFEST.sha256`), initialises
-git on `main`, and installs the web dependencies. It refuses a non-empty target. Then follow design 16 section 13 (tasks B-1 to B-3, and
-the milestone order of 4.12) and `../40-implementation-plan.md` (milestone M0 first). Read `repo/docs/seed-notes.md` (copied to `docs/seed-notes.md`) for what differs from the design files.
+`bootstrap.sh [<repo-root>] [--git|--commit] [--install] [--verify]` lays `repo/` into the root of the repository that holds this design
+package at `.claude/work/plans/` (the default root is derived from the script's own location; an explicit root must be that repository). The
+design package is **not** copied or mirrored: planning and design live under `.claude/work/`, and `docs/` is user documentation only (owner
+layout rule, 2026-10-14). Nothing is overwritten: every seed file whose target exists with different content is listed as a conflict and the run
+stops before copying anything. The one exception is a root `.gitignore` or `.gitattributes` whose every rule is already in the seed's version;
+the seed's version then replaces it. A second run finds only identical files and changes nothing. With `--git` it uses the existing repository
+(or runs `git init -b main` if there is none) and stages everything; `--commit` commits `chore: repository seed`. Then follow design 16 section 13
+(tasks B-1 to B-3, and the milestone order of 4.12) and `../40-implementation-plan.md` (milestone M0 first). Read `seed-notes.md` for what
+differs from the design files.
 
 | Path | What |
 |---|---|
 | `bootstrap.sh` | the script above (bash 3.2 compatible, shellcheck clean) |
 | `repo/` | the files that become the repository root (about 230 files; 76 `doc.go`, one per package) |
+| `design-map.md` | map from each design document to the units, packages and reference assets it lands in |
+| `seed-notes.md` | what the seed changed against the design files, and what it leaves open |
 | `checks/` | the verification helpers used for this README: `matrix-compare.py` (rules.go against architecture 5.2), `validate-yaml-json.py`, `renovate-schema-check.mjs`, `dump-rules.go.txt` |
 | `README.md` | this file |
 
@@ -37,12 +44,13 @@ the milestone order of 4.12) and `../40-implementation-plan.md` (milestone M0 fi
 | Image | `deploy/Dockerfile` (node -> golang -> `distroless/static-debian13:nonroot`, digests pinned), `Dockerfile.release`, `Dockerfile.fakegithub`, `check-binary.sh`, `check-final-stage.sh`, `smoke.sh`, `compose.dev.yaml`, `k8s/scp.yaml`, `dev*.yaml` | 16 seed files |
 | Dependency updates | `renovate.json` (self-contained, 7-day cooldown, grouped toolchain rules, custom managers for Makefile and workflow versions) | 16 seed files |
 | Web scaffold | `web/`: `package.json` (exact pins; React 19.3.0, Vite 8.3.3, Tailwind 4.3.3, TanStack Router/Query, Lingui, Base UI + shadcn 4.21.3), `pnpm-lock.yaml`, `pnpm-workspace.yaml` (supply-chain policy), `tsconfig*.json`, `vite.config.ts`, `vitest.config.ts`, `playwright.config.ts`, `eslint.config.js` (feature boundaries, URL and HTML-sink bans, Lingui), `components.json` (Base UI, `base-nova`), `lingui.config.ts`, `routes.ts`, `scripts/*` (finalize, precompress, verify-dist, budget, check-pins, bundle-check), `e2e/` (axe + CSP gate), a shell with the full route table as stub pages | unit 17 prototype |
-| Contract placeholders | `api/openapi.yaml`, `api/openapi.admin.yaml` (`paths: {}`), `api/oasdiff-severity.txt`, `internal/apispec/*.bundled.yaml`, `web/src/lib/api/schema.d.ts`, `web/redocly.yaml`; the real contract is mirrored at `docs/design/20-design/api/` | units 06, 07 |
-| Agent and human docs | `AGENTS.md`, `CLAUDE.md` (imports AGENTS.md), `llms.txt`, `README.md`, `SECURITY.md`, `CHANGELOG.md`, `LICENSE` (Apache-2.0), `THIRD_PARTY.md` (generated), `docs/README.md`, `docs/seed-notes.md`, `docs/design/README.md` (map of the design mirror: document, unit, packages, assets), `docs/design/go.mod` (keeps the mirror's Go files out of the module), `docs/adr/README.md` and `0000-template.md` | this seed |
+| Contract placeholders | `api/openapi.yaml`, `api/openapi.admin.yaml` (`paths: {}`), `api/oasdiff-severity.txt`, `internal/apispec/*.bundled.yaml`, `web/src/lib/api/schema.d.ts`, `web/redocly.yaml`; the real contract is in the design package at `.claude/work/plans/20-design/api/` | units 06, 07 |
+| Agent and human docs | `AGENTS.md`, `CLAUDE.md` (imports AGENTS.md), `llms.txt`, `README.md`, `SECURITY.md`, `CHANGELOG.md`, `LICENSE` (Apache-2.0), `THIRD_PARTY.md` (generated), `docs/README.md` (user documentation only); the design map, the seed notes and the ADR template live in the design package (`design-map.md`, `seed-notes.md`, `../11-adr/README.md`, `../11-adr/ADR-000-template.md`), not in `repo/` | this seed |
 
 ## Validation (2026-10-14, macOS arm64)
 
-Method: `bootstrap.sh` into an empty scratch directory (`.../scratchpad/seed-check/final3`, with the real design mirror and a git commit), then the
+This log records the first validation, when `bootstrap.sh` still created a new repository with a mirror of the design package under
+`docs/design/` (superseded the same day by the in-place layout, see S-12 and the re-validation below). Method: `bootstrap.sh` into an empty scratch directory (`.../scratchpad/seed-check/final3`, with the real design mirror and a git commit), then the
 commands below. Toolchains: Go 1.27.1 (installed) and Go 1.27.2 (the pin, fetched by `GOTOOLCHAIN=auto`), Node 24.21.0 (the pin, from the `node`
 npm package) and 26.10.0 (installed), pnpm 12.10.1 (the pin), golangci-lint v2.14.0 (binary from the GitHub release), GoReleaser v2.18.3, actionlint,
 shellcheck, Docker 29.8.2.
@@ -66,6 +74,24 @@ shellcheck, Docker 29.8.2.
 | YAML and JSON parse (`validate-yaml-json.py`); `renovate.json` against the schema fetched from docs.renovatebot.com | valid |
 | The 14 pinned action SHAs resolved with `gh api` (tags dereferenced) | all 14 equal their commented tag |
 | `bootstrap.sh`: copy, mirror (`shasum -a 256 -c MANIFEST.sha256` 1,727 files OK), `--commit`, `--install`; refuses a non-empty target, an old pnpm | as intended |
+
+
+### Re-validation of the in-place bootstrap (2026-10-14, macOS arm64)
+
+Method: a scratch copy of this repository (with the design package at `.claude/work/plans/`, git on `main`), then `bootstrap.sh --git`.
+
+| Check | Result |
+|---|---|
+| `bash -n` and `shellcheck` on `bootstrap.sh` | clean |
+| first run: conflict check, copy, staging in the existing repository | the root `.gitignore` and `.gitattributes` (subsets of the seed's) replaced by the seed's versions, the other 223 of the 225 seed files new; all staged |
+| second run | no conflict, no change |
+| a modified `Makefile` in the root | refused: "1 conflict(s); nothing was copied" |
+| `.gitattributes` after seeding | the CRLF fixture `20-design/10-docs-pages-media.assets/testdata/bridge/asciidoctor_asciidoctor.h` stays `-text` (byte-exact) |
+| `go list ./...` (Go 1.27.2 via `GOTOOLCHAIN=auto`) | 80 packages, none under `.claude/` (the nested reference modules stay out) |
+| `go vet ./...`; `go test ./internal/archtest/...` | clean; ok |
+
+Not re-run in this pass: `make check` with golangci-lint and the web toolchain (golangci-lint is not installed locally; pnpm 10 is installed, the
+pin is 12.10.1). The first validation above ran them on the same seed files apart from the path changes of S-12.
 
 **Not run** (no subject yet, or needs infrastructure): `deploy/smoke.sh` and the compose end-to-end stack (need `scp serve`), Playwright e2e and
 Schemathesis, Lighthouse, `release.yml` (needs a GitHub repository, OIDC and cosign), `make api-check` (needs `tools/apicheck` of unit 07, step 4),
@@ -102,20 +128,20 @@ architecture Appendix A (verified 2026-10-13/14 by the architecture and the unit
 | S-8 | `LICENSE` exists at step 1 and `go.sum` is an empty file | `make licenses` fails without a LICENSE (`go-licenses: Did not find license for library 'github.com/cantara/source-code-portal/cmd/scp'`, reproduced); `deploy/Dockerfile` runs `COPY go.mod go.sum` | none needed |
 | S-9 | `renovate.json` also covers `.github/workflow-stages/*.yml` and sets `github-actions.managerFilePatterns` | otherwise the SHAs in the inactive workflows age until activated. The file validates against `renovate-schema.json` (fetched 2026-10-14); `renovate-config-validator` itself was not run | drop the two edits; re-pin by hand at activation |
 | S-10 | `web/pnpm-workspace.yaml` merges the 16 comments with the 17 keys (`trustPolicyIgnoreAfter`, `allowBuilds: {unrs-resolver: false}`) | with `strictDepBuilds: true` and the 16 file (`allowBuilds: {}`), `pnpm install --frozen-lockfile` stops with `ERR_PNPM_IGNORED_BUILDS: unrs-resolver@1.12.2` (reproduced) | use the 17 file |
-| S-11 | `cmd/scp` is a minimal command (`version`, `help`, exit-code table, build info) instead of the 16 skeleton | the 16 skeleton imports `internal/platform/*` of unit 02 and stand-ins; it is copied at task B-2 when those exist (`docs/design/20-design/16-cmd-build-release.assets/cmd/scp`) | copy the 16 skeleton together with unit 02 |
-| S-12 | `docs/design/INDEX.md` is the workspace `README.md` of the design package (`bootstrap.sh` renames it); `docs/design/README.md` is the map for this repository | the workspace README.md and the required `docs/design/README.md` cannot both keep the name | rename |
+| S-11 | `cmd/scp` is a minimal command (`version`, `help`, exit-code table, build info) instead of the 16 skeleton | the 16 skeleton imports `internal/platform/*` of unit 02 and stand-ins; it is copied at task B-2 when those exist (`.claude/work/plans/20-design/16-cmd-build-release.assets/cmd/scp`) | copy the 16 skeleton together with unit 02 |
+| S-12 | **Superseded 2026-10-14 by the owner's layout rule.** Originally: `bootstrap.sh` mirrored the design package into `docs/design/` (workspace `README.md` renamed `INDEX.md`, a `docs/design/README.md` map, a `docs/design/go.mod` fence, `MIRROR.txt`, `MANIFEST.sha256`) and new ADRs went to `docs/adr/`. Now: the design package stays at `.claude/work/plans/` in the same repository and is not copied; the map is `design-map.md`, the seed notes `seed-notes.md`, new ADRs go to `../11-adr/` (template `ADR-000-template.md`); `docs/` is user documentation only. Tools skip `.claude/` (Go skips dot directories; archtest `skipDir`, the Makefile fuzz list, `renovate.json` `ignorePaths`, `.gitattributes`) | owner decision 2026-10-14; re-validation below | none (owner decision) |
 | S-13 | `TestDocGoStatesTheRow` (new): the "Allowed internal imports" sentence of every `doc.go` must equal the Allow list of its row | mutation: removing `platform/secret` from `internal/commits/doc.go` fails the test | delete the test; comments may then drift |
 
 
 ## Left open
 
-The list is in `repo/docs/seed-notes.md` ("Left open"): owner confirmations of `../README.md` section 9 keep their shipped defaults, the Vite proxy
+The list is in `seed-notes.md` ("Left open"): owner confirmations of `../README.md` section 9 keep their shipped defaults, the Vite proxy
 list seam (16 snippet versus 17 prototype) waits for the seam test of task B-7, `@redocly/cli` 2.59.0 versus 2.63.0 (cooldown), the
 `schema.d.ts` path named differently in design 16 4.6.3, and the checks that need a subject or infrastructure (above).
 
 ## Next steps for the owner (design 16 section 13, 7 and the architecture risk table)
 
-1. `bootstrap.sh`, create the GitHub repository, set branch protection, the required check `ci / gate` and the tag rules (design 16 section 4.7.3), push (B-1 to B-3).
+1. `bootstrap.sh --commit` in this repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`), set branch protection, the required check `ci / gate` and the tag rules (design 16 section 4.7.3), push (B-1 to B-3).
 2. Run the M0 spikes of `../README.md` section 2 item 7 (W1, W3, W21, W22) before the first feature lands.
 3. Land units in the order of design 16 section 4.12; each landing pull request flips its `Planned`/placeholder state, adds its `assert.go` lines and keeps `make check` green.
 4. Decide the owner items in `../20-design/93-deviations-and-open-questions.md` section 3 and the proposals S-1 to S-13 above; none blocks M0.

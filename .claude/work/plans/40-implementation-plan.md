@@ -188,7 +188,7 @@ Effort per milestone (engineer-days, estimates of section 1.4): M0 20, M1 53, M2
 1. Every SP-n has a verdict (pass, partial, fail) with its fallback adopted or explicitly deferred (SP-1 deferral is allowed because it gates only post-v1 work).
 2. `go test -race -timeout 5m -count=20` of `refresh` and `webhook` green against the real kernel (`04:T0.1`).
 3. CI jobs `go` and `gate` required on `main`; archtest `TestTableMaterialises` and `TestTableIsAcyclic` green with the Planned flags.
-4. Owner answers for O-8 (namespace, merge queue), O-11 and O-14 recorded in `docs/decisions.md`.
+4. Owner answers for O-8 (namespace, merge queue), O-11 and O-14 recorded in `.claude/work/decisions.md`.
 
 **Tests that gate M0.** archtest (`TestTableMaterialises`, `TestTableIsAcyclic`, `TestRealTree`), the 04 engine and webhook suites, the synctest list of section 22, the SP-5 apicheck run, the SP-6 Schemathesis run, the SP-7 Playwright CSP run, the SP-8 image smoke.
 
@@ -819,7 +819,7 @@ Package manifest intelligence (M6, M7c) is the largest single block of work and 
 
 ## 10. Definition of Done for v1
 
-`v1.0.0` is tagged only when every line below is true. Each line says how it is checked; "CI" means a required job of the `gate`; "drill" means a recorded run under `docs/operations/drills/`; "log" means an entry in `docs/decisions.md`.
+`v1.0.0` is tagged only when every line below is true. Each line says how it is checked; "CI" means a required job of the `gate`; "drill" means a recorded run under `docs/operations/drills/`; "log" means an entry in `.claude/work/decisions.md`.
 
 | # | Criterion | How it is checked |
 |---|---|---|
@@ -850,7 +850,7 @@ Package manifest intelligence (M6, M7c) is the largest single block of work and 
 | D20 | runbooks exist and were exercised: readiness states, status warnings, parked key retry, webhook setup and secret rotation, backup and restore, upgrade and downgrade, pprof, go-live and rollback; alert examples exist | `docs/operations/*`, drills |
 | D21 | documentation: README, CHANGELOG, ADRs copied with their exit conditions, `docs/reference` (config, env, metrics, routes, API, diagnostics) generated and drift-free, authoring guide for `scp.yaml`, deployment guide, `llms.txt` and `AGENTS.md` at the repository root | CI `gen`, review |
 | **Decisions and risks** | | |
-| D22 | every spike has a verdict (SP-1 may be deferred because it gates post-v1 work only); every owner decision O-1 to O-14 and prerequisite P-1 to P-3 is logged; the open items CD-CF-10, CD-MT-06, CD-DM-03 and CD-FX-02 to CD-FX-05 are closed (CD-FX-01 only if SP-1 passes) | `docs/spikes/`, `docs/decisions.md` |
+| D22 | every spike has a verdict (SP-1 may be deferred because it gates post-v1 work only); every owner decision O-1 to O-14 and prerequisite P-1 to P-3 is logged; the open items CD-CF-10, CD-MT-06, CD-DM-03 and CD-FX-02 to CD-FX-05 are closed (CD-FX-01 only if SP-1 passes) | `.claude/work/spikes/`, `.claude/work/decisions.md` |
 | D23 | no `TODO`, `FIXME` or `t.Skip` without an issue reference; no code path calls the removed synchronous SBOM endpoint | lint rules of 16 B-11, CI grep |
 | **Go-live** | | |
 | D24 | the staging acceptance criteria SA-1 to SA-12 are met; the go-live verification (smoke list) passed; no rollback trigger fired within 14 days of go-live | harness reports, runbook log |
@@ -1189,7 +1189,7 @@ Tasks that no unit design contains, added by this plan, with the milestone that 
 | FX-4 | generated 1,000-repository world | M3 | cold-start budget test (about 3,000 calls) |
 | FX-5 | recorded Jenkins, Snyk, deps.dev and README-variant fixtures (CD-FX-05) | M5 (README variants), M8 (Jenkins, Snyk) | integration and badge tests |
 | FX-6 | dependency-graph SBOM endpoints in the fake (CD-FX-01) | post-v1, only if SP-1 passes | M11 provider tests |
-| PL-1 | decision log `docs/decisions.md` and spike report template `docs/spikes/` | M0 (closed M9) | every spike has a verdict file |
+| PL-1 | decision log `.claude/work/decisions.md` and spike report template `.claude/work/spikes/` | M0 (closed M9) | every spike has a verdict file |
 | PL-2 | real fixtures: `record-github.sh` against the P-1 test organisation | M3 (rerun M9) | `08:C-5.1` and `05:M6` use the output |
 | PL-3 | traceability check: every capability of architecture 21 and every guardrail row (GR-01 to GR-45) of architecture 20 names an existing test or mechanism | M1 skeleton, M9 complete | D1 |
 | PL-4 | staging acceptance harness and staging deployment | M9 (built), M10 (run) | SA-1 to SA-12 |

@@ -4,5 +4,5 @@
 // Allowed internal imports: none.
 // Third-party libraries owned here: none.
 //
-// Design: docs/design/20-design/02-platform.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/02-platform.md; architecture sections 4 and 5.2.
 package secret

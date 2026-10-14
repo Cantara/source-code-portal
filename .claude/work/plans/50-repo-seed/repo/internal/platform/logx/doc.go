@@ -4,5 +4,5 @@
 // Allowed internal imports: internal/platform/secret.
 // Third-party libraries owned here: otel API (trace, for trace_id).
 //
-// Design: docs/design/20-design/02-platform.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/02-platform.md; architecture sections 4 and 5.2.
 package logx

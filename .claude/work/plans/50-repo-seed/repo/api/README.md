@@ -9,9 +9,9 @@ The contract lives here, spec first (ADR-020, design 07). Today both roots are p
 | `openapi.admin.yaml` | placeholder admin root (superset: public plus `getStatus`, `retryJob`) | design 07 task T-1 |
 | `oasdiff-severity.txt` | real: severity levels for `oasdiff breaking` (Makefile `api-check`) | (kept) |
 
-The real contract is a design deliverable, mirrored by `bootstrap.sh` under `docs/design/20-design/api/` (`common.yaml`, `openapi-public.yaml`,
-`openapi-admin.yaml`, `trusted-members.txt`) together with the endpoint catalogue `docs/design/20-design/07-openapi-contract-catalogue.md`.
-Task T-1 turns those three single files into the repository layout once (`docs/design/20-design/07-openapi-contract.assets/tools/split.py`),
+The real contract is a design deliverable, kept in the design package under `.claude/work/plans/20-design/api/` (`common.yaml`, `openapi-public.yaml`,
+`openapi-admin.yaml`, `trusted-members.txt`) together with the endpoint catalogue `.claude/work/plans/20-design/07-openapi-contract-catalogue.md`.
+Task T-1 turns those three single files into the repository layout once (`.claude/work/plans/20-design/07-openapi-contract.assets/tools/split.py`),
 then generates `internal/httpapi/openapi`, the eight `<feature>api` packages and the two bundles in `internal/apispec/`
 (`openapi.bundled.yaml`, `openapi.admin.bundled.yaml`, committed and drift-checked by `pnpm api:bundle-check`).
 

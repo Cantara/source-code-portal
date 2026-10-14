@@ -6,5 +6,5 @@
 // Allowed internal imports: internal/scm.
 // Third-party libraries owned here: none.
 //
-// Design: docs/design/20-design/05-github-adapter.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/05-github-adapter.md; architecture sections 4 and 5.2.
 package githubtest

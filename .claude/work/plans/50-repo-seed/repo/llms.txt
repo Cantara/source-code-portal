@@ -5,16 +5,16 @@
 ## Start here
 
 - [AGENTS.md](AGENTS.md): architecture in one screen, enforced rules, commands, conventions.
-- [docs/design/README.md](docs/design/README.md): map of the binding design documents (decisions, architecture, ADRs, one design per unit).
-- [docs/design/10-architecture.md](docs/design/10-architecture.md): package map (section 4), dependency matrix (section 5.2), Go signatures (section 8).
+- [.claude/work/plans/50-repo-seed/design-map.md](.claude/work/plans/50-repo-seed/design-map.md): map of the binding design documents (decisions, architecture, ADRs, one design per unit).
+- [.claude/work/plans/10-architecture.md](.claude/work/plans/10-architecture.md): package map (section 4), dependency matrix (section 5.2), Go signatures (section 8).
 - [internal/archtest/rules.go](internal/archtest/rules.go): the executable form of the dependency matrix (closed world).
 
 ## Working rules
 
-- [docs/design/04-decisions.md](docs/design/04-decisions.md): binding decisions; section 7 amendments win over section 4.
-- [docs/design/11-adr/](docs/design/11-adr/): decision records ADR-001..025; new ones in [docs/adr/](docs/adr/).
-- [docs/design/02-design-guardrails.md](docs/design/02-design-guardrails.md): the design guardrails (GR-01..GR-45) every change must respect.
-- [docs/design/20-design/93-deviations-and-open-questions.md](docs/design/20-design/93-deviations-and-open-questions.md): settled and open questions.
+- [.claude/work/plans/04-decisions.md](.claude/work/plans/04-decisions.md): binding decisions; section 7 amendments win over section 4.
+- [.claude/work/plans/11-adr/](.claude/work/plans/11-adr/): decision records ADR-001..025; new ones are added there from ADR-026 (template `ADR-000-template.md`).
+- [.claude/work/plans/02-design-guardrails.md](.claude/work/plans/02-design-guardrails.md): the design guardrails (GR-01..GR-45) every change must respect.
+- [.claude/work/plans/20-design/93-deviations-and-open-questions.md](.claude/work/plans/20-design/93-deviations-and-open-questions.md): settled and open questions.
 
 ## Contract and generated files
 

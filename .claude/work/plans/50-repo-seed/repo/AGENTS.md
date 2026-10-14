@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for people and coding agents working in this repository. Keep it short: the reasons live in `docs/design/`.
+Guidance for people and coding agents working in this repository. Keep it short: the reasons live in `.claude/work/plans/`.
 
 ## What this is
 
@@ -12,12 +12,12 @@ features land one pull request at a time.
 
 ## The design is binding
 
-Read in this order when a rule is unclear (mirrored under `docs/design/`, map in `docs/design/README.md`):
+Read in this order when a rule is unclear (the design package is `.claude/work/plans/`: index `README.md`, map `50-repo-seed/design-map.md`):
 `04-decisions.md` (incl. section 7 amendments) > `10-architecture.md` > `11-adr/` > `20-design/NN-*.md` (one document per unit, each
 with its tasks) > background (`00`-`03`, `05-research`, `30-verification`).
 Planning: `40-implementation-plan.md` (milestones M0-M11 with task ids) and `41-test-plan.md` say what to build next and how it is proven.
 If you believe the architecture or an ADR must change, do not diverge silently: write the proposal with evidence in a new ADR
-(`docs/adr/`, template `0000-template.md`) and a "Deviations proposed" note in the pull request, then follow the owner's decision.
+(`.claude/work/plans/11-adr/`, template `ADR-000-template.md`) and a "Deviations proposed" note in the pull request, then follow the owner's decision.
 
 ## Architecture in one screen
 
@@ -72,7 +72,7 @@ make dev           fake GitHub + portal + Vite (needs the dev tooling of design 
 - **A config key**: owner unit, default, range, env name in the config table; the documented-keys equals consumed-keys test must stay green.
 - **An endpoint**: edit the OpenAPI fragment first (spec-first, ADR-020), regenerate, then implement the strict handler.
 - **A route**: `internal/routes` table first (one name, one pattern); the SPA shape in `web/routes.ts` and the golden tests change together.
-- **An ADR**: copy `docs/adr/0000-template.md` to the next free number (025 is the last design-phase ADR); Status starts as Proposed.
+- **An ADR**: copy `.claude/work/plans/11-adr/ADR-000-template.md` to the next free number (025 is the last design-phase ADR); Status starts as Proposed.
 
 ## Conventions
 
@@ -86,7 +86,7 @@ make dev           fake GitHub + portal + Vite (needs the dev tooling of design 
   `THIRD_PARTY.md`) are committed, never edited by hand, and drift-checked.
 - Commits: Conventional Commits (`feat(commits): ...`, `fix(webhook): ...`, `chore(deps): ...`), one logical change, tests with the change.
   A change that touches the matrix, a contract or a decision says so in the pull request.
-- Comments say why, not history. Design notes belong in `docs/`, not in code. Nothing is added without a consumer.
+- Comments say why, not history. Design notes belong under `.claude/work/` (`docs/` is user documentation only), not in code. Nothing is added without a consumer.
 
 ## Security posture (short)
 
@@ -96,5 +96,5 @@ private repositories. Static CSP, no inline script or style in the SPA. See arch
 
 ## Design guardrails
 
-`docs/design/02-design-guardrails.md` lists the guardrails (GR-01..GR-45): each has a principle, a rationale and the test that enforces it,
+`.claude/work/plans/02-design-guardrails.md` lists the guardrails (GR-01..GR-45): each has a principle, a rationale and the test that enforces it,
 and architecture section 20 maps each one to its enforcement mechanism. A change that relaxes a guardrail needs an ADR.

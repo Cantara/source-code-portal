@@ -8,7 +8,7 @@ This repository (`git@github.com:Cantara/source-code-portal.git`, default branch
 
 Current phase: planning. Do not write product code yet. Work on the plans means editing documents under `.claude/work/plans/`.
 
-Layout rule (owner, 2026-10-14): all project work material (plans, design, notes, roadmap, ...) lives under `.claude/work/`. `docs/` is reserved for user documentation and must never hold planning or design documents. This overrides the seed's mirroring of the design package into `docs/design/` (`bootstrap.sh`, seed deviation S-12), and `bootstrap.sh` refuses a non-empty target while the seed must now be laid into this existing repository; both are to be reworked before M0.
+Layout rule (owner, 2026-10-14): all project work material (plans, design, notes, roadmap, ...) lives under `.claude/work/`. `docs/` is reserved for user documentation and must never hold planning or design documents. The seed follows it: `bootstrap.sh` lays `50-repo-seed/repo/` into this repository in place (no design mirror, nothing overwritten), the design map and seed notes live in `50-repo-seed/`, new ADRs go to `11-adr/` from ADR-026 (template `ADR-000-template.md`), and every tool skips `.claude/` (seed deviation S-12, superseded).
 
 ## Where to start
 
@@ -25,7 +25,7 @@ Layout rule (owner, 2026-10-14): all project work material (plans, design, notes
 
 - `20-design/`: 18 unit designs (`01-kernel` .. `18-web-pages`), each with `<unit>.assets/` reference code (own `go.mod`, compiled and tested at design time per the docs; units 05 and 13 have no code). Catalogues that are the single source for a key space: `90-config-reference.md` (370 config keys), `91-metrics-catalogue.md`, `92-error-catalogue.md`, `93-deviations-and-open-questions.md` (authoritative for open items), `01-kernel.routes.tsv`, and `api/` (OpenAPI roots). **Copy OpenAPI from `20-design/api/`, not from the older `common.yaml` copies under some `.assets/`.**
 - `30-verification/`: one report per unit plus the architecture reviews and `cross-design-consistency.md`. Newer than the row texts in 93 where they conflict.
-- `50-repo-seed/`: `bootstrap.sh` plus `repo/` (the starter files of the new repository: Makefile, archtest, CI, Dockerfiles, web scaffold, 76 `doc.go`). `repo/CLAUDE.md` and `repo/AGENTS.md` are for the **new** repository, not this one. `repo/` is derived from `20-design/16-seed-files/` (the unit 16 design-time seed) plus the unit 17 prototype, with proposed deviations S-1..S-13 (`50-repo-seed/README.md`); where the two disagree, `50-repo-seed/repo/` is the newer copy, pending owner sign-off of S-1..S-13.
+- `50-repo-seed/`: `bootstrap.sh` plus `repo/` (the starter files of this repository, laid in at M0: Makefile, archtest, CI, Dockerfiles, web scaffold, 76 `doc.go`). `repo/CLAUDE.md` and `repo/AGENTS.md` become the root `CLAUDE.md` and `AGENTS.md` of this repository at M0 (product-build guidance); this file stays the planning guidance. `repo/` is derived from `20-design/16-seed-files/` (the unit 16 design-time seed) plus the unit 17 prototype, with proposed deviations S-1..S-13 (`50-repo-seed/README.md`); where the two disagree, `50-repo-seed/repo/` is the newer copy, pending owner sign-off of S-1..S-13.
 - `05-research/`, `review/`, `00`..`03`: evidence and Java-side background. Prototypes are throwaway.
 
 ## Architecture in brief (full text: `10-architecture.md`, ADR-001/018/024)
@@ -46,15 +46,15 @@ Rules that hold the design together:
 - Never invent a package, config key, metric, route or error code. Add it to the catalogue that owns it (90, 91, 92, `routes.Table`, the OpenAPI fragment) in the same change as the design text that needs it.
 - Library and version facts move fast. Every pin was read on 2026-10-13/14; re-verify against the primary source and date it before relying on one (task `PL-9`).
 - Open owner decisions ship their stated default; keep them open in `README.md` section 9 / `40` section 2 rather than silently deciding them.
-- Known unresolved inconsistencies (decide before first push, do not paper over): `schema.d.ts` path `web/src/api/` (design 16 4.6.3) vs `web/src/lib/api/` (architecture, seed); `README.md` section 2 step 1 still says to copy `20-design/16-seed-files/` verbatim rather than run `50-repo-seed/bootstrap.sh`; open items CD-CF-10, CD-MT-06, CD-DM-03 and CD-FX-01..05 in 93 section 3; seed deviations S-1..S-13 in `50-repo-seed/README.md`.
-- Documents say `~/.scp` in places (the package's earlier home). `bootstrap.sh` resolves the design directory from its own location, so it works from `.claude/work/plans/50-repo-seed/`.
+- Known unresolved inconsistencies (decide before first push, do not paper over): `schema.d.ts` path `web/src/api/` (design 16 4.6.3) vs `web/src/lib/api/` (architecture, seed); open items CD-CF-10, CD-MT-06, CD-DM-03 and CD-FX-01..05 in 93 section 3; seed deviations S-1..S-13 in `50-repo-seed/README.md`.
+- Documents say `~/.scp` in places (the package's earlier home). `bootstrap.sh` resolves the design package and the repository root from its own location (`.claude/work/plans/50-repo-seed/`).
 
-## Commands (for the new repository, not runnable here)
+## Commands (once the seed is laid in, at M0)
 
-From the seed's `AGENTS.md` and `Makefile`; they apply once `bootstrap.sh` has produced the repo:
+From the seed's `AGENTS.md` and `Makefile`; they apply after `bootstrap.sh` has laid the seed into this repository:
 
 ```
-.claude/work/plans/50-repo-seed/bootstrap.sh <empty-dir-outside-workspace> --commit --install   # refuses non-empty target
+.claude/work/plans/50-repo-seed/bootstrap.sh --commit --install   # from the repository root; lists conflicts and copies nothing if a file differs
 make check      # PR gate at bootstrap step 1: gen-check modverify lint arch test lint-web vuln licenses
 make arch       # archtest: closed-world matrix, rank proof, depguard drift, source rules
 make arch-fix   # regenerate the depguard block of .golangci.yml after editing internal/archtest/rules.go
@@ -64,7 +64,7 @@ make gen / make gen-check   # generated source is committed and drift-checked
 make build      # pnpm build, then static binary with SPA embedded -> bin/scp
 ```
 
-Toolchain pins: Go 1.27.2 (`GOTOOLCHAIN=local` in CI), Node 24.21.0, pnpm 12.10.1, golangci-lint v2.14.0 (binary). `-race` needs cgo, so CI tests use it while releases are `CGO_ENABLED=0`. In that repository, commits are Conventional Commits and generated files are never edited by hand.
+Toolchain pins: Go 1.27.2 (`GOTOOLCHAIN=local` in CI), Node 24.21.0, pnpm 12.10.1, golangci-lint v2.14.0 (binary). `-race` needs cgo, so CI tests use it while releases are `CGO_ENABLED=0`. In this repository, commits are Conventional Commits and generated files are never edited by hand.
 
 ## Build order (when implementation starts)
 

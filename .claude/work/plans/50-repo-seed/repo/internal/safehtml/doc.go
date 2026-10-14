@@ -5,5 +5,5 @@
 // Allowed internal imports: none.
 // Third-party libraries owned here: microcosm-cc/bluemonday (owner).
 //
-// Design: docs/design/20-design/01-kernel.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/01-kernel.md; architecture sections 4 and 5.2.
 package safehtml

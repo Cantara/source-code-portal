@@ -161,8 +161,8 @@ third-party: ## regenerate THIRD_PARTY.md (Go modules and the npm packages embed
 FUZZTIME ?= 30s
 SHARDS   ?= 1
 SHARD    ?= 0
-# "dir Target" per line in a stable order; tools/, docs/design (the design mirror), node_modules and .git hold no product fuzz targets.
-FUZZ_LIST = grep -rl --include='*_test.go' '^func Fuzz' . | grep -v -e '^\./tools/' -e '^\./docs/design/' -e '/node_modules/' -e '^\./\.git/' | sort -u | xargs -n1 dirname | sort -u | while read -r dir; do \
+# "dir Target" per line in a stable order; tools/, .claude/ (the design package), node_modules and .git hold no product fuzz targets.
+FUZZ_LIST = grep -rl --include='*_test.go' '^func Fuzz' . | grep -v -e '^\./tools/' -e '^\./\.claude/' -e '/node_modules/' -e '^\./\.git/' | sort -u | xargs -n1 dirname | sort -u | while read -r dir; do \
 	  grep -h '^func Fuzz' $$dir/*_test.go | sed -E 's/^func (Fuzz[A-Za-z0-9_]*).*/\1/' | sort -u | while read -r t; do echo "$$dir $$t"; done; done
 
 .PHONY: fuzz-list

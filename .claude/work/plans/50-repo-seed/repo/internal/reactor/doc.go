@@ -5,5 +5,5 @@
 // Allowed internal imports: internal/job, internal/scm, internal/platform/logx.
 // Third-party libraries owned here: none.
 //
-// Design: docs/design/20-design/01-kernel.md; architecture sections 4 and 5.2.
+// Design: .claude/work/plans/20-design/01-kernel.md; architecture sections 4 and 5.2.
 package reactor
