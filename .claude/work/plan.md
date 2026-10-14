@@ -32,7 +32,6 @@ Target: up to 1,000 repositories, one instance.
 - Private repositories behind a trusted authenticating proxy.
 - Multiple instances, with Hazelcast for shared state (A-35).
 - Image proxy for external README images; live updates by server-sent events.
-- Web UI on Next.js with server-side rendering, so every page is complete HTML for search engines (owner decision P-13).
 
 **Later (v1.2+), only on demand**
 
@@ -124,9 +123,11 @@ v1.1, one milestone per bullet of section 2; each starts with its design note:
 |---|---|---|
 | M7 | Package manifests (`design/manifests.md`): `go.mod`, `package.json` and `pom.xml` per repository, technology and dependency panel, internal dependencies between catalogued repositories | a repository page shows its technologies and dependencies and the catalogued repositories it uses and is used by |
 | M8 | Private repositories behind a trusted authenticating proxy | anonymous requests see public repositories only on every surface (pages, API, badges, Markdown, feeds); a request from the proxy with a permitted group sees the private ones |
-| M9 | Web UI on Next.js with server-side rendering (`design/web.md` rewritten first) | every page arrives as complete HTML with title, description, canonical link and structured data; a sitemap lists every public page; Playwright smoke, axe and CSP checks pass on the new server |
-| M10 | Multiple instances with Hazelcast | two instances on one Hazelcast cluster make each GitHub call once, share webhook de-duplication and serve the same data |
-| M11 | Image proxy for external README images; live updates by server-sent events | README images load from the portal under `img-src 'self'`; a push reaches an open page without polling |
+| M9 | Multiple instances with Hazelcast | two instances on one Hazelcast cluster make each GitHub call once, share webhook de-duplication and serve the same data |
+| M10 | Image proxy for external README images; live updates by server-sent events | README images load from the portal under `img-src 'self'`; a push reaches an open page without polling |
+
+Queued after v1.1 (owner decision P-13), planned only when M10 is done: the web UI on Next.js with server-side rendering, so pages
+arrive as complete HTML for search engines. It does not change the v1.1 milestones.
 
 ## 6. How we work
 
