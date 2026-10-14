@@ -252,6 +252,69 @@ func (s *Source) Repo(ctx context.Context, owner, name string) (snapshot.Repo, e
 	return s.convert(r), nil
 }
 
+// CommitInfo is a commit as GitHub lists it; callers clean the fields.
+type CommitInfo struct {
+	SHA, Message, AuthorName, AuthorLogin, HTMLURL string
+	Date                                           time.Time // committer date
+}
+
+// Commits returns the latest n commits of the repository's default branch, newest first.
+func (s *Source) Commits(ctx context.Context, owner, name string, n int) ([]CommitInfo, error) {
+	c, err := s.client(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	got, resp, err := c.Repositories.ListCommits(ctx, owner, name, &gh.CommitsListOptions{ListOptions: gh.ListOptions{PerPage: n}})
+	if err != nil {
+		return nil, classify(resp, err)
+	}
+	out := make([]CommitInfo, 0, len(got))
+	for _, rc := range got {
+		ci := CommitInfo{SHA: rc.GetSHA(), Message: rc.GetCommit().GetMessage(), AuthorName: rc.GetCommit().GetAuthor().GetName(),
+			AuthorLogin: rc.GetAuthor().GetLogin(), HTMLURL: rc.GetHTMLURL(), Date: rc.GetCommit().GetCommitter().GetDate().Time}
+		out = append(out, ci)
+	}
+	return out, nil
+}
+
+// TreeEntry is one entry of a git tree.
+type TreeEntry struct {
+	Path string // name within the tree
+	Type string // blob | tree | commit
+	SHA  string
+	Size int64 // blobs only
+}
+
+// Tree returns the entries of one tree (not recursive). ref is a tree SHA or a branch name; "HEAD" is the default branch.
+func (s *Source) Tree(ctx context.Context, owner, name, ref string) ([]TreeEntry, error) {
+	c, err := s.client(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	t, resp, err := c.Git.GetTree(ctx, owner, name, ref, false)
+	if err != nil {
+		return nil, classify(resp, err)
+	}
+	out := make([]TreeEntry, 0, len(t.Entries))
+	for _, e := range t.Entries {
+		out = append(out, TreeEntry{Path: e.GetPath(), Type: e.GetType(), SHA: e.GetSHA(), Size: int64(e.GetSize())})
+	}
+	return out, nil
+}
+
+// Blob returns the content of a blob.
+func (s *Source) Blob(ctx context.Context, owner, name, sha string) ([]byte, error) {
+	c, err := s.client(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	b, resp, err := c.Git.GetBlobRaw(ctx, owner, name, sha)
+	if err != nil {
+		return nil, classify(resp, err)
+	}
+	return b, nil
+}
+
 func (s *Source) convert(r *gh.Repository) snapshot.Repo {
 	return snapshot.Repo{
 		ID:            snapshot.RepoID{Source: s.id, GitHubID: r.GetID()},

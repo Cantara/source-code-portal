@@ -176,3 +176,38 @@ func TestETagCacheEvicts(t *testing.T) {
 		t.Errorf("want b evicted and a, c kept")
 	}
 }
+
+func TestCommitsTreesAndBlobs(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("one")})
+	srv.AddRepo("acme", gh.Repository{Name: new("empty")})
+	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	srv.SetCommits(id, githubtest.Commit{SHA: strings.Repeat("b", 40), Message: "second\n\nbody", AuthorName: "Ann", AuthorLogin: "ann", Date: at},
+		githubtest.Commit{SHA: strings.Repeat("a", 40), Message: "first", AuthorName: "Bo", Date: at.Add(-time.Hour)})
+	srv.SetFile(id, ".github/scp.yaml", "schema: 1\n")
+	srv.SetFile(id, "README.md", "# one\n")
+	s := tokenSource(t, srv, "acme")
+	ctx := t.Context()
+
+	cs, err := s.Commits(ctx, "acme", "one", 30)
+	if err != nil || len(cs) != 2 || cs[0].Message != "second\n\nbody" || cs[0].AuthorLogin != "ann" || !cs[0].Date.Equal(at) ||
+		!strings.HasSuffix(cs[0].HTMLURL, "/commit/"+strings.Repeat("b", 40)) {
+		t.Fatalf("commits = %+v, %v", cs, err)
+	}
+	if _, err := s.Commits(ctx, "acme", "empty", 30); !IsNotFound(err) {
+		t.Errorf("empty repository: err = %v, want not found", err)
+	}
+
+	root, err := s.Tree(ctx, "acme", "one", "HEAD")
+	if err != nil || len(root) != 2 || root[0].Path != ".github" || root[0].Type != "tree" || root[1].Path != "README.md" {
+		t.Fatalf("root = %+v, %v", root, err)
+	}
+	sub, err := s.Tree(ctx, "acme", "one", root[0].SHA)
+	if err != nil || len(sub) != 1 || sub[0].Path != "scp.yaml" || sub[0].Size != 10 {
+		t.Fatalf(".github = %+v, %v", sub, err)
+	}
+	b, err := s.Blob(ctx, "acme", "one", sub[0].SHA)
+	if err != nil || string(b) != "schema: 1\n" {
+		t.Errorf("blob = %q, %v", b, err)
+	}
+}

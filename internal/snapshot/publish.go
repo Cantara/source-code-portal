@@ -30,10 +30,13 @@ func newBuilder(cur *Snapshot) *Builder {
 // Repos returns the builder's repositories. Callers must not modify the map or the entries; use ReplaceSource.
 func (b *Builder) Repos() map[RepoKey]*RepoEntry { return b.s.Repos }
 
-// ReplaceSource replaces every repository and alias of source with repos and aliases, and records its status.
+// ReplaceSource replaces every repository and alias of source with repos and aliases, and records its status. Only Repo and Fresh
+// of the given entries are used: what other jobs contributed is kept for a repository that stays at the same address.
 func (b *Builder) ReplaceSource(source string, repos []*RepoEntry, aliases map[RepoKey]RepoKey, status SourceStatus) {
+	old := map[RepoKey]*RepoEntry{}
 	for k, e := range b.s.Repos {
 		if e.Repo.ID.Source == source {
+			old[k] = e
 			delete(b.s.Repos, k)
 		}
 	}
@@ -43,7 +46,13 @@ func (b *Builder) ReplaceSource(source string, repos []*RepoEntry, aliases map[R
 		}
 	}
 	for _, e := range repos {
-		b.s.Repos[e.Repo.Key()] = e
+		k := e.Repo.Key()
+		if prev := old[k]; prev != nil && prev.Repo.ID == e.Repo.ID {
+			merged := *prev
+			merged.Repo, merged.Fresh = e.Repo, e.Fresh
+			e = &merged
+		}
+		b.s.Repos[k] = e
 	}
 	for old, cur := range aliases {
 		if _, taken := b.s.Repos[old]; !taken {
@@ -57,6 +66,18 @@ func (b *Builder) ReplaceSource(source string, repos []*RepoEntry, aliases map[R
 	} else {
 		b.s.Sources[i] = status
 	}
+}
+
+// UpdateRepo replaces the entry at key with a copy changed by fn. It reports false, and does nothing, when key is not catalogued.
+func (b *Builder) UpdateRepo(key RepoKey, fn func(*RepoEntry)) bool {
+	cur, ok := b.s.Repos[key]
+	if !ok {
+		return false
+	}
+	next := *cur
+	fn(&next)
+	b.s.Repos[key] = &next
+	return true
 }
 
 // Sources returns the builder's source statuses. Callers must not modify the slice.
@@ -78,7 +99,38 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
 		}
 	}
+	keys := slices.Sorted(maps.Keys(s.Repos))
+	s.Latest = feed(s.Repos, keys)
+	s.latestByGroup = make(map[string][]CommitRef, len(s.Groups))
+	for _, g := range s.Groups {
+		s.latestByGroup[g.ID] = feed(s.Repos, g.Members)
+	}
 	return s
+}
+
+// feed merges the commits of keys, newest first.
+func feed(repos map[RepoKey]*RepoEntry, keys []RepoKey) []CommitRef {
+	var out []CommitRef
+	for _, k := range keys {
+		if e := repos[k]; e != nil {
+			for i := range e.Commits {
+				out = append(out, CommitRef{Repo: k, Commit: &e.Commits[i]})
+			}
+		}
+	}
+	slices.SortFunc(out, CompareRefs)
+	return out
+}
+
+// CompareRefs orders a feed: committedAt desc, repo asc, sha desc.
+func CompareRefs(a, b CommitRef) int {
+	if c := b.Commit.CommittedAt.Compare(a.Commit.CommittedAt); c != 0 {
+		return c
+	}
+	if c := strings.Compare(string(a.Repo), string(b.Repo)); c != 0 {
+		return c
+	}
+	return strings.Compare(b.Commit.SHA, a.Commit.SHA)
 }
 
 // Publisher owns the current snapshot. Updates are queued and applied in order at the next publish, which happens Debounce after

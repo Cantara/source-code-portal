@@ -3,6 +3,7 @@ package snapshot
 import (
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -118,5 +119,50 @@ func TestPanicKeepsSnapshot(t *testing.T) {
 	p.Flush()
 	if got := p.Current(); got.Version != 0 || got.Catalogued {
 		t.Fatalf("a panicking batch was published: version %d", got.Version)
+	}
+}
+
+func TestFeedsAndUpdates(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	a := Repo{ID: RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "a"}
+	b := Repo{ID: RepoID{Source: "gh", GitHubID: 2}, Owner: "acme", Name: "b"}
+	p.Update(func(bd *Builder) {
+		bd.ReplaceSource("gh", []*RepoEntry{{Repo: a}, {Repo: b}}, nil, SourceStatus{ID: "gh"})
+		bd.SetGroups([]Group{{ID: "only-b", Members: []RepoKey{"acme/b"}}})
+		bd.UpdateRepo("acme/a", func(e *RepoEntry) {
+			e.Commits = []Commit{{SHA: "a2", CommittedAt: at}, {SHA: "a1", CommittedAt: at.Add(-2 * time.Hour)}}
+		})
+		bd.UpdateRepo("acme/b", func(e *RepoEntry) { e.Commits = []Commit{{SHA: "b1", CommittedAt: at.Add(-time.Hour)}} })
+		if bd.UpdateRepo("acme/missing", func(*RepoEntry) {}) {
+			t.Error("UpdateRepo of an unknown key reported true")
+		}
+	})
+	p.Flush()
+	s := p.Current()
+	var shas []string
+	for _, r := range s.Latest {
+		shas = append(shas, r.Commit.SHA)
+	}
+	if strings.Join(shas, ",") != "a2,b1,a1" {
+		t.Errorf("Latest = %v", shas)
+	}
+	if f, ok := s.Feed("only-b"); !ok || len(f) != 1 || f[0].Repo != "acme/b" {
+		t.Errorf("group feed = %v", f)
+	}
+
+	// A new listing keeps the commits of repositories that stay, and drops those of a repository whose identity changed.
+	b2 := b
+	b2.ID.GitHubID = 3
+	p.Update(func(bd *Builder) {
+		bd.ReplaceSource("gh", []*RepoEntry{{Repo: a}, {Repo: b2}}, nil, SourceStatus{ID: "gh"})
+	})
+	p.Flush()
+	s2 := p.Current()
+	if len(s2.Repos["acme/a"].Commits) != 2 || len(s2.Repos["acme/b"].Commits) != 0 {
+		t.Errorf("after relisting: a has %d commits, b %d", len(s2.Repos["acme/a"].Commits), len(s2.Repos["acme/b"].Commits))
+	}
+	if len(s.Repos["acme/b"].Commits) != 1 {
+		t.Error("the old snapshot changed")
 	}
 }

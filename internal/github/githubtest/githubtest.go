@@ -13,8 +13,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -39,6 +41,8 @@ type Server struct {
 	installs map[int64]string  // installation id -> account login
 	issued   map[string]string // installation token -> account login
 	orgs     map[string][]*gh.Repository
+	commits  map[int64][]Commit          // by repository id, newest first
+	files    map[int64]map[string]string // by repository id: path -> content
 	nextID   int64
 	used     map[string]int // credential -> requests charged this window
 	reset    time.Time
@@ -61,12 +65,15 @@ func New(t testing.TB) *Server {
 		t.Fatal(err)
 	}
 	s := &Server{AppID: 42, key: key, tokens: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
-		orgs: map[string][]*gh.Repository{}, nextID: 1000, used: map[string]int{}}
+		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, files: map[int64]map[string]string{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
 	mux.HandleFunc("POST /app/installations/{id}/access_tokens", s.accessToken)
 	mux.HandleFunc("GET /orgs/{org}/repos", s.listRepos)
 	mux.HandleFunc("GET /repos/{owner}/{name}", s.getRepo)
+	mux.HandleFunc("GET /repos/{owner}/{name}/commits", s.listCommits)
+	mux.HandleFunc("GET /repos/{owner}/{name}/git/trees/{ref}", s.getTree)
+	mux.HandleFunc("GET /repos/{owner}/{name}/git/blobs/{sha}", s.getBlob)
 	s.Server = httptest.NewServer(s.wrap(mux))
 	t.Cleanup(s.Close)
 	return s
@@ -416,4 +423,183 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"message": msg})
+}
+
+// Commit is a commit on the fake default branch.
+type Commit struct {
+	SHA, Message, AuthorName, AuthorLogin string
+	Date                                  time.Time
+}
+
+// SetCommits replaces the default-branch commits of the repository with id (newest first). No commits means an empty repository.
+func (s *Server) SetCommits(id int64, cs ...Commit) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.commits[id] = cs
+}
+
+// SetFile writes a file on the default branch of the repository with id; an empty content deletes it.
+func (s *Server) SetFile(id int64, path, content string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.files[id] == nil {
+		s.files[id] = map[string]string{}
+	}
+	if content == "" {
+		delete(s.files[id], path)
+		return
+	}
+	s.files[id][path] = content
+}
+
+// lookup returns the repository at owner/name. Callers hold s.mu.
+func (s *Server) lookup(owner, name string) *gh.Repository {
+	for _, r := range s.orgs[strings.ToLower(owner)] {
+		if strings.EqualFold(r.GetName(), name) {
+			return r
+		}
+	}
+	return nil
+}
+
+func (s *Server) listCommits(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
+	var cs []Commit
+	if r != nil {
+		cs = slices.Clone(s.commits[r.GetID()])
+	}
+	s.mu.Unlock()
+	switch {
+	case r == nil:
+		writeError(w, http.StatusNotFound, "Not Found")
+		return
+	case len(cs) == 0:
+		writeError(w, http.StatusConflict, "Git Repository is empty.")
+		return
+	}
+	per, _ := strconv.Atoi(req.URL.Query().Get("per_page"))
+	if per <= 0 || per > 100 {
+		per = 30
+	}
+	out := make([]*gh.RepositoryCommit, 0, min(per, len(cs)))
+	for _, c := range cs[:min(per, len(cs))] {
+		date := &gh.Timestamp{Time: c.Date}
+		rc := &gh.RepositoryCommit{SHA: new(c.SHA), HTMLURL: new(r.GetHTMLURL() + "/commit/" + c.SHA),
+			Commit: &gh.Commit{Message: new(c.Message), Author: &gh.CommitAuthor{Name: new(c.AuthorName), Date: date},
+				Committer: &gh.CommitAuthor{Name: new(c.AuthorName), Date: date}}}
+		if c.AuthorLogin != "" {
+			rc.Author = &gh.User{Login: new(c.AuthorLogin)}
+		}
+		out = append(out, rc)
+	}
+	s.respond(w, req, cred, out)
+}
+
+// tree builds the git tree at dir ("" is the root) from the repository's files. Callers hold s.mu.
+func (s *Server) tree(id int64, dir string) *gh.Tree {
+	prefix := ""
+	if dir != "" {
+		prefix = dir + "/"
+	}
+	seen := map[string]bool{}
+	var entries []*gh.TreeEntry
+	for _, p := range slices.Sorted(maps.Keys(s.files[id])) {
+		rest, ok := strings.CutPrefix(p, prefix)
+		if !ok {
+			continue
+		}
+		if sub, _, isDir := strings.Cut(rest, "/"); isDir {
+			if !seen[sub] {
+				seen[sub] = true
+				t := s.tree(id, prefix+sub)
+				entries = append(entries, &gh.TreeEntry{Path: new(sub), Type: new("tree"), Mode: new("040000"), SHA: t.SHA})
+			}
+			continue
+		}
+		content := s.files[id][p]
+		entries = append(entries, &gh.TreeEntry{Path: new(rest), Type: new("blob"), Mode: new("100644"), SHA: new(blobSHA(content)),
+			Size: new(len(content))})
+	}
+	h := sha256.New()
+	for _, e := range entries {
+		fmt.Fprintf(h, "%s %s\n", e.GetPath(), e.GetSHA())
+	}
+	return &gh.Tree{SHA: new(hex.EncodeToString(h.Sum(nil))[:40]), Entries: entries}
+}
+
+func blobSHA(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])[:40]
+}
+
+func (s *Server) getTree(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
+	var found *gh.Tree
+	empty := true
+	if r != nil {
+		id := r.GetID()
+		empty = len(s.commits[id]) == 0
+		ref := req.PathValue("ref")
+		if root := s.tree(id, ""); ref == "HEAD" || ref == r.GetDefaultBranch() || ref == root.GetSHA() {
+			found = root
+		} else {
+			for p := range s.files[id] {
+				for dir := path.Dir(p); dir != "."; dir = path.Dir(dir) {
+					if t := s.tree(id, dir); t.GetSHA() == ref {
+						found = t
+					}
+				}
+			}
+		}
+	}
+	s.mu.Unlock()
+	switch {
+	case r == nil:
+		writeError(w, http.StatusNotFound, "Not Found")
+	case empty:
+		writeError(w, http.StatusConflict, "Git Repository is empty.")
+	case found == nil:
+		writeError(w, http.StatusNotFound, "Not Found")
+	default:
+		s.respond(w, req, cred, found)
+	}
+}
+
+func (s *Server) getBlob(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
+	content, ok := "", false
+	if r != nil {
+		for _, c := range s.files[r.GetID()] {
+			if blobSHA(c) == req.PathValue("sha") {
+				content, ok = c, true
+			}
+		}
+	}
+	s.mu.Unlock()
+	if !ok {
+		writeError(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	if strings.Contains(req.Header.Get("Accept"), "raw") {
+		w.Header().Set("Content-Type", "application/vnd.github.raw")
+		_, _ = w.Write([]byte(content))
+		return
+	}
+	s.respond(w, req, cred, map[string]any{"sha": req.PathValue("sha"), "size": len(content), "encoding": "base64",
+		"content": base64.StdEncoding.EncodeToString([]byte(content))})
 }

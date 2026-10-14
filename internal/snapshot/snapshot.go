@@ -62,11 +62,57 @@ type SourceStatus struct {
 	Repos int
 }
 
+// Commit is one default-branch commit.
+type Commit struct {
+	SHA         string    `json:"sha"`
+	Subject     string    `json:"subject"` // first line of the message
+	AuthorName  string    `json:"authorName"`
+	AuthorLogin string    `json:"authorLogin,omitempty"`
+	URL         string    `json:"url"`
+	CommittedAt time.Time `json:"committedAt"`
+}
+
+// CommitRef is a commit in a merged feed.
+type CommitRef struct {
+	Repo   RepoKey
+	Commit *Commit // points into the repository's entry
+}
+
+// Descriptor is the repository's own scp.yaml. It affects display only.
+type Descriptor struct {
+	Present     bool      `json:"present"`
+	File        string    `json:"file,omitempty"` // ".github/scp.yaml" etc.
+	Title       string    `json:"title,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Lifecycle   string    `json:"lifecycle,omitempty"` // "" | experimental | production | deprecated
+	Owners      []string  `json:"owners,omitempty"`
+	Tags        []string  `json:"tags,omitempty"`
+	Links       []Link    `json:"links,omitempty"`
+	Problems    []Problem `json:"problems,omitempty"`
+}
+
+// Link is a titled https link.
+type Link struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// Problem is a finding in a repository-authored file.
+type Problem struct {
+	Pointer string `json:"pointer"` // JSON pointer into the document; "" for the whole document
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 // RepoEntry is everything the snapshot holds about one repository. Entries are shared by pointer between snapshot versions and
-// never mutated after publish.
+// never mutated after publish; Builder.UpdateRepo replaces them.
 type RepoEntry struct {
-	Repo  Repo
-	Fresh Freshness // of the listing that last confirmed the repository
+	Repo            Repo
+	Fresh           Freshness // of the listing that last confirmed the repository
+	Commits         []Commit  // newest first
+	CommitsFresh    Freshness
+	Descriptor      Descriptor
+	DescriptorFresh Freshness
 }
 
 // Snapshot is the serving state. It is immutable after publish.
@@ -79,7 +125,19 @@ type Snapshot struct {
 	Aliases    map[RepoKey]RepoKey // old address -> current address
 	Groups     []Group             // config order
 	Sources    []SourceStatus      // sorted by id
-	groupsOf   map[RepoKey][]string
+	// Latest is every repository's commits merged, newest first (committedAt desc, repo asc, sha desc).
+	Latest        []CommitRef
+	groupsOf      map[RepoKey][]string
+	latestByGroup map[string][]CommitRef
+}
+
+// Feed returns the merged commits of the group with id, or of every repository when id is empty.
+func (s *Snapshot) Feed(id string) ([]CommitRef, bool) {
+	if id == "" {
+		return s.Latest, true
+	}
+	f, ok := s.latestByGroup[id]
+	return f, ok
 }
 
 // Repo returns the entry at key, following an alias. moved is true when key is an old address.
