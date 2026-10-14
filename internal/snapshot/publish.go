@@ -227,6 +227,7 @@ type Publisher struct {
 	debounce, maxDelay time.Duration
 	log                *slog.Logger
 	cur                atomic.Pointer[Snapshot]
+	building           sync.Mutex // one build at a time: a build starts from the snapshot the previous one stored
 
 	mu        sync.Mutex
 	pending   []func(*Builder)
@@ -288,6 +289,8 @@ func (p *Publisher) Close() {
 }
 
 func (p *Publisher) publish() {
+	p.building.Lock()
+	defer p.building.Unlock()
 	p.mu.Lock()
 	batch := p.pending
 	p.pending = nil

@@ -17,7 +17,7 @@ CREATE TABLE item (
   key         TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,
   repo_key    TEXT REFERENCES repo (key) ON DELETE CASCADE, -- NULL for source jobs
-  status      TEXT NOT NULL CHECK (status IN ('never', 'ok', 'not_found', 'too_large', 'no_content', 'error')),
+  status      TEXT NOT NULL CHECK (status IN ('never', 'ok', 'not_found', 'too_large', 'no_content', 'unsupported', 'error')),
   fetched_at  INTEGER,
   checked_at  INTEGER,
   next_due_at INTEGER,

@@ -1,10 +1,12 @@
 package snapshot
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -280,5 +282,33 @@ func TestPublicView(t *testing.T) {
 	}
 	if g, _ := full.Group("all"); len(g.Members) != 3 {
 		t.Errorf("the full view changed: %+v", g)
+	}
+}
+
+func TestConcurrentPublishesKeepEveryUpdate(t *testing.T) {
+	p := NewPublisher(time.Microsecond, time.Microsecond, slog.New(slog.DiscardHandler))
+	defer p.Close()
+	const n = 64
+	entries := make([]*RepoEntry, n)
+	for i := range entries {
+		entries[i] = &RepoEntry{Repo: Repo{ID: RepoID{Source: "gh", GitHubID: int64(i + 1)}, Owner: "acme", Name: fmt.Sprint("r", i)}}
+	}
+	p.Update(func(b *Builder) { b.ReplaceSource("gh", entries, nil, SourceStatus{ID: "gh"}) })
+	p.Flush()
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			p.Update(func(b *Builder) {
+				b.UpdateRepo(RepoKey(fmt.Sprint("acme/r", i)), func(e *RepoEntry) { e.Commits = []Commit{{SHA: fmt.Sprint(i)}} })
+			})
+			p.Flush() // races the debounce timer's publish
+		})
+	}
+	wg.Wait()
+	p.Flush()
+	for k, e := range p.Current().Repos {
+		if len(e.Commits) != 1 {
+			t.Errorf("%s lost its update", k)
+		}
 	}
 }
