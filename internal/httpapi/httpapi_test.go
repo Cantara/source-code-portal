@@ -33,7 +33,7 @@ func public(cur *snapshot.Snapshot) http.Handler {
 		"index.html":           {Data: []byte("<!doctype html>")},
 		"assets/app-1a2b3c.js": {Data: []byte("console.log(1)")},
 	}
-	return Public(testOptions(), spa, []byte("openapi: 3.1.0\n"), stub{SnapshotAPI: SnapshotAPI{Current: func() *snapshot.Snapshot { return cur }}},
+	return Public(testOptions(), spa, []byte("openapi: 3.1.0\n"), stub{SnapshotAPI: SnapshotAPI{Current: func(context.Context) *snapshot.Snapshot { return cur }}},
 		Route{Pattern: "POST /upload", MaxBody: 8, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if _, err := io.ReadAll(r.Body); err != nil {
 				http.Error(w, "too large", http.StatusRequestEntityTooLarge)
@@ -303,5 +303,56 @@ func TestNegotiation(t *testing.T) {
 		if !strings.Contains(rec.Header().Get("Vary"), "Accept") || rec.Header().Get("Link") != `</llms.txt>; rel="describedby"` {
 			t.Errorf("%s: Vary %q Link %q", tc.path, rec.Header().Get("Vary"), rec.Header().Get("Link"))
 		}
+	}
+}
+
+func TestPrivateViewer(t *testing.T) {
+	o := testOptions()
+	o.Access = Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{"staff", "Ops"}, Vary: true}
+	for _, tc := range []struct {
+		peer, user, groups string
+		want               bool
+	}{
+		{"10.0.0.1:1", "ann", "dev, staff", true},
+		{"10.0.0.1:1", "ann", "dev,Ops", true},
+		{"10.0.0.1:1", "ann", "ops", false}, // names are exact
+		{"10.0.0.1:1", "", "staff", false},  // no user: not authenticated
+		{"10.0.0.1:1", "ann", "", false},
+		{"203.0.113.9:1", "ann", "staff", false}, // not from the proxy
+	} {
+		var seen bool
+		var leaked string
+		h := o.wrap("public", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			seen, leaked = Private(r.Context()), r.Header.Get("X-Forwarded-User")
+			w.Header().Set("Cache-Control", "public, max-age=300")
+		}))
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = tc.peer
+		r.Header.Set("X-Forwarded-User", tc.user)
+		r.Header.Set("X-Forwarded-Groups", tc.groups)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		cc := "public, max-age=300"
+		if tc.want {
+			cc = "private, max-age=300"
+		}
+		if seen != tc.want || rec.Header().Get("Cache-Control") != cc || !strings.Contains(rec.Header().Get("Vary"), "X-Forwarded-Groups") {
+			t.Errorf("%+v: private %v, %v", tc, seen, rec.Header())
+		}
+		if strings.HasPrefix(tc.peer, "203.") && leaked != "" {
+			t.Errorf("a header from an untrusted peer reached the handler: %q", leaked)
+		}
+	}
+	o.Access.PrivateGroups = []string{"*"}
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "10.0.0.1:1"
+	r.Header.Set("X-Forwarded-User", "bob")
+	if !o.private(r) {
+		t.Error("* does not admit an authenticated user")
+	}
+	sw := &statusWriter{ResponseWriter: httptest.NewRecorder(), private: true}
+	sw.WriteHeader(http.StatusOK)
+	if got := sw.Header().Get("Cache-Control"); got != "private, no-cache" {
+		t.Errorf("no Cache-Control: %q", got)
 	}
 }

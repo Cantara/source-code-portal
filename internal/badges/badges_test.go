@@ -100,7 +100,7 @@ func testSnapshot(t *testing.T) *snapshot.Snapshot {
 
 func TestHandler(t *testing.T) {
 	s := testSnapshot(t)
-	h := Handler(func() *snapshot.Snapshot { return s })
+	h := Handler(func(context.Context) *snapshot.Snapshot { return s })
 	tests := []struct {
 		path, msg, cache string
 		status           int
@@ -150,7 +150,7 @@ func TestHandler(t *testing.T) {
 
 	starting := &snapshot.Snapshot{}
 	rec := httptest.NewRecorder()
-	Handler(func() *snapshot.Snapshot { return starting }).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/badges/repos/a/b/issues.svg", nil))
+	Handler(func(context.Context) *snapshot.Snapshot { return starting }).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/badges/repos/a/b/issues.svg", nil))
 	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") != "15" || rec.Header().Get("Cache-Control") != "no-store" ||
 		!strings.Contains(rec.Body.String(), "starting") {
 		t.Errorf("starting: %d %v", rec.Code, rec.Header())

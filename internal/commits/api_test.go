@@ -1,6 +1,7 @@
 package commits
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ func feedSnapshot(t *testing.T) *snapshot.Snapshot {
 
 func TestListCommitsPages(t *testing.T) {
 	s := feedSnapshot(t)
-	a := API{Current: func() *snapshot.Snapshot { return s }}
+	a := API{Current: func(context.Context) *snapshot.Snapshot { return s }}
 	list := func(p oapi.ListCommitsParams) oapi.ListCommitsResponseObject {
 		res, err := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: p})
 		if err != nil {

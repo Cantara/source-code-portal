@@ -12,7 +12,7 @@ import (
 
 // API serves groups and repositories from the current snapshot. It implements the catalogue's methods of the strict server.
 type API struct {
-	Current func() *snapshot.Snapshot
+	Current func(context.Context) *snapshot.Snapshot // the viewer's view
 }
 
 // dashboardCommits is how many of the latest commits the dashboard shows.
@@ -22,8 +22,8 @@ func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {
 	return oapi.NotFoundApplicationProblemPlusJSONResponse(oapi.NewProblem(http.StatusNotFound, "not-found", "Not Found", detail))
 }
 
-func (a API) GetDashboard(context.Context, oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
-	s, now := a.Current(), time.Now()
+func (a API) GetDashboard(ctx context.Context, _ oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
+	s, now := a.Current(ctx), time.Now()
 	out := oapi.Dashboard{Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos),
 		Latest: make([]oapi.Commit, 0, dashboardCommits)}
 	for _, g := range s.Groups {
@@ -54,8 +54,8 @@ func (a API) GetDashboard(context.Context, oapi.GetDashboardRequestObject) (oapi
 	return oapi.GetDashboard200JSONResponse{Body: out}, nil
 }
 
-func (a API) ListGroups(context.Context, oapi.ListGroupsRequestObject) (oapi.ListGroupsResponseObject, error) {
-	s := a.Current()
+func (a API) ListGroups(ctx context.Context, _ oapi.ListGroupsRequestObject) (oapi.ListGroupsResponseObject, error) {
+	s := a.Current(ctx)
 	out := oapi.GroupList{Groups: make([]oapi.GroupSummary, 0, len(s.Groups))}
 	for _, g := range s.Groups {
 		def, state := defaultRepo(g)
@@ -65,8 +65,8 @@ func (a API) ListGroups(context.Context, oapi.ListGroupsRequestObject) (oapi.Lis
 	return oapi.ListGroups200JSONResponse{Body: out}, nil
 }
 
-func (a API) GetGroup(_ context.Context, req oapi.GetGroupRequestObject) (oapi.GetGroupResponseObject, error) {
-	s := a.Current()
+func (a API) GetGroup(ctx context.Context, req oapi.GetGroupRequestObject) (oapi.GetGroupResponseObject, error) {
+	s := a.Current(ctx)
 	g, ok := s.Group(req.Group)
 	if !ok {
 		return oapi.GetGroup404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: notFound("no such group")}, nil
@@ -76,8 +76,8 @@ func (a API) GetGroup(_ context.Context, req oapi.GetGroupRequestObject) (oapi.G
 		DefaultRepoState: oapi.GroupDefaultRepoState(state), RepoCount: len(g.Members), Repos: repos(s, g.Members, time.Now())}}, nil
 }
 
-func (a API) ListRepos(_ context.Context, req oapi.ListReposRequestObject) (oapi.ListReposResponseObject, error) {
-	s := a.Current()
+func (a API) ListRepos(ctx context.Context, req oapi.ListReposRequestObject) (oapi.ListReposResponseObject, error) {
+	s := a.Current(ctx)
 	var keys []snapshot.RepoKey
 	if req.Params.Group != nil {
 		g, ok := s.Group(*req.Params.Group)
@@ -94,8 +94,8 @@ func (a API) ListRepos(_ context.Context, req oapi.ListReposRequestObject) (oapi
 	return oapi.ListRepos200JSONResponse{Body: oapi.RepoList{Repos: repos(s, keys, time.Now())}}, nil
 }
 
-func (a API) GetRepo(_ context.Context, req oapi.GetRepoRequestObject) (oapi.GetRepoResponseObject, error) {
-	s := a.Current()
+func (a API) GetRepo(ctx context.Context, req oapi.GetRepoRequestObject) (oapi.GetRepoResponseObject, error) {
+	s := a.Current(ctx)
 	e, moved := s.Repo(snapshot.KeyOf(req.Owner, req.Name))
 	switch {
 	case e == nil:
@@ -131,8 +131,11 @@ func detail(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oapi.Rep
 }
 
 func defaultRepo(g snapshot.Group) (*string, string) {
-	if g.DefaultMissing {
+	switch {
+	case g.DefaultMissing:
 		return nil, "missing"
+	case g.DefaultRepo == "": // private and hidden from this viewer
+		return nil, "ok"
 	}
 	d := string(g.DefaultRepo)
 	return &d, "ok"

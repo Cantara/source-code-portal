@@ -37,7 +37,8 @@ type Options struct {
 	Log            *slog.Logger
 	Build          string         // sent as X-SCP-Build on every response, so the web UI notices a new deployment
 	HSTS           bool           // the public URL is https
-	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For is believed
+	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For, and the Access headers, are believed
+	Access         Access
 	// Observe, when set, receives every request: listener, matched pattern ("unmatched" when none), method, status, duration.
 	Observe func(listener, pattern, method string, status int, d time.Duration)
 }
@@ -62,10 +63,14 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		if o.HSTS {
 			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), requestTimeout)
+		private := o.private(r)
+		if o.Access.Vary {
+			h.Add("Vary", o.Access.UserHeader+", "+o.Access.GroupsHeader)
+		}
+		ctx, cancel := context.WithTimeout(context.WithValue(r.Context(), privateKey{}, private), requestTimeout)
 		defer cancel()
 		r = r.WithContext(ctx)
-		sw := &statusWriter{ResponseWriter: w}
+		sw := &statusWriter{ResponseWriter: w, private: private}
 		defer func() {
 			if v := recover(); v != nil {
 				if v == http.ErrAbortHandler { //nolint:errorlint // the sentinel is panicked as is
@@ -81,7 +86,8 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 				pattern = "unmatched"
 			}
 			status := sw.status
-			if status == 0 {
+			if status == 0 { // nothing written: the server sends the headers after this
+				sw.privatise()
 				status = http.StatusOK
 			}
 			d := time.Since(start)
@@ -146,13 +152,15 @@ func limit(n int64, next http.Handler) http.Handler {
 // statusWriter records the status and the bytes written.
 type statusWriter struct {
 	http.ResponseWriter
-	status int
-	bytes  int64
+	status  int
+	bytes   int64
+	private bool // the response holds what only a private viewer sees: no shared cache may store it
 }
 
 func (w *statusWriter) WriteHeader(status int) {
 	if w.status == 0 {
 		w.status = status
+		w.privatise()
 	}
 	w.ResponseWriter.WriteHeader(status)
 }
@@ -160,6 +168,7 @@ func (w *statusWriter) WriteHeader(status int) {
 func (w *statusWriter) Write(p []byte) (int, error) {
 	if w.status == 0 {
 		w.status = http.StatusOK
+		w.privatise()
 	}
 	n, err := w.ResponseWriter.Write(p)
 	w.bytes += int64(n)
@@ -167,6 +176,23 @@ func (w *statusWriter) Write(p []byte) (int, error) {
 }
 
 func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// privatise marks a private viewer's response private: "public" becomes "private", and "private" is added when neither is set.
+func (w *statusWriter) privatise() {
+	if !w.private {
+		return
+	}
+	h := w.Header()
+	cc := h.Get("Cache-Control")
+	switch {
+	case strings.Contains(cc, "public"):
+		h.Set("Cache-Control", strings.Replace(cc, "public", "private", 1))
+	case cc == "":
+		h.Set("Cache-Control", "private, no-cache")
+	case !strings.Contains(cc, "private") && !strings.Contains(cc, "no-store"):
+		h.Set("Cache-Control", "private, "+cc)
+	}
+}
 
 func acceptsGzip(ae string) bool {
 	for part := range strings.SplitSeq(ae, ",") {

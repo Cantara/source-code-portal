@@ -93,6 +93,13 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 	s := b.s
 	s.Version++
 	s.BuiltAt = now
+	s.index()
+	s.public = s.publicView()
+	return s
+}
+
+// index builds the derived lookups: group membership, commit feeds and the dependency indexes.
+func (s *Snapshot) index() {
 	s.groupsOf = map[RepoKey][]string{}
 	for _, g := range s.Groups {
 		for _, m := range g.Members {
@@ -106,7 +113,40 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 		s.latestByGroup[g.ID] = feed(s.Repos, g.Members)
 	}
 	s.providers, s.usedBy = dependencies(s.Repos, keys)
-	return s
+}
+
+// publicView is s without its private and internal repositories, or s itself when it has none.
+func (s *Snapshot) publicView() *Snapshot {
+	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !e.Repo.Public() }) {
+		return s
+	}
+	p := &Snapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{}}
+	count := map[string]int{}
+	for k, e := range s.Repos {
+		if e.Repo.Public() {
+			p.Repos[k] = e
+			count[e.Repo.ID.Source]++
+		}
+	}
+	for old, cur := range s.Aliases {
+		if _, ok := p.Repos[cur]; ok {
+			p.Aliases[old] = cur
+		}
+	}
+	for _, g := range s.Groups {
+		g.Members = slices.DeleteFunc(slices.Clone(g.Members), func(k RepoKey) bool { return p.Repos[k] == nil })
+		if g.DefaultRepo != "" && p.Repos[g.DefaultRepo] == nil {
+			g.DefaultRepo = "" // private: not shown, and not reported missing either
+		}
+		p.Groups = append(p.Groups, g)
+	}
+	for _, src := range s.Sources {
+		src.Repos = count[src.ID]
+		p.Sources = append(p.Sources, src)
+	}
+	p.index()
+	p.public = p
+	return p
 }
 
 // dependencies indexes the package names the manifests of keys declare, and inverts the dependencies between the repositories.

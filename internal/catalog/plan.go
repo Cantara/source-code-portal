@@ -25,7 +25,7 @@ type Tracked struct {
 
 // Filter is a source's admission rule.
 type Filter struct {
-	IncludeForks, IncludeArchived bool
+	IncludeForks, IncludeArchived, IncludePrivate bool
 }
 
 // Plan returns the source's catalogue after a complete listing: listed repositories that pass the filter are tracked (renames keep
@@ -92,11 +92,16 @@ func cleanAliases(as []snapshot.RepoKey, taken map[snapshot.RepoKey]bool, curren
 	return out
 }
 
-// admit validates and cleans a listed repository and applies the filter. Only public repositories are admitted.
+// Visible reports whether a repository of visibility passes the filter: public always, private and internal with IncludePrivate.
+func (f Filter) Visible(visibility string) bool {
+	return visibility == "public" || f.IncludePrivate && (visibility == "private" || visibility == "internal")
+}
+
+// admit validates and cleans a listed repository and applies the filter.
 func admit(r snapshot.Repo, f Filter) (snapshot.Repo, bool) {
 	switch {
 	case r.ID.GitHubID == 0, !namePattern.MatchString(r.Owner), !namePattern.MatchString(r.Name),
-		r.Name == "." || r.Name == "..", r.Visibility != "public",
+		r.Name == "." || r.Name == "..", !f.Visible(r.Visibility),
 		r.Archived && !f.IncludeArchived, r.Fork && !f.IncludeForks:
 		return r, false
 	}

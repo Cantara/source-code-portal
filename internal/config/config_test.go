@@ -46,6 +46,7 @@ func TestDefaults(t *testing.T) {
 			IncludeArchived: true, Token: NewSecret([]byte("ghp_test")),
 		}}},
 		Catalog: Catalog{ReconcileInterval: 5 * time.Minute},
+		Access:  Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{}},
 	}
 	if diff := cmp.Diff(want, cfg, cmp.Comparer(func(a, b Secret) bool { return string(a.v) == string(b.v) })); diff != "" {
 		t.Errorf("defaults (-want +got):\n%s", diff)
@@ -113,6 +114,11 @@ func TestRefused(t *testing.T) {
 		"bad proxy":              {file: "server:\n  trusted_proxies: [10.0.0.0/33]\n", want: "trusted_proxies"},
 		"previous secret alone":  {file: "webhook:\n  previous_secret_file: /x\n", want: "needs webhook.secret_file"},
 		"missing secret file":    {file: "webhook:\n  secret_file: /does/not/exist\n", want: "webhook.secret_file"},
+		"private without groups": {file: "!server:\n  trusted_proxies: [10.0.0.0/8]\ngithub:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, include_private: true}\n", want: "access.private_groups: required"},
+		"private without proxy":  {file: "!access:\n  private_groups: [staff]\ngithub:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, include_private: true}\n", want: "server.trusted_proxies: required"},
+		"bad user header":        {env: map[string]string{"SCP_ACCESS_USER_HEADER": "X User"}, want: "access.user_header"},
+		"same headers":           {env: map[string]string{"SCP_ACCESS_GROUPS_HEADER": "x-forwarded-user"}, want: "must differ"},
+		"group with comma":       {file: "access:\n  private_groups: ['a,b']\n", want: "not a group name"},
 		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {

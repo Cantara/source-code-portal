@@ -1,6 +1,6 @@
 # Operator guide
 
-Source Code Portal (SCP) is one static binary, `scp`, with the web UI embedded. It reads the public repositories of one or more GitHub
+Source Code Portal (SCP) is one static binary, `scp`, with the web UI embedded. It reads the repositories of one or more GitHub
 organisations, keeps a local SQLite cache and serves the portal. One instance serves up to 1,000 repositories.
 
 - Public listener `:9090`: the web UI, the JSON API `/api/v1`, badges, `/llms.txt` and the GitHub webhook. Put it behind your proxy.
@@ -81,6 +81,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].token_file` | | a token file, instead of `app` |
 | `github.sources[].include_forks` | `false` | list forks |
 | `github.sources[].include_archived` | `true` | list archived repositories |
+| `github.sources[].include_private` | `false` | list private and internal repositories too (section 2.1) |
 | `catalog.reconcile_interval` | `5m` | how often every organisation is listed (1m to 24h) |
 | `catalog.groups[]` | none | groups in dashboard order (at most 500) |
 | `catalog.groups[].id` | required | URL id, `[a-z0-9-]`, at most 63 characters |
@@ -89,6 +90,9 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `catalog.groups[].default_repo` | required | the group's main repository name; a missing one is shown on the group, the group stays |
 | `catalog.groups[].sources` | all | source ids the group draws from |
 | `catalog.groups[].match[]` | required | 1 to 64 matchers; a repository in any matcher is a member |
+| `access.user_header` | `X-Forwarded-User` | header in which the authenticating proxy names the user |
+| `access.groups_header` | `X-Forwarded-Groups` | header with the user's groups, comma-separated |
+| `access.private_groups` | `[]` | groups whose members see private repositories; `"*"` is every authenticated user |
 | `webhook.secret_file` | empty | webhook secret; the receiver is served only when set |
 | `webhook.previous_secret_file` | empty | the old secret, accepted too while you rotate |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
@@ -105,6 +109,34 @@ Matchers (each has exactly one field) see the repository name, except `topic`:
 | `catch_all: true` | every repository |
 
 A repository can be in several groups. Repositories in no group are counted on the dashboard and listed by the API.
+
+### 2.1 Private repositories
+
+The portal can show private and internal repositories to people your authenticating proxy (oauth2-proxy, an OIDC ingress, an SSO
+gateway) lets through, and keep them from everyone else. The portal does not log anyone in; it believes the proxy.
+
+1. Give the credential access: a GitHub App installed on the repositories (its *Contents* and *Metadata* read permissions cover private
+   ones), or a token that can read them.
+2. Set `include_private: true` on the source, the proxy's address in `server.trusted_proxies`, and the permitted groups:
+
+```yaml
+server:
+  trusted_proxies: [10.0.0.0/8]
+access:
+  private_groups: [engineering]       # or ["*"] for every authenticated user
+github:
+  sources:
+    - { id: github, orgs: [Cantara], app: { id: 123456, private_key_file: /run/secrets/scp-app.pem }, include_private: true }
+```
+
+3. Have the proxy pass the user in `X-Forwarded-User` and the groups in `X-Forwarded-Groups` (or name other headers with
+   `access.user_header` and `access.groups_header`).
+
+A request whose user is in one of `access.private_groups` sees everything; any other request sees the public repositories only, on
+every page, in the API, badges, `/llms.txt` and the Markdown answers. The two headers are believed only from an address in
+`server.trusted_proxies` and dropped from any other. Answers to a permitted user are marked `Cache-Control: private`, and every answer
+varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and `server.trusted_proxies`.
+Images in private READMEs load from GitHub and show for users signed in there.
 
 ## 3. Run
 

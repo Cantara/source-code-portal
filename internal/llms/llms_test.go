@@ -1,6 +1,7 @@
 package llms
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -71,7 +72,7 @@ func golden(t *testing.T, name, got string) {
 }
 
 func TestIndexAndFull(t *testing.T) {
-	h := handler(New(fixture, "https://scp.example/"))
+	h := handler(New(func(context.Context) *snapshot.Snapshot { return fixture() }, "https://scp.example/"))
 	rec := get(h, "/llms.txt")
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/plain; charset=utf-8" || rec.Header().Get("Cache-Control") != cacheControl {
 		t.Fatalf("llms.txt: %d %v", rec.Code, rec.Header())
@@ -91,7 +92,7 @@ func TestIndexAndFull(t *testing.T) {
 }
 
 func TestDocuments(t *testing.T) {
-	h := handler(New(fixture, ""))
+	h := handler(New(func(context.Context) *snapshot.Snapshot { return fixture() }, ""))
 	rec := get(h, "/repos/ACME/core/readme.md")
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/markdown; charset=utf-8" {
 		t.Fatalf("readme: %d %v", rec.Code, rec.Header())
@@ -151,7 +152,7 @@ func TestRepoPage(t *testing.T) {
 	})
 	p.Flush()
 	mux := http.NewServeMux()
-	mux.Handle("GET /repos/{owner}/{name}", New(p.Current, "https://scp.example").Repo())
+	mux.Handle("GET /repos/{owner}/{name}", New(func(context.Context) *snapshot.Snapshot { return p.Current() }, "https://scp.example").Repo())
 	lib := get(mux, "/repos/acme/lib").Body.String()
 	if !strings.Contains(lib, "# Lib\n") || !strings.Contains(lib, "- Used by: [acme/app](https://scp.example/repos/acme/app)\n") {
 		t.Errorf("lib:\n%s", lib)

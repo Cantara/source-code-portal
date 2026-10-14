@@ -257,7 +257,7 @@ func TestAPI(t *testing.T) {
 	})
 	p.Flush()
 	defer p.Close()
-	a := API{Current: p.Current}
+	a := API{Current: func(context.Context) *snapshot.Snapshot { return p.Current() }}
 	res, err := a.GetManifests(t.Context(), oapi.GetManifestsRequestObject{Owner: "acme", Name: "APP"})
 	if err != nil {
 		t.Fatal(err)

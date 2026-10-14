@@ -27,6 +27,7 @@ github:
       # token_file: /run/secrets/github-token
       include_forks: false
       include_archived: true
+      include_private: false # true needs access.private_groups and server.trusted_proxies
 catalog:
   reconcile_interval: 5m
   groups:
@@ -47,5 +48,10 @@ catalog:
 webhook:
   secret_file: /run/secrets/webhook-secret
   # previous_secret_file: /run/secrets/webhook-secret-old
+# Who sees private repositories: the headers a trusted authenticating proxy sets and the permitted groups.
+access:
+  user_header: X-Forwarded-User
+  groups_header: X-Forwarded-Groups
+  private_groups: [] # ["*"] admits every authenticated user
 ops:
   pprof: false # /debug/pprof/ on the admin listener

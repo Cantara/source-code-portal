@@ -78,8 +78,8 @@ func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 }
 
 // Handler serves GET /badges/repos/{owner}/{name}/{kind}.svg (last-commit, release, license, issues) and
-// GET /badges/groups/{group}/repos.svg from the current snapshot.
-func Handler(current func() *snapshot.Snapshot) http.Handler {
+// GET /badges/groups/{group}/repos.svg from the viewer's view of the current snapshot.
+func Handler(current func(context.Context) *snapshot.Snapshot) http.Handler {
 	h := handler{current: current, now: time.Now}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /badges/repos/{owner}/{name}/{file}", h.repo)
@@ -89,7 +89,7 @@ func Handler(current func() *snapshot.Snapshot) http.Handler {
 }
 
 type handler struct {
-	current func() *snapshot.Snapshot
+	current func(context.Context) *snapshot.Snapshot // the viewer's view
 	now     func() time.Time
 }
 
@@ -101,7 +101,7 @@ func unknown(label string) badge {
 }
 
 func (h handler) repo(w http.ResponseWriter, r *http.Request) {
-	s := h.current()
+	s := h.current(r.Context())
 	if !h.ready(w, r, s) {
 		return
 	}
@@ -159,7 +159,7 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) group(w http.ResponseWriter, r *http.Request) {
-	s := h.current()
+	s := h.current(r.Context())
 	if !h.ready(w, r, s) {
 		return
 	}

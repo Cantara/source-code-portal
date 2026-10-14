@@ -13,11 +13,11 @@ import (
 
 // API serves the manifests from the current snapshot. It implements the manifests method of the strict server.
 type API struct {
-	Current func() *snapshot.Snapshot
+	Current func(context.Context) *snapshot.Snapshot // the viewer's view
 }
 
-func (a API) GetManifests(_ context.Context, req oapi.GetManifestsRequestObject) (oapi.GetManifestsResponseObject, error) {
-	s := a.Current()
+func (a API) GetManifests(ctx context.Context, req oapi.GetManifestsRequestObject) (oapi.GetManifestsResponseObject, error) {
+	s := a.Current(ctx)
 	e, moved := s.Repo(snapshot.KeyOf(req.Owner, req.Name))
 	switch {
 	case e == nil:

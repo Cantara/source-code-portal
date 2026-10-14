@@ -47,6 +47,9 @@ type Repo struct {
 // Key returns the repository's address.
 func (r Repo) Key() RepoKey { return KeyOf(r.Owner, r.Name) }
 
+// Public reports whether everyone may see the repository: it is neither private nor internal.
+func (r Repo) Public() bool { return r.Visibility != "private" && r.Visibility != "internal" }
+
 // Group is a configured group with its resolved members.
 type Group struct {
 	ID             string
@@ -197,6 +200,15 @@ type Snapshot struct {
 	latestByGroup map[string][]CommitRef
 	providers     map[pkg][]RepoKey // sorted
 	usedBy        map[RepoKey][]RepoKey
+	public        *Snapshot // the view without private and internal repositories; s itself when there are none
+}
+
+// Public returns the view of s without its private and internal repositories: s itself when it has none.
+func (s *Snapshot) Public() *Snapshot {
+	if s.public == nil {
+		return s
+	}
+	return s.public
 }
 
 // pkg is a package name within its ecosystem.

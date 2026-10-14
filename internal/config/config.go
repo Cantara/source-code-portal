@@ -26,6 +26,7 @@ type Config struct {
 	GitHub  GitHub  `mapstructure:"github"`
 	Catalog Catalog `mapstructure:"catalog"`
 	Webhook Webhook `mapstructure:"webhook"`
+	Access  Access  `mapstructure:"access"`
 	Ops     Ops     `mapstructure:"ops"`
 }
 
@@ -68,6 +69,9 @@ func defaults() map[string]any {
 		"catalog.reconcile_interval":   "5m",
 		"webhook.secret_file":          "",
 		"webhook.previous_secret_file": "",
+		"access.user_header":           "X-Forwarded-User",
+		"access.groups_header":         "X-Forwarded-Groups",
+		"access.private_groups":        []string{},
 	}
 }
 
@@ -196,6 +200,7 @@ func (c Config) validate() []string {
 	if c.Webhook.PreviousSecretFile != "" && c.Webhook.SecretFile == "" {
 		p = append(p, "webhook.previous_secret_file: needs webhook.secret_file")
 	}
+	p = append(p, c.Access.validate(c.GitHub, len(c.Server.TrustedProxies) > 0)...)
 	slices.Sort(p)
 	return p
 }

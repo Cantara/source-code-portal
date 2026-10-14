@@ -13,6 +13,7 @@ import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { SafeHtml } from "@/shared/safe-html"
+import { VisibilityBadge } from "@/shared/visibility-badge"
 import { docListQuery, docQuery, repoQuery } from "./api"
 import { Dependencies, TechnologyCard } from "./manifests"
 
@@ -49,6 +50,7 @@ function RepoPage() {
               <span className="text-muted-foreground">
                 Last push <RelativeTime at={repo.pushedAt} />
               </span>
+              <VisibilityBadge visibility={repo.visibility} />
               {repo.archived && <Badge variant="warn">Archived</Badge>}
             </p>
             <p className="flex flex-wrap gap-2">

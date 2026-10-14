@@ -1,7 +1,8 @@
 # API guide
 
 Everything the portal shows is readable by scripts: a JSON API, SVG badges, and a Markdown surface for LLM agents. All of it is on the
-public listener, read-only and unauthenticated (the portal shows public repositories only).
+public listener and read-only. Without an identity from the trusted proxy every answer covers the public repositories only; a user
+in `access.private_groups` sees the private ones too (operator guide, section 2.1).
 
 ## JSON API (`/api/v1`)
 

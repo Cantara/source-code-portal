@@ -34,6 +34,8 @@ type Source struct {
 	App          *App     `mapstructure:"app"`
 	TokenFile    string   `mapstructure:"token_file"`
 	IncludeForks bool     `mapstructure:"include_forks"`
+	// IncludePrivate admits private and internal repositories; access.private_groups says who sees them.
+	IncludePrivate bool `mapstructure:"include_private"`
 	// RawIncludeArchived is the configured value; IncludeArchived holds it with its default (true).
 	RawIncludeArchived *bool  `mapstructure:"include_archived"`
 	IncludeArchived    bool   `mapstructure:"-"`
@@ -64,6 +66,40 @@ type Webhook struct {
 	PreviousSecretFile string `mapstructure:"previous_secret_file"`
 	Secret             Secret `mapstructure:"-"`
 	PreviousSecret     Secret `mapstructure:"-"`
+}
+
+// Access names the headers a trusted authenticating proxy sets and the groups whose members see private repositories.
+type Access struct {
+	UserHeader    string   `mapstructure:"user_header"`
+	GroupsHeader  string   `mapstructure:"groups_header"`  // comma-separated group names
+	PrivateGroups []string `mapstructure:"private_groups"` // "*" admits every authenticated user
+}
+
+var headerPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+
+func (a Access) validate(g GitHub, proxies bool) []string {
+	var p []string
+	for key, h := range map[string]string{"access.user_header": a.UserHeader, "access.groups_header": a.GroupsHeader} {
+		if !headerPattern.MatchString(h) {
+			p = append(p, fmt.Sprintf("%s: %q is not a header name", key, h))
+		}
+	}
+	if strings.EqualFold(a.UserHeader, a.GroupsHeader) {
+		p = append(p, "access.groups_header: must differ from access.user_header")
+	}
+	for _, gr := range a.PrivateGroups {
+		if strings.TrimSpace(gr) == "" || strings.Contains(gr, ",") || len(gr) > 256 {
+			p = append(p, fmt.Sprintf("access.private_groups: %q is not a group name", gr))
+		}
+	}
+	private := slices.ContainsFunc(g.Sources, func(s Source) bool { return s.IncludePrivate })
+	switch {
+	case private && len(a.PrivateGroups) == 0:
+		p = append(p, "access.private_groups: required when a source sets include_private")
+	case private && !proxies:
+		p = append(p, "server.trusted_proxies: required when a source sets include_private (the authenticating proxy)")
+	}
+	return p
 }
 
 // Group is a configured group of repositories. Matchers are compiled and checked by the catalog.

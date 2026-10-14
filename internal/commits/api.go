@@ -21,7 +21,7 @@ const (
 
 // API serves the merged commit feeds from the current snapshot. It implements the commits methods of the strict server.
 type API struct {
-	Current func() *snapshot.Snapshot
+	Current func(context.Context) *snapshot.Snapshot // the viewer's view
 }
 
 // cursor is the position after the last commit of a page, bound to the filter it was issued for.
@@ -43,8 +43,8 @@ func notFound(detail string) oapi.ListCommits404ApplicationProblemPlusJSONRespon
 		oapi.NewProblem(http.StatusNotFound, "not-found", "Not Found", detail))}
 }
 
-func (a API) ListCommits(_ context.Context, req oapi.ListCommitsRequestObject) (oapi.ListCommitsResponseObject, error) {
-	s, now, p := a.Current(), time.Now(), req.Params
+func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject) (oapi.ListCommitsResponseObject, error) {
+	s, now, p := a.Current(ctx), time.Now(), req.Params
 	limit := defaultLimit
 	if p.Limit != nil {
 		limit = *p.Limit

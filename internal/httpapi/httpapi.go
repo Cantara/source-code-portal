@@ -108,11 +108,11 @@ func Server(h http.Handler, log *slog.Logger) *http.Server {
 
 // SnapshotAPI implements getSnapshot.
 type SnapshotAPI struct {
-	Current func() *snapshot.Snapshot
+	Current func(context.Context) *snapshot.Snapshot // the viewer's view
 }
 
-func (a SnapshotAPI) GetSnapshot(context.Context, oapi.GetSnapshotRequestObject) (oapi.GetSnapshotResponseObject, error) {
-	s, now := a.Current(), time.Now()
+func (a SnapshotAPI) GetSnapshot(ctx context.Context, _ oapi.GetSnapshotRequestObject) (oapi.GetSnapshotResponseObject, error) {
+	s, now := a.Current(ctx), time.Now()
 	out := oapi.SnapshotInfo{Version: int64(s.Version), BuiltAt: oapi.TimeOrNil(s.BuiltAt), Ready: s.Catalogued, //nolint:gosec // G115: a count
 		Sources: make([]oapi.SourceInfo, 0, len(s.Sources))}
 	for _, src := range s.Sources {

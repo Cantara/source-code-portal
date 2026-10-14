@@ -75,7 +75,8 @@ func New(cfg config.Catalog, configured []config.Source, sources map[string]GitH
 		if g == nil {
 			return nil, fmt.Errorf("catalog: no GitHub for source %s", s.ID)
 		}
-		c.sources[s.ID] = source{orgs: s.Orgs, gh: g, filter: Filter{IncludeForks: s.IncludeForks, IncludeArchived: s.IncludeArchived}}
+		c.sources[s.ID] = source{orgs: s.Orgs, gh: g, filter: Filter{IncludeForks: s.IncludeForks, IncludeArchived: s.IncludeArchived,
+			IncludePrivate: s.IncludePrivate}}
 	}
 	return c, nil
 }
@@ -156,14 +157,15 @@ func decode(payload []byte) state {
 // publish puts a source's catalogue into the snapshot and resolves the groups over every source's repositories.
 func (c *Catalog) publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 	id := strings.TrimPrefix(it.Key, Kind+"/")
-	if _, ok := c.sources[id]; !ok {
+	src, ok := c.sources[id]
+	if !ok {
 		return
 	}
 	st := decode(it.Payload)
 	entries := make([]*snapshot.RepoEntry, 0, len(st.Repos))
 	aliases := map[snapshot.RepoKey]snapshot.RepoKey{}
 	for _, t := range st.Repos {
-		if t.Repo.Visibility != "public" {
+		if !src.filter.Visible(t.Repo.Visibility) {
 			continue // fail closed on stored rows too
 		}
 		entries = append(entries, &snapshot.RepoEntry{Repo: t.Repo, Fresh: fresh})

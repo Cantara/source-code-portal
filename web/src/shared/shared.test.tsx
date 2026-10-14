@@ -4,6 +4,7 @@ import { FreshnessBadge, freshnessLabel } from "./freshness-badge"
 import { colour, initials } from "./initials-avatar"
 import { ProblemAlert, problemTitle } from "./problem-alert"
 import { ProblemError } from "@/lib/api/client"
+import { VisibilityBadge } from "./visibility-badge"
 
 describe("shared", () => {
   it("labels freshness, anything unexpected as Unknown", () => {
@@ -34,5 +35,16 @@ describe("shared", () => {
   it("derives initials and a stable colour from a name", () => {
     expect([initials("Ada Lovelace"), initials("ada"), initials("  "), initials("Øyvind von Ås")]).toEqual(["AL", "A", "?", "ØÅ"])
     expect(colour("Ada Lovelace")).toBe(colour("Ada Lovelace"))
+  })
+})
+
+describe("VisibilityBadge", () => {
+  it("marks private and internal repositories only", () => {
+    const { rerender, container } = render(<VisibilityBadge visibility="private" />)
+    expect(screen.getByText("Private")).toBeInTheDocument()
+    rerender(<VisibilityBadge visibility="internal" />)
+    expect(screen.getByText("Internal")).toBeInTheDocument()
+    rerender(<VisibilityBadge visibility="public" />)
+    expect(container).toBeEmptyDOMElement()
   })
 })

@@ -14,15 +14,15 @@ import (
 
 // API serves the documents from the current snapshot. It implements the docs methods of the strict server.
 type API struct {
-	Current func() *snapshot.Snapshot
+	Current func(context.Context) *snapshot.Snapshot // the viewer's view
 }
 
 func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {
 	return oapi.NotFoundApplicationProblemPlusJSONResponse(oapi.NewProblem(http.StatusNotFound, "not-found", "Not Found", detail))
 }
 
-func (a API) ListDocs(_ context.Context, req oapi.ListDocsRequestObject) (oapi.ListDocsResponseObject, error) {
-	e, moved := a.Current().Repo(snapshot.KeyOf(req.Owner, req.Name))
+func (a API) ListDocs(ctx context.Context, req oapi.ListDocsRequestObject) (oapi.ListDocsResponseObject, error) {
+	e, moved := a.Current(ctx).Repo(snapshot.KeyOf(req.Owner, req.Name))
 	switch {
 	case e == nil:
 		return oapi.ListDocs404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: notFound("no such repository")}, nil
@@ -39,8 +39,8 @@ func (a API) ListDocs(_ context.Context, req oapi.ListDocsRequestObject) (oapi.L
 	return oapi.ListDocs200JSONResponse{Body: out}, nil
 }
 
-func (a API) GetDoc(_ context.Context, req oapi.GetDocRequestObject) (oapi.GetDocResponseObject, error) {
-	e, moved := a.Current().Repo(snapshot.KeyOf(req.Owner, req.Name))
+func (a API) GetDoc(ctx context.Context, req oapi.GetDocRequestObject) (oapi.GetDocResponseObject, error) {
+	e, moved := a.Current(ctx).Repo(snapshot.KeyOf(req.Owner, req.Name))
 	switch {
 	case e == nil:
 		return oapi.GetDoc404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: notFound("no such repository")}, nil

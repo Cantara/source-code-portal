@@ -5,6 +5,7 @@ package llms
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -32,24 +33,28 @@ const (
 
 // LLMs serves the Markdown surface.
 type LLMs struct {
-	current func() *snapshot.Snapshot
-	base    string // public URL without a trailing slash; "" gives root-relative links
+	current func(context.Context) *snapshot.Snapshot // the viewer's view
+	base    string                                   // public URL without a trailing slash; "" gives root-relative links
 
 	mu    gosync.Mutex
-	built *snapshot.Snapshot // the snapshot index and full were built from
-	index []byte
-	full  []byte
+	built [2]files // the last views the files were built for: the public one and the full one
+}
+
+// files are /llms.txt and /llms-full.txt of one view of a snapshot.
+type files struct {
+	view        *snapshot.Snapshot
+	index, full []byte
 }
 
 // New serves from current with links under base (server.public_url, may be empty).
-func New(current func() *snapshot.Snapshot, base string) *LLMs {
+func New(current func(context.Context) *snapshot.Snapshot, base string) *LLMs {
 	return &LLMs{current: current, base: strings.TrimRight(base, "/")}
 }
 
 // Index serves /llms.txt.
 func (l *LLMs) Index() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		index, _ := l.files()
+		index, _ := l.files(r.Context())
 		serve(w, r, "text/plain; charset=utf-8", index)
 	})
 }
@@ -57,7 +62,7 @@ func (l *LLMs) Index() http.Handler {
 // Full serves /llms-full.txt.
 func (l *LLMs) Full() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, full := l.files()
+		_, full := l.files(r.Context())
 		serve(w, r, "text/plain; charset=utf-8", full)
 	})
 }
@@ -93,7 +98,7 @@ func (l *LLMs) Repo() http.Handler {
 		} else {
 			fmt.Fprintf(&b, "---\nscp:\n  repo: %s\n---\n\n# %s\n", quote(string(e.Repo.Key())), line(e.Repo.Owner+"/"+e.Repo.Name, maxDescription))
 		}
-		b.WriteString(l.technology(l.current(), e))
+		b.WriteString(l.technology(l.current(r.Context()), e))
 		serve(w, r, "text/markdown; charset=utf-8", b.Bytes())
 	})
 }
@@ -177,7 +182,7 @@ func (l *LLMs) Doc() http.Handler {
 // Group serves the negotiated group page: the group and its repositories.
 func (l *LLMs) Group() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s := l.current()
+		s := l.current(r.Context())
 		g, ok := s.Group(r.PathValue("group"))
 		if !ok {
 			notFound(w)
@@ -201,7 +206,7 @@ func (l *LLMs) Group() http.Handler {
 
 // repo finds {owner}/{name}; an old address answers 308 to the same page under the current one.
 func (l *LLMs) repo(w http.ResponseWriter, r *http.Request) (*snapshot.RepoEntry, bool) {
-	e, moved := l.current().Repo(snapshot.KeyOf(r.PathValue("owner"), r.PathValue("name")))
+	e, moved := l.current(r.Context()).Repo(snapshot.KeyOf(r.PathValue("owner"), r.PathValue("name")))
 	switch {
 	case e == nil:
 		notFound(w)
@@ -217,15 +222,19 @@ func (l *LLMs) repo(w http.ResponseWriter, r *http.Request) (*snapshot.RepoEntry
 	return e, true
 }
 
-// files returns /llms.txt and /llms-full.txt for the current snapshot, building them once per snapshot.
-func (l *LLMs) files() (index, full []byte) {
-	s := l.current()
+// files returns /llms.txt and /llms-full.txt for the viewer's view, building them once per view of a snapshot.
+func (l *LLMs) files(ctx context.Context) (index, full []byte) {
+	s := l.current(ctx)
+	slot := 0
+	if s != s.Public() {
+		slot = 1
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.built != s {
-		l.built, l.index, l.full = s, l.buildIndex(s), l.buildFull(s)
+	if f := l.built[slot]; f.view != s {
+		l.built[slot] = files{view: s, index: l.buildIndex(s), full: l.buildFull(s)}
 	}
-	return l.index, l.full
+	return l.built[slot].index, l.built[slot].full
 }
 
 func (l *LLMs) url(p string) string { return l.base + p }
@@ -235,7 +244,7 @@ func (l *LLMs) buildIndex(s *snapshot.Snapshot) []byte {
 	keys := sortedKeys(s)
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "# %s\n\n", title)
-	fmt.Fprintf(&b, "> %s\n\n", line(fmt.Sprintf("%d public repositories in %d groups, with READMEs, documentation and recent commits.",
+	fmt.Fprintf(&b, "> %s\n\n", line(fmt.Sprintf("%d repositories in %d groups, with READMEs, documentation and recent commits.",
 		len(keys), len(s.Groups)), maxSummary))
 	fmt.Fprintf(&b, "%s Last sync: %s. Freshness: %s.\n\n", untrustedNote, lastSync(s), freshnessCounts(s, keys, now))
 	b.WriteString("## Groups\n\n")

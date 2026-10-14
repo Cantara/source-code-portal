@@ -10,6 +10,7 @@ import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
+import { VisibilityBadge } from "@/shared/visibility-badge"
 import { groupCommitsQuery, groupQuery } from "./api"
 import type { SortKey } from "./search"
 
@@ -94,9 +95,12 @@ function GroupPage() {
                     {repos.map((r) => (
                       <tr key={r.address}>
                         <td className="p-2 font-medium">
-                          <Link to="/repos/$owner/$name" params={{ owner: r.owner, name: r.name }} className="hover:underline">
-                            {r.owner}/{r.name}
-                          </Link>
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            <Link to="/repos/$owner/$name" params={{ owner: r.owner, name: r.name }} className="hover:underline">
+                              {r.owner}/{r.name}
+                            </Link>
+                            <VisibilityBadge visibility={r.visibility} />
+                          </span>
                         </td>
                         <td className="p-2 text-muted-foreground">{r.description}</td>
                         <td className="p-2 whitespace-nowrap">

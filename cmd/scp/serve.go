@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -141,8 +142,16 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		webhook: cfg.Webhook.Secret.IsSet(), deliveries: map[string]int{}}
 
-	md := llms.New(s.pub.Current, cfg.Server.PublicURL)
-	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(s.pub.Current)},
+	// view is what a request may see: the full snapshot for a private viewer, else its public view.
+	view := func(ctx context.Context) *snapshot.Snapshot {
+		cur := s.pub.Current()
+		if httpapi.Private(ctx) {
+			return cur
+		}
+		return cur.Public()
+	}
+	md := llms.New(view, cfg.Server.PublicURL)
+	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
 		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
@@ -153,10 +162,13 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
+	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
 	opts := httpapi.Options{Log: log, Build: build, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), TrustedProxies: cfg.Server.TrustedProxies,
+		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
+			Vary: private},
 		Observe: m.request}
-	features := api{catalog.API{Current: s.pub.Current}, commits.API{Current: s.pub.Current}, docs.API{Current: s.pub.Current},
-		manifests.API{Current: s.pub.Current}, httpapi.SnapshotAPI{Current: s.pub.Current}}
+	features := api{catalog.API{Current: view}, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
+		httpapi.SnapshotAPI{Current: view}}
 	s.public = httpapi.Server(httpapi.Public(opts, spa, contract.OpenAPI, features, routes...), log)
 	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
 	if cfg.Ops.Pprof {

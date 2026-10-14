@@ -8,6 +8,8 @@ change from its Conventional Commit subjects.
 - Package manifests: `go.mod`, `package.json` and `pom.xml` are read per repository; the repository page shows the technology and
   dependencies they declare and the catalogued repositories it uses and is used by (`/api/v1/repos/{owner}/{name}/manifests`, and in the
   repository's Markdown).
+- Private and internal repositories (`include_private`), shown only to the groups in `access.private_groups` as named by a trusted
+  authenticating proxy; everyone else sees the public repositories on every surface.
 
 ## 2.0.0
 

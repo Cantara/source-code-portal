@@ -203,3 +203,56 @@ func TestDependencyIndex(t *testing.T) {
 		t.Errorf("UsedBy(app) = %v", got)
 	}
 }
+
+func TestPublicView(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	pub := repo("gh", 1, "acme", "open")
+	pub.Repo.Visibility = "public"
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{pub}, nil, SourceStatus{ID: "gh", Repos: 1})
+		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/open", Members: []RepoKey{"acme/open"}}})
+	})
+	p.Flush()
+	if s := p.Current(); s.Public() != s {
+		t.Error("a snapshot without private repositories is not its own public view")
+	}
+
+	secret := repo("gh", 2, "acme", "secret")
+	secret.Repo.Visibility = "private"
+	inner := repo("gh", 3, "acme", "inner")
+	inner.Repo.Visibility = "internal"
+	at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{pub, secret, inner}, map[RepoKey]RepoKey{"acme/was-secret": "acme/secret", "acme/was-open": "acme/open"},
+			SourceStatus{ID: "gh", Repos: 3})
+		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/secret", Members: []RepoKey{"acme/inner", "acme/open", "acme/secret"}}})
+		b.UpdateRepo("acme/open", func(e *RepoEntry) {
+			e.Commits = []Commit{{SHA: "o", CommittedAt: at}}
+			e.Manifests = []Manifest{{Ecosystem: "go", Name: "open", Dependencies: []Dependency{{Name: "secret"}}}}
+		})
+		b.UpdateRepo("acme/secret", func(e *RepoEntry) {
+			e.Commits = []Commit{{SHA: "s", CommittedAt: at}}
+			e.Manifests = []Manifest{{Ecosystem: "go", Name: "secret", Dependencies: []Dependency{{Name: "open"}}}}
+		})
+	})
+	p.Flush()
+	full := p.Current()
+	v := full.Public()
+	if len(full.Repos) != 3 || len(full.Latest) != 2 || len(full.UsedBy("acme/open")) != 1 {
+		t.Fatalf("full view: %d repos, %d commits, used by %v", len(full.Repos), len(full.Latest), full.UsedBy("acme/open"))
+	}
+	g, _ := v.Group("all")
+	if len(v.Repos) != 1 || v.Repos["acme/open"] == nil || len(v.Aliases) != 1 || v.Aliases["acme/was-open"] != "acme/open" ||
+		!slices.Equal(g.Members, []RepoKey{"acme/open"}) || g.DefaultRepo != "" || g.DefaultMissing || v.Sources[0].Repos != 1 {
+		t.Errorf("public view: repos %v, aliases %v, group %+v, sources %+v", v.Repos, v.Aliases, g, v.Sources)
+	}
+	if f, _ := v.Feed("all"); len(v.Latest) != 1 || len(f) != 1 || v.Providers("go", "secret") != nil || v.UsedBy("acme/open") != nil {
+		t.Errorf("public view leaks: latest %d, feed %d, providers %v, usedBy %v", len(v.Latest), len(f), v.Providers("go", "secret"), v.UsedBy("acme/open"))
+	}
+	if e, _ := v.Repo("acme/was-secret"); e != nil || v.Public() != v || v.Version != full.Version {
+		t.Error("an alias to a private repository resolves, or the view is not its own public view")
+	}
+	if g, _ := full.Group("all"); len(g.Members) != 3 {
+		t.Errorf("the full view changed: %+v", g)
+	}
+}
