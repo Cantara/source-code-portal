@@ -82,12 +82,12 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 	if err != nil {
 		return nil, err
 	}
-	listers := map[string]catalog.Lister{}
+	sources := map[string]catalog.GitHub{}
 	fetchers := map[string]commits.Fetcher{}
-	sources := make([]string, 0, len(cfg.GitHub.Sources))
+	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
-		listers[s.ID], fetchers[s.ID] = gh.Source(s.ID), gh.Source(s.ID)
-		sources = append(sources, s.ID)
+		sources[s.ID], fetchers[s.ID] = gh.Source(s.ID), gh.Source(s.ID)
+		ids = append(ids, s.ID)
 	}
 
 	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log)}
@@ -99,13 +99,13 @@ func newServer(ctx context.Context, cfg config.Config, log *slog.Logger) (_ *ser
 			_ = s.store.Close()
 		}
 	}()
-	s.engine = sync.New(s.store, s.pub, gh, sources, cfg.Sync.Concurrency, log)
-	cat, err := catalog.New(cfg.Catalog, cfg.GitHub.Sources, listers, s.engine.Notify, log)
+	s.engine = sync.New(s.store, s.pub, gh, ids, cfg.Sync.Concurrency, log)
+	cat, err := catalog.New(cfg.Catalog, cfg.GitHub.Sources, sources, s.engine.Notify, log)
 	if err != nil {
 		return nil, err
 	}
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
-	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec()} {
+	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), cat.DescriptorSpec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}

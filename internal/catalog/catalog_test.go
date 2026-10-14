@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -16,18 +18,47 @@ import (
 type lister struct {
 	repos map[string][]snapshot.Repo
 	err   error
+	files map[string]string // path -> content, for the descriptor job
+}
+
+func (l *lister) Tree(_ context.Context, _, _, ref string) ([]github.TreeEntry, error) {
+	var out []github.TreeEntry
+	dirs := map[string]bool{}
+	prefix := ""
+	if ref != "HEAD" {
+		prefix = ref + "/" // the fake uses the directory name as its tree SHA
+	}
+	for p, c := range l.files {
+		rest, ok := strings.CutPrefix(p, prefix)
+		if !ok {
+			continue
+		}
+		if dir, _, isDir := strings.Cut(rest, "/"); isDir {
+			if !dirs[dir] {
+				dirs[dir] = true
+				out = append(out, github.TreeEntry{Path: dir, Type: "tree", SHA: prefix + dir})
+			}
+			continue
+		}
+		out = append(out, github.TreeEntry{Path: rest, Type: "blob", SHA: "sha:" + c, Size: int64(len(c))})
+	}
+	return out, nil
+}
+
+func (l *lister) Blob(_ context.Context, _, _, sha string) ([]byte, error) {
+	return []byte(strings.TrimPrefix(sha, "sha:")), nil
 }
 
 func (l *lister) ListRepos(_ context.Context, owner string) ([]snapshot.Repo, error) {
 	return l.repos[owner], l.err
 }
 
-func newCatalog(t *testing.T, l Lister) *Catalog {
+func newCatalog(t *testing.T, l GitHub) *Catalog {
 	t.Helper()
 	c, err := New(config.Catalog{ReconcileInterval: 5 * time.Minute, Groups: []config.Group{
 		{ID: "whydah", Name: "Whydah", DefaultRepo: "Whydah-Core", Match: []config.Match{{Prefix: "whydah-"}}},
 		{ID: "other", Name: "Other", DefaultRepo: "x", Match: []config.Match{{CatchAll: true}}},
-	}}, []config.Source{{ID: "gh", Orgs: []string{"acme", "beta"}}}, map[string]Lister{"gh": l}, nil, slog.New(slog.DiscardHandler))
+	}}, []config.Source{{ID: "gh", Orgs: []string{"acme", "beta"}}}, map[string]GitHub{"gh": l}, nil, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +146,7 @@ func TestPushedAtNotifies(t *testing.T) {
 	var pushed []snapshot.RepoKey
 	c, err := New(config.Catalog{ReconcileInterval: 5 * time.Minute, Groups: []config.Group{
 		{ID: "all", Name: "All", DefaultRepo: "a", Match: []config.Match{{CatchAll: true}}},
-	}}, []config.Source{{ID: "gh", Orgs: []string{"acme"}}}, map[string]Lister{"gh": l},
+	}}, []config.Source{{ID: "gh", Orgs: []string{"acme"}}}, map[string]GitHub{"gh": l},
 		func(ev sync.Event, k snapshot.RepoKey) {
 			if ev == sync.EventPush {
 				pushed = append(pushed, k)

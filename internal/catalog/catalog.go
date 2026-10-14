@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -23,9 +24,11 @@ const Kind = "catalog.reconcile"
 
 const schema = 1
 
-// Lister lists an organisation's repositories; *github.Source implements it.
-type Lister interface {
+// GitHub is what the catalogue reads from one source; *github.Source implements it.
+type GitHub interface {
 	ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error)
+	Tree(ctx context.Context, owner, name, ref string) ([]github.TreeEntry, error)
+	Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
 }
 
 // Catalog is the catalogue feature.
@@ -40,7 +43,7 @@ type Catalog struct {
 type source struct {
 	orgs   []string
 	filter Filter
-	lister Lister
+	gh     GitHub
 }
 
 // state is the payload of a source's listing item: its tracked repositories.
@@ -49,9 +52,9 @@ type state struct {
 	Repos  []Tracked `json:"repos"`
 }
 
-// New builds the catalogue for the configured sources. listers has one Lister per source id. notify (may be nil) receives
+// New builds the catalogue for the configured sources, reading GitHub through one GitHub per source id. notify (may be nil) receives
 // EventPush for every tracked repository whose pushed_at changed in a listing; *sync.Engine's Notify fits.
-func New(cfg config.Catalog, sources []config.Source, listers map[string]Lister, notify func(sync.Event, snapshot.RepoKey),
+func New(cfg config.Catalog, configured []config.Source, sources map[string]GitHub, notify func(sync.Event, snapshot.RepoKey),
 	log *slog.Logger) (*Catalog, error) {
 	groups, findings := Compile(cfg.Groups)
 	for _, f := range findings {
@@ -66,12 +69,12 @@ func New(cfg config.Catalog, sources []config.Source, listers map[string]Lister,
 		notify = func(sync.Event, snapshot.RepoKey) {}
 	}
 	c := &Catalog{groups: groups, sources: map[string]source{}, interval: cfg.ReconcileInterval, notify: notify, log: log}
-	for _, s := range sources {
-		l := listers[s.ID]
-		if l == nil {
-			return nil, fmt.Errorf("catalog: no lister for source %s", s.ID)
+	for _, s := range configured {
+		g := sources[s.ID]
+		if g == nil {
+			return nil, fmt.Errorf("catalog: no GitHub for source %s", s.ID)
 		}
-		c.sources[s.ID] = source{orgs: s.Orgs, lister: l, filter: Filter{IncludeForks: s.IncludeForks, IncludeArchived: s.IncludeArchived}}
+		c.sources[s.ID] = source{orgs: s.Orgs, gh: g, filter: Filter{IncludeForks: s.IncludeForks, IncludeArchived: s.IncludeArchived}}
 	}
 	return c, nil
 }
@@ -102,7 +105,7 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	}
 	var listed []snapshot.Repo
 	for _, org := range src.orgs {
-		rs, err := src.lister.ListRepos(ctx, org)
+		rs, err := src.gh.ListRepos(ctx, org)
 		if err != nil {
 			return sync.Result{}, fmt.Errorf("list %s: %w", org, err)
 		}
