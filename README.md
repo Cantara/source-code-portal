@@ -82,7 +82,7 @@ Run the image:
 ```sh
 docker run --rm -p 9090:9090 -p 9091:9091 -v scp-data:/data \
   -v "$PWD/scp.yaml:/etc/scp/scp.yaml:ro" -v "$PWD/secrets:/run/secrets:ro" \
-  ghcr.io/cantara/source-code-portal:2.1.0 serve --config /etc/scp/scp.yaml
+  ghcr.io/cantara/source-code-portal:2.0.0 serve --config /etc/scp/scp.yaml
 ```
 
 Open http://localhost:9090. The first sync of a large organisation takes a few minutes; the pages show what is loaded so far.

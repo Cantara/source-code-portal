@@ -8,8 +8,8 @@ earlier detailed design are in `history/`.
 An organisational dashboard for GitHub: repositories grouped into products, with their health (activity, release, licence, issues,
 language), latest commits, rendered README and docs, technology and dependencies, SVG badges, a JSON API and a Markdown surface for LLM
 agents. One static Go binary serves the API and supervises the server-rendered Next.js web UI; webhooks and a scheduled sync keep it
-current. Up to 1,000 repositories and more, on one instance or several sharing state through Hazelcast. Released as `v2.0.0`; the next
-release is `v2.1.0`.
+current. Up to 1,000 repositories and more, on one instance or several sharing state through Hazelcast. The first release is `v2.0.0`;
+later releases bump the patch version unless the owner decides otherwise.
 
 Built: GitHub App or token sources with discovery and reconcile; groups by matchers (exact, prefix, glob, regexp, topic, catch-all);
 dashboard, group, repository, document and commit-log pages; README and `docs/` rendered and sanitised; the `scp.yaml` descriptor;
@@ -78,7 +78,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 |---|---|---|---|
 | M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | queued |
 
-`v2.1.0` is the release with the feature modules. Each milestone starts with its design note and lands as small commits on `main`, CI green.
+Each milestone starts with its design note and lands as small commits on `main`, CI green.
 
 ## 5. How we work
 

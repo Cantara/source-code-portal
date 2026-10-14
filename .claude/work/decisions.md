@@ -13,7 +13,7 @@ standing instruction: the agent decides as it goes, records here and reports; de
 | P-11 | The Go module path has no `/v2`: SCP is an application, not a library | `go.mod` |
 | P-13 | The web UI is Next.js with server-side rendering, every page complete HTML | `design/web.md` |
 | P-15 | Licence: Apache License 2.0, as for the Java version | `LICENSE` |
-| P-16 | Semantic versioning; published tags are never moved. `v2.0.0` is published; the next release is `v2.1.0` | `plan.md` section 4, `CHANGELOG.md` |
+| P-16 | Semantic versioning. The first release is `v2.0.0`, tagged by the owner's team; every later release bumps the patch version unless the owner decides a minor or major bump. Published tags are never moved | `plan.md` section 4, `CHANGELOG.md` |
 | P-17 | Dependencies are the latest release of the best-in-class choice. TypeScript 7 is `tsc` (`@typescript/native`); the `typescript` name holds the 6.0 API (`@typescript/typescript6`) for typescript-eslint and Next.js | `plan.md` section 3, `web/package.json` |
 | P-18 | Search engines are planned from the krantho study and built after the feature modules | `plan.md` section 4, `design/seo.md` |
 | P-19 | `.claude/work/` holds only what is built and in progress; finished milestone plans, the full decision log, the earlier detailed design and the UI brief live in `.claude/work/history/` | `plan.md`, `README.md` |

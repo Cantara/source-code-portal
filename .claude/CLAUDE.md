@@ -5,8 +5,8 @@ Guidance for Claude Code in this repository.
 ## State
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`, public)
-is Source Code Portal (SCP) in Go with a server-rendered Next.js web UI. `v2.0.0` is published; `v2.1.0` is the release with the
-feature modules; **M13 (search engines)** is queued. Coding instructions for the repository itself are in
+is Source Code Portal (SCP) in Go with a server-rendered Next.js web UI. The first release is `v2.0.0`, which the owner's team tags;
+**M13 (search engines)** is queued. Coding instructions for the repository itself are in
 the root `AGENTS.md`.
 
 - **`.claude/work/plan.md` is the binding plan**: what SCP is, architecture and rules, stack, the work in progress. Read it first.
@@ -28,7 +28,8 @@ never modify it, push to it or open issues or pull requests on it.
 - **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
   for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
   `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
-- **Version**: semantic versioning (P-16); published tags are never moved. `v2.1.0` is next.
+- **Version**: semantic versioning (P-16): `v2.0.0` first, then every release bumps the patch version unless the owner decides a minor
+  or major bump; the agent does not tag releases. Published tags are never moved.
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
 - Dependencies are the latest releases of the best-in-class choice (owner P-17), pure Go on the server; `bluemonday` is the one exception
   (`plan.md` section 3). Web: TypeScript 7 is `tsc` (`@typescript/native`); the `typescript` name holds the 6.0 API for typescript-eslint and Next.js.

@@ -1,6 +1,6 @@
 # Source Code Portal image: node (web bundle) -> golang (static binary) -> distroless Node.js, non-root.
 # Base images are pinned by tag and digest; Renovate updates both.
-#   docker build -f deploy/Dockerfile --build-arg VERSION=2.1.0 --build-arg BUILD_ID=$(git rev-parse HEAD) -t scp:dev .
+#   docker build -f deploy/Dockerfile --build-arg VERSION=2.0.0 --build-arg BUILD_ID=$(git rev-parse HEAD) -t scp:dev .
 
 FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS web
 ARG PNPM_VERSION=12.11.2
