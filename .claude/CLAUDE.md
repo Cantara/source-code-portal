@@ -28,6 +28,7 @@ never modify it, push to it or open issues or pull requests on it.
 - **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
   for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
   `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
+- **Version**: releases are `v2.0.0` and stay at 2.0.0 until the greenfield streams are complete (owner decision P-11).
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
 - Dependencies must be current (release within 18 months), widely used and pure Go; `bluemonday` is the one exception (`plan.md` section 4).
 - Planning and design live under `.claude/work/`; `docs/` is user documentation only. Documents describe what is built, not what is not.
@@ -71,6 +72,6 @@ Test idioms: engine tests run in `testing/synctest` bubbles with a real store in
 
 ## Next: M6
 
-Release v1.0 (`plan.md` section 5): operator documentation in `docs/`, GoReleaser, the image `ghcr.io/cantara/source-code-portal:1.0.0`
+Release 2.0.0 (`plan.md` section 5): operator documentation in `docs/`, GoReleaser, the image `ghcr.io/cantara/source-code-portal:2.0.0`
 published and running from the operator guide. Read `design/build-ops.md` and the M5 entry in `decisions.md`. Local web commands:
 `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs `pnpm -C web exec playwright install chromium`.

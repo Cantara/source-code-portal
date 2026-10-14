@@ -8,7 +8,7 @@ Documentation: [operator guide](docs/operator-guide.md), [repository guide](docs
 
 ```sh
 docker run --rm -p 9090:9090 -v scp-data:/data -v "$PWD/scp.yaml:/etc/scp/scp.yaml:ro" -v "$PWD/secrets:/run/secrets:ro" \
-  ghcr.io/cantara/source-code-portal:1.0.0 serve --config /etc/scp/scp.yaml
+  ghcr.io/cantara/source-code-portal:2.0.0 serve --config /etc/scp/scp.yaml
 ```
 
 Binaries for Linux (amd64, arm64) and macOS (arm64) are on the [releases page](https://github.com/Cantara/source-code-portal/releases).

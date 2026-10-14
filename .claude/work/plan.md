@@ -115,7 +115,7 @@ UI from `design/web.md`.
 | M3 | Docs, badges, webhooks, freshness | a push updates the page within seconds; a GitHub outage serves stale data |
 | M4 | `/llms.txt`, raw Markdown, metrics, readiness, hardening (CSP, limits) | security and load checks pass for 1,000 repositories |
 | M5 | Web UI: dashboard, group, repository, docs and commit pages | every page renders a real org; Playwright smoke, axe and CSP checks pass |
-| M6 | Release v1.0: docs for operators, GoReleaser, image published | `ghcr.io/cantara/source-code-portal:1.0.0` runs from the operator guide |
+| M6 | Release 2.0.0: docs for operators, GoReleaser, image published | `ghcr.io/cantara/source-code-portal:2.0.0` runs from the operator guide |
 
 v1.1 follows the same pattern, one milestone per bullet of section 2.
 

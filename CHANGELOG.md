@@ -3,9 +3,9 @@
 Notable changes, newest first. Versions follow [Semantic Versioning](https://semver.org/); the GitHub release of each tag lists every
 change from its Conventional Commit subjects.
 
-## 1.0.0
+## 2.0.0
 
-The first release: one static binary and container image serving an organisational dashboard for GitHub.
+The first release of the Go rewrite (2.0.0 follows the Java product's 1.x line): one static binary and container image serving an organisational dashboard for GitHub.
 
 - Catalogue of the public repositories of one or more organisations (GitHub App or token, github.com or Enterprise Server), grouped by
   configured matchers, with renames and transfers followed.

@@ -111,8 +111,8 @@ A repository can be in several groups. Repositories in no group are counted on t
 **Binary.** Download the archive for your platform from the GitHub release, check it and run it:
 
 ```sh
-sha256sum -c scp_1.0.0_checksums.txt --ignore-missing
-tar xzf scp_1.0.0_linux_amd64.tar.gz
+sha256sum -c scp_2.0.0_checksums.txt --ignore-missing
+tar xzf scp_2.0.0_linux_amd64.tar.gz
 ./scp config check -c scp.yaml && ./scp serve -c scp.yaml
 ```
 
@@ -123,14 +123,14 @@ system; `/data` is the one writable path.
 docker run -d --name scp --read-only --cap-drop=ALL \
   -p 9090:9090 -p 127.0.0.1:9091:9091 \
   -v scp-data:/data -v "$PWD/scp.yaml:/etc/scp/scp.yaml:ro" -v "$PWD/secrets:/run/secrets:ro" \
-  ghcr.io/cantara/source-code-portal:1.0.0 serve --config /etc/scp/scp.yaml
+  ghcr.io/cantara/source-code-portal:2.0.0 serve --config /etc/scp/scp.yaml
 ```
 
 Images and checksum files are signed keyless by the release workflow. Verify an image with cosign:
 
 ```sh
-cosign verify ghcr.io/cantara/source-code-portal:1.0.0 \
-  --certificate-identity https://github.com/Cantara/source-code-portal/.github/workflows/release.yml@refs/tags/v1.0.0 \
+cosign verify ghcr.io/cantara/source-code-portal:2.0.0 \
+  --certificate-identity https://github.com/Cantara/source-code-portal/.github/workflows/release.yml@refs/tags/v2.0.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -150,7 +150,7 @@ spec:
       securityContext: { runAsNonRoot: true, fsGroup: 65532, seccompProfile: { type: RuntimeDefault } }
       containers:
         - name: scp
-          image: ghcr.io/cantara/source-code-portal:1.0.0
+          image: ghcr.io/cantara/source-code-portal:2.0.0
           args: [serve, --config, /etc/scp/scp.yaml]
           ports: [{ name: public, containerPort: 9090 }, { name: admin, containerPort: 9091 }]
           securityContext: { readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
