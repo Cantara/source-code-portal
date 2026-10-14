@@ -35,10 +35,18 @@
     {
       "customType": "regex",
       "description": "pnpm version in CI, the Dockerfile and package.json",
-      "managerFilePatterns": ["/^\\.github/workflows/ci\\.yml$/", "/^deploy/Dockerfile$/"],
+      "managerFilePatterns": ["/^\\.github/workflows/(ci|release)\\.yml$/", "/^deploy/Dockerfile$/"],
       "matchStrings": ["PNPM_VERSION[:=] ?(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "pnpm",
       "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "GoReleaser version in the release workflow",
+      "managerFilePatterns": ["/^\\.github/workflows/release\\.yml$/"],
+      "matchStrings": ["GORELEASER_VERSION: (?<currentValue>v\\S+)"],
+      "depNameTemplate": "goreleaser/goreleaser",
+      "datasourceTemplate": "github-releases"
     }
   ]
 }

@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# Release v2 (release.yml on tags v*): one CGO-free binary per platform with the web UI embedded (release.yml builds web/dist first),
+# archives with sha256 checksums signed keyless by cosign, and one multi-platform image around those binaries (deploy/Dockerfile.release),
+# signed by digest and carrying a BuildKit SBOM. Full releases also move :latest.
+version: 2
+project_name: scp
+
+before:
+  hooks:
+    - test -s web/dist/index.html # a release without the built UI would embed the placeholder page
+
+builds:
+  - id: scp
+    main: ./cmd/scp
+    binary: scp
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    tags: [spa]
+    ldflags:
+      - "-s -w -X main.version={{ .Version }} -X main.build={{ .FullCommit }}"
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ignore:
+      - { goos: darwin, goarch: amd64 }
+
+archives:
+  - id: scp
+    formats: [tar.gz]
+    name_template: "scp_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md, deploy/config.example.yaml]
+
+checksum:
+  name_template: "scp_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+signs:
+  - id: checksums
+    cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args: ["sign-blob", "--yes", "--bundle=${signature}", "${artifact}"]
+    output: true
+
+dockers_v2:
+  - id: image
+    ids: [scp]
+    dockerfile: deploy/Dockerfile.release
+    images: [ghcr.io/cantara/source-code-portal]
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms: [linux/amd64, linux/arm64]
+    build_args:
+      VERSION: "{{ .Version }}"
+      BUILD_ID: "{{ .FullCommit }}"
+    annotations:
+      org.opencontainers.image.created: "{{ .Date }}"
+    sbom: true
+
+docker_signs:
+  - id: image
+    cmd: cosign
+    args: ["sign", "--yes", "${artifact}@${digest}"]
+    output: true
+
+release:
+  prerelease: auto
+  name_template: "v{{ .Version }}"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ["^chore\\(deps\\)", "^docs?(\\(.*\\))?:", "^test(\\(.*\\))?:", "^ci(\\(.*\\))?:"]

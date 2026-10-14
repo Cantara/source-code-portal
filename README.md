@@ -4,9 +4,16 @@ An organisational dashboard for GitHub: repositories grouped into systems, with 
 badges and an API that scripts and LLM agents can read. One static Go binary with the web UI embedded, kept fresh by webhooks and
 scheduled sync.
 
-Status: under development towards v1.0. The plan is in [`.claude/work/plan.md`](.claude/work/plan.md).
+Documentation: [operator guide](docs/operator-guide.md), [repository guide](docs/repository-guide.md), [API guide](docs/api.md).
 
-## Run
+```sh
+docker run --rm -p 9090:9090 -v scp-data:/data -v "$PWD/scp.yaml:/etc/scp/scp.yaml:ro" -v "$PWD/secrets:/run/secrets:ro" \
+  ghcr.io/cantara/source-code-portal:1.0.0 serve --config /etc/scp/scp.yaml
+```
+
+Binaries for Linux (amd64, arm64) and macOS (arm64) are on the [releases page](https://github.com/Cantara/source-code-portal/releases).
+
+## Build from source
 
 ```sh
 make build                     # web UI and bin/scp (needs Go 1.27, Node 24, pnpm 12)
@@ -24,7 +31,7 @@ updates within seconds; without it the portal still refreshes on its schedule.
 ## Develop
 
 ```sh
-make check                     # the gate: generated code, tidy modules, lint, tests
+make check                     # the gate: generated code, tidy modules, lint, tests, Playwright
 make dev                       # Go server (scp.yaml) on :9090 and the web UI with hot reload on :5173
 go test -race ./internal/config/
 ```

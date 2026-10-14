@@ -125,10 +125,11 @@ volume for SQLite, `EXPOSE 9090 9091`, `ENTRYPOINT ["/scp"]`, `CMD ["serve"]`, O
 It runs with `readOnlyRootFilesystem` and all capabilities dropped; SQLite uses `temp_store=MEMORY`, so `/data` is the only writable mount.
 
 Release (M6, `release.yml` on tags `v*`, `contents: write`, `packages: write`, `id-token: write`): `make web`, then GoReleaser v2:
-binaries `linux/amd64`, `linux/arm64`, `darwin/arm64`, tar.gz with `LICENSE` and `README.md`, sha256 checksums; a multi-arch image from
+binaries `linux/amd64`, `linux/arm64`, `darwin/arm64`, tar.gz with `LICENSE`, `README.md` and `deploy/config.example.yaml`, sha256 checksums; a multi-arch image from
 `deploy/Dockerfile.release` (distroless, copies the GoReleaser binary) pushed to `ghcr.io/cantara/source-code-portal:<version>` and
 `:latest` for full releases, with a BuildKit SBOM; cosign keyless signatures of the image and the checksums file; changelog from
-Conventional Commits; the GitHub release is published by the same run.
+Conventional Commits; the GitHub release is published by the same run, which then runs the published image (`scp version`) and verifies
+its signature. `CHANGELOG.md` holds the human summary of each release.
 
 Renovate (`renovate.json`, self-contained): `config:recommended`, `helpers:pinGitHubActionDigests`, `docker:pinDigests`; managers gomod
 (the one `go.mod`, tool directives included), npm (`web/`), github-actions, dockerfile, and one regex manager for the Makefile tool
