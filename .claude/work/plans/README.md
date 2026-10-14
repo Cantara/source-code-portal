@@ -1,5 +1,8 @@
 # Source Code Portal: design package
 
+> **Reference only (2026-10-14).** The binding plan is [`../plan.md`](../plan.md): shorter, coarser and with a smaller scope. This package
+> is the earlier detailed design; consult it, copy what helps, ignore what the plan dropped. It is not kept in sync.
+
 Index and user guide for the complete design of Source Code Portal (SCP). Written 2026-10-14. This directory is the only input the owner needs to build the application from scratch in a new repository.
 
 Contents: [1. What this is](#1-what-this-is) | [2. How to use it](#2-how-to-use-this-package-to-build-the-product) | [3. Reading order](#3-reading-order) | [4. Product and architecture on one page](#4-product-and-architecture-on-one-page) | [5. Document table](#5-document-table) | [6. Glossary](#6-glossary) | [7. Binding decisions at a glance](#7-binding-decisions-at-a-glance) | [8. Product behaviour highlights](#8-product-behaviour-highlights) | [9. Owner confirmations needed](#9-owner-confirmations-needed) | [10. Deviations proposed](#10-deviations-proposed-by-this-index) | [11. Conventions and status of this package](#11-conventions-and-status-of-this-package)
