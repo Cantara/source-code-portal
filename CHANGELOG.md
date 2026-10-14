@@ -10,6 +10,9 @@ change from its Conventional Commit subjects.
   repository's Markdown).
 - Private and internal repositories (`include_private`), shown only to the groups in `access.private_groups` as named by a trusted
   authenticating proxy; everyone else sees the public repositories on every surface.
+- Several instances serve one portal through Hazelcast (`cluster.addresses`): one leads and alone calls GitHub, every instance serves
+  the same data, webhook deliveries are de-duplicated across instances and reach the leader from any of them, and another instance takes
+  over when the leader stops.
 
 ## 2.0.0
 

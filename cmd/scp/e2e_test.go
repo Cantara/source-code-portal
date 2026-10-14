@@ -72,7 +72,7 @@ catalog:
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := newServer(t.Context(), cfg, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := newServer(t.Context(), cfg, deps{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

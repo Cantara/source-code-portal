@@ -47,6 +47,7 @@ func TestDefaults(t *testing.T) {
 		}}},
 		Catalog: Catalog{ReconcileInterval: 5 * time.Minute},
 		Access:  Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{}},
+		Cluster: Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},
 	}
 	if diff := cmp.Diff(want, cfg, cmp.Comparer(func(a, b Secret) bool { return string(a.v) == string(b.v) })); diff != "" {
 		t.Errorf("defaults (-want +got):\n%s", diff)
@@ -119,6 +120,8 @@ func TestRefused(t *testing.T) {
 		"bad user header":        {env: map[string]string{"SCP_ACCESS_USER_HEADER": "X User"}, want: "access.user_header"},
 		"same headers":           {env: map[string]string{"SCP_ACCESS_GROUPS_HEADER": "x-forwarded-user"}, want: "must differ"},
 		"group with comma":       {file: "access:\n  private_groups: ['a,b']\n", want: "not a group name"},
+		"cluster address":        {file: "cluster:\n  addresses: [hazelcast]\n", want: "not host:port"},
+		"cluster namespace":      {env: map[string]string{"SCP_CLUSTER_NAMESPACE": "SCP_Prod"}, want: "cluster.namespace"},
 		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {

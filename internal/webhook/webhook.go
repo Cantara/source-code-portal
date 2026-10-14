@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -49,6 +50,7 @@ type Receiver struct {
 	sink    Sink
 	log     *slog.Logger
 	seen    *dedupe
+	first   func(ctx context.Context, id string) (bool, error) // shared de-duplication; nil: local only
 	observe func(event, result string)
 }
 
@@ -64,6 +66,21 @@ func New(secret, previous []byte, sink Sink, log *slog.Logger) *Receiver {
 // Observe sets fn to receive every delivery's event (empty before the signature is verified) and result: accepted, duplicate, ping,
 // ignored, invalid_signature, too_large, malformed or unsupported_media_type.
 func (rc *Receiver) Observe(fn func(event, result string)) { rc.observe = fn }
+
+// Dedupe sets fn to tell whether a delivery id is new across instances. When fn fails, the receiver de-duplicates locally.
+func (rc *Receiver) Dedupe(fn func(ctx context.Context, id string) (bool, error)) { rc.first = fn }
+
+// isNew reports whether delivery has not been seen within the de-duplication window.
+func (rc *Receiver) isNew(ctx context.Context, delivery string) bool {
+	if rc.first != nil {
+		first, err := rc.first(ctx, delivery)
+		if err == nil {
+			return first
+		}
+		rc.log.Warn("shared webhook de-duplication failed; using the local one", "err", err)
+	}
+	return rc.seen.add(delivery, time.Now())
+}
 
 // ServeHTTP checks size and signature before anything reads the payload.
 func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +134,7 @@ func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case event == "ping":
 		rc.observe(label, "ping")
 		accepted(w, "pong", delivery)
-	case !rc.seen.add(delivery, time.Now()):
+	case !rc.isNew(r.Context(), delivery):
 		rc.observe(label, "duplicate")
 		accepted(w, "duplicate", delivery)
 	default:

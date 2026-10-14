@@ -58,7 +58,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | POST | `/webhooks/github` | webhook | GitHub deliveries (registered when `webhook.secret_file` is set) |
 | A | GET | `/livez` | httpapi | process alive (dispatcher heartbeat) |
 | A | GET | `/readyz` | httpapi | 200 once a snapshot with a catalogue is published; 503 while warming and during shutdown |
-| A | GET | `/api/v1/status` | httpapi | readiness, snapshot, queue, GitHub rate, installations, webhook stats, warnings |
+| A | GET | `/api/v1/status` | httpapi | readiness, snapshot, queue, GitHub rate, installations, webhook stats, cluster role, warnings |
 | A | GET | `/metrics` | httpapi | Prometheus exposition |
 | A | GET | `/debug/pprof/` (+ stdlib subpaths) | httpapi | profiling, when `ops.pprof: true` |
 
@@ -126,6 +126,7 @@ Prometheus, prefix `scp_`, plus the Go and process collectors. Labels use route 
 | Name | Type | Labels | Recorded by |
 |---|---|---|---|
 | `scp_build_info` | gauge | version, commit, goversion | cmd/scp |
+| `scp_cluster_leader` | gauge | | cmd/scp (with `cluster.addresses`) |
 | `scp_http_requests_total` | counter | listener, pattern, method, code | httpapi |
 | `scp_http_request_duration_seconds` | histogram | listener, pattern | httpapi |
 | `scp_webhook_deliveries_total` | counter | event, result (accepted, duplicate, ping, ignored, invalid_signature, too_large, malformed, queue_full) | webhook |

@@ -3,7 +3,8 @@ Status: v1 design note, 2026-10-14. Binding order: ../plan.md > this note > ../r
 
 ## Scope (v1)
 `internal/sync` (scheduler, keyed job queue, retry, rate budget, pauses, readiness), `internal/snapshot` (immutable serving state, shared
-value types, freshness), `internal/store` (SQLite last-good cache). Single instance. Features register jobs and contribute snapshot parts;
+value types, freshness), `internal/store` (SQLite last-good cache). One instance runs the jobs; several share its outcomes as
+`cluster.md` describes. Features register jobs and contribute snapshot parts;
 handlers read only the snapshot. This note is the one description of the rate budget, retries and pauses.
 
 ## Decisions (bullets, each with a one-line reason)

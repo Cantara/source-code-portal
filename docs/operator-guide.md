@@ -1,7 +1,8 @@
 # Operator guide
 
 Source Code Portal (SCP) is one static binary, `scp`, with the web UI embedded. It reads the repositories of one or more GitHub
-organisations, keeps a local SQLite cache and serves the portal. One instance serves up to 1,000 repositories.
+organisations, keeps a local SQLite cache and serves the portal. One instance serves up to 1,000 repositories; several instances
+can serve one portal together through Hazelcast (section 3.1).
 
 - Public listener `:9090`: the web UI, the JSON API `/api/v1`, badges, `/llms.txt` and the GitHub webhook. Put it behind your proxy.
 - Admin listener `:9091`: `/livez`, `/readyz`, `/metrics`, `/api/v1/status` and optional profiling. Keep it inside the cluster.
@@ -95,6 +96,9 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `access.private_groups` | `[]` | groups whose members see private repositories; `"*"` is every authenticated user |
 | `webhook.secret_file` | empty | webhook secret; the receiver is served only when set |
 | `webhook.previous_secret_file` | empty | the old secret, accepted too while you rotate |
+| `cluster.addresses` | `[]` | Hazelcast members `host:port`; set to run as one of several instances (section 3.1) |
+| `cluster.name` | `dev` | the Hazelcast cluster name |
+| `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
@@ -203,6 +207,28 @@ spec:
 Expose only the `public` port through your ingress. The ingress must pass `X-Forwarded-For` from an address in
 `server.trusted_proxies` and keep request bodies up to 25 MiB for `/webhooks/github`.
 
+### 3.1 Several instances
+
+Two or more instances serve one portal when they share a Hazelcast cluster (Hazelcast 5, the open-source edition is enough). One
+instance leads: it alone calls GitHub, and every instance applies what it records, so all of them serve the same data with the same
+ETags and the load balancer may send any request, webhooks included, to any of them. A webhook delivery is de-duplicated across the
+instances. When the leader stops, another takes over within a few seconds (within about a minute when it crashed: Hazelcast's
+`hazelcast.client.max.no.heartbeat.seconds`).
+
+```yaml
+cluster:
+  addresses: ["hazelcast-0.hazelcast:5701", "hazelcast-1.hazelcast:5701"]
+  name: dev          # the server's cluster-name
+```
+
+- Give every instance the same configuration and secrets; only `store.path` is each instance's own. A new instance fills its cache from
+  the cluster, so in Kubernetes the cache may be an `emptyDir`: drop the claim and `Recreate` from the Deployment above, set `replicas`
+  and use the default rolling update.
+- Hazelcast holds the portal's data (private repositories included when they are admitted) and has no authentication in the
+  open-source edition: run it on a private network that only the instances reach.
+- When Hazelcast is unreachable every instance keeps serving its last good data and stays ready, but nothing is refreshed until the
+  connection is back; `/api/v1/status` warns.
+
 ## 4. Lifecycle
 
 **Start.** A start loads the cache and serves it at once, then lists every organisation. On the first start (empty cache) the pages
@@ -228,7 +254,7 @@ restart, change the secret on GitHub, then remove the previous one.
 | `/livez` | 200 while the process and its sync loop run; restart on failure |
 | `/readyz` | 200 once a catalogue is loaded, 503 before and during shutdown |
 | `/metrics` | Prometheus exposition |
-| `/api/v1/status` | JSON for people: readiness, snapshot version and age, queue, per-source freshness and rate limit left, webhook deliveries, warnings |
+| `/api/v1/status` | JSON for people: readiness, snapshot version and age, queue, per-source freshness and rate limit left, webhook deliveries, the cluster role, warnings |
 | `/debug/pprof/` | Go profiles, when `ops.pprof` is true |
 
 Metrics:
@@ -246,9 +272,11 @@ Metrics:
 | `scp_snapshot_age_seconds` | | time since the served data last changed |
 | `scp_items` | `kind`, `freshness` | repositories by data kind and freshness |
 | `scp_build_info` | `version`, `commit`, `goversion` | the running build |
+| `scp_cluster_leader` | | 1 on the instance that leads the cluster, 0 on the others (only with `cluster.addresses`) |
 
 Useful alerts: `scp_github_rate_remaining_ratio < 0.1` for 15 minutes; `scp_items{freshness="error"}` above zero for an hour;
-an increase of `scp_webhook_deliveries_total{result="invalid_signature"}` (a wrong secret or a sender that is not GitHub).
+an increase of `scp_webhook_deliveries_total{result="invalid_signature"}` (a wrong secret or a sender that is not GitHub);
+with several instances, `sum(scp_cluster_leader) != 1` for 5 minutes. On the instances that do not lead the queue metrics are 0.
 
 Logs are JSON lines on stderr (`log.format: text` for people): one line per request with method, route, status and duration, startup
 steps, and job failures. Secrets are never logged.

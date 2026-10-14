@@ -53,5 +53,10 @@ access:
   user_header: X-Forwarded-User
   groups_header: X-Forwarded-Groups
   private_groups: [] # ["*"] admits every authenticated user
+# Several instances serving one portal through Hazelcast; leave addresses empty for one instance.
+cluster:
+  addresses: [] # ["hazelcast:5701"]
+  name: dev
+  namespace: scp
 ops:
   pprof: false # /debug/pprof/ on the admin listener

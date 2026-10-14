@@ -21,6 +21,10 @@ type status struct {
 	depth        func() (waiting, running int)
 	rate         func() map[string]float64
 	webhook      bool
+	cluster      interface {
+		Leader() bool
+		Connected() bool
+	} // nil when the instance is alone
 
 	mu         gosync.Mutex
 	deliveries map[string]int // by result
@@ -34,6 +38,7 @@ type statusBody struct {
 	Queue    statusQueue    `json:"queue"`
 	Sources  []statusSource `json:"sources"`
 	Webhook  statusWebhook  `json:"webhook"`
+	Cluster  statusCluster  `json:"cluster"`
 	Warnings []string       `json:"warnings"`
 }
 
@@ -56,6 +61,12 @@ type statusSource struct {
 	Freshness     string     `json:"freshness"`
 	CheckedAt     *time.Time `json:"checkedAt"`
 	RateRemaining float64    `json:"rateRemaining"`
+}
+
+type statusCluster struct {
+	Enabled   bool `json:"enabled"`
+	Connected bool `json:"connected"`
+	Leader    bool `json:"leader"` // runs the sync jobs; true when the instance is alone
 }
 
 type statusWebhook struct {
@@ -95,6 +106,13 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	for id, f := range rates {
 		if f < lowRate {
 			b.Warnings = append(b.Warnings, fmt.Sprintf("source %s: %.0f%% of the GitHub rate limit left", id, f*100))
+		}
+	}
+	b.Cluster.Leader = true
+	if st.cluster != nil {
+		b.Cluster = statusCluster{Enabled: true, Connected: st.cluster.Connected(), Leader: st.cluster.Leader()}
+		if !b.Cluster.Connected {
+			b.Warnings = append(b.Warnings, "cluster: not connected; serving the last good data, nothing is refreshed")
 		}
 	}
 	if !st.webhook {

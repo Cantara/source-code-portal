@@ -1,10 +1,12 @@
 package webhook
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -166,4 +168,32 @@ func FuzzNormalise(f *testing.F) {
 			t.Errorf("owner-wide event with a name: %+v", n)
 		}
 	})
+}
+
+func TestSharedDedupe(t *testing.T) {
+	calls := 0
+	rc := New([]byte("s"), nil, func(sync.Event, string, string) { calls++ }, slog.New(slog.DiscardHandler))
+	shared := map[string]bool{"elsewhere": true}
+	down := false
+	rc.Dedupe(func(_ context.Context, id string) (bool, error) {
+		if down {
+			return false, errors.New("cluster down")
+		}
+		first := !shared[id]
+		shared[id] = true
+		return first, nil
+	})
+	for _, tc := range []struct {
+		id, want string
+		down     bool
+	}{{"elsewhere", "duplicate", false}, {"new", "accepted", false}, {"new", "duplicate", false}, {"local", "accepted", true},
+		{"local", "duplicate", true}} {
+		down = tc.down
+		if _, status := deliver(t, rc, "push", tc.id, sign("s", pushMain), pushMain, nil); status != tc.want {
+			t.Errorf("%s (cluster down %v): %q, want %q", tc.id, tc.down, status, tc.want)
+		}
+	}
+	if calls != 2 {
+		t.Errorf("sink called %d times, want 2", calls)
+	}
 }

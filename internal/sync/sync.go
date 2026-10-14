@@ -86,6 +86,7 @@ type Result struct {
 type Spec struct {
 	Kind      string
 	PerSource bool // keyed "<kind>/<source>"; otherwise "<kind>/<owner>/<name>" for every catalogued repository
+	Lists     bool // per-source: results carry the source's catalogue
 	Prio      Priority
 	TTL       time.Duration
 	Timeout   time.Duration // default 2m
@@ -93,6 +94,16 @@ type Spec struct {
 	Run       func(ctx context.Context, j Job) (Result, error)
 	// Publish puts a stored item into the snapshot. It runs for live results and at the warm start, in registration order.
 	Publish func(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness)
+}
+
+// Shared is one recorded outcome as instances share it (internal/cluster): the item with its schedule, for listing jobs the source's
+// catalogue, and the keys of the items that left with their repositories. Rev orders the outcomes of one key.
+type Shared struct {
+	Rev       int64
+	Source    string
+	Item      store.Item
+	Catalogue []store.Repo
+	Removed   []string
 }
 
 // Budget reports the share of the rate limit left for owner's credential in source, and when it resets.
@@ -123,11 +134,16 @@ type Engine struct {
 
 	observe func(kind, result string, d time.Duration)
 	beat    atomic.Int64 // unix nanoseconds of the dispatcher's last loop
+	share   func(Shared) // nil when the instance is alone
+	leader  atomic.Bool  // runs jobs
+	warm    chan struct{}
 
 	mu      gosync.Mutex
 	entries map[string]*entry
 	repos   map[snapshot.RepoKey]store.Repo
 	pauses  map[string]*pause // by source
+	rev     int64             // the newest revision made or seen
+	orphans map[string]Shared // received items of repositories not catalogued yet, by key
 }
 
 type entry struct {
@@ -140,7 +156,8 @@ type entry struct {
 	prio    Priority
 	backoff bool // due is a retry time that events do not pull earlier
 	running bool
-	dirty   bool // an event arrived while running: run once more
+	dirty   bool  // an event arrived while running: run once more
+	rev     int64 // revision of item when it was shared or received
 }
 
 type pause struct {
@@ -158,10 +175,29 @@ type outcome struct {
 
 // New returns an engine for the configured source ids. budget may be nil.
 func New(st *store.DB, pub *snapshot.Publisher, budget Budget, sources []string, concurrency int, log *slog.Logger) *Engine {
-	return &Engine{store: st, pub: pub, budget: budget, sources: slices.Clone(sources), n: max(concurrency, 1), log: log,
-		wake: make(chan struct{}, 1), done: make(chan outcome), entries: map[string]*entry{},
-		repos: map[snapshot.RepoKey]store.Repo{}, pauses: map[string]*pause{}, observe: func(string, string, time.Duration) {}}
+	e := &Engine{store: st, pub: pub, budget: budget, sources: slices.Clone(sources), n: max(concurrency, 1), log: log,
+		wake: make(chan struct{}, 1), done: make(chan outcome), warm: make(chan struct{}), entries: map[string]*entry{},
+		repos: map[snapshot.RepoKey]store.Repo{}, pauses: map[string]*pause{}, orphans: map[string]Shared{},
+		observe: func(string, string, time.Duration) {}}
+	e.leader.Store(true)
+	return e
 }
+
+// Share makes the engine one of several instances: fn receives every recorded outcome, and the engine runs no jobs until Lead. Call
+// it before Run.
+func (e *Engine) Share(fn func(Shared)) {
+	e.share = fn
+	e.leader.Store(false)
+}
+
+// Lead starts or stops running jobs. A job that finishes after the lead was lost is dropped: the new leader runs it again.
+func (e *Engine) Lead(on bool) {
+	e.leader.Store(on)
+	e.poke()
+}
+
+// Warm is closed when the warm start has published the store's content.
+func (e *Engine) Warm() <-chan struct{} { return e.warm }
 
 // Observe sets fn to receive every finished job: its kind, result (ok, not_modified, error, rate_limited) and duration. Call it
 // before Run.
@@ -173,8 +209,11 @@ func (e *Engine) Alive() bool {
 	return b == 0 || time.Since(time.Unix(0, b)) < 3*idleWake
 }
 
-// Depth returns how many jobs are due and waiting, and how many run.
+// Depth returns how many jobs are due and waiting, and how many run; both are zero on an instance that does not lead.
 func (e *Engine) Depth() (waiting, running int) {
+	if !e.leader.Load() {
+		return 0, 0
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	now := time.Now()
@@ -277,7 +316,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	for {
 		e.beat.Store(time.Now().UnixNano())
 		wait := idleWake
-		if running < e.n {
+		if running < e.n && e.leader.Load() {
 			if next := lastStart.Add(pace); time.Now().Before(next) {
 				wait = time.Until(next)
 			} else if en, at := e.next(time.Now()); en != nil {
@@ -378,9 +417,9 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 	}
 	e.mu.Lock()
 	en.running = false
-	if e.entries[en.key] != en {
+	if e.entries[en.key] != en || !e.leader.Load() {
 		e.mu.Unlock()
-		return // the repository left the catalogue while the job ran
+		return // the repository left the catalogue while the job ran, or another instance leads now
 	}
 	class, retryAt := classify(o.err)
 	result := "error"
@@ -418,9 +457,15 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 	en.item.NextDue = en.due
 	it, spec := en.item, en.spec
 	ch := store.Change{Item: it}
+	var removed []string
 	if class == classOK && o.res.Catalogue != nil {
 		ch.Source, ch.Catalogue = en.source, o.res.Catalogue
-		e.setCatalogue(en.source, o.res.Catalogue, now)
+		removed = e.setCatalogue(en.source, o.res.Catalogue, now)
+	}
+	var shared Shared
+	if e.share != nil {
+		en.rev = e.nextRev()
+		shared = Shared{Rev: en.rev, Source: en.source, Item: it, Catalogue: ch.Catalogue, Removed: removed}
 	}
 	e.mu.Unlock()
 
@@ -432,6 +477,122 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 	}
 	fresh := freshness(it, spec.TTL)
 	e.pub.Update(func(b *snapshot.Builder) { spec.Publish(b, it, fresh) })
+	if e.share != nil {
+		e.share(shared)
+	}
+}
+
+// nextRev returns a revision newer than every one made or seen. Callers hold e.mu.
+func (e *Engine) nextRev() int64 {
+	e.rev = max(time.Now().UnixNano(), e.rev+1)
+	return e.rev
+}
+
+// Receive applies an outcome the leader recorded, as if the job had run here: the store row, the schedule and the snapshot. An
+// outcome older than what the engine has for its key is ignored; one for a repository not catalogued yet waits for the listing that
+// admits it. It waits for the warm start.
+func (e *Engine) Receive(ctx context.Context, r Shared) {
+	select {
+	case <-e.warm:
+	case <-ctx.Done():
+		return
+	}
+	now := time.Now()
+	e.mu.Lock()
+	e.rev = max(e.rev, r.Rev)
+	en := e.entries[r.Item.Key]
+	if en == nil {
+		if _, known := e.repos[r.Item.Repo]; r.Item.Repo != "" && !known && e.spec(r.Item.Kind) != nil {
+			if o, ok := e.orphans[r.Item.Key]; !ok || o.Rev < r.Rev {
+				e.orphans[r.Item.Key] = r
+			}
+		}
+		e.mu.Unlock()
+		return
+	}
+	if r.Rev <= en.rev {
+		e.mu.Unlock()
+		return
+	}
+	en.rev, en.item = r.Rev, r.Item
+	en.due, en.backoff, en.prio = r.Item.NextDue, r.Item.Attempts > 0, en.spec.Prio
+	if en.due.IsZero() {
+		en.due = now
+	}
+	ch := store.Change{Item: r.Item}
+	var adopted []Shared
+	if r.Catalogue != nil {
+		ch.Source, ch.Catalogue = r.Source, r.Catalogue
+		e.setCatalogue(r.Source, r.Catalogue, now)
+		for k, o := range e.orphans {
+			switch {
+			case e.entries[k] != nil:
+				adopted = append(adopted, o)
+				delete(e.orphans, k)
+			case o.Source == r.Source:
+				delete(e.orphans, k) // the listing does not admit its repository
+			}
+		}
+	}
+	it, spec := en.item, en.spec
+	e.mu.Unlock()
+
+	if err := e.store.Apply(ctx, ch); err != nil {
+		e.log.Error("store write failed; serving from memory", "key", it.Key, "err", err)
+	}
+	fresh := freshness(it, spec.TTL)
+	e.pub.Update(func(b *snapshot.Builder) { spec.Publish(b, it, fresh) })
+	slices.SortFunc(adopted, func(a, b Shared) int { return strings.Compare(a.Item.Key, b.Item.Key) })
+	for _, o := range adopted {
+		e.Receive(ctx, o)
+	}
+	e.poke()
+}
+
+// Records returns every recorded outcome, the listings with their catalogues first, for an instance that takes the lead and fills
+// the shared state. Outcomes never shared get a new revision.
+func (e *Engine) Records() []Shared {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	var out []Shared
+	for _, en := range e.entries {
+		if en.item.State == snapshot.StateNever {
+			continue
+		}
+		if en.rev == 0 {
+			en.rev = e.nextRev()
+		}
+		r := Shared{Rev: en.rev, Source: en.source, Item: en.item}
+		if en.spec.Lists {
+			r.Catalogue = []store.Repo{}
+			for _, repo := range e.repos {
+				if repo.ID.Source == en.source {
+					r.Catalogue = append(r.Catalogue, repo)
+				}
+			}
+			slices.SortFunc(r.Catalogue, func(a, b store.Repo) int { return strings.Compare(string(a.Key), string(b.Key)) })
+		}
+		out = append(out, r)
+	}
+	slices.SortFunc(out, func(a, b Shared) int {
+		if (a.Catalogue != nil) != (b.Catalogue != nil) {
+			if a.Catalogue != nil {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.Item.Key, b.Item.Key)
+	})
+	return out
+}
+
+func (e *Engine) spec(kind string) *Spec {
+	for _, s := range e.specs {
+		if s.Kind == kind {
+			return s
+		}
+	}
+	return nil
 }
 
 type class uint8
@@ -545,8 +706,8 @@ func freshness(it store.Item, ttl time.Duration) snapshot.Freshness {
 }
 
 // setCatalogue replaces the repositories of source, dropping the entries of those that left or changed identity and adding entries
-// for new ones. Callers hold e.mu.
-func (e *Engine) setCatalogue(source string, repos []store.Repo, now time.Time) {
+// for new ones. It returns the keys of the dropped entries. Callers hold e.mu.
+func (e *Engine) setCatalogue(source string, repos []store.Repo, now time.Time) (removed []string) {
 	next := make(map[snapshot.RepoKey]store.Repo, len(repos))
 	for _, r := range repos {
 		next[r.Key] = r
@@ -557,6 +718,7 @@ func (e *Engine) setCatalogue(source string, repos []store.Repo, now time.Time) 
 			for key, en := range e.entries {
 				if en.repo == k {
 					delete(e.entries, key) // the store deletes its items with the repository
+					removed = append(removed, key)
 				}
 			}
 		}
@@ -565,6 +727,8 @@ func (e *Engine) setCatalogue(source string, repos []store.Repo, now time.Time) 
 		e.repos[r.Key] = r
 		e.addRepoEntries(r, nil, now)
 	}
+	slices.Sort(removed)
+	return removed
 }
 
 // addRepoEntries makes sure every per-repository spec has an entry for r. Callers hold e.mu.
@@ -642,6 +806,7 @@ func (e *Engine) warmStart(ctx context.Context) error {
 		}
 	})
 	e.pub.Flush()
+	close(e.warm)
 	e.log.Info("warm start", "repos", len(repos), "items", len(items))
 	return nil
 }

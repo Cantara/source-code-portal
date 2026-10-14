@@ -121,7 +121,7 @@ func (e fakeErr) Permanent() bool                     { return e.perm }
 func (e fakeErr) ErrorCode() string                   { return e.code }
 
 func sourceSpec(c *counter, ttl time.Duration) Spec {
-	return Spec{Kind: "list", PerSource: true, Prio: PrioScheduled, TTL: ttl, On: []Event{EventSourceChanged}, Run: c.run}
+	return Spec{Kind: "list", PerSource: true, Lists: true, Prio: PrioScheduled, TTL: ttl, On: []Event{EventSourceChanged}, Run: c.run}
 }
 
 func TestRunsAndReschedules(t *testing.T) {

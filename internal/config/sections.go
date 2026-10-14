@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/netip"
 	"net/url"
 	"os"
@@ -76,6 +77,31 @@ type Access struct {
 }
 
 var headerPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
+
+// Cluster joins the instance to other instances of the same portal through Hazelcast; empty Addresses: the instance is alone.
+type Cluster struct {
+	Addresses []string `mapstructure:"addresses"` // Hazelcast members, host:port
+	Name      string   `mapstructure:"name"`      // the Hazelcast cluster name
+	Namespace string   `mapstructure:"namespace"` // prefix of the Hazelcast objects
+}
+
+var namespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
+
+func (c Cluster) validate() []string {
+	var p []string
+	for _, a := range c.Addresses {
+		if host, port, err := net.SplitHostPort(a); err != nil || host == "" || port == "" {
+			p = append(p, fmt.Sprintf("cluster.addresses: %q is not host:port", a))
+		}
+	}
+	if strings.TrimSpace(c.Name) == "" || len(c.Name) > 256 {
+		p = append(p, "cluster.name: required")
+	}
+	if !namespacePattern.MatchString(c.Namespace) {
+		p = append(p, fmt.Sprintf("cluster.namespace: %q must be 1..32 of a-z, 0-9 and -", c.Namespace))
+	}
+	return p
+}
 
 func (a Access) validate(g GitHub, proxies bool) []string {
 	var p []string

@@ -93,7 +93,7 @@ func findingsError(fs []Finding) error {
 
 // Spec is the per-source listing job.
 func (c *Catalog) Spec() sync.Spec {
-	return sync.Spec{Kind: Kind, PerSource: true, Prio: sync.PrioScheduled, TTL: c.interval, On: []sync.Event{sync.EventSourceChanged},
+	return sync.Spec{Kind: Kind, PerSource: true, Lists: true, Prio: sync.PrioScheduled, TTL: c.interval, On: []sync.Event{sync.EventSourceChanged},
 		Run: c.run, Publish: c.publish}
 }
 

@@ -17,6 +17,7 @@ import (
 	contract "github.com/cantara/source-code-portal/api"
 	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
+	"github.com/cantara/source-code-portal/internal/cluster"
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/docs"
@@ -49,7 +50,7 @@ func newServeCmd(opts *options) *cobra.Command {
 			}
 			log := newLogger(cfg.Log, cmd.ErrOrStderr())
 			slog.SetDefault(log)
-			srv, err := newServer(cmd.Context(), cfg, nil, log)
+			srv, err := newServer(cmd.Context(), cfg, deps{}, log)
 			if err != nil {
 				return failure{err}
 			}
@@ -86,18 +87,25 @@ type server struct {
 	store             *store.DB
 	pub               *snapshot.Publisher
 	engine            *sync.Engine
+	member            *cluster.Member // nil when the instance is alone
 	stopping          atomic.Bool
 	public, admin     *http.Server
 	publicLn, adminLn net.Listener
 }
 
-// newServer opens the store, wires the features and binds both listeners. base is the transport to GitHub (nil: the default).
-func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, log *slog.Logger) (_ *server, err error) {
+// deps are the outside services; the zero value is the real ones.
+type deps struct {
+	github  http.RoundTripper                              // transport to GitHub
+	cluster func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
+}
+
+// newServer opens the store, wires the features and binds both listeners.
+func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger) (_ *server, err error) {
 	spa, err := web.FS()
 	if err != nil {
 		return nil, err
 	}
-	gh, err := github.New(cfg.GitHub, base, log)
+	gh, err := github.New(cfg.GitHub, d.github, log)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +131,14 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 		}
 	}()
 	s.engine = sync.New(s.store, s.pub, gh, ids, cfg.Sync.Concurrency, log)
+	if len(cfg.Cluster.Addresses) > 0 {
+		dial := d.cluster
+		if dial == nil {
+			dial = cluster.DialHazelcast(cfg.Cluster.Addresses, cfg.Cluster.Name, cfg.Cluster.Namespace, log)
+		}
+		s.member = cluster.New(dial, log)
+		s.engine.Share(s.member.Share)
+	}
 	cat, err := catalog.New(cfg.Catalog, cfg.GitHub.Sources, sources, s.engine.Notify, log)
 	if err != nil {
 		return nil, err
@@ -135,12 +151,19 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 		}
 	}
 
-	m := newMetrics(gauges{current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining})
+	g := gauges{current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining}
+	if s.member != nil {
+		g.leader = s.member.Leader
+	}
+	m := newMetrics(g)
 	gh.Observe(m.githubResponse)
 	s.engine.Observe(m.job)
 	ready := func() bool { return !s.stopping.Load() && s.pub.Current().Catalogued }
 	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		webhook: cfg.Webhook.Secret.IsSet(), deliveries: map[string]int{}}
+	if s.member != nil {
+		st.cluster = s.member
+	}
 
 	// view is what a request may see: the full snapshot for a private viewer, else its public view.
 	view := func(ctx context.Context) *snapshot.Snapshot {
@@ -158,7 +181,10 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}}
 	if cfg.Webhook.Secret.IsSet() {
-		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.engine, cfg.GitHub.Sources), log)
+		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.deliver, cfg.GitHub.Sources), log)
+		if s.member != nil {
+			rc.Dedupe(s.member.First)
+		}
 		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
@@ -190,9 +216,26 @@ func newServer(ctx context.Context, cfg config.Config, base http.RoundTripper, l
 	return s, nil
 }
 
-// webhookSink hands webhook events to the engine: repository events to the repository's jobs, owner-wide events to the listing of
-// the source that has the owner among its organisations. Owners no source lists are ignored.
-func webhookSink(e *sync.Engine, sources []config.Source) webhook.Sink {
+// deliver hands a webhook event to the engine of every instance (through the cluster when there is one, else or when it fails to
+// this one's): per repository when repo is set, else per source.
+func (s *server) deliver(ev sync.Event, repo snapshot.RepoKey, source string) {
+	if s.member != nil {
+		err := s.member.Event(context.Background(), ev, repo, source)
+		if err == nil {
+			return
+		}
+		s.log.Warn("webhook event not sent to the cluster; handled here", "err", err)
+	}
+	if repo == "" {
+		s.engine.NotifySource(ev, source)
+	} else {
+		s.engine.Notify(ev, repo)
+	}
+}
+
+// webhookSink hands webhook events on: repository events to the repository's jobs, owner-wide events to the listing of the source
+// that has the owner among its organisations. Owners no source lists are ignored.
+func webhookSink(deliver func(sync.Event, snapshot.RepoKey, string), sources []config.Source) webhook.Sink {
 	sourceOf := map[string]string{}
 	for _, s := range sources {
 		for _, org := range s.Orgs {
@@ -204,19 +247,27 @@ func webhookSink(e *sync.Engine, sources []config.Source) webhook.Sink {
 		switch {
 		case !ok:
 		case name == "" || ev == sync.EventSourceChanged:
-			e.NotifySource(ev, id)
+			deliver(ev, "", id)
 		default:
-			e.Notify(ev, snapshot.KeyOf(owner, name))
+			deliver(ev, snapshot.KeyOf(owner, name), "")
 		}
 	}
 }
 
-// run serves until ctx is cancelled, then shuts down within the grace period: readiness drops, the servers drain, the engine
-// stops (jobs in flight are cancelled and run again after a restart), pending snapshot updates are dropped and the store closes.
+// run serves until ctx is cancelled, then shuts down within the grace period: readiness drops, the servers drain, the instance leaves
+// the cluster (another takes the lead), the engine stops (jobs in flight are cancelled and run again after a restart), pending
+// snapshot updates are dropped and the store closes.
 func (s *server) run(ctx context.Context) error {
 	engineCtx, stopEngine := context.WithCancel(context.WithoutCancel(ctx))
 	engineDone := make(chan error, 1)
 	go func() { engineDone <- s.engine.Run(engineCtx) }()
+	memberCtx, stopMember := context.WithCancel(context.WithoutCancel(ctx))
+	memberDone := make(chan error, 1)
+	if s.member != nil {
+		go func() { memberDone <- s.member.Run(memberCtx, s.engine) }()
+	} else {
+		memberDone <- nil
+	}
 
 	errc := make(chan error, 2)
 	for _, p := range []struct {
@@ -250,6 +301,8 @@ func (s *server) run(ctx context.Context) error {
 			err = errors.Join(err, e)
 		}
 	}
+	stopMember()
+	err = errors.Join(err, <-memberDone)
 	stopEngine()
 	if engineRunning {
 		err = errors.Join(err, <-engineDone)

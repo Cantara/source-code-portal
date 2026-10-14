@@ -29,6 +29,7 @@ type gauges struct {
 	current func() *snapshot.Snapshot
 	depth   func() (waiting, running int)
 	rate    func() map[string]float64
+	leader  func() bool // nil when the instance is alone
 }
 
 func newMetrics(g gauges) *metrics {
@@ -79,8 +80,8 @@ func (m *metrics) githubResponse(source string, status int) {
 
 // live collects the gauges that describe the current state.
 type live struct {
-	g                            gauges
-	age, items, queue, run, rate *prometheus.Desc
+	g                                    gauges
+	age, items, queue, run, rate, leader *prometheus.Desc
 }
 
 func newLive(g gauges) *live {
@@ -91,11 +92,12 @@ func newLive(g gauges) *live {
 		run:   prometheus.NewDesc("scp_sync_running", "Sync jobs running.", nil, nil),
 		rate: prometheus.NewDesc("scp_github_rate_remaining_ratio",
 			"Smallest fraction of the GitHub core rate limit left over the source's credentials.", []string{"source"}, nil),
+		leader: prometheus.NewDesc("scp_cluster_leader", "1 when this instance leads the cluster and runs the sync jobs.", nil, nil),
 	}
 }
 
 func (l *live) Describe(ch chan<- *prometheus.Desc) {
-	for _, d := range []*prometheus.Desc{l.age, l.items, l.queue, l.run, l.rate} {
+	for _, d := range []*prometheus.Desc{l.age, l.items, l.queue, l.run, l.rate, l.leader} {
 		ch <- d
 	}
 }
@@ -120,5 +122,12 @@ func (l *live) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(l.run, prometheus.GaugeValue, float64(running))
 	for src, f := range l.g.rate() {
 		ch <- prometheus.MustNewConstMetric(l.rate, prometheus.GaugeValue, f, src)
+	}
+	if l.g.leader != nil {
+		v := 0.0
+		if l.g.leader() {
+			v = 1
+		}
+		ch <- prometheus.MustNewConstMetric(l.leader, prometheus.GaugeValue, v)
 	}
 }

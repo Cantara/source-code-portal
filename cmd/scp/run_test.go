@@ -147,7 +147,7 @@ catalog:
 	cfg.Server.PublicAddr, cfg.Server.AdminAddr = "127.0.0.1:0", "127.0.0.1:0"
 
 	serve := func() (stop func(), public, admin string) {
-		srv, err := newServer(t.Context(), cfg, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		srv, err := newServer(t.Context(), cfg, deps{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		if err != nil {
 			t.Fatal(err)
 		}

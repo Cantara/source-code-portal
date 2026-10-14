@@ -25,6 +25,13 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    services:
+      # The cluster tests run against a real Hazelcast on loopback (internal/cluster, cmd/scp TestCluster).
+      hazelcast:
+        image: hazelcast/hazelcast:5.7.0@sha256:f086bf0ecb23fcb2e9a516e337e51018156b89df41543ab768b8468ab281ad67
+        ports: ["127.0.0.1:5701:5701"]
+        env:
+          HZ_NETWORK_PUBLICADDRESS: 127.0.0.1:5701
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,7 +48,11 @@ jobs:
           version: v2.14.0
           install-mode: binary
       - run: go vet ./...
+      - name: hazelcast is up
+        run: timeout 120 bash -c 'until (exec 3<>/dev/tcp/127.0.0.1/5701) 2>/dev/null; do sleep 1; done'
       - run: go test -race -count=1 -timeout 10m ./...
+        env:
+          TEST_HAZELCAST: 127.0.0.1:5701
       - run: go tool govulncheck ./...
 
   web:
