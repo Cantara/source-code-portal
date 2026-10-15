@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { repo } from "@/test/server"
 import { crumbs } from "./crumbs"
-import { ld, serialise } from "./seo"
+import { ld, serialise, social } from "./seo"
 
 const base = "https://scp.example"
 
@@ -42,6 +42,15 @@ describe("JSON-LD", () => {
         { "@type": "ListItem", position: 2, name: "acme/Core", item: `${base}/repos/acme/core` },
         { "@type": "ListItem", position: 3, name: "Setup", item: `${base}/repos/acme/core/docs/docs/setup` },
       ],
+    })
+  })
+
+  it("gives a shared link its title, description and canonical address", () => {
+    expect(
+      social({ title: { absolute: "Dashboard · Source Code Portal" }, description: "All.", alternates: { canonical: "/" } }),
+    ).toMatchObject({
+      openGraph: { siteName: "Source Code Portal", title: "Dashboard", description: "All.", url: "/" },
+      twitter: { card: "summary", title: "Dashboard" },
     })
   })
 })

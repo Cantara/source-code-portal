@@ -1,4 +1,5 @@
 import "server-only"
+import type { Metadata } from "next"
 import { headers } from "next/headers"
 import type { Schemas } from "./api/client"
 import type { Crumb } from "./crumbs"
@@ -94,4 +95,27 @@ export const ld = {
     isPartOf: { "@id": `${base}${repoPath(owner, name)}#code` },
     mainEntityOfPage: { "@id": `${base}${path}` },
   }),
+}
+
+const site = "Source Code Portal"
+
+/** titleOf is a page's own title, without the site's suffix. */
+function titleOf(m: Metadata): string {
+  const t = m.title
+  if (typeof t === "string") return t
+  if (t && "absolute" in t && t.absolute) return t.absolute.replace(` · ${site}`, "")
+  return site
+}
+
+/** social adds a page's Open Graph and X summary (title, description, canonical address) for the previews of shared links. */
+export function social(m: Metadata): Metadata {
+  const title = titleOf(m)
+  const description = typeof m.description === "string" ? m.description : undefined
+  const canonical = m.alternates?.canonical
+  const url = typeof canonical === "string" ? canonical : undefined
+  return {
+    ...m,
+    openGraph: { type: "website", siteName: site, title, description, url },
+    twitter: { card: "summary", title, description },
+  }
 }

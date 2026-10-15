@@ -14,7 +14,7 @@ later releases bump the patch version unless the owner decides otherwise.
 Built: GitHub App or token sources with discovery and reconcile; groups by matchers (exact, prefix, glob, regexp, topic, catch-all);
 dashboard, group, repository, document and commit-log pages; README and `docs/` rendered and sanitised; the `scp.yaml` descriptor;
 `go.mod`, `package.json` and `pom.xml` manifests with internal dependency links; local SVG badges; freshness on every item; signed and
-de-duplicated webhooks; `/api/v1` from an OpenAPI 3.1 contract; `/llms.txt` and Markdown answers; private repositories behind a trusted
+de-duplicated webhooks; `/api/v1` from an OpenAPI 3.1 contract; `/llms.txt` and Markdown answers; a sitemap, canonical addresses, JSON-LD and breadcrumbs for search engines; private repositories behind a trusted
 proxy; several instances on Hazelcast; the image proxy; live updates by server-sent events; `/livez`, `/readyz`, Prometheus metrics and
 a status page on the admin port; a signed multi-platform image and release archives.
 
@@ -80,7 +80,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 |---|---|---|---|
 | S1 | Sign-in and admin (`design/auth.md`): OIDC with PKCE, bearer tokens, stateless sealed sessions, an admin role | signed in through a fake provider a member of a private group sees a private repository, an admin reads the status, a token reads `/llms.txt` with its groups; forged state, nonce and cookies refused | done |
 | A1 | Assistant (`design/assistant.md`): LLM providers (Anthropic, OpenAI, Gemini, OpenRouter, Ollama) and a read-only chat over the snapshot | the adapters pass their recorded fixtures; the loop keeps its budgets and frames every tool result; `/ask` answers with links against a fake provider; a public viewer's assistant never reads a private repository | done |
-| M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | in progress |
+| M13 | Search engines (`design/seo.md`): canonical addresses, sitemap, robots.txt, JSON-LD with breadcrumbs, Open Graph text | every sitemap page answers 200 with its canonical, one h1, a JSON-LD graph with its trail and a `lastmod` | done |
 
 Each milestone starts with its design note and lands as small commits on `main`, CI green.
 

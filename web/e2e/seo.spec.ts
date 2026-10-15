@@ -44,6 +44,10 @@ test.describe("without JavaScript", () => {
         "href",
         `${baseURL}${canonical === "/" ? "" : canonical}`,
       )
+      await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+        "content",
+        title.replace(" · Source Code Portal", ""),
+      )
     })
   }
 

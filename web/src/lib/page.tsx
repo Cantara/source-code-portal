@@ -6,7 +6,7 @@ import type { ReactNode } from "react"
 import type { Api } from "./api/client"
 import { origin, serverApi } from "./api/server"
 import { serverQueryClient, state } from "./load"
-import { JsonLd, ld, type Thing } from "./seo"
+import { JsonLd, ld, social, type Thing } from "./seo"
 
 /** Search is a page's query string as Next.js passes it. */
 export type Search = Record<string, string | string[] | undefined>
@@ -65,7 +65,7 @@ export function page<P>(route: Route<P>) {
       )
     },
     async generateMetadata(props: Props<P>): Promise<Metadata> {
-      return route.metadata(await context(props))
+      return social(await route.metadata(await context(props)))
     },
   }
 }
