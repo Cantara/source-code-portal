@@ -7,7 +7,7 @@ Status: as built. Binding order: ../plan.md > this note.
   repositories, everyone else sees the public ones only, on every surface (pages, `/api/v1`, badges, Markdown, `/llms.txt`, feeds).
 
 ## Decisions
-- SCP does not authenticate. The proxy (oauth2-proxy, an ingress with OIDC, a corporate SSO gateway) authenticates and passes the user
+- Viewers come from a trusted proxy, or from SCP's own sign-in (auth.md). The proxy (oauth2-proxy, an ingress with OIDC, a corporate SSO gateway) authenticates and passes the user
   and groups in headers: `access.user_header` (default `X-Forwarded-User`) and `access.groups_header` (default `X-Forwarded-Groups`,
   comma-separated, names compared exactly). Headers are believed only from a peer in `server.trusted_proxies`, the same list that governs `X-Forwarded-For`;
   from any other peer both are removed before routing. An API call of the web UI server names its page's viewer with `X-Scp-Viewer`,

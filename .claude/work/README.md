@@ -20,6 +20,8 @@ What Source Code Portal is, how it is built, and the work in progress. Binding o
 | `design/web.md` | The Next.js web UI. |
 | `design/health.md` | Repository and product health: the score, its findings, the weights. |
 | `design/commits-navigator.md` | The commit navigator: the stored history, product timelines and the git graph navigator. |
+| `design/auth.md` | S1, in progress: sign-in through OIDC, bearer tokens, sealed sessions, the admin role. |
+| `design/assistant.md` | A1, queued: LLM providers and the read-only assistant. |
 | `design/seo.md` | M13, queued: search engines. |
 | `history/` | Finished work: the M0..M11 plan and decision log, the earlier detailed design, the UI brief and screenshots. Not kept in sync. |
 
