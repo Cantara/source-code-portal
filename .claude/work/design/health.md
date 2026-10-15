@@ -1,5 +1,5 @@
 # Health
-Status: in progress (H1). Binding order: ../plan.md > this note.
+Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
 A product group exists so its owner sees at a glance that something needs attention. Health turns each repository's signals into a

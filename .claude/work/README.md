@@ -19,6 +19,7 @@ What Source Code Portal is, how it is built, and the work in progress. Binding o
 | `design/images-events.md` | The image proxy, server-sent events, the content-derived snapshot version. |
 | `design/web.md` | The Next.js web UI. |
 | `design/health.md` | Repository and product health: the score, its findings, the weights. |
+| `design/commits-navigator.md` | C1, next: the product timeline and the git graph navigator. |
 | `design/seo.md` | M13, queued: search engines. |
 | `history/` | Finished work: the M0..M11 plan and decision log, the earlier detailed design, the UI brief and screenshots. Not kept in sync. |
 
