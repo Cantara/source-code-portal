@@ -1,6 +1,6 @@
 # Search engines
 Status: M13, queued (plan.md section 4); nothing here is built yet. Binding order: ../plan.md > this note.
-Learned from krantho (`/Users/overanheim/Code/descoped/krantho`, its `krantho-site` and `packages/seo*`), adapted to SCP's model:
+Learned from krantho (its `krantho-site` and `packages/seo*`), adapted to SCP's model:
 Go owns the data and every response header, the Next.js server renders pages from the snapshot.
 
 ## What the web UI already gives

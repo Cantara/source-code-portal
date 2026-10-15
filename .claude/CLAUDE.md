@@ -19,7 +19,7 @@ the root `AGENTS.md`.
 - `.claude/work/history/`: finished work (the M0..M11 plan and decision log, the earlier detailed design, the UI brief). Not kept in
   sync; consult only for background.
 
-The Java product (`Cantara/SourceCodePortal`, checked out at `/Users/overanheim/Code/descoped/SourceCodePortal`) is read-only reference;
+The Java product (`Cantara/SourceCodePortal`, checked out beside this repository as `../SourceCodePortal`) is read-only reference;
 never modify it, push to it or open issues or pull requests on it.
 
 ## Working rules
