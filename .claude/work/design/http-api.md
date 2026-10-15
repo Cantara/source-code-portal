@@ -34,6 +34,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/repos/{o}/{n}` | llms | `Accept: text/markdown` gets the README Markdown with the technology and internal dependencies; else the page |
 | P | GET | `/repos/{o}/{n}/docs/{path...}` | llms | path ends `.md`: raw Markdown; else the page (negotiated like above) |
 | P | GET | `/repos/{o}/{n}/readme.md` | llms | raw README Markdown with `scp:` front matter |
+| P | GET | `/dashboard`, `/index`, `/group/{id}`, `/contents/{o}/{n}/{branch}`, `/commits/{id}`, `/commits/{o}/{n}`, `/badge/{kind}/{name}/{branch}`, `/wiki[/...]`; POST `/github/webhook` | catalog | the Java portal's addresses (`legacy.go`): 308 to the page or badge that replaced them (a group by its id, case and dashes ignored; a repository by its name alone), 410 for Jenkins and Snyk badges, the wiki and the old webhook, 404 for what the viewer cannot see |
 | P | GET | `/{path...}` | httpapi | every other path: `httpapi.Pages`, the proxy to the web UI server (pages, `/_next/static`, `/sitemap.xml`, `/robots.txt`, the 404 page); the reserved prefixes `/auth/`, `/badges/`, `/images/`, `/webhooks/`, `/.well-known/` answer a plain 404 |
 | P | GET | `/api/v1/dashboard` | catalog | groups with counts, latest activity, aggregate freshness |
 | P | GET | `/api/v1/groups` | catalog | all groups (matchers resolved), member counts |

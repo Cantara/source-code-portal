@@ -375,6 +375,12 @@ unreadable, the portal rebuilds it like a first start. There is nothing to back 
 **Rotating the webhook secret.** Set the new secret in `webhook.secret_file` and the old one in `webhook.previous_secret_file`,
 restart, change the secret on GitHub, then remove the previous one.
 
+**Replacing the Java portal.** On the same host name, the Java portal's addresses keep working: `/dashboard`, `/group/{id}`,
+`/contents/...` and `/commits/...` redirect (308) to the new pages, and the badges in other repositories' READMEs
+(`/badge/license|shields-issues|shields-commits|shields-releases/{repo}/{branch}`) to `/badges/repos/{owner}/{repo}/...svg`. A group is
+found by its old id with case and dashes ignored, a repository by its name. Jenkins and Snyk badges and the wiki answer 410 Gone. The old webhook
+`POST /github/webhook` answers 410: point the GitHub webhook at `/webhooks/github` with a new secret (SHA-256 signatures).
+
 ## 5. Monitor
 
 | Endpoint (admin) | Answers |

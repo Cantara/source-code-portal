@@ -212,6 +212,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
+	routes = append(routes, catalog.Legacy(view)...)
 	if cfg.Webhook.Secret.IsSet() {
 		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.deliver, cfg.GitHub.Sources), log)
 		if s.member != nil {
