@@ -84,6 +84,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].token_file` | | a token file, instead of `app` |
 | `github.sources[].include_forks` | `false` | list forks |
 | `github.sources[].include_archived` | `true` | list archived repositories |
+| `github.sources[].exclude` | `[]` | repositories kept out of the catalogue even where the credential reads them: matchers as in the groups (`exact`, `prefix`, `glob`, `regexp`, `topic`) |
 | `github.sources[].include_private` | `false` | list private and internal repositories too (section 2.1) |
 | `catalog.reconcile_interval` | `5m` | how often every account is listed (1m to 24h) |
 | `catalog.groups[]` | none | groups in dashboard order (at most 500) |
@@ -429,7 +430,7 @@ steps, and job failures. Secrets are never logged.
 |---|---|
 | `config check` exits 2 | every problem is listed with its key; unknown keys and `SCP_*` variables are errors |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
-| A repository is missing | it must be public, not a fork (unless `include_forks`), and in a configured account; a deleted or private repository disappears after two listings |
+| A repository is missing | it must be public, not a fork (unless `include_forks`), not matched by the source's `exclude`, and in a configured account; a deleted or private repository disappears after two listings |
 | Pushes show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository, `scp_webhook_deliveries_total` by result |
 | The assistant answers with an error | *Test the provider* on the *Admin* page; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |

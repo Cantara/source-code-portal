@@ -93,6 +93,7 @@ Typical wishes:
 | "anything tagged iot" | `topic: iot` |
 | "the rest in Other" | a last group with `catch_all: true` |
 | "no forks / no archived ones" | `github.sources[].include_forks: false` / `include_archived: false` (source filters, not groups) |
+| "never show the client repositories" | `github.sources[].exclude: [{glob: 'client-*'}]` (or `topic:`): kept out of the catalogue, not just ungrouped |
 
 ## Moving the legacy Java SCP config over
 

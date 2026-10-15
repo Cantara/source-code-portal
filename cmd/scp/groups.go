@@ -115,9 +115,12 @@ func previewGroups(w io.Writer, cfg config.Config, listed []listedRepo) error {
 					Topics: l.Topics, Fork: l.Fork, Archived: l.Archived, Visibility: l.Visibility})
 			}
 		}
+		filter, err := catalog.SourceFilter(src)
+		if err != nil {
+			return err
+		}
 		admitted := map[string]bool{}
-		for _, t := range catalog.Plan(mine, nil, catalog.Filter{IncludeForks: src.IncludeForks, IncludeArchived: src.IncludeArchived,
-			IncludePrivate: src.IncludePrivate}) {
+		for _, t := range catalog.Plan(mine, nil, filter) {
 			repos[t.Repo.Key()] = &snapshot.RepoEntry{Repo: t.Repo}
 			admitted[t.Repo.Name] = true
 		}
@@ -166,7 +169,7 @@ func why(r snapshot.Repo) string {
 	case !r.Public():
 		return r.Visibility + "; include_private"
 	}
-	return "not admitted"
+	return "exclude"
 }
 
 func defaultOf(cfg config.Config, id string) string {

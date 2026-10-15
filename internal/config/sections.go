@@ -36,6 +36,8 @@ type Source struct {
 	App          *App     `mapstructure:"app"`
 	TokenFile    string   `mapstructure:"token_file"`
 	IncludeForks bool     `mapstructure:"include_forks"`
+	// Exclude keeps matching repositories out of the catalogue even where the credential reads them (the groups' matcher kinds).
+	Exclude []Match `mapstructure:"exclude"`
 	// IncludePrivate admits private and internal repositories; access.private_groups says who sees them.
 	IncludePrivate bool `mapstructure:"include_private"`
 	// RawIncludeArchived is the configured value; IncludeArchived holds it with its default (true).
@@ -243,6 +245,14 @@ func (g GitHub) validate() []string {
 				p = append(p, fmt.Sprintf("%s.orgs: %q is also in source %q; an account belongs to one source", at, o, prev))
 			}
 			owners[strings.ToLower(o)] = s.ID
+		}
+		if len(s.Exclude) > 64 {
+			p = append(p, at+".exclude: at most 64 matchers")
+		}
+		for j, m := range s.Exclude {
+			if kind, _, ok := m.Kind(); !ok || kind == "catch_all" {
+				p = append(p, fmt.Sprintf("%s.exclude[%d]: exactly one of exact, prefix, glob, regexp, topic", at, j))
+			}
 		}
 		switch {
 		case s.App != nil && s.TokenFile != "":

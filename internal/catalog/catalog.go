@@ -75,8 +75,11 @@ func New(cfg config.Catalog, configured []config.Source, sources map[string]GitH
 		if g == nil {
 			return nil, fmt.Errorf("catalog: no GitHub for source %s", s.ID)
 		}
-		c.sources[s.ID] = source{orgs: s.Orgs, gh: g, filter: Filter{IncludeForks: s.IncludeForks, IncludeArchived: s.IncludeArchived,
-			IncludePrivate: s.IncludePrivate}}
+		f, err := SourceFilter(s)
+		if err != nil {
+			return nil, err
+		}
+		c.sources[s.ID] = source{orgs: s.Orgs, gh: g, filter: f}
 	}
 	return c, nil
 }

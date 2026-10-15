@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
@@ -66,6 +67,26 @@ func TestPlanFilters(t *testing.T) {
 	}
 	if got := names(Plan(listed, nil, Filter{IncludeForks: true})); !slices.Equal(got, []string{"acme/a", "acme/fork"}) {
 		t.Errorf("forks, no archived = %v", got)
+	}
+}
+
+func TestPlanExclude(t *testing.T) {
+	secret := pub(3, "vault")
+	secret.Topics = []string{"confidential"}
+	listed := []snapshot.Repo{pub(1, "core"), pub(2, "Client-Acme"), secret}
+	f, err := SourceFilter(config.Source{ID: "gh", Exclude: []config.Match{{Glob: "client-*"}, {Topic: "confidential"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(Plan(listed, nil, f)); !slices.Equal(got, []string{"acme/core"}) {
+		t.Errorf("excluded = %v", got)
+	}
+	// A tracked repository that becomes excluded leaves at the next listing.
+	if got := names(Plan(listed, Plan(listed, nil, Filter{}), f)); !slices.Equal(got, []string{"acme/core"}) {
+		t.Errorf("tracked then excluded = %v", got)
+	}
+	if _, err := SourceFilter(config.Source{ID: "gh", Exclude: []config.Match{{Regexp: "("}}}); err == nil {
+		t.Error("a bad regexp is accepted")
 	}
 }
 

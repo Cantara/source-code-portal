@@ -16,7 +16,9 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   `/_next/static/`, the favicon and theme script, `/api/v1/me` (the sign-in methods), `/webhooks/` (signed by GitHub) and `robots.txt`,
   which then disallows everything. The web UI server's own API calls carry the page's viewer and pass. `config check` wants a way to
   know the viewer (`TestRequireAuth`).
-- `github.sources[].exclude` (exact names, globs, topics) keeps repositories out of the catalogue even where the credential reads them.
+- `github.sources[].exclude` keeps repositories out of the catalogue even where the credential reads them: the groups' matcher kinds
+  (`exact`, `prefix`, `glob`, `regexp`, `topic`; no `catch_all`), applied in `admit` before anything is stored, so a tracked
+  repository that becomes excluded leaves at the next listing (`catalog.SourceFilter`, also used by `config groups`).
 - One log line per answer that includes a private repository: viewer, repository, route, no content, on the logger `access`; a
   counter without repository labels. Metrics and `/api/v1/status` carry no repository names.
 - `serve` warns at start when `include_private` is on, the public listener is not loopback and `trusted_proxies` holds a range wider
@@ -26,4 +28,4 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   network layout, the App's permissions, key rotation) and what is out of scope.
 
 ## Order
-Leak test (built) -> `require_auth` (built) -> `exclude` -> access log -> start warning -> removal on `deleted` -> `security-model.md`.
+Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> access log -> start warning -> removal on `deleted` -> `security-model.md`.

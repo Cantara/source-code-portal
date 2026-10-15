@@ -123,6 +123,7 @@ func TestRefused(t *testing.T) {
 		"private without groups":  {file: "!server:\n  trusted_proxies: [10.0.0.0/8]\ngithub:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, include_private: true}\n", want: "access.private_groups: required"},
 		"private without proxy":   {file: "!access:\n  private_groups: [staff]\ngithub:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, include_private: true}\n", want: "server.trusted_proxies: required"},
 		"bad user header":         {env: map[string]string{"SCP_ACCESS_USER_HEADER": "X User"}, want: "access.user_header"},
+		"exclude catch_all":       {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, exclude: [{catch_all: true}]}\n", want: "exclude[0]"},
 		"closed without identity": {env: map[string]string{"SCP_ACCESS_REQUIRE_AUTH": "true"}, want: "access.require_auth"},
 		"same headers":            {env: map[string]string{"SCP_ACCESS_GROUPS_HEADER": "x-forwarded-user"}, want: "must differ"},
 		"group with comma":        {file: "access:\n  private_groups: ['a,b']\n", want: "not a group name"},

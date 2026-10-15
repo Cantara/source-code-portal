@@ -2,9 +2,11 @@ package catalog
 
 import (
 	"cmp"
+	"fmt"
 	"net/url"
 	"slices"
 
+	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/untrusted"
 )
@@ -26,6 +28,21 @@ type Tracked struct {
 // Filter is a source's admission rule.
 type Filter struct {
 	IncludeForks, IncludeArchived, IncludePrivate bool
+	exclude                                       []matcher
+}
+
+// SourceFilter is the admission rule of a configured source.
+func SourceFilter(s config.Source) (Filter, error) {
+	f := Filter{IncludeForks: s.IncludeForks, IncludeArchived: s.IncludeArchived, IncludePrivate: s.IncludePrivate}
+	for i, m := range s.Exclude {
+		kind, value, _ := m.Kind() // one key: checked by config
+		fn, err := compileMatcher(kind, value)
+		if err != nil {
+			return Filter{}, fmt.Errorf("github.sources (%s).exclude[%d]: %w", s.ID, i, err)
+		}
+		f.exclude = append(f.exclude, fn)
+	}
+	return f, nil
 }
 
 // Plan returns the source's catalogue after a complete listing: listed repositories that pass the filter are tracked (renames keep
@@ -102,7 +119,8 @@ func admit(r snapshot.Repo, f Filter) (snapshot.Repo, bool) {
 	switch {
 	case r.ID.GitHubID == 0, !namePattern.MatchString(r.Owner), !namePattern.MatchString(r.Name),
 		r.Name == "." || r.Name == "..", !f.Visible(r.Visibility),
-		r.Archived && !f.IncludeArchived, r.Fork && !f.IncludeForks:
+		r.Archived && !f.IncludeArchived, r.Fork && !f.IncludeForks,
+		slices.ContainsFunc(f.exclude, func(m matcher) bool { return m(&r) }):
 		return r, false
 	}
 	r.Description = untrusted.Text(r.Description, maxDescription)

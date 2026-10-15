@@ -27,6 +27,7 @@ github:
       # token_file: /run/secrets/github-token
       include_forks: false
       include_archived: true
+      exclude: [] # e.g. [{glob: 'client-*'}, {topic: confidential}]: never catalogued
       include_private: false # true needs access.private_groups and a way to know the viewer: the proxy or auth
 catalog:
   reconcile_interval: 5m
