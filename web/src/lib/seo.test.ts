@@ -32,17 +32,22 @@ describe("JSON-LD", () => {
     })
   })
 
-  it("gives the trail it draws", () => {
-    const trail = crumbs.doc("acme", "Core", "docs/setup.md", "Setup")
+  it("gives the trail it draws, through the repository's group", () => {
+    const trail = crumbs.doc("acme", "Core", { id: "iam", name: "IAM" }, "docs/setup.md", "Setup")
     expect(ld.breadcrumbs(base, trail)).toEqual({
       "@type": "BreadcrumbList",
       "@id": `${base}/repos/acme/core/docs/docs/setup#breadcrumbs`,
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Dashboard", item: `${base}/` },
-        { "@type": "ListItem", position: 2, name: "acme/Core", item: `${base}/repos/acme/core` },
-        { "@type": "ListItem", position: 3, name: "Setup", item: `${base}/repos/acme/core/docs/docs/setup` },
+        { "@type": "ListItem", position: 2, name: "IAM", item: `${base}/groups/iam` },
+        { "@type": "ListItem", position: 3, name: "acme/Core", item: `${base}/repos/acme/core` },
+        { "@type": "ListItem", position: 4, name: "Setup", item: `${base}/repos/acme/core/docs/docs/setup` },
       ],
     })
+  })
+
+  it("puts a repository in no group under the dashboard", () => {
+    expect(crumbs.repo("acme", "Core", null).map((c) => c.name)).toEqual(["Dashboard", "acme/Core"])
   })
 
   it("gives a shared link its title, description and canonical address", () => {

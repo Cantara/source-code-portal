@@ -45,6 +45,7 @@ describe("route modules", () => {
         response(200).json({
           repo: repo("Core"),
           title: "",
+          group: null,
           descriptor,
           commits: [],
           commitsFreshness: repo("Core").freshness,

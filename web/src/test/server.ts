@@ -158,6 +158,7 @@ export const defaults = [
       ? response(200).json({
           repo: repo("Core"),
           title: "Core identity",
+          group: null,
           descriptor,
           commits: [commit(1)],
           commitsFreshness: fresh,

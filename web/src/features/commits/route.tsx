@@ -88,11 +88,12 @@ export const repoCommitsRoute: Route<RepoParams> = {
     }
   },
   async structured({ api, qc, params: { owner, name } }, base) {
-    const r = (await peek(qc, repoQuery(api, owner, name)))?.repo
-    if (!r) return []
+    const d = await peek(qc, repoQuery(api, owner, name))
+    if (!d) return []
+    const r = d.repo
     return [
       ld.page(base, repoCommitsPath(r.owner, r.name), `Commits in ${r.owner}/${r.name}`),
-      ld.breadcrumbs(base, crumbs.repoCommits(r.owner, r.name)),
+      ld.breadcrumbs(base, crumbs.repoCommits(r.owner, r.name, d.group)),
     ]
   },
   render: (ctx) => <NavigatorView owner={ctx.params.owner} name={ctx.params.name} defaultSize={historySize(ctx)} />,

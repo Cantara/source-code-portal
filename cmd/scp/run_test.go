@@ -270,6 +270,9 @@ catalog:
 			len(repo.Commits) != 3 || repo.Commits[0].Subject != "change a" || repo.CommitsFreshness.Status != "fresh" {
 			t.Errorf("repo detail: title %q, descriptor %+v, commits %+v", repo.Title, repo.Descriptor, repo.Commits)
 		}
+		if repo.Group == nil || repo.Group.Id != "whydah" || repo.Group.Name != "Whydah" {
+			t.Errorf("repo detail: group %+v, want its first group whydah", repo.Group)
+		}
 		var dash oapi.Dashboard
 		if code := fetch(public+"/api/v1/dashboard", &dash); code != http.StatusOK || dash.RepoCount != 3 || len(dash.Latest) != 6 ||
 			dash.Latest[0].Sha != strings.Repeat("a", 40) || len(dash.Groups) != 2 || dash.Groups[0].LastActivity == nil ||

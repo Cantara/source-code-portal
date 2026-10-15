@@ -18,13 +18,14 @@ import { docListQuery, docQuery, repoQuery } from "@/lib/api/queries"
 /** DocView is one document of a repository with the repository's document list and the document's outline. */
 export function DocView({ owner, name, path }: { owner: string; name: string; path: string }) {
   const { data, error } = useQuery(docQuery(api, owner, name, path))
-  const repo = useQuery(repoQuery(api, owner, name)).data?.repo
+  const detail = useQuery(repoQuery(api, owner, name)).data
+  const repo = detail?.repo
   return (
     <>
       <PageHeader
         title={data?.title || path}
         meta={data && <FreshnessBadge freshness={data.freshness} />}
-        trail={crumbs.doc(repo?.owner ?? owner, repo?.name ?? name, data?.path ?? path, data?.title || path)}
+        trail={crumbs.doc(repo?.owner ?? owner, repo?.name ?? name, detail?.group, data?.path ?? path, data?.title || path)}
       >
         <p className="flex flex-wrap gap-x-3 text-sm">
           {data && (

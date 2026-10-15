@@ -33,12 +33,13 @@ const searchId = "history-search"
 /** NavigatorView is a repository's history as a git graph in numbered pages: filters, the rows, the selected commit's details. */
 export function NavigatorView({ owner, name, defaultSize }: { owner: string; name: string; defaultSize: number }) {
   const st = historyState(Object.fromEntries(useSearchParams()), defaultSize)
-  const repo = useQuery(repoQuery(api, owner, name)).data?.repo
+  const detail = useQuery(repoQuery(api, owner, name)).data
+  const repo = detail?.repo
   return (
     <>
       <PageHeader
         title={`Commits in ${repo ? `${repo.owner}/${repo.name}` : `${owner}/${name}`}`}
-        trail={crumbs.repoCommits(repo?.owner ?? owner, repo?.name ?? name)}
+        trail={crumbs.repoCommits(repo?.owner ?? owner, repo?.name ?? name, detail?.group)}
       />
       <Navigator
         key={search({ filter: st.filter, size: defaultSize }, defaultSize)}

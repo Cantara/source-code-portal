@@ -687,6 +687,12 @@ type GroupList struct {
 	Groups []GroupSummary `json:"groups"`
 }
 
+// GroupRef defines model for GroupRef.
+type GroupRef struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // GroupSummary defines model for GroupSummary.
 type GroupSummary struct {
 	// DefaultRepo Address of the group's main repository
@@ -961,7 +967,10 @@ type RepoDetail struct {
 
 	// Descriptor The repository's own scp.yaml. It changes display only.
 	Descriptor Descriptor `json:"descriptor"`
-	Repo       Repo       `json:"repo"`
+
+	// Group The first of its groups in configuration order, the page above it; null when it is in none
+	Group *GroupRef `json:"group"`
+	Repo  Repo      `json:"repo"`
 
 	// Title The descriptor title
 	Title string `json:"title"`

@@ -37,7 +37,11 @@ export function repoRoute(panels: Panel<Params>[]): Route<Params> {
       if (!data) return []
       const { owner: o, name: n } = data.repo
       const path = repoPath(o, n)
-      return [ld.page(base, path, data.title || `${o}/${n}`), ld.repo(base, path, data), ld.breadcrumbs(base, crumbs.repo(o, n))]
+      return [
+        ld.page(base, path, data.title || `${o}/${n}`),
+        ld.repo(base, path, data),
+        ld.breadcrumbs(base, crumbs.repo(o, n, data.group)),
+      ]
     },
     render: ({ params }) => (
       <RepoView owner={params.owner} name={params.name} main={column("main", params)} side={column("side", params)} />

@@ -34,7 +34,11 @@ export const docRoute: Route<Params> = {
     const { owner: o, name: n } = repo.repo
     const page = docPath(o, n, doc.path)
     const title = doc.title || doc.path
-    return [ld.page(base, page, title), ld.doc(base, page, o, n, doc), ld.breadcrumbs(base, crumbs.doc(o, n, doc.path, title))]
+    return [
+      ld.page(base, page, title),
+      ld.doc(base, page, o, n, doc),
+      ld.breadcrumbs(base, crumbs.doc(o, n, repo.group, doc.path, title)),
+    ]
   },
   render: ({ params: { owner, name, path } }) => <DocView owner={owner} name={name} path={path.join("/")} />,
 }

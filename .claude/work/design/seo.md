@@ -17,7 +17,8 @@ for a private viewer; a 404 status for unknown pages; `/llms.txt`, `/llms-full.t
    as an SPDX URL, `dateModified` from the newest commit, `version` from the latest release, `keywords` from its topics, `author` the
    owning GitHub account as an `Organization`); a group's `mainEntity` an `ItemList` of its repositories; a document `TechArticle`
    part of its repository's code; every page but the dashboard a `BreadcrumbList` from `lib/crumbs.ts`, the trail the page header
-   shows (`shared/breadcrumbs.tsx`).
+   shows (`shared/breadcrumbs.tsx`): the pages above it, never the way the reader came. A repository sits under the first of its
+   groups in configuration order (`RepoDetail.group`), under the dashboard when it is in none; its commits and documents under it.
 3. Sitemap (built, Go's `llms`): the dashboard, the commit log, groups, repositories and their documents (not the README, which is
    the repository's page, nor hidden ones) for the viewer's view; `lastmod` a repository's newest commit, a group's newest member
    commit, a document's repository's (per-file history is not read), the dashboard's and commit log's the newest of all; an index of

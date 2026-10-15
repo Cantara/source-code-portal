@@ -390,12 +390,18 @@ export interface components {
     }
     RepoDetail: {
       repo: components["schemas"]["Repo"]
+      /** @description The first of its groups in configuration order, the page above it; null when it is in none */
+      group: components["schemas"]["GroupRef"] | null
       /** @description The descriptor title */
       title: string
       descriptor: components["schemas"]["Descriptor"]
       /** @description The latest default-branch commits */
       commits: components["schemas"]["Commit"][]
       commitsFreshness: components["schemas"]["Freshness"]
+    }
+    GroupRef: {
+      id: string
+      name: string
     }
     /** @description The repository's own scp.yaml. It changes display only. */
     Descriptor: {

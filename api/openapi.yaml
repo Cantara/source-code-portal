@@ -382,13 +382,22 @@ components:
         publishedAt: { type: string, format: date-time }
     RepoDetail:
       type: object
-      required: [repo, title, descriptor, commits, commitsFreshness]
+      required: [repo, title, group, descriptor, commits, commitsFreshness]
       properties:
         repo: { $ref: "#/components/schemas/Repo" }
+        group:
+          oneOf: [{ $ref: "#/components/schemas/GroupRef" }, { type: "null" }]
+          description: The first of its groups in configuration order, the page above it; null when it is in none
         title: { type: string, description: The descriptor title, else the repository name }
         descriptor: { $ref: "#/components/schemas/Descriptor" }
         commits: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: The latest default-branch commits }
         commitsFreshness: { $ref: "#/components/schemas/Freshness" }
+    GroupRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
     Descriptor:
       type: object
       description: The repository's own scp.yaml. It changes display only.

@@ -34,7 +34,7 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
       <PageHeader
         title={data?.title || `${owner}/${name}`}
         meta={repo && <FreshnessBadge freshness={repo.freshness} />}
-        trail={crumbs.repo(repo?.owner ?? owner, repo?.name ?? name)}
+        trail={crumbs.repo(repo?.owner ?? owner, repo?.name ?? name, data?.group)}
       >
         {repo && (
           <>
