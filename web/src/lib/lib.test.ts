@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs"
 import { HttpResponse, http as raw } from "msw"
+import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { http, server } from "@/test/server"
 import { api, ProblemError, unwrap } from "./api/client"
 import { relative } from "./format"
 import { retryDelay } from "./query"
-import { isDark, stored, themeKey } from "./theme"
+import { apply, isDark, stored, themeKey, useTheme } from "./theme"
 
 describe("unwrap", () => {
   it("returns the data of a success", async () => {
@@ -80,6 +81,40 @@ describe("theme", () => {
         )
       }
     }
+  })
+
+  it("follows the system preference while system is chosen", () => {
+    let systemDark = false
+    const changed = new Set<() => void>()
+    window.matchMedia = ((q: string) => ({
+      get matches() {
+        return systemDark
+      },
+      media: q,
+      addEventListener: (_: string, l: () => void) => changed.add(l),
+      removeEventListener: (_: string, l: () => void) => changed.delete(l),
+    })) as unknown as typeof window.matchMedia
+    const os = (dark: boolean) => {
+      systemDark = dark
+      for (const l of changed) l()
+    }
+    const dark = () => document.documentElement.classList.contains("dark")
+    const { unmount } = renderHook(() => useTheme())
+    act(() => apply("system"))
+    os(true)
+    expect(dark()).toBe(true)
+    os(false)
+    expect(dark()).toBe(false)
+    act(() => apply("dark"))
+    os(false)
+    expect(dark()).toBe(true)
+    act(() => apply("light"))
+    os(true)
+    expect(dark()).toBe(false)
+    act(() => apply("system"))
+    expect(dark()).toBe(true)
+    unmount()
+    expect(changed.size).toBe(0)
   })
 
   it("falls back to system when storage throws", () => {

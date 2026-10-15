@@ -92,6 +92,27 @@ test("a stored dark theme paints dark from the first frame", async ({ page }) =>
   ])
 })
 
+test("the theme menu switches light and dark, and system follows the system preference as it changes", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" })
+  await page.goto("/")
+  const html = page.locator("html")
+  const theme = page.getByRole("combobox", { name: "Theme" })
+  await expect(theme).toHaveValue("system")
+  await expect(html).not.toHaveClass(/dark/)
+  await page.emulateMedia({ colorScheme: "dark" })
+  await expect(html).toHaveClass(/dark/)
+  await theme.selectOption("light")
+  await expect(html).not.toHaveClass(/dark/)
+  await expect(html).toHaveCSS("color-scheme", "light")
+  await theme.selectOption("dark")
+  await page.emulateMedia({ colorScheme: "light" })
+  await expect(html).toHaveClass(/dark/)
+  await theme.selectOption("system")
+  await expect(html).not.toHaveClass(/dark/)
+  await page.reload()
+  await expect(theme).toHaveValue("system")
+})
+
 test("static files are immutable and compressed; pages are not stored", async ({ page, request }) => {
   const res = await page.goto("/")
   expect(res?.headers()["cache-control"]).toContain("no-store")

@@ -27,8 +27,9 @@ function safeStorage(): Storage | undefined {
 }
 
 const listeners = new Set<() => void>()
+const systemQuery = "(prefers-color-scheme: dark)"
 
-/** apply stores the choice and sets the dark class and colour scheme on the document. */
+/** apply stores the choice and paints it. */
 export function apply(choice: Choice) {
   try {
     if (choice === "system") window.localStorage.removeItem(themeKey)
@@ -36,20 +37,31 @@ export function apply(choice: Choice) {
   } catch {
     // storage blocked: the choice lasts for this page only
   }
-  const dark = isDark(choice, window.matchMedia("(prefers-color-scheme: dark)").matches)
+  current = choice
+  paint()
+  for (const l of listeners) l()
+}
+
+/** paint sets the dark class and colour scheme on the document from the current choice and the system preference. */
+function paint() {
+  const dark = isDark(current ?? stored(), window.matchMedia(systemQuery).matches)
   document.documentElement.classList.toggle("dark", dark)
   document.documentElement.style.colorScheme = dark ? "dark" : "light"
-  current = choice
-  for (const l of listeners) l()
 }
 
 let current: Choice | undefined
 
+/** useTheme is the current choice; while it is mounted, the system choice follows the system preference as it changes. */
 export function useTheme(): Choice {
   return useSyncExternalStore(
     (l) => {
       listeners.add(l)
-      return () => listeners.delete(l)
+      const media = window.matchMedia(systemQuery)
+      media.addEventListener("change", paint)
+      return () => {
+        listeners.delete(l)
+        media.removeEventListener("change", paint)
+      }
     },
     () => (current ??= stored()),
     () => "system",
