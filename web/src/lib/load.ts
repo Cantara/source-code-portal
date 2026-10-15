@@ -58,7 +58,7 @@ export type Here = (owner: string, name: string) => string
 /**
  * loadRepo loads the repository of a page: unknown is the not-found page, and a renamed or transferred repository (the API followed
  * the alias) answers 308 to the same page at its current address. Addresses are case-insensitive, as on GitHub: another casing
- * renders, and the page's canonical names the repository's own.
+ * renders, and the page's canonical is the lower-case address.
  */
 export async function loadRepo(api: Api, qc: QueryClient, owner: string, name: string, here: Here = repoPath) {
   const data = await load(qc, repoQuery(api, owner, name))

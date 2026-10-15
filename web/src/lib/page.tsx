@@ -4,8 +4,9 @@ import type { Metadata } from "next"
 import { cookies } from "next/headers"
 import type { ReactNode } from "react"
 import type { Api } from "./api/client"
-import { serverApi } from "./api/server"
+import { origin, serverApi } from "./api/server"
 import { serverQueryClient, state } from "./load"
+import { JsonLd, ld, type Thing } from "./seo"
 
 /** Search is a page's query string as Next.js passes it. */
 export type Search = Record<string, string | string[] | undefined>
@@ -28,6 +29,8 @@ export interface Route<P> {
   load: (ctx: Ctx<P>) => Promise<unknown>
   metadata: (ctx: Ctx<P>) => Promise<Metadata> | Metadata
   render: (ctx: Ctx<P>) => ReactNode
+  /** structured is the page's JSON-LD nodes, beside the site's, with URLs under base; a page without it has the site's only */
+  structured?: (ctx: Ctx<P>, base: string) => Promise<Thing[]> | Thing[]
 }
 
 /** Panel is a block one feature contributes to another feature's page, composed in app/. */
@@ -52,7 +55,14 @@ export function page<P>(route: Route<P>) {
     async Page(props: Props<P>) {
       const ctx = await context(props)
       await route.load(ctx)
-      return <HydrationBoundary state={state(ctx.qc)}>{route.render(ctx)}</HydrationBoundary>
+      const base = await origin()
+      const graph = [ld.website(base), ...((await route.structured?.(ctx, base)) ?? [])]
+      return (
+        <>
+          <JsonLd graph={graph} />
+          <HydrationBoundary state={state(ctx.qc)}>{route.render(ctx)}</HydrationBoundary>
+        </>
+      )
     },
     async generateMetadata(props: Props<P>): Promise<Metadata> {
       return route.metadata(await context(props))

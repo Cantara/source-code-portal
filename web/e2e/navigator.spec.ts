@@ -148,7 +148,7 @@ test("the navigator pages by number, remembers the page size and moves by keyboa
 test("a product's timeline lists its repositories and its commits by day", async ({ page }) => {
   await page.goto("/commits?group=whydah")
   const repos = page.getByRole("region", { name: "Repositories of Whydah" })
-  await expect(repos.getByRole("link", { name: /Whydah-Core/ })).toHaveAttribute("href", "/repos/acme/Whydah-Core/commits")
+  await expect(repos.getByRole("link", { name: /Whydah-Core/ })).toHaveAttribute("href", "/repos/acme/whydah-core/commits")
   await expect(page.getByRole("heading", { level: 2 }).first()).toHaveText(/^\w+day, \w+ \d+, \d{4}$/)
   await expect(page.getByText("Change 30 of repository 2")).toHaveCount(0) // tool is not in the product
   await expect(page.locator("main svg circle")).toHaveCount(0) // no graph across repositories

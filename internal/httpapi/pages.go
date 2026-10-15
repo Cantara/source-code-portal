@@ -58,7 +58,7 @@ func (o Options) Pages(upstream *url.URL) http.Handler {
 			h.Set(headerName, url.PathEscape(v.Name))
 			h.Set(headerVia, v.Via)
 			h.Del("Authorization") // the web UI server needs only the viewer
-			h.Set(headerOrigin, o.origin(pr.In))
+			h.Set(headerOrigin, o.Origin(pr.In))
 		},
 		Transport: transport,
 		ModifyResponse: func(res *http.Response) error {
@@ -129,9 +129,9 @@ func newNonce() string {
 	return base64.StdEncoding.EncodeToString(b[:])
 }
 
-// origin is the portal's public origin: server.public_url, else the scheme and host the request arrived with (the scheme from a
+// Origin is the portal's public origin: server.public_url, else the scheme and host the request arrived with (the scheme from a
 // trusted proxy's X-Forwarded-Proto).
-func (o Options) origin(r *http.Request) string {
+func (o Options) Origin(r *http.Request) string {
 	if o.PublicURL != "" {
 		if u, err := url.Parse(o.PublicURL); err == nil {
 			return u.Scheme + "://" + u.Host

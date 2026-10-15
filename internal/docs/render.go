@@ -35,7 +35,7 @@ import (
 
 // pipelineVersion is part of every stored document; a different value renders the stored source again. Bump it whenever the output
 // for the same input changes (TestPipelineLock).
-const pipelineVersion = 2
+const pipelineVersion = 3
 
 const (
 	maxDocBytes      = 512 << 10 // rendered; the rest is cut at a line boundary
@@ -488,7 +488,7 @@ func (l links) link(href string) (string, bool) {
 		if frag != "" {
 			frag = "#doc-" + strings.TrimPrefix(u.Fragment, "doc-")
 		}
-		return "/repos/" + string(l.repo) + "/docs/" + escapePath(page(p)) + frag, false
+		return snapshot.DocPage(l.repo, p) + frag, false
 	}
 	kind := "blob"
 	if dir {
@@ -557,8 +557,5 @@ func (l links) resolve(p string) (string, bool, bool) {
 	}
 	return strings.TrimPrefix(clean, "/"), dir, true
 }
-
-// page is the portal page of an indexed document: its path without the extension; the path with .md is its raw Markdown.
-func page(p string) string { return strings.TrimSuffix(p, path.Ext(p)) }
 
 func escapePath(p string) string { return (&url.URL{Path: p}).EscapedPath() }

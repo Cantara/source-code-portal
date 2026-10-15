@@ -1,7 +1,6 @@
 "use client"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
 import { Alert } from "@/components/ui/alert"
@@ -11,9 +10,9 @@ import { repoQuery } from "@/lib/api/queries"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { count, exactUTC } from "@/lib/format"
 import { firstPageOf, rememberSize } from "@/lib/paging"
-import { repoPath } from "@/lib/paths"
 import { GraphCell, maxLanes } from "@/entities/commit/graph-cell"
 import { FreshnessBadge } from "@/shared/freshness-badge"
+import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
 import { Pager, PageSizeField } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -37,11 +36,10 @@ export function NavigatorView({ owner, name, defaultSize }: { owner: string; nam
   const repo = useQuery(repoQuery(api, owner, name)).data?.repo
   return (
     <>
-      <PageHeader title={`Commits in ${repo ? `${repo.owner}/${repo.name}` : `${owner}/${name}`}`}>
-        <Link href={repoPath(owner, name)} className="text-sm hover:underline">
-          Back to the repository
-        </Link>
-      </PageHeader>
+      <PageHeader
+        title={`Commits in ${repo ? `${repo.owner}/${repo.name}` : `${owner}/${name}`}`}
+        trail={crumbs.repoCommits(repo?.owner ?? owner, repo?.name ?? name)}
+      />
       <Navigator
         key={search({ filter: st.filter, size: defaultSize }, defaultSize)}
         owner={owner}

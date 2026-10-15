@@ -11,6 +11,7 @@ import { groupCommitsPath, repoPath } from "@/lib/paths"
 import { CommitList } from "@/entities/commit/commit-list"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
+import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -71,7 +72,7 @@ export function GroupView({ group }: { group: string }) {
 
   return (
     <>
-      <PageHeader title={data?.name ?? group}>
+      <PageHeader title={data?.name ?? group} trail={crumbs.group(data?.id ?? group, data?.name ?? group)}>
         {data?.description && <p className="text-muted-foreground">{data.description}</p>}
       </PageHeader>
       {error && !data && <ProblemAlert error={error} />}

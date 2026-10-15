@@ -15,6 +15,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/llm"
+	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
 // The handlers the assistant's tools read through: the contract's methods and the llms Markdown pages, called in process with the
@@ -131,7 +132,7 @@ func day(t *time.Time) string {
 }
 
 func repoLine(b *strings.Builder, p oapi.Repo) {
-	fmt.Fprintf(b, "- [%s/%s](/repos/%s)", p.Owner, p.Name, p.Address)
+	fmt.Fprintf(b, "- [%s/%s](%s)", p.Owner, p.Name, snapshot.RepoPage(snapshot.RepoKey(p.Address)))
 	if p.Description != "" {
 		b.WriteString(": " + p.Description)
 	}
@@ -198,7 +199,7 @@ func (r assistantReads) listGroups(ctx context.Context, _ map[string]any) (strin
 	ok, _ := res.(oapi.ListGroups200JSONResponse)
 	var b strings.Builder
 	for _, g := range ok.Body.Groups {
-		fmt.Fprintf(&b, "- [%s](/groups/%s), id %s, %d repositories", g.Name, g.Id, g.Id, g.RepoCount)
+		fmt.Fprintf(&b, "- [%s](%s), id %s, %d repositories", g.Name, snapshot.GroupPage(g.Id), g.Id, g.RepoCount)
 		if g.Description != "" {
 			b.WriteString(": " + g.Description)
 		}
@@ -227,11 +228,11 @@ func page(ctx context.Context, h http.Handler, target string, values map[string]
 
 func (r assistantReads) getGroup(ctx context.Context, in map[string]any) (string, string, error) {
 	g := arg(in, "group")
-	text, err := page(ctx, r.group, "/groups/"+g, map[string]string{"group": g})
+	text, err := page(ctx, r.group, snapshot.GroupPage(g), map[string]string{"group": g})
 	if err != nil {
 		return "", "", fmt.Errorf("the group %q is %w; list_groups names them", g, err)
 	}
-	return "/groups/" + g, text, nil
+	return snapshot.GroupPage(g), text, nil
 }
 
 // resolve finds a repository the viewer may see, following a rename.
@@ -260,11 +261,11 @@ func (r assistantReads) getRepository(ctx context.Context, in map[string]any) (s
 		return "", "", err
 	}
 	owner, name, _ := strings.Cut(d.Repo.Address, "/")
-	text, err := page(ctx, r.repo, "/repos/"+d.Repo.Address, map[string]string{"owner": owner, "name": name})
+	text, err := page(ctx, r.repo, "/", map[string]string{"owner": owner, "name": name})
 	if err != nil {
 		return "", "", err
 	}
-	return "/repos/" + d.Repo.Address, text, nil
+	return snapshot.RepoPage(snapshot.RepoKey(d.Repo.Address)), text, nil
 }
 
 func (r assistantReads) getDocument(ctx context.Context, in map[string]any) (string, string, error) {
@@ -274,12 +275,11 @@ func (r assistantReads) getDocument(ctx context.Context, in map[string]any) (str
 	}
 	owner, name, _ := strings.Cut(d.Repo.Address, "/")
 	p := strings.TrimPrefix(arg(in, "path"), "/")
-	target := "/repos/" + d.Repo.Address + "/docs/" + p
-	text, err := page(ctx, r.doc, target, map[string]string{"owner": owner, "name": name, "path": p})
+	text, err := page(ctx, r.doc, "/", map[string]string{"owner": owner, "name": name, "path": p})
 	if err != nil {
 		return "", "", fmt.Errorf("the document %s of %s is %w", p, d.Repo.Address, err)
 	}
-	return target, text, nil
+	return snapshot.DocPage(snapshot.RepoKey(d.Repo.Address), p), text, nil
 }
 
 func (r assistantReads) recentCommits(ctx context.Context, in map[string]any) (string, string, error) {
@@ -301,7 +301,8 @@ func (r assistantReads) recentCommits(ctx context.Context, in map[string]any) (s
 	}
 	var b strings.Builder
 	for _, c := range ok.Body.Commits {
-		fmt.Fprintf(&b, "- %s %s [%s](/repos/%s) %s: %s\n", c.CommittedAt.UTC().Format("2006-01-02 15:04"), c.Sha[:min(7, len(c.Sha))], c.Repo, c.Repo, c.AuthorName, c.Subject)
+		fmt.Fprintf(&b, "- %s %s [%s](%s) %s: %s\n", c.CommittedAt.UTC().Format("2006-01-02 15:04"), c.Sha[:min(7, len(c.Sha))], c.Repo,
+			snapshot.RepoPage(snapshot.RepoKey(c.Repo)), c.AuthorName, c.Subject)
 	}
 	if b.Len() == 0 {
 		return "/commits", "No commits.", nil
@@ -330,7 +331,7 @@ func (r assistantReads) health(ctx context.Context, in map[string]any) (string, 
 		fmt.Fprintf(&b, "Latest release %s.\n", p.Release.Tag)
 	}
 	fmt.Fprintf(&b, "Open issues and pull requests: %d. License: %s.\n", p.OpenIssues, orUnknown(p.License))
-	return "/repos/" + p.Address, b.String(), nil
+	return snapshot.RepoPage(snapshot.RepoKey(p.Address)), b.String(), nil
 }
 
 func orUnknown(s string) string {

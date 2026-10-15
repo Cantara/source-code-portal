@@ -30,7 +30,7 @@ test("a token signs in a person without the provider; a wrong one is explained",
   await page.goto("/signin?return_to=/groups/other")
   await page.getByLabel("Token").fill("not-a-token")
   await page.getByRole("button", { name: "Sign in with the token" }).click()
-  await expect(page.getByRole("alert")).toHaveText("That token is not valid.")
+  await expect(page.getByRole("alert").filter({ hasText: "That token" })).toHaveText("That token is not valid.")
   await page.goto("/signin?return_to=/groups/other")
   await page.getByLabel("Token").fill(token)
   await page.getByRole("button", { name: "Sign in with the token" }).click()

@@ -7,6 +7,8 @@ import { commitLogQuery, defaultLogSize, logState } from "./api"
 import { defaultHistorySize, historyQuery, historyState, request } from "./history"
 import { NavigatorView } from "./navigator"
 import { AllCommitsView, GroupCommitsView } from "./view"
+import { crumbs } from "@/lib/crumbs"
+import { ld } from "@/lib/seo"
 
 /** logSize and historySize are the reader's page sizes: the one they chose last, else the default. */
 const logSize = (ctx: Ctx<unknown>) => pageSize(ctx.cookies[sizeCookie("commits")], defaultLogSize)
@@ -24,6 +26,7 @@ export const allCommitsRoute: Route<object> = {
     description: "The latest commits across the repositories of the organisation.",
     alternates: { canonical: "/commits" },
   }),
+  structured: (_, base) => [ld.page(base, "/commits", "Commits"), ld.breadcrumbs(base, crumbs.commits())],
   render: (ctx) => <AllCommitsView defaultSize={logSize(ctx)} />,
 }
 
@@ -45,6 +48,14 @@ export const groupCommitsRoute: Route<{ group: string }> = {
       description: `The latest commits in the repositories of the group ${named}.`,
       alternates: { canonical: groupCommitsPath(g?.id ?? group) },
     }
+  },
+  async structured({ api, qc, params: { group } }, base) {
+    const g = await peek(qc, groupQuery(api, group))
+    if (!g) return []
+    return [
+      ld.page(base, groupCommitsPath(g.id), `Commits in ${g.name}`),
+      ld.breadcrumbs(base, crumbs.groupCommits(g.id, g.name)),
+    ]
   },
   render: (ctx) => <GroupCommitsView group={ctx.params.group} defaultSize={logSize(ctx)} />,
 }
@@ -75,6 +86,14 @@ export const repoCommitsRoute: Route<RepoParams> = {
       description: `The history of ${o}/${n} as a git graph: its branches, tags and commits.`,
       alternates: { canonical: repoCommitsPath(o, n) },
     }
+  },
+  async structured({ api, qc, params: { owner, name } }, base) {
+    const r = (await peek(qc, repoQuery(api, owner, name)))?.repo
+    if (!r) return []
+    return [
+      ld.page(base, repoCommitsPath(r.owner, r.name), `Commits in ${r.owner}/${r.name}`),
+      ld.breadcrumbs(base, crumbs.repoCommits(r.owner, r.name)),
+    ]
   },
   render: (ctx) => <NavigatorView owner={ctx.params.owner} name={ctx.params.name} defaultSize={historySize(ctx)} />,
 }

@@ -11,6 +11,7 @@ import { withoutLeadingH1 } from "@/lib/docs"
 import { docPath } from "@/lib/paths"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
+import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -30,7 +31,11 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
   const repo = data?.repo
   return (
     <>
-      <PageHeader title={data?.title || `${owner}/${name}`} meta={repo && <FreshnessBadge freshness={repo.freshness} />}>
+      <PageHeader
+        title={data?.title || `${owner}/${name}`}
+        meta={repo && <FreshnessBadge freshness={repo.freshness} />}
+        trail={crumbs.repo(repo?.owner ?? owner, repo?.name ?? name)}
+      >
         {repo && (
           <>
             {(data.descriptor.description || repo.description) && (

@@ -72,11 +72,11 @@ func TestPages(t *testing.T) {
 	r = httptest.NewRequest(http.MethodGet, "http://portal.local/", nil)
 	r.RemoteAddr = "10.0.0.1:1"
 	r.Header.Set("X-Forwarded-Proto", "https")
-	if got := o.origin(r); got != "https://portal.local" {
+	if got := o.Origin(r); got != "https://portal.local" {
 		t.Errorf("origin behind a proxy: %q", got)
 	}
 	r.RemoteAddr = "203.0.113.9:1"
-	if got := o.origin(r); got != "http://portal.local" {
+	if got := o.Origin(r); got != "http://portal.local" {
 		t.Errorf("origin from an untrusted peer: %q", got)
 	}
 

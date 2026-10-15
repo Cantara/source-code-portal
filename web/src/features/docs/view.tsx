@@ -6,24 +6,27 @@ import { Alert } from "@/components/ui/alert"
 import { api } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { docAddress, withoutLeadingH1 } from "@/lib/docs"
-import { docPath, repoPath } from "@/lib/paths"
+import { docPath } from "@/lib/paths"
 import { FreshnessBadge } from "@/shared/freshness-badge"
+import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { SafeHtml } from "@/shared/safe-html"
-import { docListQuery, docQuery } from "@/lib/api/queries"
+import { docListQuery, docQuery, repoQuery } from "@/lib/api/queries"
 
 /** DocView is one document of a repository with the repository's document list and the document's outline. */
 export function DocView({ owner, name, path }: { owner: string; name: string; path: string }) {
   const { data, error } = useQuery(docQuery(api, owner, name, path))
+  const repo = useQuery(repoQuery(api, owner, name)).data?.repo
   return (
     <>
-      <PageHeader title={data?.title || path} meta={data && <FreshnessBadge freshness={data.freshness} />}>
+      <PageHeader
+        title={data?.title || path}
+        meta={data && <FreshnessBadge freshness={data.freshness} />}
+        trail={crumbs.doc(repo?.owner ?? owner, repo?.name ?? name, data?.path ?? path, data?.title || path)}
+      >
         <p className="flex flex-wrap gap-x-3 text-sm">
-          <Link href={repoPath(owner, name)} className="hover:underline">
-            {owner}/{name}
-          </Link>
           {data && (
             <a href={data.sourceUrl} className="hover:underline" rel="noreferrer">
               {data.path} on GitHub

@@ -1,0 +1,21 @@
+{
+  "repos": [
+    { "owner": "acme", "name": "Whydah-Core", "path": "/repos/acme/whydah-core" },
+    { "owner": "Cantara", "name": "source-code-portal", "path": "/repos/cantara/source-code-portal" },
+    { "owner": "acme", "name": "dot.repo_1", "path": "/repos/acme/dot.repo_1" }
+  ],
+  "groups": [{ "id": "whydah", "path": "/groups/whydah" }],
+  "docs": [
+    { "owner": "acme", "name": "Core", "doc": "docs/setup.md", "path": "/repos/acme/core/docs/docs/setup" },
+    { "owner": "acme", "name": "core", "doc": "docs/v1.2/notes", "path": "/repos/acme/core/docs/docs/v1.2/notes" },
+    {
+      "owner": "acme",
+      "name": "core",
+      "doc": "docs/a b/C++ & co.markdown",
+      "path": "/repos/acme/core/docs/docs/a%20b/C%2B%2B%20%26%20co"
+    },
+    { "owner": "acme", "name": "core", "doc": "docs/(draft)/x!~*'.txt", "path": "/repos/acme/core/docs/docs/(draft)/x!~*'" },
+    { "owner": "acme", "name": "core", "doc": "docs/ærlig/π.md", "path": "/repos/acme/core/docs/docs/%C3%A6rlig/%CF%80" },
+    { "owner": "acme", "name": "core", "doc": "docs/v2./README", "path": "/repos/acme/core/docs/docs/v2./README" }
+  ]
+}

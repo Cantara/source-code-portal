@@ -9,10 +9,11 @@ import { api, type Commit, type Repo } from "@/lib/api/client"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { dayUTC } from "@/lib/format"
 import { firstPageOf, rememberSize } from "@/lib/paging"
-import { groupPath, repoAt, repoCommitsPath } from "@/lib/paths"
+import { repoAt, repoCommitsPath } from "@/lib/paths"
 import { RelativeTime } from "@/shared/relative-time"
 import { CommitList } from "@/entities/commit/commit-list"
 import { FreshnessBadge } from "@/shared/freshness-badge"
+import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
 import { Pager, PageSizeField } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -27,7 +28,7 @@ export function AllCommitsView({ defaultSize }: { defaultSize: number }) {
   const st = logState(Object.fromEntries(useSearchParams()), defaultSize)
   return (
     <>
-      <PageHeader title="Commits">
+      <PageHeader title="Commits" trail={crumbs.commits()}>
         <FilterForm key={logSearch({ ...st, page: 1 }, defaultSize)} st={st} defaultSize={defaultSize} />
       </PageHeader>
       {st.filter.group && <ProductRepos group={st.filter.group} />}
@@ -70,11 +71,10 @@ export function GroupCommitsView({ group, defaultSize }: { group: string; defaul
   const st: LogState = { filter: { group }, page: search.page, size: search.size }
   return (
     <>
-      <PageHeader title={`Commits in ${data?.name ?? group}`}>
-        <Link href={groupPath(group)} className="text-sm hover:underline">
-          Back to the group
-        </Link>
-      </PageHeader>
+      <PageHeader
+        title={`Commits in ${data?.name ?? group}`}
+        trail={crumbs.groupCommits(data?.id ?? group, data?.name ?? group)}
+      />
       <CommitLog st={st} defaultSize={defaultSize} sizeField />
     </>
   )

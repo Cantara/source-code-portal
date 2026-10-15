@@ -191,7 +191,13 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		st.cluster = s.member
 	}
 
-	md := llms.New(view, cfg.Server.PublicURL, llmsOptions())
+	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
+	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
+		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
+		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
+			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
+		Observe: m.request}
+	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin))
 	external := d.images
 	if external == nil {
 		external = docs.Guarded()
@@ -200,6 +206,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth})},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
+		{Pattern: "GET /sitemap.xml", Handler: md.Sitemap()}, {Pattern: "GET /sitemaps/{file}", Handler: md.Sitemap()},
+		{Pattern: "GET /robots.txt", Handler: md.Robots()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
 		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
@@ -213,12 +221,6 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
 	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
-	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
-	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
-		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
-		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
-			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
-		Observe: m.request}
 	me := httpapi.MeAPI{}
 	if cfg.Auth.SignIn() || len(cfg.Auth.Tokens) > 0 {
 		a, err := newAuth(cfg, log)
@@ -301,13 +303,14 @@ func newAuth(cfg config.Config, log *slog.Logger) (*auth.Auth, error) {
 
 // llmsOptions is what the Markdown surface shows of the other features: documents, the descriptor, the manifests' summary and the
 // commits' freshness.
-func llmsOptions() llms.Options {
+func llmsOptions(origin func(*http.Request) string) llms.Options {
 	return llms.Options{
 		Docs: func(e *snapshot.RepoEntry) ([]llms.Doc, snapshot.Freshness) {
 			ds, fresh := docs.Of(e)
 			out := make([]llms.Doc, 0, len(ds))
 			for _, d := range ds {
-				out = append(out, llms.Doc{Path: d.Path, BlobSHA: d.BlobSHA, README: d.README, Truncated: d.Truncated, Source: d.Source})
+				out = append(out, llms.Doc{Path: d.Path, BlobSHA: d.BlobSHA, README: d.README, Truncated: d.Truncated, Hidden: d.Hidden,
+					Source: d.Source})
 			}
 			return out, fresh
 		},
@@ -325,7 +328,9 @@ func llmsOptions() llms.Options {
 			}
 			return t
 		},
-		Freshness: func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
+		Freshness:  func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
+		LastCommit: func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
+		Origin:     origin,
 	}
 }
 

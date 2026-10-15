@@ -130,7 +130,7 @@ func TestRenderBounds(t *testing.T) {
 }
 
 // lockDigest pins the pipeline output for renderCorpus. When it changes, bump pipelineVersion and set the new digest.
-const lockDigest = "991c22c08966b22161b229208a17131c89fa0451dfcd1fe6f82a62fd67e28e5a"
+const lockDigest = "1b9302ec844abbeac77ee3704a587569cde980a0f4410e70a27624349e7f0eb6"
 
 func TestPipelineLock(t *testing.T) {
 	r := &pipeline{policy: safehtml.New()}
