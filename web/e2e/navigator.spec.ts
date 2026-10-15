@@ -109,6 +109,7 @@ test("the navigator pages by number, remembers the page size and moves by keyboa
 
   // By keyboard: on the last row, j goes to the next page and selects its first row; k comes back.
   await rows.last().click()
+  await expect(rows.last()).toHaveAttribute("aria-selected", "true")
   await page.keyboard.press("j")
   await expect(pager.locator("[aria-current=page]")).toHaveText("4")
   await expect(rows.first()).toHaveAttribute("aria-selected", "true")
