@@ -4,6 +4,12 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## Unreleased
+
+- `GET /knowledge.yaml` and `GET /.well-known/kcp.json`: the catalogue as a Knowledge Context Protocol manifest, so an agent that
+  knows only the portal's address finds a map of groups, repositories and documents with intents and reading order. `GET
+  /groups/{group}.md` answers like the other `.md` addresses.
+
 ## 2.0.0
 
 The first release of the Go rewrite (2.0.0 follows the Java product's 1.x line): one static binary and container image serving an

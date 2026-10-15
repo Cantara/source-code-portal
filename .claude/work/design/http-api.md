@@ -52,6 +52,8 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/badges/groups/{group}/{file}` | badges | `repos.svg` (repository count), `health.svg`, `last-commit.svg`, `release.svg` |
 | P | GET | `/llms.txt` | llms | llmstxt.org index (Behaviour 5) |
 | P | GET | `/llms-full.txt` | llms | all READMEs, delimited, capped |
+| P | GET | `/knowledge.yaml` | llms | the catalogue as a KCP manifest (hub): front door, groups, READMEs, documents; `depends_on` from the manifests' internal dependencies |
+| P | GET | `/.well-known/kcp.json` | llms | KCP discovery document naming `/knowledge.yaml` |
 | P | POST | `/webhooks/github` | webhook | GitHub deliveries (registered when `webhook.secret_file` is set) |
 | A | GET | `/livez` | httpapi | process alive (dispatcher heartbeat) |
 | A | GET | `/readyz` | httpapi | 200 once a snapshot with a catalogue is published and the web UI server answers; 503 before and during shutdown |

@@ -71,8 +71,8 @@ type LLMs struct {
 
 // files are /llms.txt and /llms-full.txt of one view of a snapshot.
 type files struct {
-	view        *snapshot.Snapshot
-	index, full []byte
+	view                   *snapshot.Snapshot
+	index, full, knowledge []byte
 }
 
 // New serves from current with links under base (server.public_url, may be empty).
@@ -200,7 +200,7 @@ func (l *LLMs) Doc() http.Handler {
 func (l *LLMs) Group() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s := l.current(r.Context())
-		g, ok := s.Group(r.PathValue("group"))
+		g, ok := s.Group(strings.TrimSuffix(r.PathValue("group"), ".md"))
 		if !ok {
 			notFound(w)
 			return
@@ -241,6 +241,12 @@ func (l *LLMs) repo(w http.ResponseWriter, r *http.Request) (*snapshot.RepoEntry
 
 // files returns /llms.txt and /llms-full.txt for the viewer's view, building them once per view of a snapshot.
 func (l *LLMs) files(ctx context.Context) (index, full []byte) {
+	f := l.filesFor(ctx)
+	return f.index, f.full
+}
+
+// filesFor is files with the KCP manifest too.
+func (l *LLMs) filesFor(ctx context.Context) files {
 	s := l.current(ctx)
 	slot := 0
 	if s != s.Public() {
@@ -249,9 +255,9 @@ func (l *LLMs) files(ctx context.Context) (index, full []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if f := l.built[slot]; f.view != s {
-		l.built[slot] = files{view: s, index: l.buildIndex(s), full: l.buildFull(s)}
+		l.built[slot] = files{view: s, index: l.buildIndex(s), full: l.buildFull(s), knowledge: l.buildKCP(s)}
 	}
-	return l.built[slot].index, l.built[slot].full
+	return l.built[slot]
 }
 
 func (l *LLMs) url(p string) string { return l.base + p }
