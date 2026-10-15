@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -102,6 +103,62 @@ func TestAppMode(t *testing.T) {
 	var e *Error
 	if !errors.As(err, &e) || e.Code != "no_installation" || !e.Permanent() {
 		t.Errorf("uninstalled owner: err = %v, want no_installation", err)
+	}
+}
+
+func TestUserAccounts(t *testing.T) {
+	srv := githubtest.New(t)
+	for _, u := range []string{"me", "friend"} {
+		srv.AddUser(u)
+		srv.AddRepo(u, gh.Repository{Name: new(u + "-public"), Visibility: new("public")})
+		srv.AddRepo(u, gh.Repository{Name: new(u + "-private"), Visibility: new("private")})
+	}
+	srv.AddRepo("acme", gh.Repository{Name: new("org-repo")})
+	srv.AddUserToken("ghp_me", "me")
+	c, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"me", "friend", "acme"}, TokenFile: "x", Token: config.NewSecret([]byte("ghp_me")),
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := func(s *Source, owner string) []string {
+		t.Helper()
+		repos, err := s.ListRepos(t.Context(), owner)
+		if err != nil {
+			t.Fatalf("ListRepos(%s): %v", owner, err)
+		}
+		var out []string
+		for _, r := range repos {
+			out = append(out, r.Name)
+		}
+		slices.Sort(out)
+		return out
+	}
+	s := c.Source("gh")
+	if got := names(s, "me"); !slices.Equal(got, []string{"me-private", "me-public"}) {
+		t.Errorf("own account = %v, want its private and public repositories", got)
+	}
+	if got := names(s, "friend"); !slices.Equal(got, []string{"friend-public"}) {
+		t.Errorf("another user = %v, want the public repository", got)
+	}
+	if got := names(s, "acme"); !slices.Equal(got, []string{"org-repo"}) {
+		t.Errorf("organisation = %v", got)
+	}
+	names(s, "me")
+	if n := srv.Count("GET /users/me "); n != 1 {
+		t.Errorf("the account was looked up %d times, want once", n)
+	}
+
+	srv.Install("me")
+	app, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"me"},
+		App: &config.App{ID: srv.AppID, PrivateKey: config.NewSecret(srv.PrivateKeyPEM())},
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(app.Source("gh"), "me"); !slices.Equal(got, []string{"me-private", "me-public"}) {
+		t.Errorf("App user installation = %v, want the installation's repositories", got)
 	}
 }
 

@@ -32,7 +32,7 @@ type GitHub struct {
 type Source struct {
 	ID           string   `mapstructure:"id"`
 	BaseURL      string   `mapstructure:"base_url"` // REST base with a trailing slash; GHES: https://host/api/v3/
-	Orgs         []string `mapstructure:"orgs"`
+	Orgs         []string `mapstructure:"orgs"`     // organisations and user accounts
 	App          *App     `mapstructure:"app"`
 	TokenFile    string   `mapstructure:"token_file"`
 	IncludeForks bool     `mapstructure:"include_forks"`
@@ -228,14 +228,14 @@ func (g GitHub) validate() []string {
 			p = append(p, fmt.Sprintf("%s.base_url: %q must be an absolute http(s) URL ending in /", at, s.BaseURL))
 		}
 		if len(s.Orgs) == 0 {
-			p = append(p, at+".orgs: at least one organisation is required")
+			p = append(p, at+".orgs: at least one organisation or user account is required")
 		}
 		for _, o := range s.Orgs {
 			if !ownerPattern.MatchString(o) {
 				p = append(p, fmt.Sprintf("%s.orgs: %q is not a GitHub account name", at, o))
 			}
 			if prev, dup := owners[strings.ToLower(o)]; dup {
-				p = append(p, fmt.Sprintf("%s.orgs: %q is also in source %q; an organisation belongs to one source", at, o, prev))
+				p = append(p, fmt.Sprintf("%s.orgs: %q is also in source %q; an account belongs to one source", at, o, prev))
 			}
 			owners[strings.ToLower(o)] = s.ID
 		}

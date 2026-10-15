@@ -19,7 +19,7 @@ sync:
 github:
   sources:
     - id: github
-      orgs: [Cantara]
+      orgs: [Cantara] # organisations and user accounts
       # A GitHub App (preferred) or a token file; not both.
       app:
         id: 123456

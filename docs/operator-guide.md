@@ -1,7 +1,7 @@
 # Operator guide
 
 Source Code Portal (SCP) is one static binary, `scp`, and a web UI bundle it runs with Node.js. It reads the repositories of one or more GitHub
-organisations, keeps a local SQLite cache and serves the portal. One instance serves up to 1,000 repositories; several instances
+organisations and user accounts, keeps a local SQLite cache and serves the portal. One instance serves up to 1,000 repositories; several instances
 can serve one portal together through Hazelcast (section 3.1).
 
 - Public listener `:9090`: the web UI, the JSON API `/api/v1`, badges, `/llms.txt` and the GitHub webhook. Put it behind your proxy.
@@ -9,21 +9,23 @@ can serve one portal together through Hazelcast (section 3.1).
 
 ## 1. Connect GitHub
 
-SCP needs read access to the organisations' public repositories. Use a GitHub App (recommended: its own rate limit of up to 12,500
+SCP needs read access to the repositories of the organisations and user accounts it shows. Use a GitHub App (recommended: its own rate limit of up to 12,500
 requests an hour per installation) or a personal access token (5,000 an hour).
 
-**GitHub App.** Create an App in the organisation settings (Developer settings, GitHub Apps):
+**GitHub App.** Create an App in the organisation's settings, or for a user account in your own (Developer settings, GitHub Apps):
 1. Repository permissions: *Contents* read-only and *Metadata* read-only. Nothing else.
 2. Webhook: active, URL `https://<portal>/webhooks/github`, a random secret (for example `openssl rand -hex 32`), and subscribe to the
    events *Push*, *Release* and *Repository*. Installation events are sent to Apps without subscribing.
 3. Generate a private key (a `.pem` file) and note the App ID.
-4. Install the App on each organisation, on all repositories.
+4. Install the App on each organisation or user account, on all repositories (or the ones to show). An App that may be installed only on
+   its own account ("Only on this account") needs one App per account: give each its own source, with the same webhook URL and secret.
 
-**Token.** A fine-grained token with public repository read access, or a classic token without scopes, in a file. For updates within
-seconds, add an organisation webhook (Settings, Webhooks) with content type `application/json`, the same secret and the events *Pushes*,
+**Token.** A fine-grained token with public repository read access, or a classic token without scopes, in a file. Listed with a token, a
+user account shows its public repositories, or all of them, private ones included, when it is the token's own account (the token needs
+read access to them). For updates within seconds, add an organisation webhook (for a user account, a webhook on each repository) (Settings, Webhooks) with content type `application/json`, the same secret and the events *Pushes*,
 *Releases* and *Repositories*.
 
-Without a webhook the portal still refreshes: it lists every organisation every five minutes and notices pushes from that listing;
+Without a webhook the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
 commits, documents, descriptors and manifests are also re-read on their own schedule.
 
 ## 2. Configure
@@ -75,7 +77,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[]` | required | one entry per GitHub host and credential |
 | `github.sources[].id` | required | short id, `[a-z0-9-]` |
 | `github.sources[].base_url` | `https://api.github.com/` | REST base ending in `/`; GitHub Enterprise Server: `https://<host>/api/v3/` |
-| `github.sources[].orgs` | required | organisations read with this credential; an organisation belongs to one source |
+| `github.sources[].orgs` | required | organisations and user accounts read with this credential; an account belongs to one source |
 | `github.sources[].app.id` | | GitHub App ID |
 | `github.sources[].app.private_key_file` | | the App's private key (PEM) |
 | `github.sources[].app.installations` | all | account logins whose installations are used |
@@ -83,7 +85,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].include_forks` | `false` | list forks |
 | `github.sources[].include_archived` | `true` | list archived repositories |
 | `github.sources[].include_private` | `false` | list private and internal repositories too (section 2.1) |
-| `catalog.reconcile_interval` | `5m` | how often every organisation is listed (1m to 24h) |
+| `catalog.reconcile_interval` | `5m` | how often every account is listed (1m to 24h) |
 | `catalog.groups[]` | none | groups in dashboard order (at most 500) |
 | `catalog.groups[].id` | required | URL id, `[a-z0-9-]`, at most 63 characters |
 | `catalog.groups[].name` | required | display name, at most 120 characters |
@@ -117,10 +119,11 @@ Matchers (each has exactly one field) see the repository name, except `topic`:
 A repository can be in several groups. Repositories in no group are counted on the dashboard and listed by the API.
 
 Try the groups before you deploy them: `scp config groups` shows which group each repository lands in, the repositories no group
-selects and those the source filters leave out, from a listing of the organisation (it does not call GitHub itself):
+selects and those the source filters leave out, from a listing of the accounts (it does not call GitHub itself):
 
 ```sh
 gh api --paginate "orgs/Cantara/repos?per_page=100" > repos.json   # or one repository name per line
+gh api --paginate "user/repos?affiliation=owner&visibility=all&per_page=100" >> repos.json   # your own user account
 scp config groups -c scp.yaml --repos repos.json
 ```
 
@@ -151,6 +154,13 @@ every page, in the API, badges, `/llms.txt` and the Markdown answers. The two he
 `server.trusted_proxies` and dropped from any other. Answers to a permitted user are marked `Cache-Control: private`, and every answer
 varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and `server.trusted_proxies`.
 Images in private READMEs load from GitHub and show for users signed in there.
+
+**Public and private on one address.** Visitors without a session should reach the portal directly and see the public repositories,
+while signed-in users pass the authenticating proxy. With Traefik and oauth2-proxy: one router sends ``Host(`scp.example.org`)`` to the portal, a
+higher-priority router sends ``Host(`scp.example.org`) && (PathPrefix(`/oauth2`) || HeaderRegexp(`Cookie`, `(^|;\s*)_oauth2_proxy(_[0-9]+)?=`))``
+to oauth2-proxy, whose upstream is the portal. Let oauth2-proxy reach the portal over a network of its own and put only that network in
+`server.trusted_proxies`, so identity headers that arrive through Traefik are dropped. Sign in at `/oauth2/start?rd=/`, sign out at
+`/oauth2/sign_out?rd=/`.
 
 ## 3. Run
 
@@ -252,7 +262,7 @@ cluster:
 
 ## 4. Lifecycle
 
-**Start.** A start loads the cache and serves it at once, then lists every organisation and starts the web UI server. On the first start (empty cache) the pages
+**Start.** A start loads the cache and serves it at once, then lists every account and starts the web UI server. On the first start (empty cache) the pages
 say the portal is loading and fill in as data arrives; `/readyz` turns 200 once every source has a complete listing and the web UI server answers. A cold start of
 1,000 repositories needs about 5,500 GitHub requests; with a token it can wait for the hourly rate-limit reset to finish.
 
@@ -309,6 +319,6 @@ steps, and job failures. Secrets are never logged.
 |---|---|
 | `config check` exits 2 | every problem is listed with its key; unknown keys and `SCP_*` variables are errors |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
-| A repository is missing | it must be public, not a fork (unless `include_forks`), and in a configured organisation; a deleted or private repository disappears after two listings |
-| Pushes show only after minutes | the webhook: GitHub's delivery log for the App or organisation, `scp_webhook_deliveries_total` by result |
+| A repository is missing | it must be public, not a fork (unless `include_forks`), and in a configured account; a deleted or private repository disappears after two listings |
+| Pushes show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository, `scp_webhook_deliveries_total` by result |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |

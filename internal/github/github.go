@@ -109,20 +109,28 @@ type Source struct {
 
 	observe func(source string, status int) // set before the first request
 
-	mu     sync.Mutex
-	token  *credential            // token mode
-	owners map[string]*credential // App mode: lower-case owner login -> installation
+	mu       sync.Mutex
+	token    *credential            // token mode
+	owners   map[string]*credential // App mode: lower-case owner login -> installation
+	accounts map[string]account     // token mode: lower-case owner login -> what it is, looked up once
 }
 
 // credential is one rate bucket: a token, or one App installation.
 type credential struct {
 	client *gh.Client
 	rate   *rateBook
+	user   bool // App mode: the installation is on a user account
+}
+
+// account is what listing an owner's repositories needs to know about it.
+type account struct {
+	user bool // a user account, not an organisation
+	self bool // token mode: the token's own account, whose private repositories it lists
 }
 
 func newSource(sc config.Source, base http.RoundTripper, log *slog.Logger) (*Source, error) {
 	s := &Source{id: sc.ID, cfg: sc, log: log, cache: newETagCache(etagEntries), sem: make(chan struct{}, inFlight), base: base,
-		owners: map[string]*credential{}}
+		owners: map[string]*credential{}, accounts: map[string]account{}}
 	if sc.App == nil {
 		rate := &rateBook{}
 		client, err := s.newClient(s.transport(rate), sc.Token.Reveal())
@@ -219,7 +227,7 @@ func (s *Source) RefreshInstallations(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		owners[login] = &credential{client: client, rate: rate}
+		owners[login] = &credential{client: client, rate: rate, user: in.GetAccount().GetType() == "User"}
 	}
 	s.owners = owners
 	return nil
@@ -245,20 +253,25 @@ func (s *Source) client(ctx context.Context, owner string) (*gh.Client, error) {
 	return nil, &Error{Kind: Permanent, Code: "no_installation", Err: fmt.Errorf("the GitHub App is not installed on %s", owner)}
 }
 
-// ListRepos returns every repository of owner, most recently pushed first. Any failed page fails the listing.
+// ListRepos returns every repository of owner, an organisation or a user account, most recently pushed first (an App's user
+// installation lists in GitHub's order). Any failed page fails the listing.
 func (s *Source) ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error) {
 	c, err := s.client(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
-	opts := &gh.RepositoryListByOrgOptions{Type: "all", Sort: "pushed", Direction: "desc", ListOptions: gh.ListOptions{PerPage: perPage}}
+	acct, err := s.account(ctx, c, owner)
+	if err != nil {
+		return nil, err
+	}
+	list := lister(c, owner, acct, s.token == nil)
 	seen := map[int64]bool{}
 	var out []snapshot.Repo
 	for page := 0; ; page++ {
 		if page == maxPages {
 			return nil, &Error{Kind: Permanent, Code: "too_many_pages", Err: fmt.Errorf("%s has more than %d pages of repositories", owner, maxPages)}
 		}
-		got, resp, err := c.Repositories.ListByOrg(ctx, owner, opts)
+		got, resp, err := list(ctx, gh.ListOptions{PerPage: perPage, Page: page + 1})
 		if err != nil {
 			return nil, classify(resp, err)
 		}
@@ -272,8 +285,64 @@ func (s *Source) ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, 
 		if resp.NextPage == 0 {
 			return out, nil
 		}
-		opts.Page = resp.NextPage
 	}
+}
+
+type listPage func(ctx context.Context, page gh.ListOptions) ([]*gh.Repository, *gh.Response, error)
+
+// lister picks the listing for owner: the organisation's repositories, the repositories of an App's user installation, every
+// repository the token's own account owns, or another user's public repositories.
+func lister(c *gh.Client, owner string, acct account, app bool) listPage {
+	switch {
+	case !acct.user:
+		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
+			return c.Repositories.ListByOrg(ctx, owner, &gh.RepositoryListByOrgOptions{Type: "all", Sort: "pushed", Direction: "desc", ListOptions: p})
+		}
+	case app:
+		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
+			got, resp, err := c.Apps.ListRepos(ctx, &p)
+			return got.GetRepositories(), resp, err
+		}
+	case acct.self:
+		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
+			return c.Repositories.ListByAuthenticatedUser(ctx, &gh.RepositoryListByAuthenticatedUserOptions{Affiliation: "owner",
+				Visibility: "all", Sort: "pushed", Direction: "desc", ListOptions: p})
+		}
+	default:
+		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
+			return c.Repositories.ListByUser(ctx, owner, &gh.RepositoryListByUserOptions{Type: "owner", Sort: "pushed", Direction: "desc", ListOptions: p})
+		}
+	}
+}
+
+// account says what owner is: from its installation in App mode, looked up once (the owner, then the token's own login) in token mode.
+func (s *Source) account(ctx context.Context, c *gh.Client, owner string) (account, error) {
+	key := strings.ToLower(owner)
+	s.mu.Lock()
+	if s.token == nil {
+		defer s.mu.Unlock()
+		return account{user: s.owners[key] != nil && s.owners[key].user}, nil
+	}
+	a, ok := s.accounts[key]
+	s.mu.Unlock()
+	if ok {
+		return a, nil
+	}
+	u, resp, err := c.Users.Get(ctx, owner)
+	if err != nil {
+		return account{}, classify(resp, err)
+	}
+	if a.user = u.GetType() == "User"; a.user {
+		me, resp, err := c.Users.Get(ctx, "")
+		if err != nil {
+			return account{}, classify(resp, err)
+		}
+		a.self = strings.EqualFold(me.GetLogin(), owner)
+	}
+	s.mu.Lock()
+	s.accounts[key] = a
+	s.mu.Unlock()
+	return a, nil
 }
 
 // Repo returns one repository.

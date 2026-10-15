@@ -25,7 +25,8 @@ Build once: `make build` (gives `bin/scp`), or use `go run ./cmd/scp` in place o
 
 ```sh
 bin/scp config check -c scp.yaml                      # validates exactly like serve; every problem with its key; exit 0 = good
-gh api --paginate "orgs/<org>/repos?per_page=100" > /tmp/scp-repos.json   # the organisation's repositories (read only)
+gh api --paginate "orgs/<org>/repos?per_page=100" > /tmp/scp-repos.json   # an organisation's repositories (read only)
+gh api --paginate "user/repos?affiliation=owner&visibility=all&per_page=100" >> /tmp/scp-repos.json   # their own user account
 bin/scp config groups -c scp.yaml --repos /tmp/scp-repos.json            # which group each repository lands in
 ```
 
@@ -122,7 +123,7 @@ Run `config groups` on the result and compare with what the old portal showed; l
 
 ## The rest, when asked
 
-- **GitHub source** (`github.sources[]`): `id`, `orgs`, and either a GitHub App (`app.id`, `app.private_key_file`; preferred) or
+- **GitHub source** (`github.sources[]`): `id`, `orgs` (organisations and user accounts; an account belongs to one source), and either a GitHub App (`app.id`, `app.private_key_file`; preferred) or
   `token_file`; GitHub Enterprise sets `base_url`. Filters: `include_forks` (default false), `include_archived` (default true),
   `include_private` (default false; needs `access.private_groups` and `server.trusted_proxies`, operator guide 2.1).
 - **Webhook**: `webhook.secret_file`; the GitHub side is in the operator guide section 1.

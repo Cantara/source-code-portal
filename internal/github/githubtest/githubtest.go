@@ -1,5 +1,5 @@
-// Package githubtest is a fake GitHub REST server for tests: App and token authentication, organisation listings with
-// pagination, single repositories, rate-limit headers, ETags and 304s, fault injection and a request ledger.
+// Package githubtest is a fake GitHub REST server for tests: App and token authentication, organisation and user account listings
+// with pagination, single repositories, rate-limit headers, ETags and 304s, fault injection and a request ledger.
 package githubtest
 
 import (
@@ -37,7 +37,8 @@ type Server struct {
 
 	mu       sync.Mutex
 	key      *rsa.PrivateKey
-	tokens   map[string]bool   // accepted personal tokens
+	tokens   map[string]string // accepted personal tokens -> the account login they belong to ("" for none)
+	users    map[string]bool   // lower-case logins of user accounts; every other owner is an organisation
 	installs map[int64]string  // installation id -> account login
 	issued   map[string]string // installation token -> account login
 	orgs     map[string][]*gh.Repository
@@ -65,13 +66,18 @@ func New(t testing.TB) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{AppID: 42, key: key, tokens: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
+	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, files: map[int64]map[string]string{},
 		releases: map[int64]*gh.RepositoryRelease{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
 	mux.HandleFunc("POST /app/installations/{id}/access_tokens", s.accessToken)
 	mux.HandleFunc("GET /orgs/{org}/repos", s.listRepos)
+	mux.HandleFunc("GET /users/{user}", s.getUser)
+	mux.HandleFunc("GET /user", s.getUser)
+	mux.HandleFunc("GET /users/{user}/repos", s.listRepos)
+	mux.HandleFunc("GET /user/repos", s.listRepos)
+	mux.HandleFunc("GET /installation/repositories", s.listRepos)
 	mux.HandleFunc("GET /repos/{owner}/{name}", s.getRepo)
 	mux.HandleFunc("GET /repos/{owner}/{name}/commits", s.listCommits)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/trees/{ref}", s.getTree)
@@ -91,10 +97,21 @@ func (s *Server) PrivateKeyPEM() []byte {
 }
 
 // AddToken accepts tok as a personal access token.
-func (s *Server) AddToken(tok string) {
+func (s *Server) AddToken(tok string) { s.AddUserToken(tok, "") }
+
+// AddUserToken accepts tok as a personal access token of the user account login.
+func (s *Server) AddUserToken(tok, login string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.tokens[tok] = true
+	s.tokens[tok] = login
+}
+
+// AddUser makes login a user account (owners are organisations otherwise): GET /orgs/{login}/repos answers 404, its repositories
+// list at /users/{login}/repos (public ones), /user/repos (for its own token) and /installation/repositories.
+func (s *Server) AddUser(login string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.users[strings.ToLower(login)] = true
 }
 
 // Install installs the App on login and returns the installation id.
@@ -238,15 +255,13 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 // charge authenticates a REST call and counts it against the credential's limit. It writes the error and returns "" when the
 // call must not proceed.
 func (s *Server) charge(w http.ResponseWriter, req *http.Request) string {
-	tok, ok := strings.CutPrefix(req.Header.Get("Authorization"), "Bearer ")
-	if !ok {
-		tok, _ = strings.CutPrefix(req.Header.Get("Authorization"), "token ")
-	}
+	tok := bearer(req)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cred := ""
+	_, personal := s.tokens[tok]
 	switch {
-	case s.tokens[tok]:
+	case personal:
 		cred = tok
 	case s.issued[tok] != "":
 		cred = s.issued[tok]
@@ -269,6 +284,14 @@ func (s *Server) charge(w http.ResponseWriter, req *http.Request) string {
 	}
 	s.rateHeaders(w, cred)
 	return cred
+}
+
+func bearer(req *http.Request) string {
+	tok, ok := strings.CutPrefix(req.Header.Get("Authorization"), "Bearer ")
+	if !ok {
+		tok, _ = strings.CutPrefix(req.Header.Get("Authorization"), "token ")
+	}
+	return tok
 }
 
 func (s *Server) rateHeaders(w http.ResponseWriter, cred string) {
@@ -315,7 +338,11 @@ func (s *Server) listInstallations(w http.ResponseWriter, req *http.Request) {
 	slices.Sort(ids)
 	out := make([]*gh.Installation, 0, len(ids))
 	for _, id := range ids {
-		out = append(out, &gh.Installation{ID: new(id), Account: &gh.User{Login: new(s.installs[id])}})
+		kind := "Organization"
+		if s.users[strings.ToLower(s.installs[id])] {
+			kind = "User"
+		}
+		out = append(out, &gh.Installation{ID: new(id), Account: &gh.User{Login: new(s.installs[id]), Type: new(kind)}})
 	}
 	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, out)
@@ -344,16 +371,35 @@ func (s *Server) accessToken(w http.ResponseWriter, req *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"token": tok, "expires_at": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)})
 }
 
+// listRepos answers the four listings: an organisation's, a user's public repositories, the token's own account's, an
+// installation's.
 func (s *Server) listRepos(w http.ResponseWriter, req *http.Request) {
 	cred := s.charge(w, req)
 	if cred == "" {
 		return
 	}
 	s.mu.Lock()
-	repos, ok := s.orgs[strings.ToLower(req.PathValue("org"))]
-	repos = slices.Clone(repos)
+	var owner string
+	public := false
+	switch {
+	case req.PathValue("org") != "":
+		if owner = strings.ToLower(req.PathValue("org")); s.users[owner] {
+			owner = "" // GitHub has no organisation of that name
+		}
+	case req.PathValue("user") != "":
+		if owner = strings.ToLower(req.PathValue("user")); !s.users[owner] {
+			owner = ""
+		}
+		public = true
+	case req.URL.Path == "/user/repos":
+		owner = strings.ToLower(s.tokens[bearer(req)])
+	default: // /installation/repositories
+		owner = strings.ToLower(s.issued[bearer(req)])
+	}
+	repos, ok := s.orgs[owner]
+	repos = slices.DeleteFunc(slices.Clone(repos), func(r *gh.Repository) bool { return public && r.GetVisibility() == "private" })
 	s.mu.Unlock()
-	if !ok {
+	if !ok && req.URL.Path != "/user/repos" && req.URL.Path != "/installation/repositories" {
 		writeError(w, http.StatusNotFound, "Not Found")
 		return
 	}
@@ -372,7 +418,35 @@ func (s *Server) listRepos(w http.ResponseWriter, req *http.Request) {
 		next.RawQuery = q.Encode()
 		w.Header().Set("Link", fmt.Sprintf(`<%s%s>; rel="next"`, s.URL, next.RequestURI()))
 	}
+	if req.URL.Path == "/installation/repositories" {
+		s.respond(w, req, cred, &gh.ListRepositories{TotalCount: new(len(repos)), Repositories: repos[lo:hi]})
+		return
+	}
 	s.respond(w, req, cred, repos[lo:hi])
+}
+
+// getUser answers GET /users/{user} and, for a personal token, GET /user.
+func (s *Server) getUser(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	login, kind := req.PathValue("user"), "Organization"
+	if login == "" {
+		login = s.tokens[bearer(req)]
+	}
+	_, known := s.orgs[strings.ToLower(login)]
+	user := s.users[strings.ToLower(login)]
+	s.mu.Unlock()
+	if user {
+		kind = "User"
+	}
+	if login == "" || !known && !user {
+		writeError(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	s.respond(w, req, cred, &gh.User{Login: new(login), Type: new(kind)})
 }
 
 func (s *Server) getRepo(w http.ResponseWriter, req *http.Request) {

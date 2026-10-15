@@ -104,7 +104,7 @@ Configuration is one YAML file (`--config`); every key can also be set as `SCP_<
 
 | Key | Purpose |
 |---|---|
-| `github.sources[]` | organisations to read, with a GitHub App or a token file; forks, archived and private repositories on or off |
+| `github.sources[]` | organisations and user accounts to read, with a GitHub App or a token file; forks, archived and private repositories on or off |
 | `catalog.groups[]` | the products: id, name, description, default repository and matchers |
 | `catalog.reconcile_interval` | how often each organisation is listed (default 5 minutes) |
 | `webhook.secret_file` | turns on `POST /webhooks/github`; `previous_secret_file` for rotation |

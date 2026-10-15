@@ -11,7 +11,7 @@ aliases to the snapshot. It owns the removal rule; the listing every `catalog.re
 - The address is `lower(owner/name)` (`snapshot.RepoKey`), the same two segments in every URL; when two listed repositories share an
   address, the lower id keeps it.
 - Renames and transfers keep the old address as an alias (at most 8 per repository) answered with 308: links in chat and docs keep working.
-- Listing is `GET /orgs/{owner}/repos?type=all&sort=pushed&direction=desc` for App and token auth alike; each item's `visibility` is checked
+- Listing is per owner, an organisation or a user account (github.md); each item's `visibility` is checked
   fail closed: `public` is admitted, `private` and `internal` only with `include_private` (access.md); stored rows are checked again at publish.
 - Admission filters per source (`github.sources[].include_forks` false, `include_archived` true): forks are usually noise, archived systems
   are still part of the map.

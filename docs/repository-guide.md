@@ -1,6 +1,6 @@
 # Repository guide
 
-The portal shows every public repository of the configured organisations. This page is for repository owners: what the portal reads
+The portal shows every public repository of the configured organisations and user accounts. This page is for repository owners: what the portal reads
 from a repository and how to describe it.
 
 ## What the portal reads
@@ -39,7 +39,7 @@ with `${property}` references replaced from the POM's own properties. A dependen
 (Go module path, npm package name, Maven `groupId:artifactId`) links the two repositories: each page lists what it uses and what uses it.
 A file over 512 KiB, or one that does not parse, is listed with the problem.
 
-Changes show within seconds when the organisation webhook is set up, otherwise after the next scheduled check (a push is noticed within
+Changes show within seconds when the portal's webhook is set up, otherwise after the next scheduled check (a push is noticed within
 the listing interval, five minutes by default).
 
 ## The `scp.yaml` descriptor

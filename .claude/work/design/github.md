@@ -13,8 +13,12 @@ webhook events the portal reacts to and the `sync` event each becomes.
 - REST covers every read: listings, commits, trees and blobs; the README and documents are read as blobs found in the tree.
 - Commit freshness: webhooks, plus the org listing every `catalog.reconcile_interval` (default 5 m) sorted by `pushed_at`; a repository
   whose `pushed_at` changed gets `sync.EventPush`; the 2 h commits TTL is the safety net.
-- One listing call for both auth modes, `GET /orgs/{org}/repos`: one code path, and every item carries `visibility`, topics, licence,
-  default branch, archived, fork, stars, `pushed_at` and `open_issues_count`.
+- `orgs` names organisations and user accounts. An organisation lists with `GET /orgs/{org}/repos` in both auth modes; a user account
+  lists its App installation's repositories (`GET /installation/repositories`), with a token its own repositories, private ones
+  included (`GET /user/repos?affiliation=owner&visibility=all`), or another user's public ones (`GET /users/{u}/repos?type=owner`).
+  The kind comes from the installation's account type, in token mode from `GET /users/{u}` (and `GET /user`), looked up once per
+  owner. Every listing item carries `visibility`, topics, licence, default branch, archived, fork, stars, `pushed_at` and
+  `open_issues_count`.
 - Blob SHAs from the tree are the persisted validators: a blob is fetched only when its SHA changed.
 - ETags live in memory, keyed by the hashed `Authorization` value: within one token lifetime an authorised 304 costs no rate limit.
 - One go-github client per token or App installation, so each installation keeps its own rate bucket.
@@ -51,7 +55,11 @@ methods here; a call only one feature makes lives in that feature over `REST` an
 | Need | go-github v92 call | Auth | Endpoint |
 |---|---|---|---|
 | installations | `Apps.ListInstallations` | App JWT | `GET /app/installations` |
-| repos | `Repositories.ListByOrg` (`type=all`, `sort=pushed`, `direction=desc`, `per_page=100`) | either | `GET /orgs/{org}/repos` |
+| repos of an organisation | `Repositories.ListByOrg` (`type=all`, `sort=pushed`, `direction=desc`, `per_page=100`) | either | `GET /orgs/{org}/repos` |
+| repos of a user installation | `Apps.ListRepos` | installation | `GET /installation/repositories` |
+| repos of the token's user | `Repositories.ListByAuthenticatedUser` (`affiliation=owner`, `visibility=all`, sorted) | token | `GET /user/repos` |
+| repos of another user | `Repositories.ListByUser` (`type=owner`, sorted) | token | `GET /users/{u}/repos` |
+| account kind | `Users.Get` | token | `GET /users/{u}`, `GET /user` |
 | one repo | `Repositories.Get` | either | `GET /repos/{o}/{r}` |
 | commits | `Repositories.ListCommits` (`PerPage: n`, default branch) | either | `GET /repos/{o}/{r}/commits` |
 | tree | `Git.GetTree(ref, recursive)` | either | `GET /repos/{o}/{r}/git/trees/{ref}` |
@@ -121,7 +129,7 @@ API version header, conditional cache, rate observer), then `http.Transport`. `s
 |---|---|---|
 | `github.sources[].id` | none (one source required) | stable name, `[a-z0-9-]+` |
 | `github.sources[].base_url` | `https://api.github.com/` | REST base; GHES `https://host/api/v3/` |
-| `github.sources[].orgs` | none (required) | organisations of this source |
+| `github.sources[].orgs` | none (required) | organisations and user accounts of this source |
 | `github.sources[].app.id`, `.app.private_key_file` | none | App mode: App id and PEM file (mounted secret) |
 | `github.sources[].app.installations` | `[]` (all) | allowed account logins |
 | `github.sources[].token_file` | none | token mode (exclusive with `app`) |
