@@ -197,31 +197,36 @@ catalog:
 		}
 	}
 
-	// The same data: equal bodies and ETags on both instances.
+	// The same data: equal bodies and ETags on both instances, read between two equal versions of both, since the leader may still be
+	// publishing what its last jobs read.
 	paths := []string{"/api/v1/dashboard", "/api/v1/repos", "/api/v1/groups/all", "/api/v1/repos/acme/core", "/api/v1/repos/acme/core/docs",
 		"/api/v1/repos/acme/web/manifests", "/api/v1/commits", "/llms.txt", "/repos/acme/core/readme.md", "/badges/repos/acme/core/release.svg"}
-	same := func() bool {
-		for _, p := range paths {
-			lb, le := get(leader.public + p)
-			fb, fe := get(follower.public + p)
-			if lb != fb || le != fe || le == "" {
-				return false
-			}
-		}
-		return true
-	}
 	version := func(n *node) int64 {
 		var info oapi.SnapshotInfo
 		b, _ := get(n.public + "/api/v1/snapshot")
 		_ = json.Unmarshal([]byte(b), &info)
 		return info.Version
 	}
-	waitFor("the same responses on both instances", same)
-	waitFor("the same snapshot version on both instances", func() bool { v := version(leader); return v != 0 && v == version(follower) })
-	for _, p := range paths {
-		lb, _ := get(leader.public + p)
-		if fb, _ := get(follower.public + p); lb != fb {
-			t.Errorf("%s differs:\nleader   %s\nfollower %s", p, lb, fb)
+	var differs string
+	same := func() bool {
+		v := version(leader)
+		if v == 0 || version(follower) != v {
+			differs = "the snapshot version"
+			return false
+		}
+		for _, p := range paths {
+			lb, le := get(leader.public + p)
+			fb, fe := get(follower.public + p)
+			if lb != fb || le != fe || le == "" {
+				differs = fmt.Sprintf("%s:\nleader   %s\nfollower %s", p, lb, fb)
+				return false
+			}
+		}
+		return version(leader) == v && version(follower) == v
+	}
+	for deadline := time.Now().Add(20 * time.Second); !same(); time.Sleep(50 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the instances differ after 20s in %s", differs)
 		}
 	}
 
