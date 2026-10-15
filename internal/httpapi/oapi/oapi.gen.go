@@ -641,6 +641,9 @@ type HistoryCommit struct {
 	// Automated Made by automation: a [bot] author or a release plugin
 	Automated bool `json:"automated"`
 
+	// Beyond The parents older than the stored history
+	Beyond []string `json:"beyond"`
+
 	// Body The message after its subject line; empty when there is none
 	Body          string    `json:"body"`
 	CommittedAt   time.Time `json:"committedAt"`

@@ -7,7 +7,7 @@ export interface Edge {
   to: number
   /** colour index of the lane the line belongs to, 0..5 */
   color: number
-  /** the line leads to a parent outside the rows */
+  /** the line leads to a parent older than the history (its `beyond`), or, for commits without `beyond`, outside the rows */
   open: boolean
 }
 
@@ -29,10 +29,13 @@ export interface Graph {
 /**
  * graph lays out commits (newest first) like `git log --graph`: a commit takes the lane that expects it (else the first free one),
  * every other lane expecting it converges into it, its first parent continues the lane, and each further parent opens a lane or joins
- * the one already expecting it. Freed lanes are reused; lanes never shift.
+ * the one already expecting it. Freed lanes are reused; lanes never shift. A row depends only on the commits above it, so loading
+ * more rows below never changes the rows above (prefix stability) when the commits say which parents are beyond the history.
  */
-export function graph(commits: readonly { sha: string; parents: readonly string[] }[]): Graph {
+export function graph(commits: readonly { sha: string; parents: readonly string[]; beyond?: readonly string[] }[]): Graph {
   const known = new Set(commits.map((c) => c.sha))
+  const beyond = commits.some((c) => c.beyond) ? new Set(commits.flatMap((c) => c.beyond ?? [])) : undefined
+  const outside = (sha: string) => (beyond ? beyond.has(sha) : !known.has(sha))
   const lanes: (string | null)[] = []
   const colors: number[] = []
   let opened = 0
@@ -75,7 +78,7 @@ export function graph(commits: readonly { sha: string; parents: readonly string[
     lanes.forEach((sha, j) => {
       if (sha === null) return
       const color = colors[j] ?? 0
-      const out = !known.has(sha)
+      const out = outside(sha)
       if (fromNode.has(j)) below.push({ from: lane, to: j, color, open: out })
       if (!fromNode.has(j) || (j !== lane && before[j] === sha)) below.push({ from: j, to: j, color, open: out })
     })

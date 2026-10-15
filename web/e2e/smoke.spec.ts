@@ -10,6 +10,8 @@ const pages = [
   ["/groups/whydah/commits", "Commits in Whydah"],
   ["/repos/acme/whydah-core", "Whydah Core"],
   ["/repos/acme/whydah-core/commits", "Commits in acme/Whydah-Core"],
+  ["/repos/acme/whydah-core/commits?sha=0000000000000000000000000000000000000029", "Commits in acme/Whydah-Core"],
+  ["/commits?group=whydah", "Commits"],
   ["/repos/acme/whydah-core/docs/docs/setup", "Setup"],
 ] as const
 
@@ -51,12 +53,13 @@ test("navigation moves focus to the new page's h1", async ({ page }) => {
   await expect(page).toHaveTitle("Whydah · Source Code Portal")
 })
 
-test("the commit log loads more", async ({ page }) => {
+test("the commit log loads older commits", async ({ page }) => {
   await page.goto("/commits")
   await expect(page.getByRole("listitem")).toHaveCount(50)
-  await page.getByRole("button", { name: "Load more" }).click()
-  await expect(page.getByRole("listitem")).toHaveCount(90)
-  await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0)
+  await page.getByRole("link", { name: "Older commits" }).click()
+  await expect(page.getByRole("listitem")).toHaveCount(100)
+  await expect(page).toHaveURL("/commits") // loaded in place
+  await expect(page.getByRole("link", { name: "Older commits" })).toBeVisible()
 })
 
 test("the README renders with highlighting and no script", async ({ page }) => {
@@ -113,7 +116,7 @@ test("the theme menu switches light and dark, and system follows the system pref
   await expect(theme).toHaveValue("system")
 })
 
-for (const path of ["/repos/acme/whydah-core", "/repos/acme/whydah-core/commits"]) {
+for (const path of ["/repos/acme/whydah-core"]) {
   test(`${path} draws its commits as a git graph, the merge in a second lane`, async ({ page }) => {
     await page.goto(path)
     const merge = page.locator("main li", { hasText: "Merge pull request #7" }).first()

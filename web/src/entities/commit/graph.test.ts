@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { graph } from "./graph"
+import { graph, maxLanes } from "./graph"
 
 const c = (sha: string, ...parents: string[]) => ({ sha, parents })
 const lines = (es: { from: number; to: number }[]) => es.map((e) => `${e.from}>${e.to}`).sort()
@@ -47,5 +47,42 @@ describe("graph", () => {
     expect(graph([c("b", "a"), c("x"), c("a")]).rows.map((r) => r.lane)).toEqual([0, 1, 0])
     const wide = graph([c("o", ...Array.from({ length: 12 }, (_, i) => `p${i}`))])
     expect(wide.lanes).toBe(8)
+  })
+})
+
+// A random history in graph order: commit i's parents are later commits, some beyond the history.
+function randomHistory(seed: number, n: number) {
+  let s = seed
+  const rnd = (k: number) => {
+    s = (s * 1103515245 + 12345) % 2147483648
+    return s % k
+  }
+  return Array.from({ length: n }, (_, i) => {
+    const parents = new Set<string>()
+    const count = i === n - 1 ? 0 : rnd(5) === 0 ? 2 + rnd(3) : 1
+    for (let j = 0; j < count; j++)
+      parents.add(i + 1 + rnd(n - i - 1) < n && rnd(10) > 0 ? `c${i + 1 + rnd(n - i - 1)}` : `old${rnd(4)}`)
+    const ps = [...parents]
+    return { sha: `c${i}`, parents: ps, beyond: ps.filter((p) => p.startsWith("old")) }
+  })
+}
+
+describe("graph on random histories", () => {
+  it("keeps earlier rows identical as more rows load, and every line meets a node or goes on", () => {
+    for (let seed = 1; seed <= 150; seed++) {
+      const all = randomHistory(seed, 2 + (seed % 90))
+      const full = graph(all)
+      expect(full.lanes).toBeLessThanOrEqual(maxLanes)
+      for (let k = 1; k < all.length; k += 1 + (seed % 7)) {
+        expect(graph(all.slice(0, k)).rows).toEqual(full.rows.slice(0, k))
+      }
+      full.rows.forEach((r, i) => {
+        for (const e of r.above) expect(e.to === r.lane || e.to === e.from).toBe(true)
+        for (const e of r.below) expect(e.from === r.lane || e.to === e.from).toBe(true)
+        // A line out of a row comes into the next one at the same lane.
+        const next = full.rows[i + 1]
+        if (next) for (const e of r.below) expect(next.above.some((a) => a.from === e.to)).toBe(true)
+      })
+    }
   })
 })

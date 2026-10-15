@@ -47,6 +47,19 @@ test.describe("without JavaScript", () => {
     })
   }
 
+  for (const path of ["/commits", "/repos/acme/tool/commits"]) {
+    test(`${path} pages through older and newer commits`, async ({ page }) => {
+      await page.goto(path)
+      await expect(page.getByText("Change 30 of repository 2").first()).toBeVisible()
+      await page.getByRole("link", { name: "Older commits" }).click()
+      await expect(page).toHaveURL(/cursor=/)
+      await expect(page.getByText("Change 30 of repository 2")).toHaveCount(0)
+      await expect(page.getByText(/Old change \d+ of repository 2/).first()).toBeVisible()
+      await page.getByRole("link", { name: "Newest commits" }).click()
+      await expect(page.getByText("Change 30 of repository 2").first()).toBeVisible()
+    })
+  }
+
   test("an unknown repository answers 404", async ({ page }) => {
     const res = await page.goto("/repos/acme/nope")
     expect(res?.status()).toBe(404)

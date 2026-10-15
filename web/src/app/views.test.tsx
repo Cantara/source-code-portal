@@ -132,9 +132,9 @@ describe("commit log", () => {
     show(<AllCommitsView />, "/commits", qc)
     await screen.findByText("Commit 0")
     await waitFor(() => expect(qc.getQueryData(["snapshot"])).toBeDefined())
-    await user.click(screen.getByRole("button", { name: "Load more" }))
+    await user.click(screen.getByRole("link", { name: "Older commits" }))
     expect(await screen.findByText("Commit 54")).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "Older commits" })).not.toBeInTheDocument()
 
     server.use(http.get("/snapshot", ({ response }) => response(200).json(snapshot(2))))
     await qc.refetchQueries({ queryKey: ["snapshot"] })

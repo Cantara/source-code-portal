@@ -3,7 +3,9 @@ import { load, loadRepo, peek, prefetch } from "@/lib/load"
 import type { Route } from "@/lib/page"
 import { groupCommitsPath, repoCommitsPath } from "@/lib/paths"
 import { commitFilter, commitLogQuery } from "./api"
-import { AllCommitsView, GroupCommitsView, RepoCommitsView } from "./view"
+import { historyFilter, historyQuery } from "./history"
+import { NavigatorView } from "./navigator"
+import { AllCommitsView, GroupCommitsView } from "./view"
 
 /** allCommitsRoute is `/commits`: the commit log across repositories, filtered through the query string. */
 export const allCommitsRoute: Route<object> = {
@@ -38,12 +40,12 @@ export const groupCommitsRoute: Route<{ group: string }> = {
 
 type RepoParams = { owner: string; name: string }
 
-/** repoCommitsRoute is `/repos/{owner}/{name}/commits`, at the repository's current address. */
+/** repoCommitsRoute is `/repos/{owner}/{name}/commits`, the navigator of the repository's history at its current address. */
 export const repoCommitsRoute: Route<RepoParams> = {
-  load: ({ api, qc, params: { owner, name } }) =>
+  load: ({ api, qc, params: { owner, name }, search }) =>
     Promise.all([
       loadRepo(api, qc, owner, name, repoCommitsPath),
-      qc.infiniteQuery(commitLogQuery(api, qc, { repo: `${owner}/${name}` })).catch(() => undefined),
+      qc.infiniteQuery(historyQuery(api, qc, owner, name, historyFilter(search))).catch(() => undefined),
     ]),
   async metadata({ api, qc, params: { owner, name } }) {
     const r = (await peek(qc, repoQuery(api, owner, name)))?.repo
@@ -51,9 +53,9 @@ export const repoCommitsRoute: Route<RepoParams> = {
     const n = r?.name ?? name
     return {
       title: `Commits in ${o}/${n}`,
-      description: `The latest commits on the default branch of ${o}/${n}.`,
+      description: `The history of ${o}/${n} as a git graph: its branches, tags and commits.`,
       alternates: { canonical: repoCommitsPath(o, n) },
     }
   },
-  render: ({ params: { owner, name } }) => <RepoCommitsView owner={owner} name={name} />,
+  render: ({ params: { owner, name } }) => <NavigatorView owner={owner} name={name} />,
 }

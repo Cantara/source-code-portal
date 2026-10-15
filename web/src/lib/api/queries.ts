@@ -16,7 +16,10 @@ export const keys = {
   manifests: (owner: string, name: string) => ["manifests", lc(owner), lc(name)] as const,
   groups: () => ["groups"] as const,
   group: (group: string) => ["group", group] as const,
-  commitLog: (group = "", repo = "") => ["commits", "log", group, repo] as const,
+  commitLog: (group = "", repo = "", automation = true, cursor = "") =>
+    ["commits", "log", group, repo, automation, cursor] as const,
+  history: (owner: string, name: string, filter: Record<string, string | boolean | undefined>) =>
+    ["commits", "history", lc(owner), lc(name), filter] as const,
   latestCommits: (group: string) => ["commits", "latest", group] as const,
 }
 

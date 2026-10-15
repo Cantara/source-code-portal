@@ -147,7 +147,12 @@ func (h *History) reachable(ref string) (map[string]bool, bool) {
 func (h *History) commitOf(key snapshot.RepoKey, c *Commit) oapi.HistoryCommit {
 	out := oapi.HistoryCommit{Repo: string(key), Sha: c.SHA, Subject: c.Subject, Body: c.Body, AuthorName: c.AuthorName,
 		AuthorLogin: c.AuthorLogin, CommitterName: c.CommitterName, Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents,
-		Automated: Automated(c), Labels: []oapi.Label{}}
+		Automated: Automated(c), Labels: []oapi.Label{}, Beyond: []string{}}
+	for _, p := range c.Parents {
+		if _, held := h.Position(p); !held {
+			out.Beyond = append(out.Beyond, p)
+		}
+	}
 	for _, l := range h.LabelsAt(c.SHA) {
 		out.Labels = append(out.Labels, labelOf(l))
 	}

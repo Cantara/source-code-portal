@@ -25,6 +25,13 @@ export function exactUTC(at: string | Date): string {
   return exact.format(new Date(at)) + " UTC"
 }
 
+const day = new Intl.DateTimeFormat("en", { dateStyle: "full", timeZone: "UTC" })
+
+/** dayUTC is the day of the instant in UTC, "Wednesday, October 14, 2026". */
+export function dayUTC(at: string | Date): string {
+  return day.format(new Date(at))
+}
+
 export function count(n: number): string {
   return num.format(n)
 }

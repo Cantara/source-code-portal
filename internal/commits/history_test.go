@@ -137,7 +137,7 @@ func TestHistoryFilters(t *testing.T) {
 	cs := []Commit{
 		{SHA: sha('d'), Subject: "Merge feature", AuthorName: "Ada", AuthorLogin: "ada", Parents: []string{sha('c'), sha('b')}, CommittedAt: at.Add(3 * time.Hour)},
 		{SHA: sha('c'), Subject: "chore(deps): update", AuthorName: "renovate[bot]", Parents: []string{sha('a')}, CommittedAt: at.Add(2 * time.Hour)},
-		{SHA: sha('a'), Subject: "Initial", AuthorName: "Bob", Body: "the parser", Parents: []string{}, CommittedAt: at},
+		{SHA: sha('a'), Subject: "Initial", AuthorName: "Bob", Body: "the parser", Parents: []string{sha('0')}, CommittedAt: at},
 	}
 	side := []Commit{{SHA: sha('b'), Subject: "Add feature", AuthorName: "Ada", Parents: []string{sha('a')}, CommittedAt: at.Add(time.Hour)}}
 	labels := []Label{{Name: "main", Kind: "branch", SHA: sha('d')}, {Name: "feature", Kind: "branch", SHA: sha('b')}, {Name: "v1", Kind: "tag", SHA: sha('a')}}
@@ -165,8 +165,11 @@ func TestHistoryFilters(t *testing.T) {
 		}
 	}
 	page := getHistory(t, a, oapi.GetHistoryParams{}).(oapi.GetHistory200JSONResponse).Body
-	if d := page.Commits[0]; len(d.Labels) != 1 || !d.Labels[0].Default || d.Automated || !page.Commits[1].Automated {
+	if d := page.Commits[0]; len(d.Labels) != 1 || !d.Labels[0].Default || d.Automated || !page.Commits[1].Automated || len(d.Beyond) != 0 {
 		t.Errorf("labels and automation: %+v", page.Commits[:2])
+	}
+	if a := page.Commits[3]; len(a.Beyond) != 1 || a.Beyond[0] != sha('0') {
+		t.Errorf("a parent older than the history: %+v", a.Beyond)
 	}
 
 	next := getHistory(t, a, oapi.GetHistoryParams{Limit: new(1)}).(oapi.GetHistory200JSONResponse).Body.Page.NextCursor

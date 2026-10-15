@@ -58,9 +58,27 @@ func TestServeForPlaywright(t *testing.T) {
 			}
 			cs[1].Message = "Merge pull request #7 from acme/feature"
 		}
+		if id == tool { // a long history: 600 commits, of which the portal keeps 500
+			for j := 30; j < 600; j++ {
+				cs = append(cs, githubtest.Commit{SHA: fmt.Sprintf("%02d%038d", i, 1000+600-j), Message: fmt.Sprintf("Old change %d of repository %d", 600-j, i),
+					AuthorName: "Ann Example", AuthorLogin: "ann", Date: start.Add(-time.Duration(j-30) * time.Hour)})
+			}
+		}
 		gh.SetCommits(id, cs...)
 		history[id] = cs
 	}
+	// A branch off the main line at 3, a renovate branch the portal leaves out, and tags: four at the head, one further down.
+	core0 := history[core]
+	gh.SetBranch(core, "feature/sso", githubtest.Commit{SHA: fmt.Sprintf("%040x", 0xb2), Message: "Bridge the SSO session",
+		AuthorName: "Bo Example", AuthorLogin: "bo", Date: start.Add(27*time.Hour + 40*time.Minute)},
+		githubtest.Commit{SHA: fmt.Sprintf("%040x", 0xb1), Message: "Start the SSO bridge\n\nThe bridge keeps one session per user.",
+			AuthorName: "Bo Example", AuthorLogin: "bo", Date: start.Add(27*time.Hour + 30*time.Minute), Parents: []string{core0[3].SHA}})
+	gh.SetBranch(core, "renovate/slf4j", githubtest.Commit{SHA: fmt.Sprintf("%040x", 0xc1), Message: "chore(deps): update slf4j",
+		AuthorName: "renovate[bot]", Date: start.Add(29*time.Hour + 30*time.Minute), Parents: []string{core0[0].SHA}})
+	for _, tag := range []string{"v1.3.0", "v1.3.0-rc2", "v1.3.0-rc1", "nightly"} {
+		gh.SetTag(core, tag, core0[0].SHA)
+	}
+	gh.SetTag(core, "v1.2.0", core0[10].SHA)
 	gh.SetFile(core, ".github/scp.yaml", "schema: 1\ntitle: Whydah Core\nlifecycle: production\nowners: ['@acme/iam']\ntags: [java]\n"+
 		"links: [{title: Runbook, url: 'https://runbook.example/core'}]\n")
 	logo, _ := base64.StdEncoding.DecodeString(logoPNG)

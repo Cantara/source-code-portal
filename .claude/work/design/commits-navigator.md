@@ -1,5 +1,5 @@
 # Commit navigator (C1)
-Status: in progress (data and API built; web next). Binding order: ../plan.md > this note.
+Status: as built. Binding order: ../plan.md > this note.
 
 ## Goal
 `/commits` is where an owner follows the work of a product: the product's commits as one timeline, and for any of its repositories a
@@ -26,7 +26,8 @@ Today: the latest 30 default-branch commits, subject only. The `commits` job gro
 only from the snapshot by the handlers:
 1. Default branch: up to 500 commits (`per_page=100`). A cold run reads 5 pages; a later run reads page 1 (ETag, a 304 is free) and
    follows pages only until it reaches a SHA it holds.
-2. Branches: `GET /branches` (one page, 100). The 10 newest branches by head date, without `renovate/` and `dependabot/` (automation
+2. Branches: `GET /branches` (one page, 100). The 10 newest branches by head date, without `renovate/`, `dependabot/`, `snyk-fix-`
+   and `snyk-upgrade-` (automation
    branches merge themselves within hours and would push people's branches out), read up to 100 commits each, stopping at a SHA
    already held; a full re-read every 24 hours drops what was deleted.
 3. Tags: `GET /tags` (one page, 100): labels for commits in the history.
@@ -47,14 +48,17 @@ only from the snapshot by the handlers:
 - `/commits`: a product picker (the groups; `?group=`) and, inside a product, its repositories with their activity. The product's
   timeline is the merged feed grouped by day, a repository chip per row, filters for repository and automation. Choosing a
   repository opens its navigator (`/repos/{o}/{n}/commits`, which the repository page links to as today).
-- Navigator: rows 32 px with columns graph | refs and subject | author | date | hash; one SVG per rendered window drawn with
-  `graph.ts` (lanes never shift, freed lanes reused, merge rings, dashed lines to parents beyond the loaded rows); branch and tag pills
-  at their commits (the default branch marked, `+N` past three); virtual scrolling (`@tanstack/react-virtual`); infinite loading
-  with a Load more button as the accessible fallback; selecting a commit highlights its lane and opens the details panel (message,
-  author and committer, exact UTC time, parents and children as links, refs, GitHub links to the commit and its tree).
-- URL state: `group`, `ref`, `author`, `q`, `automation`, `sha` (the selected commit), written in place; back and forward restore.
-  A `sha` outside the stored history says so and links to GitHub.
-- Keyboard: up and down or j and k move the selection, Enter opens the panel, Escape closes it, `/` focuses the search.
+- Navigator (`features/commits/navigator.tsx`, `history.ts`): a listbox of rows 32 px with columns graph | refs and subject | author |
+  date | hash, each row's graph cell drawn from `graph.ts` (lanes never shift, freed lanes reused, merge rings, dashed lines to
+  parents in the API's `beyond`); branch and tag pills with their icons at their commits (the default branch marked, `+N` past
+  three); window virtual scrolling (`@tanstack/react-virtual`) with spacers sized through the DOM (the CSP allows no style
+  attribute), the first render drawing the whole first page; infinite loading on scroll and an "Older commits" link; selecting a
+  commit highlights its lane and opens the details panel (message, author and committer, exact UTC time, parents and children that
+  select their commit, refs, GitHub links to the commit and its files). A filtered page is a list without a graph.
+- URL state: `group`, `ref`, `author`, `q`, `automation`, `sha` (the selected commit; a prefix of 4 or more hex digits selects too),
+  filters pushed and the selection replaced through `history` (no server round trip); back and forward restore. A `sha` not yet loaded
+  pages until it is; one outside the stored history says so and links to GitHub.
+- Keyboard: up and down or j and k move the selection, Home and End, Enter opens the panel, Escape closes it, `/` focuses the search.
 - Without JavaScript the first page renders on the server with older and newer links.
 
 ## Acceptance criteria
@@ -67,8 +71,8 @@ only from the snapshot by the handlers:
    every edge starts and ends at a node or a page end; at most 8 lanes, a commit beyond them sits in the last.
 4. Labels: every branch and tag of the history shows at its commit; the default branch is marked; four or more labels show three and
    `+N`.
-5. Performance: with 2,000 rows loaded, at most 120 rows are in the DOM and a Playwright trace of a scroll through them has no long
-   task over 50 ms; the history API answers p99 under 50 ms at 1,000 repositories in the load test; the JavaScript stays within the
+5. Performance: with a whole stored history loaded (500 rows in the e2e suite; the caps allow 1,500), at most 120 rows are in the DOM
+   and a scroll through them has no long task over 50 ms; the history API answers p99 under 50 ms at 1,000 repositories in the load test; the JavaScript stays within the
    300 KB budget.
 6. Navigation: product, repository, branch, author, text and automation filters work from the URL alone; back and forward restore;
    `?sha=` selects and scrolls to the commit or says it is older than the stored history.
@@ -78,3 +82,12 @@ only from the snapshot by the handlers:
    says in text what the graph shows (a merge, its parents, its labels); colour is never the only signal.
 9. Without JavaScript the first page of the timeline and of the navigator render with working older and newer links (the SEO spec).
 10. The product timeline merges only the product's repositories, grouped by day in UTC, with no graph across repositories.
+
+## Where the criteria are proved
+1. `internal/commits/github_test.go` (`TestHistory`: ledger of the cold, warm and push runs); `cmd/scp/run_test.go` (warm start).
+2. `internal/commits/history_test.go` (`TestHistoryPages`, `TestHistoryPush`, `TestHistoryFilters`), `commits_test.go` (`TestGraphOrder`).
+3. `web/src/entities/commit/graph.test.ts` (random histories).
+4, 6, 7, 10. `web/e2e/navigator.spec.ts`.
+5. `web/e2e/navigator.spec.ts` (rows and long tasks), `cmd/scp/load_test.go` (the history p99 under 50 ms), the bundle budget.
+8. `web/e2e/smoke.spec.ts` (axe in both themes on the timeline, the navigator and the open panel), `navigator.spec.ts` (keyboard).
+9. `web/e2e/seo.spec.ts` (older and newer links without JavaScript).

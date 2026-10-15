@@ -381,12 +381,13 @@ components:
       allOf:
         - $ref: "#/components/schemas/Commit"
         - type: object
-          required: [body, committerName, automated, labels]
+          required: [body, committerName, automated, labels, beyond]
           properties:
             body: { type: string, description: The message after its subject line; empty when there is none }
             committerName: { type: string }
             automated: { type: boolean, description: "Made by automation: a [bot] author or a release plugin" }
             labels: { type: array, items: { $ref: "#/components/schemas/Label" }, description: "The branches and tags at this commit, the default branch first" }
+            beyond: { type: array, items: { type: string }, description: The parents older than the stored history }
     HistoryPage:
       type: object
       required: [commits, labels, filtered, total, page, freshness]

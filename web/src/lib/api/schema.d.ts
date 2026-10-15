@@ -392,6 +392,8 @@ export interface components {
       automated: boolean
       /** @description The branches and tags at this commit, the default branch first */
       labels: components["schemas"]["Label"][]
+      /** @description The parents older than the stored history */
+      beyond: string[]
     }
     HistoryPage: {
       commits: components["schemas"]["HistoryCommit"][]
