@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 
 	contract "github.com/cantara/source-code-portal/api"
+	"github.com/cantara/source-code-portal/internal/auth"
 	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/cluster"
@@ -80,6 +81,7 @@ type (
 		docsAPI
 		manifestsAPI
 		httpapi.SnapshotAPI
+		httpapi.MeAPI
 	}
 )
 
@@ -208,19 +210,29 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
+	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
 	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
 	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
 		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
-			Vary: private},
+			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
 		Observe: m.request}
+	me := httpapi.MeAPI{}
+	if cfg.Auth.SignIn() || len(cfg.Auth.Tokens) > 0 {
+		a, err := newAuth(cfg, log)
+		if err != nil {
+			return nil, err
+		}
+		opts.Auth, me.SignIn = a, a.Methods
+		routes = append(routes, a.Routes()...)
+	}
 	catalogAPI := catalog.API{Current: view,
 		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
 		Repo:      []func(*snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, repoHealthAPI},
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
 	features := api{catalogAPI, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
-		httpapi.SnapshotAPI{Current: view}}
+		httpapi.SnapshotAPI{Current: view}, me}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}
@@ -244,6 +256,28 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return nil, err
 	}
 	return s, nil
+}
+
+// newAuth builds sign-in from the config. A session keeps only the provider's groups the access lists name, so it fits a cookie;
+// a group added to a list applies at the next sign-in, one removed at once.
+func newAuth(cfg config.Config, log *slog.Logger) (*auth.Auth, error) {
+	a := cfg.Auth
+	named := slices.Concat(cfg.Access.PrivateGroups, a.AdminGroups)
+	o := auth.Options{SessionTTL: a.SessionTTL, PublicURL: cfg.Server.PublicURL, Log: log,
+		Keep: func(groups []string) []string {
+			return slices.DeleteFunc(slices.Clone(groups), func(g string) bool { return !slices.Contains(named, g) })
+		}}
+	if a.SignIn() {
+		o.SessionKey = a.SessionKey.Reveal()
+	}
+	for _, t := range a.Tokens {
+		o.Tokens = append(o.Tokens, auth.Token{Name: t.Name, Secret: t.Secret.Reveal(), Groups: t.Groups, Admin: t.Admin})
+	}
+	if a.OIDC.Issuer != "" {
+		o.OIDC = &auth.OIDC{Issuer: a.OIDC.Issuer, ClientID: a.OIDC.ClientID, ClientSecret: string(a.OIDC.ClientSecret.Reveal()),
+			Scopes: a.OIDC.Scopes, GroupsClaim: a.OIDC.GroupsClaim}
+	}
+	return auth.New(o)
 }
 
 // llmsOptions is what the Markdown surface shows of the other features: documents, the descriptor, the manifests' summary and the

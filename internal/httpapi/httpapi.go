@@ -130,6 +130,23 @@ func snapshotInfo(s *snapshot.Snapshot, now time.Time) oapi.SnapshotInfo {
 	return out
 }
 
+// MeAPI implements getMe.
+type MeAPI struct {
+	SignIn func() (oidc, token bool) // the ways of signing in; nil: none
+}
+
+func (a MeAPI) GetMe(ctx context.Context, _ oapi.GetMeRequestObject) (oapi.GetMeResponseObject, error) {
+	v := ViewerOf(ctx)
+	out := oapi.Me{SignedIn: v.SignedIn(), Name: v.Name, Via: oapi.MeVia(v.Via), Private: v.Private, Admin: v.Admin}
+	if !v.SignedIn() {
+		out.Via = oapi.None
+	}
+	if a.SignIn != nil {
+		out.SignIn.Oidc, out.SignIn.Token = a.SignIn()
+	}
+	return oapi.GetMe200JSONResponse(out), nil
+}
+
 // WriteProblem writes an RFC 9457 problem with fixed text; the instance is the request id the middleware set.
 func WriteProblem(w http.ResponseWriter, status int, code, detail string) {
 	h := w.Header()

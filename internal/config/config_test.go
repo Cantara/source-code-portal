@@ -47,6 +47,8 @@ func TestDefaults(t *testing.T) {
 		}}},
 		Catalog: Catalog{ReconcileInterval: 5 * time.Minute},
 		Access:  Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{}},
+		Auth: Auth{SessionTTL: 12 * time.Hour, AdminEmails: []string{}, AdminGroups: []string{},
+			OIDC: OIDC{Scopes: []string{"openid", "email", "profile"}, GroupsClaim: "groups"}},
 		Cluster: Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},
 		Web:     Web{Node: "node"},
 	}
@@ -125,6 +127,17 @@ func TestRefused(t *testing.T) {
 		"cluster namespace":      {env: map[string]string{"SCP_CLUSTER_NAMESPACE": "SCP_Prod"}, want: "cluster.namespace"},
 		"web dir without server": {env: map[string]string{"SCP_WEB_DIR": "/nonexistent"}, want: "web.dir"},
 		"web node empty":         {env: map[string]string{"SCP_WEB_NODE": " "}, want: "web.node"},
+		"short session ttl":      {env: map[string]string{"SCP_AUTH_SESSION_TTL": "1m"}, want: "auth.session_ttl"},
+		"oidc without key":       {file: "auth:\n  oidc: {issuer: 'https://id.example', client_id: scp}\nserver:\n  public_url: https://scp.example\n", want: "auth.session_key_file: required"},
+		"oidc without client":    {env: map[string]string{"SCP_AUTH_OIDC_ISSUER": "https://id.example"}, want: "auth.oidc.client_id"},
+		"oidc without url":       {env: map[string]string{"SCP_AUTH_OIDC_ISSUER": "https://id.example"}, want: "server.public_url: required"},
+		"oidc over http":         {env: map[string]string{"SCP_AUTH_OIDC_ISSUER": "http://id.example"}, want: "auth.oidc.issuer"},
+		"oidc without openid":    {file: "auth:\n  oidc: {issuer: 'https://id.example', scopes: [email]}\n", want: "must include openid"},
+		"bad admin email":        {file: "auth:\n  admin_emails: [root]\n", want: "auth.admin_emails"},
+		"bad token name":         {file: "auth:\n  tokens: [{name: 'CI bot', secret_file: /x}]\n", want: "auth.tokens[0].name"},
+		"token without secret":   {file: "auth:\n  tokens: [{name: ci}]\n", want: "auth.tokens[0].secret_file: required"},
+		"short token secret":     {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  tokens: [{name: ci, secret_file: TOKEN}]\n", want: "at least 32 characters"},
+		"short session key":      {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  session_key_file: TOKEN\n", want: "at least 32 bytes"},
 		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {
@@ -193,5 +206,20 @@ func TestSecretRedacted(t *testing.T) {
 		if strings.Contains(strings.ToLower(k), "token") && !strings.Contains(k, "file") {
 			t.Errorf("settings expose %s = %v", k, v)
 		}
+	}
+}
+
+func TestAuth(t *testing.T) {
+	key, secret := write(t, "key", strings.Repeat("k", 32)+"\n"), write(t, "ci", strings.Repeat("s", 40))
+	cfg, _, err := Load(write(t, "scp.yaml", "server:\n  public_url: https://scp.example\ngithub:\n  sources:\n    - {id: gh, orgs: [a], token_file: "+
+		write(t, "t", "ghp")+", include_private: true}\naccess:\n  private_groups: [staff]\nauth:\n  session_key_file: "+key+
+		"\n  admin_emails: [ada@example.org]\n  tokens: [{name: ci, secret_file: "+secret+", groups: [staff]}]\n"+
+		"  oidc: {issuer: 'http://127.0.0.1:5556/dex', client_id: scp}\n"), nil) // include_private without a proxy: sign-in identifies
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := cfg.Auth
+	if !a.SignIn() || len(a.SessionKey.Reveal()) != 32 || len(a.Tokens[0].Secret.Reveal()) != 40 || a.OIDC.GroupsClaim != "groups" {
+		t.Errorf("auth = %+v", a)
 	}
 }

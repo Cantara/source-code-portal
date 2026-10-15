@@ -5,9 +5,9 @@ import { cache } from "react"
 import type { Api } from "./client"
 import type { paths } from "./schema"
 
-// The headers the Go server puts on a proxied page request that the API calls of the page carry back: the viewer with its token,
-// and the request id.
-const forwarded = ["x-scp-token", "x-scp-viewer", "x-request-id"]
+// The headers the Go server puts on a proxied page request that the API calls of the page carry back: the viewer (its kind, name
+// and how it was identified) with the web UI's token, and the request id.
+const forwarded = ["x-scp-token", "x-scp-viewer", "x-scp-name", "x-scp-via", "x-request-id"]
 
 /** serverApi is the API client of the current request: it reaches the Go server at SCP_API as the page's viewer. */
 export const serverApi = cache(async (): Promise<Api> => {
@@ -28,7 +28,8 @@ export const origin = cache(async (): Promise<string> => {
 
 /** privateViewer reports whether the page is rendered for a viewer who sees private repositories. */
 export async function privateViewer(): Promise<boolean> {
-  return (await headers()).get("x-scp-viewer") === "private"
+  const v = (await headers()).get("x-scp-viewer")
+  return v === "private" || v === "admin"
 }
 
 /** renderedAt is the instant the request renders at, on the clock's 30 s tick grid; the browser hydrates against it (lib/clock.ts). */

@@ -311,6 +311,30 @@ func (e ManifestEcosystem) Valid() bool {
 	}
 }
 
+// Defines values for MeVia.
+const (
+	None  MeVia = "none"
+	Oidc  MeVia = "oidc"
+	Proxy MeVia = "proxy"
+	Token MeVia = "token"
+)
+
+// Valid indicates whether the value is a known member of the MeVia enum.
+func (e MeVia) Valid() bool {
+	switch e {
+	case None:
+		return true
+	case Oidc:
+		return true
+	case Proxy:
+		return true
+	case Token:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RepoFindingCode.
 const (
 	RepoFindingCodeDormant    RepoFindingCode = "dormant"
@@ -762,6 +786,32 @@ type Manifests struct {
 	Uses []RepoLink `json:"uses"`
 }
 
+// Me defines model for Me.
+type Me struct {
+	// Admin Sees the operator surfaces
+	Admin bool `json:"admin"`
+
+	// Name The viewer's name; empty when anonymous
+	Name string `json:"name"`
+
+	// Private Sees private and internal repositories
+	Private bool `json:"private"`
+	SignIn  struct {
+		// Oidc GET /auth/login signs in at the provider
+		Oidc bool `json:"oidc"`
+
+		// Token POST /auth/token exchanges a token for a session
+		Token bool `json:"token"`
+	} `json:"signIn"`
+	SignedIn bool `json:"signedIn"`
+
+	// Via How the viewer is identified; none when anonymous
+	Via MeVia `json:"via"`
+}
+
+// MeVia How the viewer is identified; none when anonymous
+type MeVia string
+
 // Page defines model for Page.
 type Page struct {
 	// Number This page
@@ -1016,6 +1066,9 @@ type ServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(w http.ResponseWriter, r *http.Request, group string)
+	// GetMe The viewer, its roles and how one signs in
+	// (GET /me)
+	GetMe(w http.ResponseWriter, r *http.Request)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(w http.ResponseWriter, r *http.Request, params ListReposParams)
@@ -1178,6 +1231,20 @@ func (siw *ServerInterfaceWrapper) GetGroup(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGroup(w, r, group)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1643,6 +1710,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/manifests", wrapper.GetManifests)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/history", wrapper.GetHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 
 	return m
 }
@@ -1859,6 +1927,27 @@ func (response GetGroup404ApplicationProblemPlusJSONResponse) VisitGetGroupRespo
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse Me
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2308,6 +2397,9 @@ type StrictServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(ctx context.Context, request GetGroupRequestObject) (GetGroupResponseObject, error)
+	// GetMe The viewer, its roles and how one signs in
+	// (GET /me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(ctx context.Context, request ListReposRequestObject) (ListReposResponseObject, error)
@@ -2463,6 +2555,30 @@ func (sh *strictHandler) GetGroup(w http.ResponseWriter, r *http.Request, group 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetGroupResponseObject); ok {
 		if err := validResponse.VisitGetGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

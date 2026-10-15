@@ -27,6 +27,7 @@ type Config struct {
 	Catalog Catalog `mapstructure:"catalog"`
 	Webhook Webhook `mapstructure:"webhook"`
 	Access  Access  `mapstructure:"access"`
+	Auth    Auth    `mapstructure:"auth"`
 	Cluster Cluster `mapstructure:"cluster"`
 	Web     Web     `mapstructure:"web"`
 	Ops     Ops     `mapstructure:"ops"`
@@ -74,6 +75,15 @@ func defaults() map[string]any {
 		"access.user_header":           "X-Forwarded-User",
 		"access.groups_header":         "X-Forwarded-Groups",
 		"access.private_groups":        []string{},
+		"auth.session_key_file":        "",
+		"auth.session_ttl":             "12h",
+		"auth.admin_emails":            []string{},
+		"auth.admin_groups":            []string{},
+		"auth.oidc.issuer":             "",
+		"auth.oidc.client_id":          "",
+		"auth.oidc.client_secret_file": "",
+		"auth.oidc.scopes":             []string{"openid", "email", "profile"},
+		"auth.oidc.groups_claim":       "groups",
 		"cluster.addresses":            []string{},
 		"cluster.name":                 "dev",
 		"cluster.namespace":            "scp",
@@ -207,7 +217,8 @@ func (c Config) validate() []string {
 	if c.Webhook.PreviousSecretFile != "" && c.Webhook.SecretFile == "" {
 		p = append(p, "webhook.previous_secret_file: needs webhook.secret_file")
 	}
-	p = append(p, c.Access.validate(c.GitHub, len(c.Server.TrustedProxies) > 0)...)
+	p = append(p, c.Access.validate(c.GitHub, len(c.Server.TrustedProxies) > 0 || c.Auth.SignIn() || len(c.Auth.Tokens) > 0)...)
+	p = append(p, c.Auth.validate(c.Server.PublicURL)...)
 	p = append(p, c.Cluster.validate()...)
 	p = append(p, c.Web.validate()...)
 	slices.Sort(p)

@@ -124,7 +124,8 @@ func (c Cluster) validate() []string {
 	return p
 }
 
-func (a Access) validate(g GitHub, proxies bool) []string {
+// validate checks the access lists; identified reports a way to know a viewer (a trusted proxy, sign-in or tokens).
+func (a Access) validate(g GitHub, identified bool) []string {
 	var p []string
 	for key, h := range map[string]string{"access.user_header": a.UserHeader, "access.groups_header": a.GroupsHeader} {
 		if !headerPattern.MatchString(h) {
@@ -143,8 +144,8 @@ func (a Access) validate(g GitHub, proxies bool) []string {
 	switch {
 	case private && len(a.PrivateGroups) == 0:
 		p = append(p, "access.private_groups: required when a source sets include_private")
-	case private && !proxies:
-		p = append(p, "server.trusted_proxies: required when a source sets include_private (the authenticating proxy)")
+	case private && !identified:
+		p = append(p, "server.trusted_proxies: required when a source sets include_private (the authenticating proxy), unless auth signs viewers in")
 	}
 	return p
 }
@@ -334,6 +335,7 @@ func (c *Config) readSecrets() []string {
 	if c.Webhook.PreviousSecretFile != "" {
 		read("webhook.previous_secret_file", c.Webhook.PreviousSecretFile, &c.Webhook.PreviousSecret)
 	}
+	p = append(p, c.Auth.readSecrets(read)...)
 	slices.Sort(p)
 	return p
 }

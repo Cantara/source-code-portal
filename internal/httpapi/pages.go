@@ -14,7 +14,9 @@ import (
 // The headers a proxied page request carries to the web UI server, which sends the first three back on its API calls.
 const (
 	headerToken  = "X-Scp-Token"  //nolint:gosec // a header name; proves that a request comes from the web UI server
-	headerViewer = "X-Scp-Viewer" // private or public: the viewer the page is rendered for
+	headerViewer = "X-Scp-Viewer" // public, private or admin: the viewer the page is rendered for
+	headerName   = "X-Scp-Name"   // the signed-in viewer's name, path-escaped
+	headerVia    = "X-Scp-Via"    // how the viewer is identified: proxy, oidc, token; empty when anonymous
 	headerOrigin = "X-Scp-Origin" // the portal's public origin, for canonical URLs
 )
 
@@ -48,18 +50,14 @@ func (o Options) Pages(upstream *url.URL) http.Handler {
 			pr.Out.Host = pr.In.Host
 			p, _ := pr.In.Context().Value(pageKey{}).(pageRequest)
 			h := pr.Out.Header
-			if o.Access.UserHeader != "" {
-				h.Del(o.Access.UserHeader)
-				h.Del(o.Access.GroupsHeader)
-			}
-			viewer := "public"
-			if Private(pr.In.Context()) {
-				viewer = "private"
-			}
+			v := ViewerOf(pr.In.Context())
 			h.Set("Content-Security-Policy", cspPage(p.nonce))
 			h.Set("X-Request-Id", p.id)
 			h.Set(headerToken, o.WebToken)
-			h.Set(headerViewer, viewer)
+			h.Set(headerViewer, v.headerValue())
+			h.Set(headerName, url.PathEscape(v.Name))
+			h.Set(headerVia, v.Via)
+			h.Del("Authorization") // the web UI server needs only the viewer
 			h.Set(headerOrigin, o.origin(pr.In))
 		},
 		Transport: transport,

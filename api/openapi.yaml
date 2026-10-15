@@ -201,6 +201,19 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SnapshotInfo" }
         "304": { $ref: "#/components/responses/NotModified" }
+  /me:
+    get:
+      operationId: getMe
+      summary: The viewer, its roles and how one signs in
+      description: |
+        Who the request comes from, as the trusted proxy, the session or a bearer token names it, and what that admits: private
+        repositories, the admin surfaces. `signIn` says which ways of signing in the portal offers. Never cached by a shared cache.
+      responses:
+        "200":
+          description: The viewer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
   /events:
     get:
       operationId: streamEvents
@@ -613,6 +626,21 @@ components:
         id: { type: string }
         repos: { type: integer }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    Me:
+      type: object
+      required: [signedIn, name, via, private, admin, signIn]
+      properties:
+        signedIn: { type: boolean }
+        name: { type: string, description: "The viewer's name; empty when anonymous" }
+        via: { type: string, enum: [none, proxy, oidc, token], description: "How the viewer is identified; none when anonymous" }
+        private: { type: boolean, description: Sees private and internal repositories }
+        admin: { type: boolean, description: Sees the operator surfaces }
+        signIn:
+          type: object
+          required: [oidc, token]
+          properties:
+            oidc: { type: boolean, description: "GET /auth/login signs in at the provider" }
+            token: { type: boolean, description: "POST /auth/token exchanges a token for a session" }
     SnapshotInfo:
       type: object
       required: [version, builtAt, ready, sources]

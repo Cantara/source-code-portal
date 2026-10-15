@@ -205,6 +205,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/me": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The viewer, its roles and how one signs in
+     * @description Who the request comes from, as the trusted proxy, the session or a bearer token names it, and what that admits: private
+     *     repositories, the admin surfaces. `signIn` says which ways of signing in the portal offers. Never cached by a shared cache.
+     */
+    get: operations["getMe"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/events": {
     parameters: {
       query?: never
@@ -611,6 +632,26 @@ export interface components {
       repos: number
       freshness: components["schemas"]["Freshness"]
     }
+    Me: {
+      signedIn: boolean
+      /** @description The viewer's name; empty when anonymous */
+      name: string
+      /**
+       * @description How the viewer is identified; none when anonymous
+       * @enum {string}
+       */
+      via: "none" | "proxy" | "oidc" | "token"
+      /** @description Sees private and internal repositories */
+      private: boolean
+      /** @description Sees the operator surfaces */
+      admin: boolean
+      signIn: {
+        /** @description GET /auth/login signs in at the provider */
+        oidc: boolean
+        /** @description POST /auth/token exchanges a token for a session */
+        token: boolean
+      }
+    }
     SnapshotInfo: {
       /**
        * Format: int64
@@ -980,6 +1021,26 @@ export interface operations {
         }
       }
       304: components["responses"]["NotModified"]
+    }
+  }
+  getMe: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The viewer */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Me"]
+        }
+      }
     }
   }
   streamEvents: {
