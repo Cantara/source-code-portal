@@ -1,4 +1,4 @@
-# One required status check protects main: "gate". Actions are pinned by commit SHA (Renovate updates SHA and comment together);
+# The "gate" job sums up the others. Actions are pinned by commit SHA (Renovate updates SHA and comment together);
 # the token is read-only.
 name: ci
 
