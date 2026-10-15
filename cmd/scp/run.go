@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/netip"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
@@ -75,6 +78,9 @@ func loadConfig(cmd *cobra.Command, opts *options) (config.Config, map[string]an
 			err = failure{err}
 		}
 		return cfg, settings, err
+	}
+	for _, w := range trustWarnings(cfg) {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "scp: warning:", w)
 	}
 	_, findings := catalog.Compile(cfg.Catalog.Groups)
 	var problems []string
@@ -155,4 +161,22 @@ func newVersionCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print as JSON")
 	return cmd
+}
+
+// trustWarnings names the trusted proxy ranges wider than one proxy network (/24, /64) while private repositories are served on
+// an address other than loopback: any host in such a range can name any user and groups.
+func trustWarnings(cfg config.Config) []string {
+	private := slices.ContainsFunc(cfg.GitHub.Sources, func(s config.Source) bool { return s.IncludePrivate })
+	host, _, _ := net.SplitHostPort(cfg.Server.PublicAddr)
+	if ip, err := netip.ParseAddr(host); !private || err == nil && ip.IsLoopback() || host == "localhost" {
+		return nil
+	}
+	var out []string
+	for _, p := range cfg.Server.TrustedProxies {
+		if p.Addr().Is4() && p.Bits() < 24 || p.Addr().Is6() && p.Bits() < 64 {
+			out = append(out, fmt.Sprintf("server.trusted_proxies: %s trusts more than the proxy's network while private repositories are "+
+				"served on %s; any host in it can claim any user and groups", p, cfg.Server.PublicAddr))
+		}
+	}
+	return out
 }

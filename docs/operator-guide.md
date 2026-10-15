@@ -178,7 +178,8 @@ A request whose user is in one of `access.private_groups` sees everything; any o
 every page, in the API, badges, `/llms.txt` and the Markdown answers. The two headers are believed only from an address in
 `server.trusted_proxies` and dropped from any other. Answers to a permitted user are marked `Cache-Control: private`, and every answer
 varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and a way to know the viewer: `server.trusted_proxies`,
-`auth.oidc` or `auth.tokens`.
+`auth.oidc` or `auth.tokens`. `serve` and `config check` warn when a range in `server.trusted_proxies` is wider than /24 (IPv4) or /64
+(IPv6) while private repositories are served on an address other than loopback: any host in it could claim any user.
 Images in private READMEs load from GitHub and show for users signed in there.
 
 **Signed-in viewers only.** For a portal whose repositories are nearly all private, set `access.require_auth: true`: there is no

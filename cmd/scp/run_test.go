@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
@@ -414,4 +415,29 @@ catalog:
 		t.Errorf("metrics on the public listener: %d", code)
 	}
 	stop()
+}
+
+func TestTrustWarnings(t *testing.T) {
+	cfg := func(addr string, private bool, proxies ...string) config.Config {
+		var c config.Config
+		c.Server.PublicAddr = addr
+		c.GitHub.Sources = []config.Source{{ID: "gh", IncludePrivate: private}}
+		for _, p := range proxies {
+			c.Server.TrustedProxies = append(c.Server.TrustedProxies, netip.MustParsePrefix(p))
+		}
+		return c
+	}
+	for name, tc := range map[string]struct {
+		cfg  config.Config
+		want int
+	}{
+		"wide, all interfaces":   {cfg(":9090", true, "10.0.0.0/8", "10.1.2.0/24", "fd00::/48", "fd00::/64"), 2},
+		"wide, loopback":         {cfg("127.0.0.1:9090", true, "10.0.0.0/8"), 0},
+		"wide, public only":      {cfg(":9090", false, "10.0.0.0/8"), 0},
+		"narrow, all interfaces": {cfg("0.0.0.0:9090", true, "172.18.0.0/24"), 0},
+	} {
+		if got := trustWarnings(tc.cfg); len(got) != tc.want {
+			t.Errorf("%s: %q", name, got)
+		}
+	}
 }

@@ -23,11 +23,11 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   method, pattern, path, status, request id; never the answer), written by the middleware after the request line; static assets
   (`/_next/`) and the web UI server's own API calls (the page request is the record) are left out (`TestAudit`). Metrics and
   `/api/v1/status` carry no repository names: patterns, counts and source ids only.
-- `serve` warns at start when `include_private` is on, the public listener is not loopback and `trusted_proxies` holds a range wider
-  than /24 (IPv4) or /64 (IPv6).
+- `serve` and `config check` warn (stderr, `loadConfig`) when `include_private` is on, the public listener is not loopback and
+  `trusted_proxies` holds a range wider than /24 (IPv4) or /64 (IPv6) (`trustWarnings`).
 - A verified `repository` `deleted` delivery removes the repository at once; otherwise two complete listings must miss it.
 - `docs/security-model.md` states the guarantees, what the operator provides (an encrypted or tmpfs volume for `store.path`, the
   network layout, the App's permissions, key rotation) and what is out of scope.
 
 ## Order
-Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> audit log (built) -> start warning -> removal on `deleted` -> `security-model.md`.
+Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> audit log (built) -> start warning (built) -> removal on `deleted` -> `security-model.md`.
