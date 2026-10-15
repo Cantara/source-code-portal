@@ -40,6 +40,7 @@ scheduled sync, and built for organisations from a handful to thousands of repos
 - SVG badges: `/badges/repos/{owner}/{name}/{last-commit,release,license,issues}.svg` and `/badges/groups/{group}/repos.svg`.
 - The JSON API under `/api/v1`, described by [`api/openapi.yaml`](api/openapi.yaml) and served at `/api/v1/openapi.yaml`.
 - `/llms.txt`, `/llms-full.txt` and Markdown answers for every page (`Accept: text/markdown`), for LLM agents and scripts.
+- `/knowledge.yaml`, the catalogue as a [KCP](https://github.com/Cantara/knowledge-context-protocol) manifest (discovered at `/.well-known/kcp.json`): a map of groups, repositories and documents with intents and reading order.
 - Server-sent events at `/api/v1/events`: open pages update when the catalogue changes.
 - Every page is complete HTML with its own title, description and canonical URL, plus `/sitemap.xml` and `/robots.txt`.
 

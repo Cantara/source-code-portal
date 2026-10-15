@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,8 @@ func handler(l *LLMs) http.Handler {
 	mux.Handle("GET /repos/{owner}/{name}/readme.md", l.Readme())
 	mux.Handle("GET /repos/{owner}/{name}/docs/{path...}", l.Doc())
 	mux.Handle("GET /groups/{group}", l.Group())
+	mux.Handle("GET /knowledge.yaml", l.KCP())
+	mux.Handle("GET /.well-known/kcp.json", l.WellKnown())
 	return mux
 }
 
@@ -180,6 +183,48 @@ func TestRepoPage(t *testing.T) {
 	for _, want := range []string{`repo: "acme/app"`, "- Toolchains: go 1.27\n", "- Uses: [acme/lib](https://scp.example/repos/acme/lib)\n"} {
 		if !strings.Contains(app, want) {
 			t.Errorf("app misses %q:\n%s", want, app)
+		}
+	}
+}
+
+func TestKCP(t *testing.T) {
+	s := fixture()
+	techFacet.Set(s.Repos["acme/evil"], Technology{Uses: []snapshot.RepoKey{"acme/core", "acme/none"}}, snapshot.Freshness{})
+	s.Repos["acme/evil"].Repo.Description = "x\"\n  - id: forged\n    path: /etc/passwd"
+	s.Repos["acme/evil"].Repo.Topics = []string{"Beta", "alpha"}
+	docs, fresh := docsFacet.Get(s.Repos["acme/core"])
+	docsFacet.Set(s.Repos["acme/core"], append(docs, Doc{Path: "docs/Getting Started.markdown", Source: []byte("# Start\n")}), fresh)
+	h := New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", options())
+	mux := handler(h)
+
+	rec := get(mux, "/knowledge.yaml")
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != kcpTypeYAML || rec.Header().Get("ETag") == "" {
+		t.Fatalf("knowledge.yaml: %d %v", rec.Code, rec.Header())
+	}
+	golden(t, "knowledge.yaml", rec.Body.String())
+	if got := rec.Body.String(); strings.Count(got, "\n  - id: ") != 6 || strings.Contains(got, "\n  - id: forged") ||
+		!strings.Contains(got, "depends_on: [repo-acme-core]\n") {
+		t.Errorf("units or dependencies wrong:\n%s", got)
+	}
+	if again := get(mux, "/knowledge.yaml", "If-None-Match", rec.Header().Get("ETag")); again.Code != http.StatusNotModified {
+		t.Errorf("If-None-Match: %d", again.Code)
+	}
+
+	wk := get(mux, "/.well-known/kcp.json")
+	if wk.Code != 200 || wk.Header().Get("Content-Type") != "application/json" || !strings.Contains(wk.Body.String(), `"manifest": "https://scp.example/knowledge.yaml"`) {
+		t.Errorf("well-known: %d %s", wk.Code, wk.Body)
+	}
+	// every path the manifest names is served
+	for _, line := range strings.Split(rec.Body.String(), "\n") {
+		if p, ok := strings.CutPrefix(strings.TrimSpace(line), "path: "); ok {
+			if u, err := strconv.Unquote(p); err == nil {
+				p = u
+			}
+			if p != "llms.txt" {
+				if c := get(mux, "/"+p).Code; c != 200 {
+					t.Errorf("%s: %d", p, c)
+				}
+			}
 		}
 	}
 }

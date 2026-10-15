@@ -206,6 +206,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth})},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
+		{Pattern: "GET /knowledge.yaml", Handler: md.KCP()}, {Pattern: "GET /.well-known/kcp.json", Handler: md.WellKnown()},
 		{Pattern: "GET /sitemap.xml", Handler: md.Sitemap()}, {Pattern: "GET /sitemaps/{file}", Handler: md.Sitemap()},
 		{Pattern: "GET /robots.txt", Handler: md.Robots()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
