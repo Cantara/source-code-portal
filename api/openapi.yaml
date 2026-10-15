@@ -221,7 +221,7 @@ components:
     Repo:
       type: object
       required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, topics, archived, fork,
-                 stars, openIssues, pushedAt, lastCommitAt, release, language, groups, freshness]
+                 stars, openIssues, pushedAt, lastCommitAt, lastAuthoredAt, release, language, groups, health, freshness]
       properties:
         address: { type: string, description: "Lower-case owner/name, used in URLs" }
         owner: { type: string }
@@ -239,10 +239,46 @@ components:
         openIssues: { type: integer, description: Open issues and pull requests }
         pushedAt: { type: string, format: date-time }
         lastCommitAt: { type: [string, "null"], format: date-time, description: The newest default-branch commit; null until read }
+        lastAuthoredAt: { type: [string, "null"], format: date-time, description: "The newest default-branch commit by a person, not automation (bots, release plugins); when every read commit is automated, the oldest read one (the person's is older); null until read" }
         release: { oneOf: [{ $ref: "#/components/schemas/Release" }, { type: "null" }], description: The latest release; null when there is none or it is not read yet }
         language: { type: string, description: Language of the first package manifest; empty when there is none }
         groups: { type: array, items: { type: string }, description: Group ids in configuration order }
+        health: { oneOf: [{ $ref: "#/components/schemas/Health" }, { type: "null" }], description: Null for an archived or deprecated repository }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    HealthLevel: { type: string, enum: [good, watch, attention], description: "good from 80, watch from 50, attention below" }
+    Finding:
+      type: object
+      required: [code, penalty, message]
+      properties:
+        code: { type: string, enum: [failing, dormant, quiet, unreleased, no-licence, issues] }
+        penalty: { type: integer, description: Points the finding costs }
+        message: { type: string }
+    Health:
+      type: object
+      required: [score, level, findings]
+      properties:
+        score: { type: integer, minimum: 0, maximum: 100 }
+        level: { $ref: "#/components/schemas/HealthLevel" }
+        findings: { type: array, items: { $ref: "#/components/schemas/Finding" } }
+    RepoFinding:
+      allOf:
+        - $ref: "#/components/schemas/Finding"
+        - type: object
+          required: [repo]
+          properties:
+            repo: { type: string, description: Address of the repository }
+    ProductHealth:
+      type: object
+      description: The weighted health of a group's repositories; archived and deprecated ones are not counted
+      required: [score, level, counted, attention, watch, findings, findingCount]
+      properties:
+        score: { type: integer, minimum: 0, maximum: 100 }
+        level: { $ref: "#/components/schemas/HealthLevel" }
+        counted: { type: integer, description: Repositories with a score }
+        attention: { type: integer, description: Repositories at attention }
+        watch: { type: integer, description: Repositories at watch }
+        findings: { type: array, items: { $ref: "#/components/schemas/RepoFinding" }, description: "Most costly first; the dashboard carries the first 5" }
+        findingCount: { type: integer }
     Release:
       type: object
       required: [tag, url, publishedAt]
@@ -327,7 +363,7 @@ components:
         error: { type: integer }
     DashboardGroup:
       type: object
-      required: [id, name, description, defaultRepo, repoCount, lastActivity]
+      required: [id, name, description, defaultRepo, repoCount, lastActivity, health]
       properties:
         id: { type: string }
         name: { type: string }
@@ -335,11 +371,13 @@ components:
         defaultRepo: { type: [string, "null"], description: Address of the group's main repository, whose badges the dashboard shows }
         repoCount: { type: integer }
         lastActivity: { type: [string, "null"], format: date-time, description: Time of the group's newest commit }
+        health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: Null when no repository is counted }
     Dashboard:
       type: object
-      required: [groups, repoCount, ungroupedCount, latest, freshness]
+      required: [groups, repoCount, ungroupedCount, latest, health, freshness]
       properties:
         groups: { type: array, items: { $ref: "#/components/schemas/DashboardGroup" } }
+        health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: "Every repository weighed as one product; the first 5 findings" }
         repoCount: { type: integer }
         ungroupedCount: { type: integer, description: Repositories in no group }
         latest: { type: array, items: { $ref: "#/components/schemas/Commit" } }
@@ -465,7 +503,7 @@ components:
         groups: { type: array, items: { $ref: "#/components/schemas/GroupSummary" } }
     Group:
       type: object
-      required: [id, name, description, defaultRepo, defaultRepoState, repoCount, repos]
+      required: [id, name, description, defaultRepo, defaultRepoState, repoCount, health, repos]
       properties:
         id: { type: string }
         name: { type: string }
@@ -473,6 +511,7 @@ components:
         defaultRepo: { type: [string, "null"] }
         defaultRepoState: { type: string, enum: [ok, missing] }
         repoCount: { type: integer }
+        health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: Every finding }
         repos: { type: array, items: { $ref: "#/components/schemas/Repo" } }
     SourceInfo:
       type: object

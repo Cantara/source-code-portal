@@ -76,7 +76,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 
 | M | Delivers | Done when | State |
 |---|---|---|---|
-| G1 | Commit graph on the repository page and the repository's commit log (`design/web.md` Behaviour 13, `design/content.md` Commits 3) | a repository's commits draw as a git graph (lanes, branches, merges) in both themes, axe clean, linear histories as one line | in progress |
+| H1 | Health: weighed repository and product scores with their findings (`design/health.md`) | the API, the dashboard, the group page and the health badges show each score with the findings behind it; one neglected repository is never averaged away | in progress |
 | M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | queued |
 
 Each milestone starts with its design note and lands as small commits on `main`, CI green.

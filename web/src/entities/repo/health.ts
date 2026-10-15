@@ -2,21 +2,21 @@ import type { Repo } from "@/lib/api/client"
 
 const day = 24 * 3600 * 1000
 
-/** Activity is how recently a repository changed: by its newest commit, else its last push. */
+/** Activity is how recently a person changed a repository: by its newest commit not made by automation, else its last push. */
 export type Activity = "active" | "recent" | "quiet" | "dormant" | "archived"
 
 /** activities in display order, with their labels. */
 export const activities: { level: Activity; label: string; within: string }[] = [
-  { level: "active", label: "Active", within: "a commit in the last 30 days" },
-  { level: "recent", label: "Recent", within: "a commit in the last 6 months" },
-  { level: "quiet", label: "Quiet", within: "a commit in the last 2 years" },
-  { level: "dormant", label: "Dormant", within: "no commit for 2 years" },
+  { level: "active", label: "Active", within: "a commit by a person in the last 30 days" },
+  { level: "recent", label: "Recent", within: "a commit by a person in the last 6 months" },
+  { level: "quiet", label: "Quiet", within: "a commit by a person in the last 2 years" },
+  { level: "dormant", label: "Dormant", within: "no commit by a person for 2 years" },
   { level: "archived", label: "Archived", within: "archived on GitHub" },
 ]
 
 /** lastChange is the instant activity is measured from. */
 export function lastChange(r: Repo): string {
-  return r.lastCommitAt ?? r.pushedAt
+  return r.lastAuthoredAt ?? r.lastCommitAt ?? r.pushedAt
 }
 
 /** activity classifies a repository relative to now. */

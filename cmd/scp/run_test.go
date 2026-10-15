@@ -239,6 +239,9 @@ catalog:
 		if b := read(public + "/badges/groups/whydah/repos.svg"); !strings.Contains(b, ">2</text>") {
 			t.Errorf("group badge: %s", b)
 		}
+		if b := read(public + "/badges/groups/whydah/release.svg"); !strings.Contains(b, ">v2.0.0</text>") {
+			t.Errorf("group release badge: %s", b)
+		}
 		var groups oapi.GroupList
 		if code := fetch(public+"/api/v1/groups", &groups); code != http.StatusOK || len(groups.Groups) != 2 {
 			t.Fatalf("groups: %d %+v", code, groups)
@@ -254,6 +257,14 @@ catalog:
 			repo.Repo.Freshness.Status != "fresh" || strings.Join(repo.Repo.Groups, ",") != "whydah,other" {
 			t.Errorf("repo: %d %+v", code, repo.Repo)
 		}
+		if h := repo.Repo.Health; h == nil || !slices.ContainsFunc(h.Findings, func(f oapi.Finding) bool { return f.Code == "no-licence" }) {
+			t.Errorf("repo health: %+v", h)
+		}
+		var whydah oapi.Group
+		if code := fetch(public+"/api/v1/groups/whydah", &whydah); code != http.StatusOK || whydah.Health == nil ||
+			whydah.Health.Counted != 2 || whydah.Health.FindingCount != len(whydah.Health.Findings) {
+			t.Errorf("group health: %d %+v", code, whydah.Health)
+		}
 		if repo.Title != "Whydah Core" || repo.Descriptor.File != ".github/scp.yaml" || repo.Descriptor.Lifecycle != "production" ||
 			len(repo.Commits) != 3 || repo.Commits[0].Subject != "change a" || repo.CommitsFreshness.Status != "fresh" {
 			t.Errorf("repo detail: title %q, descriptor %+v, commits %+v", repo.Title, repo.Descriptor, repo.Commits)
@@ -261,7 +272,7 @@ catalog:
 		var dash oapi.Dashboard
 		if code := fetch(public+"/api/v1/dashboard", &dash); code != http.StatusOK || dash.RepoCount != 3 || len(dash.Latest) != 6 ||
 			dash.Latest[0].Sha != strings.Repeat("a", 40) || len(dash.Groups) != 2 || dash.Groups[0].LastActivity == nil ||
-			!dash.Groups[0].LastActivity.Equal(at(9)) {
+			!dash.Groups[0].LastActivity.Equal(at(9)) || dash.Health == nil || dash.Health.Counted != 3 || dash.Groups[0].Health == nil {
 			t.Errorf("dashboard: %d %+v", code, dash)
 		}
 		var shas []string

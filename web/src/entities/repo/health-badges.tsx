@@ -2,6 +2,7 @@ import type { Repo } from "@/lib/api/client"
 import { ago, count, exactUTC } from "@/lib/format"
 import { activities, activity, lastChange, type Activity, type Pulse } from "./health"
 import { cn } from "@/lib/cn"
+import { levels } from "@/entities/health/health"
 
 const label = Object.fromEntries(activities.map((a) => [a.level, a])) as Record<Activity, (typeof activities)[number]>
 
@@ -35,14 +36,24 @@ export function ActivityLight({
 }
 
 /**
- * HealthBadges are a repository's health at a glance: activity and age, latest release, licence, open issues and language.
- * Every badge carries its meaning in text, so colour is never the only signal.
+ * HealthBadges are a repository's health at a glance: its score when it is not good (the findings in its title), activity and age,
+ * latest release, licence, open issues and language. Every badge carries its meaning in text, so colour is never the only signal.
  */
 export function HealthBadges({ repo, now, className }: { repo: Repo; now: number; className?: string }) {
   const level = activity(repo, now)
   const licensed = repo.license !== "" && repo.license !== "NOASSERTION"
   return (
     <span className={cn("flex flex-wrap items-center gap-1", className)}>
+      {repo.health && repo.health.level !== "good" && (
+        <span
+          className={cn(levels[repo.health.level].className, "chip")}
+          title={repo.health.findings.map((f) => `−${f.penalty} ${f.message}`).join("\n")}
+        >
+          <span className="sr-only">Health </span>
+          {repo.health.score} {levels[repo.health.level].label.toLowerCase()}
+          <span className="sr-only">: {repo.health.findings.map((f) => f.message).join("; ")}</span>
+        </span>
+      )}
       <span className={`lvl-${level} chip`} title={`${label[level].label}: last change ${exactUTC(lastChange(repo))}`}>
         <span aria-hidden="true" className="led size-1.5" />
         <span className="sr-only">{label[level].label}, last change</span>

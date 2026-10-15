@@ -72,7 +72,11 @@ Flat SVG badges for READMEs and wikis; they are drawn by the portal, so no third
 | latest release | `/badges/repos/{owner}/{name}/release.svg` |
 | licence | `/badges/repos/{owner}/{name}/license.svg` |
 | open issues and pull requests | `/badges/repos/{owner}/{name}/issues.svg` |
+| health score | `/badges/repos/{owner}/{name}/health.svg` |
 | repositories in a group | `/badges/groups/{group}/repos.svg` |
+| a group's weighed health | `/badges/groups/{group}/health.svg` |
+| a group's newest commit | `/badges/groups/{group}/last-commit.svg` |
+| a group's release (its default repository's, else the newest) | `/badges/groups/{group}/release.svg` |
 
 ```markdown
 [![last commit](https://scp.example.org/badges/repos/cantara/whydah-sso/last-commit.svg)](https://scp.example.org/repos/cantara/whydah-sso)

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { Card, CardTitle } from "@/components/ui/card"
-import { api, type Repo } from "@/lib/api/client"
+import { api, type Repo, type Schemas } from "@/lib/api/client"
 import { useNow } from "@/lib/clock"
 import { plural } from "@/lib/format"
 import { groupCommitsPath, repoPath } from "@/lib/paths"
@@ -16,6 +16,7 @@ import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { ActivityLight, HealthBadges } from "@/entities/repo/health-badges"
+import { FindingList, HealthScore } from "@/entities/health/health"
 import { VisibilityBadge } from "@/entities/repo/visibility-badge"
 import { groupQuery } from "@/lib/api/queries"
 import { groupCommitsQuery } from "./api"
@@ -140,12 +141,35 @@ export function GroupView({ group }: { group: string }) {
               </div>
             )}
           </section>
-          <PanelBoundary>
-            <LatestCommits group={group} />
-          </PanelBoundary>
+          <div className="flex min-w-0 flex-col gap-6">
+            {data.health && <GroupHealth health={data.health} />}
+            <PanelBoundary>
+              <LatestCommits group={group} />
+            </PanelBoundary>
+          </div>
         </div>
       )}
     </>
+  )
+}
+
+/** GroupHealth is the group's weighed score and every finding behind it, the most costly first. */
+function GroupHealth({ health }: { health: Schemas["ProductHealth"] }) {
+  return (
+    <Card aria-labelledby="health">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <CardTitle id="health">Health</CardTitle>
+        <HealthScore health={health} large />
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {plural(health.counted, "repository", "repositories")} weighed: {health.attention} at attention, {health.watch} to watch
+      </p>
+      {health.findings.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">Nothing needs attention.</p>
+      ) : (
+        <FindingList findings={health.findings} className="mt-2" />
+      )}
+    </Card>
   )
 }
 

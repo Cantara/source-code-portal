@@ -42,6 +42,28 @@ A file over 512 KiB, or one that does not parse, is listed with the problem.
 Changes show within seconds when the portal's webhook is set up, otherwise after the next scheduled check (a push is noticed within
 the listing interval, five minutes by default).
 
+## Health
+
+Every repository gets a health score from 0 to 100, so the owner of a product sees what needs attention. It starts at 100 and loses
+points for each finding, and the portal shows the findings beside the score:
+
+| Finding | Points | When |
+|---|---|---|
+| SCP cannot update it | 25 | the portal failed to read the repository or its commits three times in a row |
+| dormant | 30 | no change by a person for 2 years: archive it or revive it |
+| quiet | 10 | no change by a person for 6 months |
+| unreleased changes | 20 | commits landed after the latest release, and that release is older than 90 days |
+| no licence | 20 | a public repository where GitHub detects no licence |
+| open issues and pull requests | 10 or 20 | more than 20, or more than 50 |
+
+Commits by automation do not count as change: authors ending in `[bot]` (Renovate, Dependabot, GitHub Actions) and
+`[maven-release-plugin]` commits. They do count as unreleased changes. 80 and above is good, 50 and above is to watch, below 50 needs
+attention. Archived repositories and those with `lifecycle: deprecated`
+in their descriptor have no score.
+
+A group's health weighs its repositories: one changed in the last 6 months counts twice, the group's default repository three times
+more. A group with a repository that needs attention is never shown as good.
+
 ## The `scp.yaml` descriptor
 
 Place `scp.yaml` (or `scp.yml`, not both) in `.github/` or at the repository root; `.github/` wins when both exist. Every field is

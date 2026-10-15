@@ -151,6 +151,7 @@ describe("commit log", () => {
       http.get("/dashboard", ({ response }) =>
         response(200).json({
           groups: [],
+          health: null,
           repoCount: ++n,
           ungroupedCount: 0,
           latest: [],
@@ -192,6 +193,7 @@ describe("commit log", () => {
         http.get("/dashboard", ({ response }) =>
           response(200).json({
             groups: [],
+            health: null,
             repoCount: ++n,
             ungroupedCount: 0,
             latest: [],

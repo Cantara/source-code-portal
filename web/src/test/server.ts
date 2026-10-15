@@ -23,6 +23,19 @@ export function commit(i: number, repo = "acme/core"): S["Commit"] {
   }
 }
 
+export const healthy: S["Health"] = { score: 100, level: "good", findings: [] }
+
+/** product is a product's health with one repository at attention. */
+export const product: S["ProductHealth"] = {
+  score: 74,
+  level: "watch",
+  counted: 2,
+  attention: 1,
+  watch: 0,
+  findings: [{ repo: "acme/agent", code: "dormant", penalty: 30, message: "No change for 3 years: archive it or revive it" }],
+  findingCount: 1,
+}
+
 export function repo(name: string, over: Partial<S["Repo"]> = {}): S["Repo"] {
   return {
     address: `acme/${name.toLowerCase()}`,
@@ -41,9 +54,11 @@ export function repo(name: string, over: Partial<S["Repo"]> = {}): S["Repo"] {
     openIssues: 0,
     pushedAt: at,
     lastCommitAt: at,
+    lastAuthoredAt: at,
     release: { tag: "v1.0.0", url: `https://github.com/acme/${name}/releases/tag/v1.0.0`, publishedAt: at },
     language: "Go",
     groups: ["iam"],
+    health: healthy,
     freshness: fresh,
     ...over,
   }
@@ -78,8 +93,10 @@ export const defaults = [
           defaultRepo: "acme/whydah",
           repoCount: 2,
           lastActivity: at,
+          health: product,
         },
       ],
+      health: product,
       repoCount: 3,
       ungroupedCount: 1,
       latest: [commit(1)],
@@ -100,7 +117,18 @@ export const defaults = [
           defaultRepo: null,
           defaultRepoState: "missing",
           repoCount: 2,
-          repos: [repo("Core", { pushedAt: "2026-10-01T00:00:00Z" }), repo("Agent", { description: "The agent" })],
+          health: product,
+          repos: [
+            repo("Core", { pushedAt: "2026-10-01T00:00:00Z" }),
+            repo("Agent", {
+              description: "The agent",
+              health: {
+                score: 40,
+                level: "attention",
+                findings: [{ code: "dormant", penalty: 30, message: "No change for 3 years" }],
+              },
+            }),
+          ],
         })
       : response(404).json({
           type: "about:blank",

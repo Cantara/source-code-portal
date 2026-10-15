@@ -245,13 +245,55 @@ export interface components {
        * @description The newest default-branch commit; null until read
        */
       lastCommitAt: string | null
+      /**
+       * Format: date-time
+       * @description The newest default-branch commit by a person, not automation (bots, release plugins); when every read commit is automated, the oldest read one (the person's is older); null until read
+       */
+      lastAuthoredAt: string | null
       /** @description The latest release; null when there is none or it is not read yet */
       release: components["schemas"]["Release"] | null
       /** @description Language of the first package manifest; empty when there is none */
       language: string
       /** @description Group ids in configuration order */
       groups: string[]
+      /** @description Null for an archived or deprecated repository */
+      health: components["schemas"]["Health"] | null
       freshness: components["schemas"]["Freshness"]
+    }
+    /**
+     * @description good from 80, watch from 50, attention below
+     * @enum {string}
+     */
+    HealthLevel: "good" | "watch" | "attention"
+    Finding: {
+      /** @enum {string} */
+      code: "failing" | "dormant" | "quiet" | "unreleased" | "no-licence" | "issues"
+      /** @description Points the finding costs */
+      penalty: number
+      message: string
+    }
+    Health: {
+      score: number
+      level: components["schemas"]["HealthLevel"]
+      findings: components["schemas"]["Finding"][]
+    }
+    RepoFinding: components["schemas"]["Finding"] & {
+      /** @description Address of the repository */
+      repo: string
+    }
+    /** @description The weighted health of a group's repositories; archived and deprecated ones are not counted */
+    ProductHealth: {
+      score: number
+      level: components["schemas"]["HealthLevel"]
+      /** @description Repositories with a score */
+      counted: number
+      /** @description Repositories at attention */
+      attention: number
+      /** @description Repositories at watch */
+      watch: number
+      /** @description Most costly first; the dashboard carries the first 5 */
+      findings: components["schemas"]["RepoFinding"][]
+      findingCount: number
     }
     Release: {
       tag: string
@@ -338,9 +380,13 @@ export interface components {
        * @description Time of the group's newest commit
        */
       lastActivity: string | null
+      /** @description Null when no repository is counted */
+      health: components["schemas"]["ProductHealth"] | null
     }
     Dashboard: {
       groups: components["schemas"]["DashboardGroup"][]
+      /** @description Every repository weighed as one product; the first 5 findings */
+      health: components["schemas"]["ProductHealth"] | null
       repoCount: number
       /** @description Repositories in no group */
       ungroupedCount: number
@@ -471,6 +517,8 @@ export interface components {
       /** @enum {string} */
       defaultRepoState: "ok" | "missing"
       repoCount: number
+      /** @description Every finding */
+      health: components["schemas"]["ProductHealth"] | null
       repos: components["schemas"]["Repo"][]
     }
     SourceInfo: {

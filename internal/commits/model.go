@@ -103,6 +103,28 @@ func LastCommit(e *snapshot.RepoEntry) (time.Time, snapshot.Freshness) {
 	return cs[0].CommittedAt, fresh
 }
 
+// Automated reports whether a commit was made by automation: an author named like a GitHub App (`renovate[bot]`) or a Maven release
+// commit.
+func Automated(c *Commit) bool {
+	return strings.HasSuffix(c.AuthorLogin, "[bot]") || strings.HasSuffix(c.AuthorName, "[bot]") ||
+		strings.HasPrefix(c.Subject, "[maven-release-plugin]")
+}
+
+// LastAuthored returns the time of the newest commit of e made by a person. When every read commit is automated, it returns the oldest
+// read commit's time with before set: the last person's commit is older. Zero when there are no commits.
+func LastAuthored(e *snapshot.RepoEntry) (at time.Time, before bool) {
+	cs, _ := Of(e)
+	for i := range cs {
+		if !Automated(&cs[i]) {
+			return cs[i].CommittedAt, false
+		}
+	}
+	if len(cs) == 0 {
+		return time.Time{}, false
+	}
+	return cs[len(cs)-1].CommittedAt, true
+}
+
 // dashboardCommits is how many of the latest commits the dashboard shows.
 const dashboardCommits = 10
 
@@ -137,6 +159,9 @@ func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 func Repo(e *snapshot.RepoEntry, r *oapi.Repo) {
 	if at, _ := LastCommit(e); !at.IsZero() {
 		r.LastCommitAt = oapi.TimeOrNil(at)
+	}
+	if at, _ := LastAuthored(e); !at.IsZero() {
+		r.LastAuthoredAt = oapi.TimeOrNil(at)
 	}
 }
 

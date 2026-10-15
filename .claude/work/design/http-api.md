@@ -49,7 +49,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/images/{o}/{n}/{id}` | docs | the images documents show, through the proxy (images-events.md) |
 | P | GET | `/api/v1/openapi.yaml` | httpapi | the embedded contract |
 | P | GET | `/badges/repos/{o}/{n}/{file}` | badges | `last-commit.svg`, `release.svg`, `license.svg`, `issues.svg` |
-| P | GET | `/badges/groups/{group}/{file}` | badges | `repos.svg` (repository count) |
+| P | GET | `/badges/groups/{group}/{file}` | badges | `repos.svg` (repository count), `health.svg`, `last-commit.svg`, `release.svg` |
 | P | GET | `/llms.txt` | llms | llmstxt.org index (Behaviour 5) |
 | P | GET | `/llms-full.txt` | llms | all READMEs, delimited, capped |
 | P | POST | `/webhooks/github` | webhook | GitHub deliveries (registered when `webhook.secret_file` is set) |

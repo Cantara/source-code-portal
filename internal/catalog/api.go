@@ -15,6 +15,7 @@ import (
 type API struct {
 	Current   func(context.Context) *snapshot.Snapshot // the viewer's view
 	Dashboard []func(*snapshot.Snapshot, *oapi.Dashboard)
+	Group     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group)
 	Repo      []func(*snapshot.RepoEntry, *oapi.Repo)
 	Detail    []func(*snapshot.RepoEntry, *oapi.RepoDetail)
 }
@@ -60,8 +61,12 @@ func (a API) GetGroup(ctx context.Context, req oapi.GetGroupRequestObject) (oapi
 		return oapi.GetGroup404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: notFound("no such group")}, nil
 	}
 	def, state := defaultRepo(g)
-	return oapi.GetGroup200JSONResponse{Body: oapi.Group{Id: g.ID, Name: g.Name, Description: g.Description, DefaultRepo: def,
-		DefaultRepoState: oapi.GroupDefaultRepoState(state), RepoCount: len(g.Members), Repos: a.repos(s, g.Members, time.Now())}}, nil
+	out := oapi.Group{Id: g.ID, Name: g.Name, Description: g.Description, DefaultRepo: def,
+		DefaultRepoState: oapi.GroupDefaultRepoState(state), RepoCount: len(g.Members), Repos: a.repos(s, g.Members, time.Now())}
+	for _, fn := range a.Group {
+		fn(s, g, &out)
+	}
+	return oapi.GetGroup200JSONResponse{Body: out}, nil
 }
 
 func (a API) ListRepos(ctx context.Context, req oapi.ListReposRequestObject) (oapi.ListReposResponseObject, error) {

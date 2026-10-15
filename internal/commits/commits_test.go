@@ -122,3 +122,26 @@ func TestPublish(t *testing.T) {
 		t.Errorf("published: %+v", s.Repos)
 	}
 }
+
+func TestLastAuthored(t *testing.T) {
+	day := func(d int) time.Time { return time.Date(2026, 10, d, 0, 0, 0, 0, time.UTC) }
+	bot := Commit{AuthorName: "renovate[bot]", Subject: "chore(deps): update", CommittedAt: day(9)}
+	release := Commit{AuthorName: "Jenkins", Subject: "[maven-release-plugin] prepare release v1", CommittedAt: day(8)}
+	person := Commit{AuthorName: "Ada", AuthorLogin: "ada", Subject: "Fix the parser", CommittedAt: day(7)}
+	app := Commit{AuthorLogin: "github-actions[bot]", CommittedAt: day(6)}
+	for name, tc := range map[string]struct {
+		cs     []Commit
+		at     time.Time
+		before bool
+	}{
+		"a person after automation": {[]Commit{bot, release, person, app}, day(7), false},
+		"only automation":           {[]Commit{bot, release, app}, day(6), true},
+		"none":                      {nil, time.Time{}, false},
+	} {
+		e := &snapshot.RepoEntry{}
+		facet.Set(e, tc.cs, snapshot.Freshness{State: snapshot.StateOK})
+		if at, before := LastAuthored(e); !at.Equal(tc.at) || before != tc.before {
+			t.Errorf("%s: %v %v, want %v %v", name, at, before, tc.at, tc.before)
+		}
+	}
+}

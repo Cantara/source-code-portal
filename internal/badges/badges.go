@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -39,6 +40,9 @@ type Release struct {
 
 // facet is the latest release: nil when there is none or it is not known yet (the freshness tells which).
 const facet snapshot.Facet[*Release] = "release"
+
+// ReleaseOf is a repository's latest release (nil when there is none or it is not known yet) and its freshness.
+func ReleaseOf(e *snapshot.RepoEntry) (*Release, snapshot.Freshness) { return facet.Get(e) }
 
 // Repo adds the latest release to a repository summary.
 func Repo(e *snapshot.RepoEntry, r *oapi.Repo) {
@@ -92,11 +96,20 @@ func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, rel, fresh) })
 }
 
-// Handler serves GET /badges/repos/{owner}/{name}/{kind}.svg (last-commit, release, license, issues) and
-// GET /badges/groups/{group}/repos.svg from the viewer's view of the current snapshot. lastCommit gives a repository's newest commit
-// time (zero when there is none) and the freshness of its commits.
-func Handler(current func(context.Context) *snapshot.Snapshot, lastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)) http.Handler {
-	h := handler{current: current, lastCommit: lastCommit, now: time.Now}
+// Data is what the badges read from other features, wired in cmd/scp.
+type Data struct {
+	// LastCommit is a repository's newest commit time (zero when there is none) and the freshness of its commits.
+	LastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)
+	// Health is a repository's health at now.
+	Health func(*snapshot.RepoEntry, time.Time) health.Repo
+	// Product is a group's weighed health at now.
+	Product func(*snapshot.Snapshot, snapshot.Group, time.Time) health.Product
+}
+
+// Handler serves GET /badges/repos/{owner}/{name}/{kind}.svg (last-commit, release, license, issues, health) and
+// GET /badges/groups/{group}/{kind}.svg (repos, health, last-commit, release) from the viewer's view of the current snapshot.
+func Handler(current func(context.Context) *snapshot.Snapshot, d Data) http.Handler {
+	h := handler{current: current, Data: d, now: time.Now}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /badges/repos/{owner}/{name}/{file}", h.repo)
 	mux.HandleFunc("GET /badges/groups/{group}/{file}", h.group)
@@ -105,9 +118,9 @@ func Handler(current func(context.Context) *snapshot.Snapshot, lastCommit func(*
 }
 
 type handler struct {
-	current    func(context.Context) *snapshot.Snapshot // the viewer's view
-	lastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)
-	now        func() time.Time
+	Data
+	current func(context.Context) *snapshot.Snapshot // the viewer's view
+	now     func() time.Time
 }
 
 func unknown(label string) badge {
@@ -133,27 +146,14 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 	switch kind {
 	case "last-commit":
 		b.label = "last commit"
-		at, fresh := h.lastCommit(e)
-		switch {
-		case !at.IsZero():
-			msg, days := relativeDay(h.now(), at)
-			b.message, b.color = msg, ageColor(days)
-		case fresh.State == snapshot.StateOK || fresh.State == snapshot.StateNoContent || fresh.State == snapshot.StateNotFound:
-			b.message, b.color, data = "none", neutralColor, false
-		default:
-			b, data = unknown(b.label), false
-		}
+		at, fresh := h.LastCommit(e)
+		b, data = h.age(at, read(fresh))
 	case "release":
-		b.label = "release"
 		rel, fresh := facet.Get(e)
-		switch {
-		case rel != nil:
-			b.message, b.color = rel.Tag, infoColor
-		case fresh.State == snapshot.StateNotFound:
-			b.message, b.color, data = "none", neutralColor, false
-		default:
-			b, data = unknown(b.label), false
-		}
+		b, data = release(rel, fresh.State == snapshot.StateNotFound)
+	case "health":
+		r := h.Health(e, h.now())
+		b, data = score(r.Counted, r.Score, r.Level)
 	case "license":
 		b.label = "license"
 		switch l := e.Repo.License; l {
@@ -182,11 +182,110 @@ func (h handler) group(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g, ok := s.Group(r.PathValue("group"))
-	if !ok || r.PathValue("file") != "repos.svg" {
+	kind, svg := strings.CutSuffix(r.PathValue("file"), ".svg")
+	if !ok || !svg {
 		h.write(w, r, unknown(""), http.StatusNotFound, false)
 		return
 	}
-	h.write(w, r, badge{label: "repos", message: formatCount(len(g.Members)), color: infoColor}, http.StatusOK, true)
+	b, data := badge{}, true
+	switch kind {
+	case "repos":
+		b = badge{label: "repos", message: formatCount(len(g.Members)), color: infoColor}
+	case "health":
+		p := h.Product(s, g, h.now())
+		b, data = score(p.Counted > 0, p.Score, p.Level)
+	case "last-commit":
+		var newest time.Time
+		known := true
+		for _, k := range g.Members {
+			if e := s.Repos[k]; e != nil {
+				at, fresh := h.LastCommit(e)
+				newest, known = maxTime(newest, at), known && read(fresh)
+			}
+		}
+		b, data = h.age(newest, known)
+		b.label = "last commit"
+	case "release":
+		b, data = release(groupRelease(s, g))
+	default:
+		h.write(w, r, unknown(""), http.StatusNotFound, false)
+		return
+	}
+	h.write(w, r, b, http.StatusOK, data)
+}
+
+// read reports whether a fetch completed with an answer, content or none.
+func read(f snapshot.Freshness) bool {
+	return f.State == snapshot.StateOK || f.State == snapshot.StateNoContent || f.State == snapshot.StateNotFound
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
+}
+
+// age is the last-commit badge for at; with no commit it says none when the commits were read, else unknown.
+func (h handler) age(at time.Time, known bool) (badge, bool) {
+	switch {
+	case !at.IsZero():
+		msg, days := relativeDay(h.now(), at)
+		return badge{label: "last commit", message: msg, color: ageColor(days)}, true
+	case known:
+		return badge{label: "last commit", message: "none", color: neutralColor}, false
+	}
+	return unknown("last commit"), false
+}
+
+// release is the release badge; none says there is no release, else a missing one is unknown.
+func release(rel *Release, none bool) (badge, bool) {
+	switch {
+	case rel != nil:
+		return badge{label: "release", message: rel.Tag, color: infoColor}, true
+	case none:
+		return badge{label: "release", message: "none", color: neutralColor}, false
+	}
+	return unknown("release"), false
+}
+
+// groupRelease is the default repository's latest release, else the newest release among the members; none when every member is known
+// to have none.
+func groupRelease(s *snapshot.Snapshot, g snapshot.Group) (*Release, bool) {
+	if e := s.Repos[g.DefaultRepo]; e != nil {
+		if rel, _ := facet.Get(e); rel != nil {
+			return rel, false
+		}
+	}
+	var newest *Release
+	none := true
+	for _, k := range g.Members {
+		e := s.Repos[k]
+		if e == nil {
+			continue
+		}
+		rel, fresh := facet.Get(e)
+		if rel != nil && (newest == nil || rel.Published.After(newest.Published)) {
+			newest = rel
+		}
+		none = none && fresh.State == snapshot.StateNotFound
+	}
+	return newest, newest == nil && none
+}
+
+// score is the health badge: the score coloured by its level; without a score it says none.
+func score(counted bool, n int, level health.Level) (badge, bool) {
+	if !counted {
+		return badge{label: "health", message: "none", color: neutralColor}, false
+	}
+	c := successColor
+	switch level {
+	case health.Watch:
+		c = warningColor
+	case health.Attention:
+		c = dangerColor
+	}
+	return badge{label: "health", message: strconv.Itoa(n), color: c}, true
 }
 
 // ready answers 503 "starting" until a catalogue is loaded.
@@ -238,6 +337,6 @@ func (h handler) write(w http.ResponseWriter, r *http.Request, b badge, status i
 	hd.Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(status)
 	if r.Method != http.MethodHead {
-		_, _ = w.Write(body)
+		_, _ = w.Write(body) //nolint:gosec // G705: an SVG marshalled by encoding/xml, served with a sandbox CSP
 	}
 }

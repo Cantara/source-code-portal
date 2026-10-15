@@ -126,6 +126,16 @@ for (const path of ["/repos/acme/whydah-core", "/repos/acme/whydah-core/commits"
   })
 }
 
+test("a product shows its weighed health and what costs it points", async ({ page }) => {
+  await page.goto("/")
+  await expect(page.getByRole("region", { name: "Telemetry" }).getByText("Health", { exact: true })).toBeVisible()
+  await page.goto("/groups/whydah")
+  const health = page.getByRole("region", { name: "Health" })
+  await expect(health.getByText(/repositories weighed/)).toBeVisible()
+  await expect(health.getByRole("listitem").filter({ hasText: "No licence detected" })).toBeVisible()
+  await expect(health.getByRole("link", { name: "whydah-sso" })).toHaveAttribute("href", "/repos/acme/whydah-sso")
+})
+
 test("a page from the running bundle sees no new version", async ({ page }) => {
   const api = page.waitForResponse((r) => r.url().includes("/api/v1/"))
   await page.goto("/")

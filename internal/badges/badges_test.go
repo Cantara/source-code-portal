@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -105,9 +106,22 @@ func lastCommit(e *snapshot.RepoEntry) (time.Time, snapshot.Freshness) {
 	return time.Time{}, snapshot.Freshness{}
 }
 
+// data stands in for the other features: acme/x scores 72, acme/new is not counted, the group scores 41.
+var data = Data{LastCommit: lastCommit, //nolint:gochecknoglobals // test double
+	Health: func(e *snapshot.RepoEntry, _ time.Time) health.Repo {
+		if e.Repo.Name == "x" {
+			return health.Repo{Counted: true, Score: 72, Level: health.Watch}
+		}
+		return health.Repo{}
+	},
+	Product: func(*snapshot.Snapshot, snapshot.Group, time.Time) health.Product {
+		return health.Product{Counted: 1, Score: 41, Level: health.Attention}
+	},
+}
+
 func TestHandler(t *testing.T) {
 	s := testSnapshot(t)
-	h := Handler(func(context.Context) *snapshot.Snapshot { return s }, lastCommit)
+	h := Handler(func(context.Context) *snapshot.Snapshot { return s }, data)
 	tests := []struct {
 		path, msg, cache string
 		status           int
@@ -121,7 +135,13 @@ func TestHandler(t *testing.T) {
 		{"/badges/repos/acme/new/release.svg", "none", "public, max-age=60", 200, false},
 		{"/badges/repos/acme/new/license.svg", "none", "public, max-age=60", 200, false},
 		{"/badges/repos/acme/new/last-commit.svg", "unknown", "public, max-age=60", 200, false},
+		{"/badges/repos/acme/x/health.svg", "72", "public, max-age=300", 200, true},
+		{"/badges/repos/acme/new/health.svg", "none", "public, max-age=60", 200, false},
 		{"/badges/groups/g/repos.svg", "2", "public, max-age=300", 200, true},
+		{"/badges/groups/g/health.svg", "41", "public, max-age=300", 200, true},
+		{"/badges/groups/g/last-commit.svg", "3 days ago", "public, max-age=300", 200, true},
+		{"/badges/groups/g/release.svg", "v1.2.3", "public, max-age=300", 200, true},
+		{"/badges/groups/g/stars.svg", "unknown", "public, max-age=60", 404, false},
 		{"/badges/repos/acme/nope/issues.svg", "unknown", "public, max-age=60", 404, false},
 		{"/badges/repos/acme/x/stars.svg", "unknown", "public, max-age=60", 404, false},
 		{"/badges/repos/acme/x/issues.png", "unknown", "public, max-age=60", 404, false},
@@ -157,7 +177,7 @@ func TestHandler(t *testing.T) {
 
 	starting := &snapshot.Snapshot{}
 	rec := httptest.NewRecorder()
-	Handler(func(context.Context) *snapshot.Snapshot { return starting }, lastCommit).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/badges/repos/a/b/issues.svg", nil))
+	Handler(func(context.Context) *snapshot.Snapshot { return starting }, data).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/badges/repos/a/b/issues.svg", nil))
 	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") != "15" || rec.Header().Get("Cache-Control") != "no-store" ||
 		!strings.Contains(rec.Body.String(), "starting") {
 		t.Errorf("starting: %d %v", rec.Code, rec.Header())
@@ -195,5 +215,18 @@ func TestReleaseJob(t *testing.T) {
 				t.Errorf("%s: the same release again is not Unchanged", name)
 			}
 		}
+	}
+}
+
+func TestGroupRelease(t *testing.T) {
+	s := testSnapshot(t)
+	if rel, _ := groupRelease(s, snapshot.Group{DefaultRepo: "acme/new", Members: []snapshot.RepoKey{"acme/new", "acme/x"}}); rel == nil || rel.Tag != "v1.2.3" {
+		t.Fatalf("a default without a release falls back to the newest: %+v", rel)
+	}
+	if rel, none := groupRelease(s, snapshot.Group{Members: []snapshot.RepoKey{"acme/new"}}); rel != nil || !none {
+		t.Fatalf("no member has a release: %+v %v", rel, none)
+	}
+	if b, _ := score(true, 30, health.Attention); b.color != dangerColor || b.message != "30" {
+		t.Fatalf("attention badge %+v", b)
 	}
 }

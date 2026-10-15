@@ -22,6 +22,7 @@ var (
 	infoColor    = color{0x0b, 0x61, 0xa4} //nolint:gochecknoglobals // constant palette
 	warningColor = color{0xb4, 0x53, 0x09} //nolint:gochecknoglobals // constant palette
 	neutralColor = color{0x6e, 0x6e, 0x6e} //nolint:gochecknoglobals // constant palette
+	dangerColor  = color{0xb6, 0x23, 0x24} //nolint:gochecknoglobals // constant palette
 )
 
 // badge is what render draws. Label and message are plain text.

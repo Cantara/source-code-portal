@@ -192,7 +192,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if external == nil {
 		external = docs.Guarded()
 	}
-	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view, commits.LastCommit)},
+	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view,
+		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth})},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
@@ -213,9 +214,11 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
 			Vary: private},
 		Observe: m.request}
-	catalogAPI := catalog.API{Current: view, Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard},
-		Repo:   []func(*snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo},
-		Detail: []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
+	catalogAPI := catalog.API{Current: view,
+		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI},
+		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
+		Repo:      []func(*snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, repoHealthAPI},
+		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
 	features := api{catalogAPI, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		httpapi.SnapshotAPI{Current: view}}
 	if s.web != nil {

@@ -161,6 +161,36 @@ func (e DocSummaryState) Valid() bool {
 	}
 }
 
+// Defines values for FindingCode.
+const (
+	FindingCodeDormant    FindingCode = "dormant"
+	FindingCodeFailing    FindingCode = "failing"
+	FindingCodeIssues     FindingCode = "issues"
+	FindingCodeNoLicence  FindingCode = "no-licence"
+	FindingCodeQuiet      FindingCode = "quiet"
+	FindingCodeUnreleased FindingCode = "unreleased"
+)
+
+// Valid indicates whether the value is a known member of the FindingCode enum.
+func (e FindingCode) Valid() bool {
+	switch e {
+	case FindingCodeDormant:
+		return true
+	case FindingCodeFailing:
+		return true
+	case FindingCodeIssues:
+		return true
+	case FindingCodeNoLicence:
+		return true
+	case FindingCodeQuiet:
+		return true
+	case FindingCodeUnreleased:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FreshnessStatus.
 const (
 	Error   FreshnessStatus = "error"
@@ -221,6 +251,27 @@ func (e GroupSummaryDefaultRepoState) Valid() bool {
 	}
 }
 
+// Defines values for HealthLevel.
+const (
+	Attention HealthLevel = "attention"
+	Good      HealthLevel = "good"
+	Watch     HealthLevel = "watch"
+)
+
+// Valid indicates whether the value is a known member of the HealthLevel enum.
+func (e HealthLevel) Valid() bool {
+	switch e {
+	case Attention:
+		return true
+	case Good:
+		return true
+	case Watch:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ManifestEcosystem.
 const (
 	ManifestEcosystemGo    ManifestEcosystem = "go"
@@ -236,6 +287,36 @@ func (e ManifestEcosystem) Valid() bool {
 	case ManifestEcosystemMaven:
 		return true
 	case ManifestEcosystemNpm:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RepoFindingCode.
+const (
+	RepoFindingCodeDormant    RepoFindingCode = "dormant"
+	RepoFindingCodeFailing    RepoFindingCode = "failing"
+	RepoFindingCodeIssues     RepoFindingCode = "issues"
+	RepoFindingCodeNoLicence  RepoFindingCode = "no-licence"
+	RepoFindingCodeQuiet      RepoFindingCode = "quiet"
+	RepoFindingCodeUnreleased RepoFindingCode = "unreleased"
+)
+
+// Valid indicates whether the value is a known member of the RepoFindingCode enum.
+func (e RepoFindingCode) Valid() bool {
+	switch e {
+	case RepoFindingCodeDormant:
+		return true
+	case RepoFindingCodeFailing:
+		return true
+	case RepoFindingCodeIssues:
+		return true
+	case RepoFindingCodeNoLicence:
+		return true
+	case RepoFindingCodeQuiet:
+		return true
+	case RepoFindingCodeUnreleased:
 		return true
 	default:
 		return false
@@ -317,8 +398,11 @@ type Dashboard struct {
 	// Freshness Repositories by the freshness of their commits
 	Freshness FreshnessCounts  `json:"freshness"`
 	Groups    []DashboardGroup `json:"groups"`
-	Latest    []Commit         `json:"latest"`
-	RepoCount int              `json:"repoCount"`
+
+	// Health Every repository weighed as one product; the first 5 findings
+	Health    *ProductHealth `json:"health"`
+	Latest    []Commit       `json:"latest"`
+	RepoCount int            `json:"repoCount"`
 
 	// UngroupedCount Repositories in no group
 	UngroupedCount int `json:"ungroupedCount"`
@@ -329,7 +413,10 @@ type DashboardGroup struct {
 	// DefaultRepo Address of the group's main repository
 	DefaultRepo *string `json:"defaultRepo"`
 	Description string  `json:"description"`
-	Id          string  `json:"id"`
+
+	// Health Null when no repository is counted
+	Health *ProductHealth `json:"health"`
+	Id     string         `json:"id"`
 
 	// LastActivity Time of the group's newest commit
 	LastActivity *time.Time `json:"lastActivity"`
@@ -439,6 +526,18 @@ type FileProblem struct {
 	Pointer string `json:"pointer"`
 }
 
+// Finding defines model for Finding.
+type Finding struct {
+	Code    FindingCode `json:"code"`
+	Message string      `json:"message"`
+
+	// Penalty Points the finding costs
+	Penalty int `json:"penalty"`
+}
+
+// FindingCode defines model for Finding.Code.
+type FindingCode string
+
 // Freshness defines model for Freshness.
 type Freshness struct {
 	// CheckedAt Last time the content was confirmed
@@ -465,10 +564,13 @@ type Group struct {
 	DefaultRepo      *string               `json:"defaultRepo"`
 	DefaultRepoState GroupDefaultRepoState `json:"defaultRepoState"`
 	Description      string                `json:"description"`
-	Id               string                `json:"id"`
-	Name             string                `json:"name"`
-	RepoCount        int                   `json:"repoCount"`
-	Repos            []Repo                `json:"repos"`
+
+	// Health Every finding
+	Health    *ProductHealth `json:"health"`
+	Id        string         `json:"id"`
+	Name      string         `json:"name"`
+	RepoCount int            `json:"repoCount"`
+	Repos     []Repo         `json:"repos"`
 }
 
 // GroupDefaultRepoState defines model for Group.DefaultRepoState.
@@ -499,6 +601,18 @@ type Heading struct {
 	Level int    `json:"level"`
 	Text  string `json:"text"`
 }
+
+// Health defines model for Health.
+type Health struct {
+	Findings []Finding `json:"findings"`
+
+	// Level good from 80, watch from 50, attention below
+	Level HealthLevel `json:"level"`
+	Score int         `json:"score"`
+}
+
+// HealthLevel good from 80, watch from 50, attention below
+type HealthLevel string
 
 // Link defines model for Link.
 type Link struct {
@@ -557,6 +671,26 @@ type Problem struct {
 	Type     string  `json:"type"`
 }
 
+// ProductHealth The weighted health of a group's repositories; archived and deprecated ones are not counted
+type ProductHealth struct {
+	// Attention Repositories at attention
+	Attention int `json:"attention"`
+
+	// Counted Repositories with a score
+	Counted      int `json:"counted"`
+	FindingCount int `json:"findingCount"`
+
+	// Findings Most costly first; the dashboard carries the first 5
+	Findings []RepoFinding `json:"findings"`
+
+	// Level good from 80, watch from 50, attention below
+	Level HealthLevel `json:"level"`
+	Score int         `json:"score"`
+
+	// Watch Repositories at watch
+	Watch int `json:"watch"`
+}
+
 // Release defines model for Release.
 type Release struct {
 	PublishedAt time.Time `json:"publishedAt"`
@@ -577,12 +711,18 @@ type Repo struct {
 	// Groups Group ids in configuration order
 	Groups []string `json:"groups"`
 
+	// Health Null for an archived or deprecated repository
+	Health *Health `json:"health"`
+
 	// Homepage Empty when not set
 	Homepage string `json:"homepage"`
 	HtmlUrl  string `json:"htmlUrl"`
 
 	// Language Language of the first package manifest; empty when there is none
 	Language string `json:"language"`
+
+	// LastAuthoredAt The newest default-branch commit by a person, not automation (bots, release plugins); when every read commit is automated, the oldest read one (the person's is older); null until read
+	LastAuthoredAt *time.Time `json:"lastAuthoredAt"`
 
 	// LastCommitAt The newest default-branch commit; null until read
 	LastCommitAt *time.Time `json:"lastCommitAt"`
@@ -616,6 +756,21 @@ type RepoDetail struct {
 	// Title The descriptor title
 	Title string `json:"title"`
 }
+
+// RepoFinding defines model for RepoFinding.
+type RepoFinding struct {
+	Code    RepoFindingCode `json:"code"`
+	Message string          `json:"message"`
+
+	// Penalty Points the finding costs
+	Penalty int `json:"penalty"`
+
+	// Repo Address of the repository
+	Repo string `json:"repo"`
+}
+
+// RepoFindingCode defines model for RepoFinding.Code.
+type RepoFindingCode string
 
 // RepoLink defines model for RepoLink.
 type RepoLink struct {
