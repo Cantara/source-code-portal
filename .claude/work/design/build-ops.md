@@ -29,8 +29,8 @@ updates and the test strategy, for one instance serving up to 1,000 repositories
 
 ## Layout
 Root files: `go.mod` (`module github.com/cantara/source-code-portal`, `go 1.27.2`, `tool` directives), `go.sum`, `Makefile`, `.golangci.yml`,
-`.goreleaser.yaml`, `renovate.json`, `.editorconfig`, `.gitattributes`, `.gitignore`, `.dockerignore`, `README.md`, `LICENSE` (Apache-2.0),
-`SECURITY.md`, `CHANGELOG.md`, `AGENTS.md`, `CLAUDE.md` (imports `AGENTS.md`).
+`.goreleaser.yaml`, `.github/renovate.json`, `.editorconfig`, `.gitattributes`, `.gitignore`, `.dockerignore`, `README.md`, `LICENSE` (Apache-2.0),
+`SECURITY.md`, `CHANGELOG.md`, `AGENTS.md` (imported by `.claude/CLAUDE.md`).
 
 | Dir | Holds |
 |---|---|
@@ -144,7 +144,7 @@ non-prereleases, with an SBOM, signed by digest; changelog from GitHub, without 
 run then runs the published image (`scp version`, `/web/server.js`) read-only with all capabilities dropped and verifies its signature.
 `CHANGELOG.md` holds the human summary of each release.
 
-Renovate (`renovate.json`): `config:recommended`, `helpers:pinGitHubActionDigests`, `docker:pinDigests`, `chore` commit type; the
+Renovate (`.github/renovate.json`): `config:recommended`, `helpers:pinGitHubActionDigests`, `docker:pinDigests`, `chore` commit type; the
 built-in managers (gomod with tool directives, npm in `web/`, github-actions, dockerfile) and regex managers for golangci-lint (Makefile,
 CI), pnpm (CI, Dockerfile) and GoReleaser (release workflow); `minimumReleaseAge` 7 days, Mondays before 06:00 Europe/Oslo,
 `postUpdateOptions: [gomodTidy]`, grouped toolchain updates (Go image with `go.mod`, whose `go` directive is bumped, Node image with

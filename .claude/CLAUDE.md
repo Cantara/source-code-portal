@@ -1,13 +1,13 @@
 # CLAUDE.md
 
-Guidance for Claude Code in this repository.
+Guidance for Claude Code in this repository. The coding instructions are imported from the root: @../AGENTS.md
 
 ## State
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`, public)
 is Source Code Portal (SCP) in Go with a server-rendered Next.js web UI. The first release is `v2.0.0`, which the owner's team tags;
 **M13 (search engines)** is queued. Coding instructions for the repository itself are in
-the root `AGENTS.md`.
+the root `AGENTS.md` (imported above).
 
 - **`.claude/work/plan.md` is the binding plan**: what SCP is, architecture and rules, stack, the work in progress. Read it first.
 - `.claude/work/README.md`: index of the development package.
