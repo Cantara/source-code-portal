@@ -76,7 +76,7 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
                 <CardTitle id="latest">Latest commits</CardTitle>
                 <FreshnessBadge freshness={data.commitsFreshness} />
               </div>
-              <CommitList commits={data.commits} showRepo={false} />
+              <CommitList commits={data.commits} showRepo={false} graph />
               <Link href={repoCommitsPath(owner, name)} className="mt-2 inline-block text-sm hover:underline">
                 Commit log
               </Link>

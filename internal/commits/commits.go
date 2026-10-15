@@ -27,7 +27,8 @@ const (
 	maxSubject    = 200           // runes
 	maxAuthor     = 100           // runes
 	futureClamp   = 24 * time.Hour
-	payloadSchema = 1
+	maxParents    = 8 // an octopus merge beyond this keeps its first eight
+	payloadSchema = 2
 )
 
 var (
@@ -86,7 +87,7 @@ func decode(b []byte) []Commit {
 	return p.Commits
 }
 
-// normalise cleans GitHub's commits: valid SHAs only, one-line subject, bounded names, plausible dates, newest first, no duplicates.
+// normalise cleans GitHub's commits: valid SHAs only (parents too), one-line subject, bounded names, plausible dates, newest first, no duplicates.
 // A date more than a day ahead is clamped to the time the commit was first seen, which prev remembers.
 func normalise(in []CommitInfo, prev []Commit, now time.Time) []Commit {
 	firstSeen := map[string]time.Time{}
@@ -117,7 +118,7 @@ func normalise(in []CommitInfo, prev []Commit, now time.Time) []Commit {
 			url = ""
 		}
 		out = append(out, Commit{SHA: sha, Subject: untrusted.Text(untrusted.FirstLine(c.Message), maxSubject),
-			AuthorName: untrusted.Text(c.AuthorName, maxAuthor), AuthorLogin: login, URL: url, CommittedAt: at})
+			AuthorName: untrusted.Text(c.AuthorName, maxAuthor), AuthorLogin: login, URL: url, CommittedAt: at, Parents: parents(c.Parents)})
 	}
 	slices.SortStableFunc(out, func(a, b Commit) int {
 		if c := b.CommittedAt.Compare(a.CommittedAt); c != 0 {
@@ -125,6 +126,17 @@ func normalise(in []CommitInfo, prev []Commit, now time.Time) []Commit {
 		}
 		return strings.Compare(b.SHA, a.SHA)
 	})
+	return out
+}
+
+// parents keeps the valid parent SHAs, lower-case, in order, without duplicates, at most maxParents; never nil.
+func parents(in []string) []string {
+	out := []string{}
+	for _, p := range in {
+		if p = strings.ToLower(p); shaPattern.MatchString(p) && !slices.Contains(out, p) && len(out) < maxParents {
+			out = append(out, p)
+		}
+	}
 	return out
 }
 

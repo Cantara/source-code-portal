@@ -307,6 +307,8 @@ export interface components {
       url: string
       /** Format: date-time */
       committedAt: string
+      /** @description SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge */
+      parents: string[]
     }
     CommitPage: {
       commits: components["schemas"]["Commit"][]

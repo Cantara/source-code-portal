@@ -289,7 +289,7 @@ components:
         message: { type: string }
     Commit:
       type: object
-      required: [repo, sha, subject, authorName, authorLogin, url, committedAt]
+      required: [repo, sha, subject, authorName, authorLogin, url, committedAt, parents]
       properties:
         repo: { type: string, description: Repository address }
         sha: { type: string }
@@ -298,6 +298,11 @@ components:
         authorLogin: { type: string, description: GitHub login; empty when unknown }
         url: { type: string, description: Commit page; empty when unknown }
         committedAt: { type: string, format: date-time }
+        parents:
+          type: array
+          items: { type: string }
+          maxItems: 8
+          description: SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge
     CommitPage:
       type: object
       required: [commits, page, freshness]

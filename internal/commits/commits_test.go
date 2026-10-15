@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,22 @@ func TestNormalise(t *testing.T) {
 	}
 	if got[2].SHA != sha('a') || got[2].Subject != "older" {
 		t.Errorf("commit a = %+v (the first of duplicate SHAs wins)", got[2])
+	}
+	if got[2].Parents == nil || len(got[2].Parents) != 0 {
+		t.Errorf("root commit parents = %#v, want empty, not nil", got[2].Parents)
+	}
+}
+
+func TestNormaliseParents(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	many := []string{strings.ToUpper(sha('1')), "nothex", sha('1'), sha('2')}
+	for _, c := range "3456789ab" {
+		many = append(many, sha(byte(c)))
+	}
+	got := normalise([]CommitInfo{{SHA: sha('f'), Message: "octopus", Date: now, Parents: many}}, nil, now)
+	want := []string{sha('1'), sha('2'), sha('3'), sha('4'), sha('5'), sha('6'), sha('7'), sha('8')}
+	if !slices.Equal(got[0].Parents, want) {
+		t.Errorf("parents = %v, want the valid ones lower-case, deduplicated, at most %d", got[0].Parents, maxParents)
 	}
 }
 

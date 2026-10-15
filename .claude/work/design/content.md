@@ -104,7 +104,9 @@ each with its freshness (sync-snapshot-store.md). The merged feeds are `Latest` 
 2. One request: list commits on the default branch, `per_page = 30`. An empty repository is `no_content`.
 3. Per commit: SHA lower-case hex 40 or 64 (else dropped); first line of the message cleaned with `untrusted.Text`, capped at 200 runes;
    author name capped at 100 runes; author login when it matches GitHub login syntax (else empty); committed date UTC whole seconds, a
-   missing date drops the commit, a date more than 24 h ahead is clamped to when the commit was first seen; URL only when `https`.
+   missing date drops the commit, a date more than 24 h ahead is clamped to when the commit was first seen; URL only when `https`;
+   parents (from the same listing, no extra request) lower-case, valid SHAs only, duplicates dropped, at most 8, first parent first.
+   The payload schema is 2.
 4. Order newest first by `(committedAt desc, sha desc)`; duplicates by SHA dropped.
 5. Storage: the commits are the item's payload, replaced on each successful run; a removed repository's item cascades.
 6. Aggregation at snapshot build: `Latest` merges every repository's commits, and each group has its own merged feed; a repository in

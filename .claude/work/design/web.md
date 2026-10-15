@@ -107,7 +107,8 @@ contrast in both themes. The header shows whether the live stream is open (`Live
    Next.js's `deploymentId` (the build id) makes a navigation across a deployment a full load.
 8. `SafeHtml` sets the API field `html` with `dangerouslySetInnerHTML`, memoised on the string. Lint allows it in this component only.
 9. Theme: `system | light | dark` in `localStorage` key `scp-theme`. The blocking `/theme-init.js` in `<head>` sets the `dark` class
-   and `colorScheme` before first paint (`<html suppressHydrationWarning>`); `lib/theme.ts` resolves the same way.
+   and `colorScheme` before first paint (`<html suppressHydrationWarning>`); `lib/theme.ts` resolves the same way, and while `system`
+   is chosen it follows the system preference as it changes (`matchMedia` change events).
 10. CSP (Go sets it): `default-src 'none'; script-src 'self' 'nonce-<n>'; style-src 'self' 'nonce-<n>'; img-src 'self';
     font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none';
     object-src 'none'`, plus the `Permissions-Policy` of http-api.md.
@@ -117,15 +118,27 @@ contrast in both themes. The header shows whether the live stream is open (`Live
 12. URLs are state: filters and sort live in search params (the server renders them too), written with `history.replaceState` (no
     server round trip) and read back from the URL by the inputs; repositories are `{owner}/{name}`, doc paths
     a catch-all encoded per segment (`lib/paths.ts`).
+13. Commit graph: where the commits share one history (the repository page's "Latest commits" and the repository's commit log) they
+    draw as a git graph, like `git log --graph`; the merged feeds (dashboard, group, all repositories) stay a plain list, since their
+    commits are unrelated. `entities/commit/graph.ts` lays the rows out from each commit's `parents`, newest first: a commit takes the
+    lane that expects it (else the first free one), every other lane expecting it converges into it, its first parent continues the
+    lane and each further parent opens a lane (or joins the one already expecting it); freed lanes are reused, lanes never shift. Each
+    row draws its own `aria-hidden` SVG (lanes 12 units apart, the node on the subject line, `h-13` with the width from the viewBox, so
+    it scales with the text and needs no style attribute under the CSP): lines in from above, the node (a ring for a merge, filled
+    otherwise), lines out to the parents' lanes, pass-through lanes straight. Lines to parents outside the loaded rows run to the bottom
+    dashed. Colours are six `--lane-*` tokens per theme (at least 3:1 against the card), the first lane `--primary`; at most 8 lanes
+    are drawn, a commit beyond them sits in the last. Rows have a fixed height: the subject is one line, truncated with the full text in
+    `title`. No day headers: the day depends on the viewer's time zone, which the server render does not know.
 
 ## Build and serve
 - `pnpm build`: `next build` with `BUILD_ID` (git SHA, `dev` locally) as `deploymentId` and `NEXT_PUBLIC_BUILD_ID`, then `scripts/bundle.ts`: copies
-  `.next/standalone`, `.next/static` and `public/` into `web/bundle` and fails when the gzip JS under `/_next/static` exceeds 300 KB,
+  `.next/standalone`, `.next/static` and `public/` into `web/bundle`, writes `BUILD` (the `BUILD_ID`) last, and fails when the gzip JS under `/_next/static` exceeds 300 KB,
   the CSS 25 KB, or any font is present. `web/bundle` is platform-independent JavaScript (`sharp` is not traced).
 - `web.dir` (the bundle directory) and `web.node` (default `node`): `scp serve` starts `node server.js` with `PORT` (a free loopback
   port), `HOSTNAME=127.0.0.1`, `NODE_ENV=production`, `SCP_API` and nothing else from its environment; output goes to the log
-  (`component=web`). It restarts the child after an exit (1 s doubling to 30 s) and at once when the bundle is replaced (its `.next/BUILD_ID`
-  changes, checked every 2 s: a running server cannot load another build's files), stops it at shutdown after the listeners drained,
+  (`component=web`). It restarts the child after an exit (1 s doubling to 30 s) and at once when the bundle is replaced (its `BUILD` file's
+  content or modification time changes, checked every 2 s: a running server cannot load another build's files; Next.js's own
+  `.next/BUILD_ID` is the same for every build), stops it at shutdown after the listeners drained,
   and `/readyz` waits for the child's first answer. Without `web.dir` page paths answer 503 with a short text naming `/llms.txt` and
   the API.
 - Proxy (`httpapi.Pages`): `httputil.ReverseProxy` to the child; it sets the CSP and `Permissions-Policy`, the `X-Scp-*` headers and

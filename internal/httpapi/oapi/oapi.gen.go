@@ -291,6 +291,9 @@ type Commit struct {
 	AuthorName  string    `json:"authorName"`
 	CommittedAt time.Time `json:"committedAt"`
 
+	// Parents SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge
+	Parents []string `json:"parents"`
+
 	// Repo Repository address
 	Repo string `json:"repo"`
 	Sha  string `json:"sha"`

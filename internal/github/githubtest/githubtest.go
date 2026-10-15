@@ -513,6 +513,7 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 type Commit struct {
 	SHA, Message, AuthorName, AuthorLogin string
 	Date                                  time.Time
+	Parents                               []string // nil: the next commit of the list (a linear history), none for the last
 }
 
 // SetCommits replaces the default-branch commits of the repository with id (newest first). No commits means an empty repository.
@@ -601,11 +602,18 @@ func (s *Server) listCommits(w http.ResponseWriter, req *http.Request) {
 		per = 30
 	}
 	out := make([]*gh.RepositoryCommit, 0, min(per, len(cs)))
-	for _, c := range cs[:min(per, len(cs))] {
+	for i, c := range cs[:min(per, len(cs))] {
 		date := &gh.Timestamp{Time: c.Date}
+		parents := c.Parents
+		if parents == nil && i+1 < len(cs) {
+			parents = []string{cs[i+1].SHA}
+		}
 		rc := &gh.RepositoryCommit{SHA: new(c.SHA), HTMLURL: new(r.GetHTMLURL() + "/commit/" + c.SHA),
 			Commit: &gh.Commit{Message: new(c.Message), Author: &gh.CommitAuthor{Name: new(c.AuthorName), Date: date},
 				Committer: &gh.CommitAuthor{Name: new(c.AuthorName), Date: date}}}
+		for _, p := range parents {
+			rc.Parents = append(rc.Parents, &gh.Commit{SHA: new(p)})
+		}
 		if c.AuthorLogin != "" {
 			rc.Author = &gh.User{Login: new(c.AuthorLogin)}
 		}

@@ -18,6 +18,7 @@ type Commit struct {
 	AuthorLogin string    `json:"authorLogin,omitempty"`
 	URL         string    `json:"url"`
 	CommittedAt time.Time `json:"committedAt"`
+	Parents     []string  `json:"parents"` // first parent first
 }
 
 // Ref is a commit in a merged feed.
@@ -90,7 +91,7 @@ func compareRefs(a, b Ref) int {
 // commitOf converts a commit of the repository at repo to its API form.
 func commitOf(repo snapshot.RepoKey, c *Commit) oapi.Commit {
 	return oapi.Commit{Repo: string(repo), Sha: c.SHA, Subject: c.Subject, AuthorName: c.AuthorName, AuthorLogin: c.AuthorLogin,
-		Url: c.URL, CommittedAt: c.CommittedAt.UTC()}
+		Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents}
 }
 
 // LastCommit returns the time of the newest commit of e (zero when there is none) and the commits' freshness.

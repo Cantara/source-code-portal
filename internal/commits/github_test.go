@@ -32,6 +32,9 @@ func TestFromGitHub(t *testing.T) {
 		!strings.HasSuffix(cs[0].HTMLURL, "/commit/"+strings.Repeat("b", 40)) {
 		t.Fatalf("commits = %+v, %v", cs, err)
 	}
+	if len(cs[0].Parents) != 1 || cs[0].Parents[0] != strings.Repeat("a", 40) || len(cs[1].Parents) != 0 {
+		t.Errorf("parents = %v, %v; want the linear history b -> a", cs[0].Parents, cs[1].Parents)
+	}
 	if _, err := f.Commits(t.Context(), "acme", "empty", 30); !github.IsNotFound(err) {
 		t.Errorf("empty repository: err = %v, want not found", err)
 	}

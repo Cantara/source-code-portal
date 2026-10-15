@@ -19,6 +19,7 @@ export function commit(i: number, repo = "acme/core"): S["Commit"] {
     authorLogin: "ada",
     url: `https://github.com/${repo}/commit/${i}`,
     committedAt: at,
+    parents: i > 0 ? [(i - 1).toString(16).padStart(40, "0")] : [],
   }
 }
 

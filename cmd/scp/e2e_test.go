@@ -50,6 +50,14 @@ func TestServeForPlaywright(t *testing.T) {
 			cs = append(cs, githubtest.Commit{SHA: fmt.Sprintf("%02d%038d", i, 30-j), Message: fmt.Sprintf("Change %d of repository %d", 30-j, i),
 				AuthorName: "Ann Example", AuthorLogin: "ann", Date: start.Add(time.Duration(30-j)*time.Hour + time.Duration(i)*time.Minute)})
 		}
+		if id == core { // a feature branch (4, 6) forked from 7 and merged back at 1, beside the main line 2, 3, 5
+			for j, ps := range map[int][]int{1: {2, 4}, 2: {3}, 3: {5}, 4: {6}, 5: {7}, 6: {7}} {
+				for _, p := range ps {
+					cs[j].Parents = append(cs[j].Parents, cs[p].SHA)
+				}
+			}
+			cs[1].Message = "Merge pull request #7 from acme/feature"
+		}
 		gh.SetCommits(id, cs...)
 		history[id] = cs
 	}

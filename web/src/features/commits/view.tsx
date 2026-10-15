@@ -142,7 +142,12 @@ export function CommitLog({ filter, showRepo = true }: { filter: Filter; showRep
           </Button>
         )}
       </div>
-      <CommitList commits={pages.flatMap((p) => p.commits)} showRepo={showRepo} firstRef={first} />
+      <CommitList
+        commits={pages.flatMap((p) => p.commits)}
+        showRepo={showRepo}
+        graph={filter.repo !== undefined}
+        firstRef={first}
+      />
       {hasNextPage && (
         <Button variant="outline" className="mt-3" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>
           {isFetchingNextPage ? "Loading…" : "Load more"}

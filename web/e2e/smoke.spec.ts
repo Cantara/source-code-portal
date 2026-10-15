@@ -113,6 +113,19 @@ test("the theme menu switches light and dark, and system follows the system pref
   await expect(theme).toHaveValue("system")
 })
 
+for (const path of ["/repos/acme/whydah-core", "/repos/acme/whydah-core/commits"]) {
+  test(`${path} draws its commits as a git graph, the merge in a second lane`, async ({ page }) => {
+    await page.goto(path)
+    const merge = page.locator("main li", { hasText: "Merge pull request #7" }).first()
+    const graph = merge.locator("svg")
+    await expect(graph).toHaveAttribute("viewBox", "0 0 32 52") // two lanes
+    await expect(graph.locator("circle")).toHaveAttribute("fill", "none") // a ring, not a dot
+    await expect(graph.locator("path")).toHaveCount(3) // in from above, out to both parents
+    const branch = page.locator("main li", { hasText: "Change 26 of repository 0" }).first() // on the feature branch
+    await expect(branch.locator("svg circle")).toHaveAttribute("cx", "24")
+  })
+}
+
 test("a page from the running bundle sees no new version", async ({ page }) => {
   const api = page.waitForResponse((r) => r.url().includes("/api/v1/"))
   await page.goto("/")

@@ -13,6 +13,7 @@ import (
 type CommitInfo struct {
 	SHA, Message, AuthorName, AuthorLogin, HTMLURL string
 	Date                                           time.Time // committer date
+	Parents                                        []string  // first parent first
 }
 
 // Fetcher lists a repository's latest commits.
@@ -42,8 +43,12 @@ func (r rest) Commits(ctx context.Context, owner, name string, n int) ([]CommitI
 	}
 	out := make([]CommitInfo, 0, len(got))
 	for _, rc := range got {
-		out = append(out, CommitInfo{SHA: rc.GetSHA(), Message: rc.GetCommit().GetMessage(), AuthorName: rc.GetCommit().GetAuthor().GetName(),
-			AuthorLogin: rc.GetAuthor().GetLogin(), HTMLURL: rc.GetHTMLURL(), Date: rc.GetCommit().GetCommitter().GetDate().Time})
+		ci := CommitInfo{SHA: rc.GetSHA(), Message: rc.GetCommit().GetMessage(), AuthorName: rc.GetCommit().GetAuthor().GetName(),
+			AuthorLogin: rc.GetAuthor().GetLogin(), HTMLURL: rc.GetHTMLURL(), Date: rc.GetCommit().GetCommitter().GetDate().Time}
+		for _, p := range rc.Parents {
+			ci.Parents = append(ci.Parents, p.GetSHA())
+		}
+		out = append(out, ci)
 	}
 	return out, nil
 }
