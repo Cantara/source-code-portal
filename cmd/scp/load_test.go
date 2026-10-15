@@ -192,6 +192,9 @@ func TestLoad1000(t *testing.T) {
 		if strings.Contains(p, "/history") {
 			bound = 50 * time.Millisecond * slowdown
 		}
+		if slowdown > 1 {
+			bound *= 2 // -race on a shared CI runner sits near 1s at p99; a regression is still many times that
+		}
 		if p99 > bound {
 			t.Errorf("%s: p99 %v over %v", p, p99, bound)
 		}
