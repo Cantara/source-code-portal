@@ -19,8 +19,10 @@ its GitHub App is installed on the repositories that audience may see, and `acce
 - `github.sources[].exclude` keeps repositories out of the catalogue even where the credential reads them: the groups' matcher kinds
   (`exact`, `prefix`, `glob`, `regexp`, `topic`; no `catch_all`), applied in `admit` before anything is stored, so a tracked
   repository that becomes excluded leaves at the next listing (`catalog.SourceFilter`, also used by `config groups`).
-- One log line per answer that includes a private repository: viewer, repository, route, no content, on the logger `access`; a
-  counter without repository labels. Metrics and `/api/v1/status` carry no repository names.
+- The audit trail: every request on the public listener from a viewer of the private view leaves a log line `audit` (user, via,
+  method, pattern, path, status, request id; never the answer), written by the middleware after the request line; static assets
+  (`/_next/`) and the web UI server's own API calls (the page request is the record) are left out (`TestAudit`). Metrics and
+  `/api/v1/status` carry no repository names: patterns, counts and source ids only.
 - `serve` warns at start when `include_private` is on, the public listener is not loopback and `trusted_proxies` holds a range wider
   than /24 (IPv4) or /64 (IPv6).
 - A verified `repository` `deleted` delivery removes the repository at once; otherwise two complete listings must miss it.
@@ -28,4 +30,4 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   network layout, the App's permissions, key rotation) and what is out of scope.
 
 ## Order
-Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> access log -> start warning -> removal on `deleted` -> `security-model.md`.
+Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> audit log (built) -> start warning -> removal on `deleted` -> `security-model.md`.

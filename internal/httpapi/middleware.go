@@ -108,6 +108,11 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 			}
 			o.Log.Info("request", "listener", listener, "pattern", pattern, "method", r.Method, "status", status, "bytes", sw.bytes,
 				"duration_ms", d.Milliseconds(), "request_id", id, "client_ip", o.clientIP(r))
+			if listener == "public" && viewer.Private && !viewer.web && !strings.HasPrefix(r.URL.Path, "/_next/") {
+				// The audit trail of the private view: who asked for what, never what was answered.
+				o.Log.Info("audit", "user", viewer.User, "via", viewer.Via, "method", r.Method, "pattern", pattern, "path", r.URL.Path,
+					"status", status, "request_id", id)
+			}
 		}()
 		if verr != nil {
 			sw.Header().Set("WWW-Authenticate", `Bearer realm="scp"`)

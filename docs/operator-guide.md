@@ -397,6 +397,10 @@ found by its old id with case and dashes ignored, a repository by its name. Jenk
 | `/api/v1/status` | JSON for people: readiness, snapshot version and age, queue, per-source freshness and rate limit left, webhook deliveries, the cluster role, warnings |
 | `/debug/pprof/` | Go profiles, when `ops.pprof` is true |
 
+**Audit.** Every request from a viewer who sees private repositories leaves a log line with the message `audit`: `user`, `via`
+(`proxy`, `oidc`, `token`), `method`, `pattern`, `path`, `status` and `request_id`, never the answer. Static assets and the web UI
+server's own calls are left out. Ship these lines where your access records go.
+
 Metrics:
 
 | Metric | Labels | Meaning |

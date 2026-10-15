@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -399,5 +400,38 @@ func TestSameOriginAndAdminOnly(t *testing.T) {
 		if rec.Code != want {
 			t.Errorf("%+v: %d, want %d", *v, rec.Code, want)
 		}
+	}
+}
+
+// TestAudit: a request in the private view leaves one audit line naming the viewer and the path; the public's and the web UI
+// server's own calls leave none.
+func TestAudit(t *testing.T) {
+	var buf bytes.Buffer
+	o := testOptions()
+	o.Log = slog.New(slog.NewJSONHandler(&buf, nil))
+	o.WebToken = "t0ken"
+	o.Access = Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{"staff"}}
+	h := o.wrap("public", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for _, hdr := range [][]string{
+		{"X-Forwarded-User", "ann", "X-Forwarded-Groups", "staff"},
+		{},
+		{headerToken, "t0ken", headerViewer, "private"},
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/repos/acme/vault", nil)
+		r.RemoteAddr = "10.0.0.1:1"
+		for i := 0; i+1 < len(hdr); i += 2 {
+			r.Header.Set(hdr[i], hdr[i+1])
+		}
+		h.ServeHTTP(httptest.NewRecorder(), r)
+	}
+	var audits []map[string]any
+	for line := range bytes.Lines(buf.Bytes()) {
+		var m map[string]any
+		if json.Unmarshal(line, &m) == nil && m["msg"] == "audit" {
+			audits = append(audits, m)
+		}
+	}
+	if len(audits) != 1 || audits[0]["user"] != "ann" || audits[0]["via"] != "proxy" || audits[0]["path"] != "/repos/acme/vault" {
+		t.Errorf("audit lines = %v", audits)
 	}
 }
