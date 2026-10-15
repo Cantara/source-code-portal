@@ -173,7 +173,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	s.engine.Observe(m.job)
 	var upstream *url.URL
 	if cfg.Web.Dir != "" {
-		if s.web, err = webui.New(cfg.Web.Dir, cfg.Web.Node, log); err != nil {
+		if s.web, err = webui.New(cfg.Web.Dir, cfg.Web.Node, readBuildInfo().Version, log); err != nil {
 			return nil, err
 		}
 		upstream = s.web.URL()

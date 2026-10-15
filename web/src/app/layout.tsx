@@ -22,6 +22,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { colorScheme: "light dark", width: "device-width", initialScale: 1 }
 
 /** RootLayout is the shell: skip link, header with navigation and theme, status banners and the page. */
+/** release is the portal's release as the header shows it: v2.0.1, or dev for a local build. */
+function release(): string {
+  const v = process.env.SCP_VERSION ?? "dev"
+  return /^\d/.test(v) ? `v${v}` : v
+}
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -43,6 +49,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   Source Code Portal
                   <span className="ml-2 hidden font-mono text-[0.6875rem] font-normal tracking-widest text-muted-foreground uppercase sm:inline">
                     Mission control
+                  </span>
+                  <span className="ml-2 font-mono text-[0.6875rem] font-normal text-muted-foreground" title="Release">
+                    {release()}
                   </span>
                 </span>
               </Link>

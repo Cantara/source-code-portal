@@ -42,7 +42,7 @@ func fakeServer() {
 	signal.Notify(stop, syscall.SIGTERM)
 	srv := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		wd, _ := os.Getwd()
-		_, _ = fmt.Fprintf(w, "%s %s %d", os.Getenv("SCP_API"), wd, len(os.Environ()))
+		_, _ = fmt.Fprintf(w, "%s %s %s %d", os.Getenv("SCP_API"), os.Getenv("SCP_VERSION"), wd, len(os.Environ()))
 	})}
 	go func() { _ = srv.Serve(ln) }()
 	<-stop
@@ -77,7 +77,7 @@ func TestServer(t *testing.T) {
 	}
 	t.Setenv("SCP_SECRET_THING", "must not leak")
 	out := &logs{}
-	s, err := New(dir, os.Args[0], slog.New(slog.NewTextHandler(out, nil)))
+	s, err := New(dir, os.Args[0], "2.0.1", slog.New(slog.NewTextHandler(out, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,9 +98,9 @@ func TestServer(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if got := string(body); !strings.HasPrefix(got, "http://127.0.0.1:9 ") || !strings.Contains(got, dir[strings.LastIndex(dir, "/"):]) ||
-		!strings.HasSuffix(got, " 6") {
-		t.Errorf("server saw %q: want SCP_API, its directory %s and six variables", got, dir)
+	if got := string(body); !strings.HasPrefix(got, "http://127.0.0.1:9 2.0.1 ") || !strings.Contains(got, dir[strings.LastIndex(dir, "/"):]) ||
+		!strings.HasSuffix(got, " 7") {
+		t.Errorf("server saw %q: want SCP_API, SCP_VERSION, its directory %s and seven variables", got, dir)
 	}
 	if !strings.Contains(out.String(), "restarting") || !strings.Contains(out.String(), "line=listening") {
 		t.Errorf("log:\n%s", out)

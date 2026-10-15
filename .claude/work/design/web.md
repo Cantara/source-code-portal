@@ -135,7 +135,7 @@ contrast in both themes. The header shows whether the live stream is open (`Live
   `.next/standalone`, `.next/static` and `public/` into `web/bundle`, writes `BUILD` (the `BUILD_ID`) last, and fails when the gzip JS under `/_next/static` exceeds 300 KB,
   the CSS 25 KB, or any font is present. `web/bundle` is platform-independent JavaScript (`sharp` is not traced).
 - `web.dir` (the bundle directory) and `web.node` (default `node`): `scp serve` starts `node server.js` with `PORT` (a free loopback
-  port), `HOSTNAME=127.0.0.1`, `NODE_ENV=production`, `SCP_API` and nothing else from its environment; output goes to the log
+  port), `HOSTNAME=127.0.0.1`, `NODE_ENV=production`, `SCP_API`, `SCP_VERSION` (the release, shown in the header next to the name) and nothing else from its environment; output goes to the log
   (`component=web`). It restarts the child after an exit (1 s doubling to 30 s) and at once when the bundle is replaced (its `BUILD` file's
   content or modification time changes, checked every 2 s: a running server cannot load another build's files; Next.js's own
   `.next/BUILD_ID` is the same for every build), stops it at shutdown after the listeners drained,

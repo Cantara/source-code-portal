@@ -136,6 +136,11 @@ test("a product shows its weighed health and what costs it points", async ({ pag
   await expect(health.getByRole("link", { name: "whydah-sso" })).toHaveAttribute("href", "/repos/acme/whydah-sso")
 })
 
+test("the header shows the portal's release", async ({ page }) => {
+  await page.goto("/")
+  await expect(page.getByRole("banner").getByTitle("Release")).toHaveText(/^(v\d+\.\d+\.\d+.*|dev)$/)
+})
+
 test("a page from the running bundle sees no new version", async ({ page }) => {
   const api = page.waitForResponse((r) => r.url().includes("/api/v1/"))
   await page.goto("/")

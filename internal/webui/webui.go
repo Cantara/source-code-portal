@@ -34,21 +34,22 @@ var errReplaced = errors.New("bundle replaced")
 // Server is the supervised web UI server.
 type Server struct {
 	dir, node string
+	version   string // the portal's release, shown by the pages (SCP_VERSION)
 	log       *slog.Logger
 	addr      string // 127.0.0.1:port the child listens on
 	ready     atomic.Bool
 	served    atomic.Pointer[string] // the build id of the bundle the running server was started from
 }
 
-// New picks a free loopback port for the server in dir (server.js), run with node.
-func New(dir, node string, log *slog.Logger) (*Server, error) {
+// New picks a free loopback port for the server in dir (server.js), run with node; version is the portal's release the pages show.
+func New(dir, node, version string, log *slog.Logger) (*Server, error) {
 	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("web UI port: %w", err)
 	}
 	addr := ln.Addr().String()
 	_ = ln.Close()
-	return &Server{dir: dir, node: node, log: log.With("component", "web"), addr: addr}, nil
+	return &Server{dir: dir, node: node, version: version, log: log.With("component", "web"), addr: addr}, nil
 }
 
 // URL is the address the pages are proxied to.
@@ -108,7 +109,7 @@ func (s *Server) once(ctx context.Context, api string) error {
 	cmd.Dir = s.dir
 	// Only what the server needs: the portal's own environment can hold its configuration.
 	cmd.Env = []string{"PORT=" + port, "HOSTNAME=127.0.0.1", "NODE_ENV=production", "NEXT_TELEMETRY_DISABLED=1", "SCP_API=" + api,
-		"PATH=" + os.Getenv("PATH")}
+		"SCP_VERSION=" + s.version, "PATH=" + os.Getenv("PATH")}
 	cmd.Stdout, cmd.Stderr = out, out
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = stopGrace
