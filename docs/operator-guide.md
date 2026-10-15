@@ -106,6 +106,18 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `auth.oidc.client_secret_file` | empty | the client's secret; empty for a public client (PKCE only) |
 | `auth.oidc.scopes` | `[openid, email, profile]` | the scopes asked for; `openid` is required |
 | `auth.oidc.groups_claim` | `groups` | the claim, in the ID token or from userinfo, that lists the user's groups |
+| `llm.provider` | empty | the assistant's language model provider: `anthropic`, `openai`, `gemini`, `openrouter` or `ollama`; empty: no assistant (section 2.3) |
+| `llm.model` | the provider's | the model, for example `claude-haiku-5-5` (anthropic), `gpt-4o` (openai) |
+| `llm.base_url` | the provider's | the provider's API base (https; http only on loopback or without a key), for a proxy or a local Ollama |
+| `llm.api_key_file` | empty | the provider's API key; required except for `ollama` |
+| `assistant.access` | `signed-in` | who may ask: `signed-in`, `admin` or `everyone` |
+| `assistant.concurrency` | `4` | answers at once per instance; more are refused with 429 |
+| `assistant.max_turns` | `8` | model turns for one answer (1 to 32); the last turn must answer without tools |
+| `assistant.max_tool_calls` | `16` | tool calls for one answer (0 to 64) |
+| `assistant.max_tokens` | `16000` | tokens for one answer, input and output, before the last turn (256 to 200,000) |
+| `assistant.max_history` | `40` | messages of a conversation (1 to 200) |
+| `assistant.max_input_chars` | `60000` | characters of a conversation (1,000 to 1,000,000) |
+| `assistant.tool_result_chars` | `12000` | characters of one tool result given to the model (1,000 to 200,000) |
 | `webhook.secret_file` | empty | webhook secret; the receiver is served only when set |
 | `webhook.previous_secret_file` | empty | the old secret, accepted too while you rotate |
 | `cluster.addresses` | `[]` | Hazelcast members `host:port`; set to run as one of several instances (section 3.1) |
@@ -215,6 +227,37 @@ anonymous. Remove a token from the configuration to revoke it, the sessions it o
 
 Behind a proxy that names its users, both work: a page from the portal's web UI, then a token or a sign-in cookie, then the proxy's
 headers decide who the viewer is.
+
+### 2.3 The assistant
+
+The portal can answer questions about its catalogue in plain language on its *Ask* page (`/ask`): which repositories use a library,
+what a group holds, what changed lately, why a repository's health is low. A language model reads the catalogue through read-only
+tools (search the repositories, list and read groups, read a repository's README and technology, read a document, the recent commits,
+a repository's health) and answers in Markdown with links into the portal. It sees exactly what the person asking may see: a private
+repository only for a viewer who sees private repositories.
+
+Nothing is stored: the conversation lives in the browser's page and is sent with each question. What the tools read is sent to the
+provider you configure, so choose one your organisation may send its repository contents to (for private repositories especially).
+
+1. Get an API key from the provider and put it in a file, for example `/run/secrets/scp-llm-key`.
+2. Configure it:
+
+```yaml
+llm:
+  provider: anthropic                 # openai, gemini, openrouter, or ollama (no key) for a model on your own machines
+  model: claude-haiku-5-5             # optional: the provider's default
+  api_key_file: /run/secrets/scp-llm-key
+assistant:
+  access: signed-in                   # admin, or everyone (also anonymous visitors: mind the provider's bill)
+```
+
+3. Restart, sign in as an administrator and press *Test the provider* on the *Admin* page: it asks the model for one short completion
+   and shows the time it took or the provider's error.
+
+The header shows *Ask* to the viewers `assistant.access` admits. `signed-in` and `admin` need a way to know the viewer (section 2.2 or
+a proxy, section 2.1). Each answer is bounded by the `assistant.*` budgets; `assistant.concurrency` limits the answers in progress on
+one instance. Everything a tool returns is marked to the model as repository content written by others, never instructions. Watch the
+cost with `scp_assistant_tokens_total` (section 5).
 
 ## 3. Run
 
@@ -358,6 +401,8 @@ Metrics:
 | `scp_items` | `kind`, `freshness` | repositories by data kind and freshness |
 | `scp_build_info` | `version`, `commit`, `goversion` | the running build |
 | `scp_cluster_leader` | | 1 on the instance that leads the cluster, 0 on the others (only with `cluster.addresses`) |
+| `scp_assistant_requests_total` | `outcome` | assistant questions: `answered`, `refused` (access, validation, busy), `budget`, `aborted` (the viewer left) or the provider's error (`auth`, `rate_limited`, `overloaded`, `bad_request`, `tools_unsupported`, `network`, `provider`) |
+| `scp_assistant_tokens_total` | `kind` | language model tokens the assistant used, `input` and `output` |
 | `scp_event_streams` | | open `/api/v1/events` streams (at most 1,000 per instance; beyond that browsers poll) |
 
 Useful alerts: `scp_github_rate_remaining_ratio < 0.1` for 15 minutes; `scp_items{freshness="error"}` above zero for an hour;
@@ -375,4 +420,5 @@ steps, and job failures. Secrets are never logged.
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
 | A repository is missing | it must be public, not a fork (unless `include_forks`), and in a configured account; a deleted or private repository disappears after two listings |
 | Pushes show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository, `scp_webhook_deliveries_total` by result |
+| The assistant answers with an error | *Test the provider* on the *Admin* page; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |

@@ -69,8 +69,9 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | Metrics | `prometheus/client_golang` |
 | Distributed state | `hazelcast/hazelcast-go-client` |
 | Sign-in | `coreos/go-oidc` v3, `golang.org/x/oauth2` |
+| Language models | own `net/http` adapters for the Anthropic Messages and OpenAI Chat Completions wire formats (P-28) |
 | Tests | `testing`, `testing/synctest`, `go-cmp`, `goleak` |
-| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, Vitest, MSW, Playwright with axe; pnpm 12, Node.js 24 |
+| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, react-markdown with remark-gfm (the assistant's answers), Vitest, MSW, Playwright with axe; pnpm 12, Node.js 24 |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, cosign, Renovate |
 
 ## 4. Work
@@ -78,7 +79,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | M | Delivers | Done when | State |
 |---|---|---|---|
 | S1 | Sign-in and admin (`design/auth.md`): OIDC with PKCE, bearer tokens, stateless sealed sessions, an admin role | signed in through a fake provider a member of a private group sees a private repository, an admin reads the status, a token reads `/llms.txt` with its groups; forged state, nonce and cookies refused | done |
-| A1 | Assistant (`design/assistant.md`): LLM providers (Anthropic, OpenAI, Gemini, OpenRouter, Ollama) and a read-only chat over the snapshot | the adapters pass their recorded fixtures; the loop keeps its budgets and frames every tool result; `/ask` answers with links against a fake provider; a public viewer's assistant never reads a private repository | in progress |
+| A1 | Assistant (`design/assistant.md`): LLM providers (Anthropic, OpenAI, Gemini, OpenRouter, Ollama) and a read-only chat over the snapshot | the adapters pass their recorded fixtures; the loop keeps its budgets and frames every tool result; `/ask` answers with links against a fake provider; a public viewer's assistant never reads a private repository | done |
 | M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | queued |
 
 Each milestone starts with its design note and lands as small commits on `main`, CI green.

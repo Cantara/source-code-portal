@@ -29,6 +29,8 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/commits[?group=][&repo=owner/name][&automation=false][&page=][&limit=]` | commits newest first, in numbered pages; `automation=false` leaves out bots and release-plugin commits |
 | `GET /api/v1/repos/{owner}/{name}/history[?ref=][&author=][&q=][&automation=false][&page=][&limit=][&at=]` | the stored history (500 default-branch commits, the newest 10 other branches, the newest 100 tags) in graph order with branch and tag labels; `ref` keeps what a branch or tag reaches, `author`, `q` (subject, body, SHA prefix) and `automation` filter and set `filtered`; each commit carries its row of the git graph (`graph`, `null` on a filtered page) and `lanes` is the page's width |
 | `GET /api/v1/me` | the viewer: signed in or not, name, how identified (`proxy`, `oidc`, `token`), whether it sees private repositories and is an administrator, and the ways to sign in |
+| `GET /api/v1/assistant` | whether the assistant is set up, whether this viewer may ask, who may (`signed-in`, `admin`, `everyone`), the provider and model |
+| `POST /api/v1/assistant/chat` | asks the assistant (below); answers server-sent events |
 | `GET /api/v1/snapshot` | the version and time of the data being served, and readiness |
 | `GET /api/v1/events` | server-sent events: `event: snapshot` with the same JSON as `/api/v1/snapshot`, when the stream opens and whenever the data changes |
 
@@ -56,6 +58,17 @@ when `version` differs from the one you saw; it identifies the data and is the s
 curl -sN https://scp.example.org/api/v1/events
 ```
 
+**The assistant.** Post the conversation as JSON, the question last, user and assistant messages taking turns; the portal keeps none
+of it. The answer is a stream of events: `tool` (`{"name", "label"}`, what the assistant reads), `text` (`{"text"}`, pieces of the
+Markdown answer), then `done` (`{"usage": {"inputTokens", "outputTokens"}}`) or `error` (`{"code", "message"}`: `budget`, `refusal`, or
+the provider's `auth`, `rate_limited`, `overloaded`, `bad_request`, `tools_unsupported`, `network`, `provider`). A comment line is
+sent every 15 seconds. A request with a sign-in cookie must come from the portal's own pages; a token needs no such check.
+
+```sh
+curl -sN -H "Authorization: Bearer $(cat ~/.config/scp/token)" -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Which repositories use whydah-core?"}]}' https://scp.example.org/api/v1/assistant/chat
+```
+
 **Images.** Documents show images at `/images/{owner}/{name}/{id}`, served by the portal with a strong `ETag` and
 `Cache-Control: public, max-age=3600`.
 
@@ -65,11 +78,13 @@ the `X-Request-Id` header):
 | Status | `code` |
 |---|---|
 | 400 | `validation-failed`, `unknown-ref` |
-| 401 | `unauthenticated` (a token that names nobody; an administrator's address without a sign-in) |
-| 403 | `forbidden` (an administrator's address), `cross-origin` (a sign-in form posted from another site) |
+| 401 | `unauthenticated` (a token that names nobody; an administrator's address or the assistant without a sign-in) |
+| 403 | `forbidden` (an administrator's address, the assistant open to administrators only), `cross-origin` (a sign-in form or a question posted from another site) |
 | 404 | `not-found` |
 | 405 | `method-not-allowed` |
 | 406 | `not-acceptable` (the API answers `application/json`) |
+| 415 | `unsupported-media-type` (a question that is not `application/json`) |
+| 429 | `too-many-requests` (the assistant is busy; `Retry-After` says when to try again) |
 | 500 | `internal` |
 
 ```json

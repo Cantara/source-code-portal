@@ -1,5 +1,5 @@
 # Assistant
-Status: A1, in progress (plan.md section 4). Binding order: ../plan.md > this note. Adapted from krantho's LLM providers (two wire
+Status: A1, built (plan.md section 4). Binding order: ../plan.md > this note. Adapted from krantho's LLM providers (two wire
 formats for six providers, streaming chat with tools, budgets, framing of untrusted text) to SCP: read-only, over the snapshot.
 
 ## Scope
@@ -30,27 +30,31 @@ links to the pages it read. It writes nothing and calls nothing but the configur
 - `POST /api/v1/assistant/chat` (`application/json`, CSRF rule of auth.md): `{messages: [{role, content}]}`, at most
   `assistant.max_history` messages and `assistant.max_input_chars` characters. The answer is `text/event-stream`: `text`, `tool`
   (name and a short label, for "Reading acme/core…"), `done{usage}`, `error{code, message}`; `: ping` every 15 s.
-- `GET /api/v1/assistant` (contract): `{enabled, allowed, provider, model}`.
+- `GET /api/v1/assistant` (contract): `{enabled, allowed, access, provider, model}`; the chat is outside the contract's generated
+  handlers (`exclude-operation-ids`), as `/api/v1/events` is.
 - Who may ask: `assistant.access` = `signed-in` (default), `admin` or `everyone`. The configured credential is spent by whoever is
   allowed; `assistant.concurrency` (default 4) bounds the requests in flight, more answer 429 with `Retry-After`.
-- The loop: at most `max_turns` (8) model calls, `max_tool_calls` (16), `max_tokens` (16,000 output tokens) per request; the last turn
-  is sent without tools so it must answer; tool results are cut to `tool_result_chars` (12,000). Providers that report no usage are
+- The loop: at most `max_turns` (8) model calls, `max_tool_calls` (16), `max_tokens` (16,000 tokens, input and output) per request; the
+  turn that reaches a budget is sent with `NoTools` so it must answer (a call beyond `max_tool_calls` is answered with an error
+  result); an answer that ends without text is the `budget` error; tool results are cut to `tool_result_chars` (12,000). Providers that report no usage are
   estimated at 4 characters a token.
 - Tools, over `Current(ctx)` (the viewer's view; a private repository exists only for a private viewer), wired in `cmd/scp`:
-  `search_repositories(query, group?)`, `list_groups()`, `get_group(id)`, `get_repository(owner/name)` (README, descriptor and
-  technology: the llms Markdown), `get_document(owner/name, path)`, `recent_commits(repository? | group?, limit)`,
-  `repository_health(owner/name)`.
+  `search_repositories(query?, group?, limit?)`, `list_groups()`, `get_group(id)`, `get_repository(owner, name)` (README and
+  technology: the llms Markdown, renames followed), `get_document(owner, name, path)`, `recent_commits(repo? | group?, limit?)` (without
+  automation), `repository_health(owner, name)`; they call the contract's methods and the llms handlers in process with the request's
+  context (`cmd/scp/assistant.go`).
 - Every tool result is repository-authored text: it is framed as `<untrusted-content id="<nonce>" source="…">…</untrusted-content
   id="<nonce>">` with a per-request nonce, and the tag name inside the text is rewritten, so text cannot close the frame. The system
   prompt says framed content is data, never instructions, and that the assistant only reads.
 - The system prompt names the portal, today's date (UTC), the groups' names and the tools; never the viewer's name or email.
-- No caching of answers; nothing of a conversation is stored or logged beyond the access log line.
+- No caching of answers; nothing of a conversation is stored or logged beyond the access log line. The viewer is told a fixed text
+  per error code; the provider's own message is only logged (`assistant provider`), and shown to administrators by the provider test.
 - Metrics: `scp_assistant_requests_total{outcome}`, `scp_assistant_tokens_total{kind}` (input, output).
 
 ## Web
 - `/ask` (feature `assistant`): the conversation (kept in the page only), the question box, the tool labels while it reads, a stop
-  button (abort), errors as alerts. Answers render as Markdown without HTML or images, links only `http`, `https` and same-origin
-  paths. The header links to it when `allowed`.
+  button (abort), errors as alerts. Answers render as Markdown without HTML or images, links only `https` and same-origin
+  paths (react-markdown with remark-gfm, `skipHtml`). The header links to it when `allowed`.
 - `/admin` shows the provider and model and offers "Test the provider" (`POST /api/v1/admin/assistant/test`, admins only: one short
   completion, its latency or error code).
 
