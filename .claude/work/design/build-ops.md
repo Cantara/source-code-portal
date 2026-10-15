@@ -22,7 +22,8 @@ updates and the test strategy, for one instance serving up to 1,000 repositories
   lockfile, versions updated like any dependency.
 - The binary holds no web files: the web UI is the separate, platform-independent `web/bundle` (`web.dir`), so `go build` and
   `go test ./...` run with Go alone and one bundle serves every platform.
-- Renovate updates every pin (Go, Node, pnpm, golangci-lint, GoReleaser, images by digest, actions by SHA) after a 7-day cooldown.
+- Renovate updates every pin (Go, Node, pnpm, golangci-lint, GoReleaser, images by digest, actions by SHA) after a 7-day cooldown;
+  patch and minor updates merge themselves when CI is green, major ones wait for review.
 - Generated code is committed and drift-checked by `make check` and CI: Go server code in `internal/httpapi/oapi`, `web/src/styles/chroma.css`,
   web client types in `web/src/lib/api/schema.d.ts`.
 
@@ -146,8 +147,10 @@ run then runs the published image (`scp version`, `/web/server.js`) read-only wi
 Renovate (`renovate.json`): `config:recommended`, `helpers:pinGitHubActionDigests`, `docker:pinDigests`, `chore` commit type; the
 built-in managers (gomod with tool directives, npm in `web/`, github-actions, dockerfile) and regex managers for golangci-lint (Makefile,
 CI), pnpm (CI, Dockerfile) and GoReleaser (release workflow); `minimumReleaseAge` 7 days, Mondays before 06:00 Europe/Oslo,
-`postUpdateOptions: [gomodTidy]`, grouped toolchain updates (Go image with `go.mod`, Node image with `.node-version`), vulnerability
-alerts at any time, `ignorePaths: [".claude/**"]`.
+`postUpdateOptions: [gomodTidy]`, grouped toolchain updates (Go image with `go.mod`, whose `go` directive is bumped, Node image with
+`.node-version`), vulnerability alerts at any time without the cooldown, `ignorePaths: [".claude/**"]`. Policy: patch, minor, digest
+and pin updates are PRs that Renovate merges itself (squash) once every check is green (CI runs on pull requests; GitHub's auto-merge
+is not used); major updates are PRs labelled `major-update` that a person reviews and merges.
 
 ## Tests (strategy)
 - Unit and table tests with stdlib `testing` and `go-cmp`; hand-written fakes in `_test.go`, named after the behaviour they provide.

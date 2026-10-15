@@ -1,13 +1,39 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Patch, minor, digest and pin updates merge themselves once CI is green; major updates wait for a person to review and merge the PR",
   "extends": ["config:recommended", "helpers:pinGitHubActionDigests", "docker:pinDigests", ":semanticCommitTypeAll(chore)"],
   "timezone": "Europe/Oslo",
   "schedule": ["before 6am on monday"],
   "minimumReleaseAge": "7 days",
   "ignorePaths": [".claude/**"],
   "postUpdateOptions": ["gomodTidy"],
-  "vulnerabilityAlerts": { "schedule": ["at any time"] },
+  "labels": ["dependencies"],
+  "automergeType": "pr",
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
+  "vulnerabilityAlerts": {
+    "schedule": ["at any time"],
+    "minimumReleaseAge": null,
+    "labels": ["dependencies", "security"]
+  },
   "packageRules": [
+    {
+      "description": "Patch, minor, digest and pin updates of the Go server, the web UI, the images, the actions and the tools merge themselves when every check passes",
+      "matchUpdateTypes": ["patch", "minor", "digest", "pin", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "Major updates open a PR for manual review",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-update"]
+    },
+    {
+      "description": "The go directive of go.mod follows the toolchain release",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang"],
+      "rangeStrategy": "bump"
+    },
     {
       "description": "One toolchain update: the Go image with go.mod",
       "matchPackageNames": ["go", "golang"],
