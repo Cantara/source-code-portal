@@ -65,7 +65,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | API | OpenAPI 3.1, `oapi-codegen` v2 (strict server), `openapi-typescript` and `openapi-fetch` for the web |
 | GitHub | `google/go-github` v92, `bradleyfalzon/ghinstallation` v2, an own ETag and rate transport |
 | Storage | `modernc.org/sqlite` |
-| Markdown | `yuin/goldmark`, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` |
+| Markdown | `yuin/goldmark` v2, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` |
 | Metrics | `prometheus/client_golang` |
 | Distributed state | `hazelcast/hazelcast-go-client` |
 | Sign-in | `coreos/go-oidc` v3, `golang.org/x/oauth2` |

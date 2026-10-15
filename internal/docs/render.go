@@ -18,14 +18,13 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer"
-	gmhtml "github.com/yuin/goldmark/renderer/html"
-	"github.com/yuin/goldmark/text"
-	"github.com/yuin/goldmark/util"
+	"github.com/yuin/goldmark/v2/ast"
+	"github.com/yuin/goldmark/v2/extension"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/renderer"
+	gmhtml "github.com/yuin/goldmark/v2/renderer/html"
+	"github.com/yuin/goldmark/v2/text"
+	"github.com/yuin/goldmark/v2/util"
 	xhtml "golang.org/x/net/html"
 
 	"github.com/cantara/source-code-portal/internal/safehtml"
@@ -206,13 +205,20 @@ func blockStart(t []byte) bool {
 // markdown renders body to sanitised HTML and returns the first H1 text, the first paragraph text and the TOC.
 func (r *pipeline) markdown(body []byte, l links) (safehtml.SafeHTML, string, string, []Heading, error) {
 	hl := &highlighter{deadline: time.Now().Add(highlightBudget)}
-	md := goldmark.New(
-		goldmark.WithExtensions(extension.GFM, extension.Footnote),
-		goldmark.WithParserOptions(parser.WithAutoHeadingID(), parser.WithASTTransformers(util.Prioritized(alerts{}, 100))),
-		goldmark.WithRendererOptions(gmhtml.WithUnsafe(), renderer.WithNodeRenderers(util.Prioritized(hl, 100))),
+	p := parser.New(
+		parser.WithExtensions(extension.GFMParser, extension.FootnoteParser),
+		parser.WithAutoHeadingID(),
+		parser.WithASTTransformers(util.Prioritized[parser.ASTTransformer](alerts{}, 100)),
+	)
+	md := gmhtml.New(
+		gmhtml.WithExtensions(extension.GFMHTMLRenderer, extension.FootnoteHTMLRenderer),
+		gmhtml.WithUnsafe(),
+		gmhtml.WithNodeRendererDecorator(ast.KindCodeBlock, func(gmhtml.NodeRenderer) gmhtml.NodeRenderer {
+			return renderer.NodeRendererFunc(hl.render)
+		}),
 	)
 	var buf bytes.Buffer
-	if err := md.Convert(body, &buf); err != nil {
+	if err := md.Render(&buf, body, p.Parse(body)); err != nil {
 		return safehtml.SafeHTML{}, "", "", nil, err
 	}
 	rw, err := rewrite(buf.Bytes(), l)
@@ -223,44 +229,36 @@ func (r *pipeline) markdown(body []byte, l links) (safehtml.SafeHTML, string, st
 	return h, rw.title, rw.description, rw.toc, err
 }
 
-// highlighter renders fenced code with chroma token classes, within a per-block size and a per-document time budget.
+// highlighter renders code blocks, fenced ones with chroma token classes, within a per-block size and a per-document time budget.
 type highlighter struct{ deadline time.Time }
 
-func (h *highlighter) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
-	reg.Register(ast.KindFencedCodeBlock, h.render)
-}
-
-func (h *highlighter) render(w util.BufWriter, src []byte, n ast.Node, entering bool) (ast.WalkStatus, error) {
+func (h *highlighter) render(w io.Writer, src []byte, n ast.Node, entering bool, _ renderer.Context) (ast.WalkStatus, error) {
 	if !entering {
 		return ast.WalkContinue, nil
 	}
-	fc := n.(*ast.FencedCodeBlock) //nolint:forcetypeassert // registered for this kind only
-	var code bytes.Buffer
-	for i := range fc.Lines().Len() {
-		seg := fc.Lines().At(i)
-		code.Write(seg.Value(src))
-	}
+	cb := n.(*ast.CodeBlock) //nolint:forcetypeassert // registered for this kind only
+	code := cb.Value.Str(src)
 	lang := ""
-	if l := string(fc.Language(src)); validLanguage(l) {
+	if l, ok := cb.Language(src); ok && validLanguage(l) {
 		lang = l
 	}
 	if lang == "" {
-		_, _ = w.WriteString("<pre><code>")
+		_, _ = io.WriteString(w, "<pre><code>")
 	} else {
 		_, _ = fmt.Fprintf(w, `<pre class="chroma"><code class="language-%s">`, lang)
 	}
-	if lexer := lexers.Get(lang); lang != "" && lang != "mermaid" && lexer != nil && code.Len() <= maxHighlight && time.Now().Before(h.deadline) {
-		if it, err := lexer.Tokenise(nil, code.String()); err == nil {
+	if lexer := lexers.Get(lang); lang != "" && lang != "mermaid" && lexer != nil && len(code) <= maxHighlight && time.Now().Before(h.deadline) {
+		if it, err := lexer.Tokenise(nil, code); err == nil {
 			var out bytes.Buffer
 			if chromahtml.New(chromahtml.WithClasses(true), chromahtml.PreventSurroundingPre(true)).Format(&out, styles.Fallback, it) == nil {
 				_, _ = w.Write(out.Bytes())
-				_, _ = w.WriteString("</code></pre>\n")
+				_, _ = io.WriteString(w, "</code></pre>\n")
 				return ast.WalkSkipChildren, nil
 			}
 		}
 	}
-	_, _ = w.WriteString(html.EscapeString(code.String()))
-	_, _ = w.WriteString("</code></pre>\n")
+	_, _ = io.WriteString(w, html.EscapeString(code))
+	_, _ = io.WriteString(w, "</code></pre>\n")
 	return ast.WalkSkipChildren, nil
 }
 
@@ -288,11 +286,10 @@ func (alerts) Transform(doc *ast.Document, reader text.Reader, _ parser.Context)
 			return ast.WalkContinue, nil
 		}
 		p, ok := bq.FirstChild().(*ast.Paragraph)
-		if !ok || p.Lines().Len() == 0 {
+		if !ok || len(p.Source()) == 0 {
 			return ast.WalkContinue, nil
 		}
-		line := p.Lines().At(0)
-		marker := strings.TrimSpace(string(line.Value(src)))
+		marker := strings.TrimSpace(p.Source()[0].Str(src))
 		kind := ""
 		for _, k := range []string{"NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"} {
 			if strings.EqualFold(marker, "[!"+k+"]") {
@@ -304,20 +301,20 @@ func (alerts) Transform(doc *ast.Document, reader text.Reader, _ parser.Context)
 		}
 		for c := p.FirstChild(); c != nil; {
 			next := c.NextSibling()
-			p.RemoveChild(p, c)
+			p.RemoveChild(c)
 			if t, ok := c.(*ast.Text); ok && (t.SoftLineBreak() || t.HardLineBreak()) {
 				break
 			}
 			c = next
 		}
 		if p.ChildCount() == 0 {
-			bq.RemoveChild(bq, p)
+			bq.RemoveChild(p)
 		}
 		title := ast.NewParagraph()
-		title.SetAttributeString("class", "md-alert-title")
-		title.AppendChild(title, ast.NewString([]byte(kind[:1]+strings.ToLower(kind[1:]))))
-		bq.InsertBefore(bq, bq.FirstChild(), title)
-		bq.SetAttributeString("class", "md-alert md-alert-"+strings.ToLower(kind))
+		title.SetAttribute("class", text.NewMultiLineValue("md-alert-title", text.IdentityDecoder))
+		title.AppendChild(ast.NewText(text.NewSingleLineValueFromString(kind[:1]+strings.ToLower(kind[1:]), text.IdentityDecoder)))
+		bq.InsertBefore(bq.FirstChild(), title)
+		bq.SetAttribute("class", text.NewMultiLineValue("md-alert md-alert-"+strings.ToLower(kind), text.IdentityDecoder))
 		return ast.WalkSkipChildren, nil
 	})
 }
