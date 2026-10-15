@@ -23,7 +23,7 @@ What Source Code Portal is, how it is built, and the work in progress. Binding o
 | `design/auth.md` | S1, built: sign-in through OIDC, bearer tokens, sealed sessions, the admin role. |
 | `design/assistant.md` | A1, in progress: LLM providers and the read-only assistant. |
 | `design/seo.md` | M13, built: search engines. |
-| `design/hardening.md` | H1, in progress: a hardened private instance (issue #5). |
+| `design/hardening.md` | H1, built: a hardened private instance (issue #5). |
 | `history/` | Finished work: the M0..M11 plan and decision log, the earlier detailed design, the UI brief and screenshots. Not kept in sync. |
 
 New decisions go into `decisions.md` and the note they change, in the same commit. When a milestone is done its note is folded into

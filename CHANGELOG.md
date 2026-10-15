@@ -9,6 +9,11 @@ subjects.
 - `GET /knowledge.yaml` and `GET /.well-known/kcp.json`: the catalogue as a Knowledge Context Protocol manifest, so an agent that
   knows only the portal's address finds a map of groups, repositories and documents with intents and reading order. `GET
   /groups/{group}.md` answers like the other `.md` addresses.
+- The Java portal's addresses (`/dashboard`, `/group/{id}`, `/contents/...`, `/commits/...`, `/badge/...`) redirect to their
+  successors; Jenkins and Snyk badges, the wiki and the old webhook answer 410.
+- For portals of private repositories (`docs/security-model.md`): `access.require_auth` (no public view), `github.sources[].exclude`,
+  an `audit` log line per request in the private view, a warning for wide `server.trusted_proxies`, deleted repositories gone within
+  about 30 seconds, and one test that holds every public route to the same view.
 
 ## 2.0.0
 

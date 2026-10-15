@@ -1,5 +1,5 @@
 # Hardened private instance (H1)
-Status: in progress. Binding order: ../plan.md > this note. Asked for in issue #5.
+Status: as built. Binding order: ../plan.md > this note. Asked for in issue #5.
 
 ## Scope
 A portal whose repositories are nearly all private, where a leak is a confidentiality incident. One instance serves one audience:
@@ -32,4 +32,4 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   network layout, the App's permissions, key rotation) and what is out of scope.
 
 ## Order
-Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> audit log (built) -> start warning (built) -> confirming listing (built) -> `security-model.md`.
+Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> audit log (built) -> start warning (built) -> confirming listing (built) -> `docs/security-model.md` (built).

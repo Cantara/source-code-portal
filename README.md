@@ -176,6 +176,7 @@ Tests never touch the network: GitHub is a fake in `internal/github/githubtest`.
 
 - [Operator guide](docs/operator-guide.md): connect GitHub, configure, run, several instances, monitor, troubleshoot.
 - [Repository guide](docs/repository-guide.md): what the portal reads from a repository and the `scp.yaml` descriptor.
+- [Security model](docs/security-model.md): the guarantees for private repositories and the operator's part.
 - [API guide](docs/api.md): the JSON API, badges and Markdown for agents.
 - [Changelog](CHANGELOG.md) and [security policy](SECURITY.md).
 
