@@ -101,7 +101,9 @@ contrast in both themes. The header shows whether the live stream is open (`Live
    that loaded." after network, 429 or 5xx failures and clears on the next success.
 6. Problems: `ProblemAlert` titles come from `code` and always show the request id. Each independent panel has its own error boundary
    (`PanelBoundary`, with Retry); `error.tsx` catches the rest and `global-error.tsx` a failing layout.
-7. Deploy skew: `X-SCP-Build` on an API response differing from the bundle's build id shows "A new version is available" with Reload;
+7. Deploy skew: the bundle records its build id in `BUILD` (`scripts/bundle.ts`); `scp` sends the running bundle's as `X-SCP-Build`
+   (`webui.Server.Build`, read at every start of the web UI server), and an API response whose build differs from the page's shows
+   "A new version is available" with Reload. The binary's own build does not take part, so the two can be upgraded apart;
    Next.js's `deploymentId` (the build id) makes a navigation across a deployment a full load.
 8. `SafeHtml` sets the API field `html` with `dangerouslySetInnerHTML`, memoised on the string. Lint allows it in this component only.
 9. Theme: `system | light | dark` in `localStorage` key `scp-theme`. The blocking `/theme-init.js` in `<head>` sets the `dark` class

@@ -37,6 +37,7 @@ type Server struct {
 	log       *slog.Logger
 	addr      string // 127.0.0.1:port the child listens on
 	ready     atomic.Bool
+	served    atomic.Pointer[string] // the build id of the bundle the running server was started from
 }
 
 // New picks a free loopback port for the server in dir (server.js), run with node.
@@ -52,6 +53,15 @@ func New(dir, node string, log *slog.Logger) (*Server, error) {
 
 // URL is the address the pages are proxied to.
 func (s *Server) URL() *url.URL { return &url.URL{Scheme: "http", Host: s.addr} }
+
+// Build is the build id of the bundle the server runs (its BUILD file, which the pages know as theirs); empty before the first start
+// or when the bundle has none.
+func (s *Server) Build() string {
+	if b := s.served.Load(); b != nil {
+		return *b
+	}
+	return ""
+}
 
 // Ready reports whether the server accepts connections.
 func (s *Server) Ready() bool { return s.ready.Load() }
@@ -92,6 +102,8 @@ func (s *Server) once(ctx context.Context, api string) error {
 	run, stop := context.WithCancelCause(ctx)
 	defer stop(nil)
 	build := s.build()
+	served := s.read("BUILD")
+	s.served.Store(&served)
 	cmd := exec.CommandContext(run, s.node, "server.js") //nolint:gosec // G204: the operator's web.node runs the operator's web.dir
 	cmd.Dir = s.dir
 	// Only what the server needs: the portal's own environment can hold its configuration.
@@ -120,9 +132,12 @@ func (s *Server) once(ctx context.Context, api string) error {
 	return err
 }
 
-// build is the bundle's build id; empty when it cannot be read.
-func (s *Server) build() string {
-	b, _ := os.ReadFile(filepath.Join(s.dir, ".next", "BUILD_ID")) //nolint:gosec // G703: the operator's web.dir
+// build is the id of the bundle's Next.js build (new on every build); empty when it cannot be read.
+func (s *Server) build() string { return s.read(filepath.Join(".next", "BUILD_ID")) }
+
+// read is a one-line file of the bundle, trimmed; empty when it cannot be read.
+func (s *Server) read(name string) string {
+	b, _ := os.ReadFile(filepath.Join(s.dir, name)) //nolint:gosec // G703: the operator's web.dir
 	return string(bytes.TrimSpace(b))
 }
 

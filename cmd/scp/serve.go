@@ -208,7 +208,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
 	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
-	opts := httpapi.Options{Log: log, Build: build, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
+	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
 		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
 			Vary: private},
@@ -218,6 +218,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Detail: []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
 	features := api{catalogAPI, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		httpapi.SnapshotAPI{Current: view}}
+	if s.web != nil {
+		opts.Build = s.web.Build
+	}
 	s.public = httpapi.Server(httpapi.Public(opts, opts.Pages(upstream), contract.OpenAPI, features, routes...), log)
 	s.public.RegisterOnShutdown(events.Close)
 	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}

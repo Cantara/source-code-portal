@@ -83,7 +83,7 @@ every other path is a page, proxied to the web UI server (behaviour 3).
    - Caching elsewhere: pages as the web UI server sends them (web.md); badges per content.md; llms `public, max-age=300` with strong
      ETag; probes `no-store`; a private viewer's responses `private` (access.md).
 2. **Middleware** (`wrap`, outermost first): request id (accept `X-Request-Id` matching `[A-Za-z0-9-]{1,64}`, else generate; echoed),
-   `X-SCP-Build`, security headers, the viewer (access.md) -> recover (500 `internal` problem, stack logged) -> access log and metrics
+   `X-SCP-Build` (the running web UI bundle's build), security headers, the viewer (access.md) -> recover (500 `internal` problem, stack logged) -> access log and metrics
    (`slog` after the handler: listener, `r.Pattern`, method, status, bytes, duration, request id, client IP) -> request deadline
    (context 30 s; not on `Route.Stream` routes) -> gzip (`text/*`, JSON, problem, YAML and SVG of at least 1 KiB; a flushed stream stays
    uncompressed) -> mux, where each route caps its body (`MaxBytesReader`, 64 KiB, the webhook 25 MiB).

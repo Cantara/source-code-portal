@@ -113,6 +113,14 @@ test("the theme menu switches light and dark, and system follows the system pref
   await expect(theme).toHaveValue("system")
 })
 
+test("a page from the running bundle sees no new version", async ({ page }) => {
+  const api = page.waitForResponse((r) => r.url().includes("/api/v1/"))
+  await page.goto("/")
+  expect((await api).headers()["x-scp-build"]).toBeTruthy()
+  await page.waitForLoadState("networkidle")
+  await expect(page.getByText("A new version is available.")).toHaveCount(0)
+})
+
 test("static files are immutable and compressed; pages are not stored", async ({ page, request }) => {
   const res = await page.goto("/")
   expect(res?.headers()["cache-control"]).toContain("no-store")

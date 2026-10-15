@@ -1,6 +1,6 @@
 // Assembles web/bundle, the directory `scp serve` runs (web.dir): the standalone server of `next build` with its static files and
-// public/. Fails when the static files outgrow their budget (gzip): JavaScript 300 KB, CSS 25 KB, and no fonts.
-import { cpSync, readdirSync, readFileSync, rmSync } from "node:fs"
+// public/, and BUILD with the build id. Fails when the static files outgrow their budget (gzip): JavaScript 300 KB, CSS 25 KB, and no fonts.
+import { cpSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { gzipSync } from "node:zlib"
 
@@ -10,6 +10,8 @@ rmSync(out, { recursive: true, force: true })
 cpSync(join(web, ".next/standalone"), out, { recursive: true, verbatimSymlinks: true })
 cpSync(join(web, ".next/static"), join(out, ".next/static"), { recursive: true })
 cpSync(join(web, "public"), join(out, "public"), { recursive: true })
+// The build the pages know (NEXT_PUBLIC_BUILD_ID); scp sends the running bundle's as X-SCP-Build.
+writeFileSync(join(out, "BUILD"), `${process.env.BUILD_ID ?? "dev"}\n`)
 
 const kb = 1000
 const files = readdirSync(join(web, ".next/static"), { recursive: true, encoding: "utf8" })

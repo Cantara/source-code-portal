@@ -48,7 +48,7 @@ func public(cur *snapshot.Snapshot) http.Handler {
 }
 
 func testOptions() Options {
-	return Options{Log: slog.New(slog.DiscardHandler), Build: "b1", HSTS: true, TrustedProxies: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}}
+	return Options{Log: slog.New(slog.DiscardHandler), Build: func() string { return "b1" }, HSTS: true, TrustedProxies: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}}
 }
 
 func get(h http.Handler, path string, hdr ...string) *httptest.ResponseRecorder {

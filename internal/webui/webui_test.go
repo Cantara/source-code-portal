@@ -78,6 +78,9 @@ func TestServer(t *testing.T) {
 	if err := os.WriteFile(dir+"/.next/BUILD_ID", []byte("b1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(dir+"/BUILD", []byte("commit-1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("SCP_SECRET_THING", "must not leak")
 	out := &logs{}
 	s, err := New(dir, os.Args[0], slog.New(slog.NewTextHandler(out, nil)))
@@ -108,7 +111,16 @@ func TestServer(t *testing.T) {
 	if !strings.Contains(out.String(), "restarting") || !strings.Contains(out.String(), "line=listening") {
 		t.Errorf("log:\n%s", out)
 	}
-	// A new bundle written under the running server restarts it at once.
+	if got := s.Build(); got != "commit-1" {
+		t.Errorf("Build = %q, want the bundle's commit-1", got)
+	}
+	// A new bundle written under the running server restarts it at once, and Build names the new one.
+	if err := os.WriteFile(dir+"/BUILD", []byte("commit-2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Build(); got != "commit-1" {
+		t.Errorf("Build = %q before the restart, want the running commit-1", got)
+	}
 	if err := os.WriteFile(dir+"/.next/BUILD_ID", []byte("b2\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -118,6 +130,9 @@ func TestServer(t *testing.T) {
 			t.Fatalf("no restart after the bundle changed; log:\n%s", out)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+	if got := s.Build(); got != "commit-2" {
+		t.Errorf("Build = %q after the restart, want commit-2", got)
 	}
 	cancel()
 	select {

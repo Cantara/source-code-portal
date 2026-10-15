@@ -33,7 +33,7 @@ var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 // Options configures what both listeners share.
 type Options struct {
 	Log            *slog.Logger
-	Build          string         // sent as X-SCP-Build on every response, so the web UI notices a new deployment
+	Build          func() string  // the web UI bundle's build, sent as X-SCP-Build on every response, so open pages notice a new one
 	HSTS           bool           // the public URL is https
 	PublicURL      string         // server.public_url: the origin of canonical URLs; empty: the request's
 	WebToken       string         // the secret the web UI server shows on its API calls to name the page's viewer (Pages)
@@ -54,8 +54,10 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		}
 		h := w.Header()
 		h.Set("X-Request-Id", id)
-		if o.Build != "" {
-			h.Set("X-SCP-Build", o.Build)
+		if o.Build != nil {
+			if b := o.Build(); b != "" {
+				h.Set("X-SCP-Build", b)
+			}
 		}
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
