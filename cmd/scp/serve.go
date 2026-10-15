@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -196,7 +197,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
 			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
-		Observe: m.request}
+		Observe: m.request, RequireAuth: cfg.Access.RequireAuth}
 	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin))
 	external := d.images
 	if external == nil {
@@ -208,7 +209,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /knowledge.yaml", Handler: md.KCP()}, {Pattern: "GET /.well-known/kcp.json", Handler: md.WellKnown()},
 		{Pattern: "GET /sitemap.xml", Handler: md.Sitemap()}, {Pattern: "GET /sitemaps/{file}", Handler: md.Sitemap()},
-		{Pattern: "GET /robots.txt", Handler: md.Robots()},
+		{Pattern: "GET /robots.txt", Handler: robots(cfg.Access.RequireAuth, md.Robots())},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
 		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
@@ -455,4 +456,15 @@ func (s *server) run(ctx context.Context) error {
 	}
 	s.pub.Close()
 	return errors.Join(err, s.store.Close())
+}
+
+// robots is robots.txt: the one llms builds, or, when the portal answers signed-in viewers only, one that keeps every crawler out.
+func robots(closed bool, open http.Handler) http.Handler {
+	if !closed {
+		return open
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = io.WriteString(w, "User-agent: *\nDisallow: /\n")
+	})
 }

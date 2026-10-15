@@ -77,6 +77,7 @@ func defaults() map[string]any {
 		"access.user_header":           "X-Forwarded-User",
 		"access.groups_header":         "X-Forwarded-Groups",
 		"access.private_groups":        []string{},
+		"access.require_auth":          false,
 		"auth.session_key_file":        "",
 		"auth.session_ttl":             "12h",
 		"auth.admin_emails":            []string{},

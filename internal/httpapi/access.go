@@ -43,6 +43,7 @@ type Viewer struct {
 	Identity
 	Private bool // sees private repositories
 	Admin   bool // sees the operator surfaces; implies Private
+	web     bool // the web UI server's call for a page the middleware already let through
 }
 
 // SignedIn reports whether the viewer is identified.
@@ -88,7 +89,7 @@ func (o Options) viewer(w http.ResponseWriter, r *http.Request) (Viewer, error) 
 	if token != "" && o.WebToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(o.WebToken)) == 1 {
 		v := Viewer{Private: kind == viewerPrivate || kind == viewerAdmin, Admin: kind == viewerAdmin}
 		v.Name, _ = url.PathUnescape(name)
-		v.Via = via
+		v.Via, v.web = via, true
 		return v, nil
 	}
 	if o.Auth != nil {

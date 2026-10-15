@@ -53,6 +53,7 @@ access:
   user_header: X-Forwarded-User
   groups_header: X-Forwarded-Groups
   private_groups: [] # ["*"] admits every authenticated user
+  require_auth: false # true: no public view, anonymous requests are refused
 # The portal's own sign-in: single sign-on through an OpenID Connect provider (redirect URI <server.public_url>/auth/callback) and
 # access tokens for API clients. A session is a cookie sealed with session_key_file (32 random bytes, the same on every instance).
 auth:

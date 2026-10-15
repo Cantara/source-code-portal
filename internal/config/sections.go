@@ -75,6 +75,7 @@ type Access struct {
 	UserHeader    string   `mapstructure:"user_header"`
 	GroupsHeader  string   `mapstructure:"groups_header"`  // comma-separated group names
 	PrivateGroups []string `mapstructure:"private_groups"` // "*" admits every authenticated user
+	RequireAuth   bool     `mapstructure:"require_auth"`   // no public view: an anonymous request is refused
 }
 
 var headerPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
@@ -146,6 +147,9 @@ func (a Access) validate(g GitHub, identified bool) []string {
 		p = append(p, "access.private_groups: required when a source sets include_private")
 	case private && !identified:
 		p = append(p, "server.trusted_proxies: required when a source sets include_private (the authenticating proxy), unless auth signs viewers in")
+	}
+	if a.RequireAuth && !identified {
+		p = append(p, "access.require_auth: needs a way to know the viewer (server.trusted_proxies, auth sign-in or auth.tokens)")
 	}
 	return p
 }

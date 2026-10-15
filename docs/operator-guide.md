@@ -96,6 +96,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `access.user_header` | `X-Forwarded-User` | header in which the authenticating proxy names the user |
 | `access.groups_header` | `X-Forwarded-Groups` | header with the user's groups, comma-separated |
 | `access.private_groups` | `[]` | groups whose members see private repositories; `"*"` is every authenticated user |
+| `access.require_auth` | `false` | no public view: an anonymous request gets 401 (a browser's page request goes to `/signin`), except sign-in, `/api/v1/me`, `/webhooks/` and `robots.txt` (which then disallows everything) |
 | `auth.session_key_file` | empty | at least 32 random bytes that seal the sign-in cookies; the same file on every instance; needed for sign-in (section 2.2) |
 | `auth.session_ttl` | `12h` | how long a sign-in lasts, `5m` to `720h`; it is renewed while in use |
 | `auth.admin_emails` | `[]` | verified email addresses of the administrators (case-insensitive) |
@@ -178,6 +179,10 @@ every page, in the API, badges, `/llms.txt` and the Markdown answers. The two he
 varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and a way to know the viewer: `server.trusted_proxies`,
 `auth.oidc` or `auth.tokens`.
 Images in private READMEs load from GitHub and show for users signed in there.
+
+**Signed-in viewers only.** For a portal whose repositories are nearly all private, set `access.require_auth: true`: there is no
+public view, and every page, API answer, badge, image, Markdown and `llms`/KCP file, the sitemap and the event stream answer only an
+identified viewer (the proxy's headers, a session or a token). Badges then show in a README only to readers signed in to the portal.
 
 **Public and private on one address.** Visitors without a session should reach the portal directly and see the public repositories,
 while signed-in users pass the authenticating proxy. With Traefik and oauth2-proxy: one router sends ``Host(`scp.example.org`)`` to the portal, a

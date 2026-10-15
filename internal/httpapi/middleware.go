@@ -10,8 +10,10 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"regexp"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 )
@@ -41,6 +43,7 @@ type Options struct {
 	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For, and the Access headers, are believed
 	Access         Access
 	Auth           Authenticator // SCP's own sign-in and bearer tokens; nil without them
+	RequireAuth    bool          // access.require_auth: the public listener refuses anonymous requests (but the open paths)
 	// Observe, when set, receives every request: listener, matched pattern ("unmatched" when none), method, status, duration.
 	Observe func(listener, pattern, method string, status int, d time.Duration)
 }
@@ -109,6 +112,10 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		if verr != nil {
 			sw.Header().Set("WWW-Authenticate", `Bearer realm="scp"`)
 			WriteProblem(sw, http.StatusUnauthorized, "unauthenticated", "The credential names nobody.")
+			return
+		}
+		if listener == "public" && o.RequireAuth && !viewer.SignedIn() && !viewer.web && !openPath(r.URL.Path) {
+			refuse(sw, r)
 			return
 		}
 		gz := &gzipWriter{ResponseWriter: sw, accept: r.Method != http.MethodHead && acceptsGzip(r.Header.Get("Accept-Encoding"))}
@@ -320,4 +327,26 @@ func (w *gzipWriter) Flush() {
 		_ = w.gz.Flush()
 	}
 	_ = http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+// openPaths answer an anonymous request under access.require_auth: signing in, the sign-in page with its assets and the sign-in
+// methods it reads (/api/v1/me), GitHub's deliveries (signed) and robots.txt.
+var openPaths = []string{"/auth/", "/signin", "/_next/static/", "/favicon.svg", "/theme-init.js", "/api/v1/me", "/webhooks/", "/robots.txt"} //nolint:gochecknoglobals // lookup table
+
+func openPath(p string) bool {
+	return slices.ContainsFunc(openPaths, func(o string) bool {
+		return p == o || strings.HasSuffix(o, "/") && strings.HasPrefix(p, o)
+	})
+}
+
+// refuse answers an anonymous request under access.require_auth: a browser asking for a page goes to sign-in and comes back;
+// anything else gets 401.
+func refuse(w http.ResponseWriter, r *http.Request) {
+	if (r.Method == http.MethodGet || r.Method == http.MethodHead) && !strings.HasPrefix(r.URL.Path, "/api/") &&
+		strings.Contains(r.Header.Get("Accept"), "text/html") {
+		http.Redirect(w, r, "/signin?return_to="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("WWW-Authenticate", `Bearer realm="scp"`)
+	WriteProblem(w, http.StatusUnauthorized, "unauthenticated", "This portal answers signed-in viewers only.")
 }

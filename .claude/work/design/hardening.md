@@ -11,8 +11,11 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   and every route outside it, fetched as the public (HTML and Markdown) must carry no trace of a private repository (name,
   description, topics, README, documents, commit subjects, dependency edges), and every address naming it must answer word for word
   as an address that does not exist. A new route goes on its list.
-- `access.require_auth: true` closes the public view: an unauthenticated request gets 401 (a page redirects to sign-in), except
-  `/auth/*`, the sign-in page and its static assets; `robots.txt` disallows everything.
+- `access.require_auth: true` closes the public view: the public listener's middleware refuses a request with no identity (401 with
+  `WWW-Authenticate`; a browser's page request, `Accept: text/html`, gets 303 to `/signin?return_to=`). Open: `/auth/`, `/signin`,
+  `/_next/static/`, the favicon and theme script, `/api/v1/me` (the sign-in methods), `/webhooks/` (signed by GitHub) and `robots.txt`,
+  which then disallows everything. The web UI server's own API calls carry the page's viewer and pass. `config check` wants a way to
+  know the viewer (`TestRequireAuth`).
 - `github.sources[].exclude` (exact names, globs, topics) keeps repositories out of the catalogue even where the credential reads them.
 - One log line per answer that includes a private repository: viewer, repository, route, no content, on the logger `access`; a
   counter without repository labels. Metrics and `/api/v1/status` carry no repository names.
@@ -23,4 +26,4 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   network layout, the App's permissions, key rotation) and what is out of scope.
 
 ## Order
-Leak test (built) -> `require_auth` -> `exclude` -> access log -> start warning -> removal on `deleted` -> `security-model.md`.
+Leak test (built) -> `require_auth` (built) -> `exclude` -> access log -> start warning -> removal on `deleted` -> `security-model.md`.
