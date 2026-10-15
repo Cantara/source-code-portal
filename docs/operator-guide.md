@@ -96,6 +96,16 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `access.user_header` | `X-Forwarded-User` | header in which the authenticating proxy names the user |
 | `access.groups_header` | `X-Forwarded-Groups` | header with the user's groups, comma-separated |
 | `access.private_groups` | `[]` | groups whose members see private repositories; `"*"` is every authenticated user |
+| `auth.session_key_file` | empty | at least 32 random bytes that seal the sign-in cookies; the same file on every instance; needed for sign-in (section 2.2) |
+| `auth.session_ttl` | `12h` | how long a sign-in lasts, `5m` to `720h`; it is renewed while in use |
+| `auth.admin_emails` | `[]` | verified email addresses of the administrators (case-insensitive) |
+| `auth.admin_groups` | `[]` | groups whose members are administrators |
+| `auth.tokens[]` | `[]` | access tokens: `name` (`[a-z0-9-]`), `secret_file` (at least 32 characters), `groups`, `admin` |
+| `auth.oidc.issuer` | empty | the OpenID Connect provider (https; http only on loopback); empty: no single sign-on |
+| `auth.oidc.client_id` | empty | the portal's client at the provider |
+| `auth.oidc.client_secret_file` | empty | the client's secret; empty for a public client (PKCE only) |
+| `auth.oidc.scopes` | `[openid, email, profile]` | the scopes asked for; `openid` is required |
+| `auth.oidc.groups_claim` | `groups` | the claim, in the ID token or from userinfo, that lists the user's groups |
 | `webhook.secret_file` | empty | webhook secret; the receiver is served only when set |
 | `webhook.previous_secret_file` | empty | the old secret, accepted too while you rotate |
 | `cluster.addresses` | `[]` | Hazelcast members `host:port`; set to run as one of several instances (section 3.1) |
@@ -129,8 +139,9 @@ scp config groups -c scp.yaml --repos repos.json
 
 ### 2.1 Private repositories
 
-The portal can show private and internal repositories to people your authenticating proxy (oauth2-proxy, an OIDC ingress, an SSO
-gateway) lets through, and keep them from everyone else. The portal does not log anyone in; it believes the proxy.
+The portal can show private and internal repositories to some people and keep them from everyone else. It learns who someone is from
+its own sign-in (section 2.2) or from your authenticating proxy (oauth2-proxy, an OIDC ingress, an SSO gateway), which it believes.
+The steps below are for a proxy; with the portal's sign-in, step 2 needs no `server.trusted_proxies` and step 3 falls away.
 
 1. Give the credential access: a GitHub App installed on the repositories (its *Contents* and *Metadata* read permissions cover private
    ones), or a token that can read them.
@@ -152,7 +163,8 @@ github:
 A request whose user is in one of `access.private_groups` sees everything; any other request sees the public repositories only, on
 every page, in the API, badges, `/llms.txt` and the Markdown answers. The two headers are believed only from an address in
 `server.trusted_proxies` and dropped from any other. Answers to a permitted user are marked `Cache-Control: private`, and every answer
-varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and `server.trusted_proxies`.
+varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and a way to know the viewer: `server.trusted_proxies`,
+`auth.oidc` or `auth.tokens`.
 Images in private READMEs load from GitHub and show for users signed in there.
 
 **Public and private on one address.** Visitors without a session should reach the portal directly and see the public repositories,
@@ -161,6 +173,48 @@ higher-priority router sends ``Host(`scp.example.org`) && (PathPrefix(`/oauth2`)
 to oauth2-proxy, whose upstream is the portal. Let oauth2-proxy reach the portal over a network of its own and put only that network in
 `server.trusted_proxies`, so identity headers that arrive through Traefik are dropped. Sign in at `/oauth2/start?rd=/`, sign out at
 `/oauth2/sign_out?rd=/`.
+
+### 2.2 Sign-in and administrators
+
+The portal signs people in itself through your organisation's OpenID Connect provider (Entra ID, Google, Okta, Keycloak, Authentik,
+...) and lets scripts and people without the provider in with access tokens. Nothing about a user is stored: a sign-in is a cookie
+sealed with `auth.session_key_file`, so every instance with the same key file accepts it. Replacing the key signs everyone out.
+
+1. Make the key: `head -c 32 /dev/urandom | base64 > /run/secrets/scp-session-key` (keep it with the other secrets).
+2. Register the portal at the provider as a web application with the redirect URI `<server.public_url>/auth/callback` and the
+   sign-out redirect `<server.public_url>/`; have it put the user's groups in a claim (`groups` unless you set `auth.oidc.groups_claim`).
+3. Configure it:
+
+```yaml
+server:
+  public_url: https://scp.example.org
+access:
+  private_groups: [engineering]
+auth:
+  session_key_file: /run/secrets/scp-session-key
+  admin_emails: [ops@example.org]
+  oidc:
+    issuer: https://login.example.org
+    client_id: source-code-portal
+    client_secret_file: /run/secrets/scp-oidc-secret
+    scopes: [openid, email, profile, groups]
+  tokens:
+    - { name: ci, secret_file: /run/secrets/scp-token-ci, groups: [engineering] }
+```
+
+**Sign in** from the header's *Sign in*: `/signin` offers single sign-on and, when tokens are configured, a form that takes a token. A
+failed attempt comes back to `/signin` with what went wrong. *Sign out* ends the portal's session and the provider's.
+
+**Roles** follow from the configuration on every request, so a change applies at once: a member of `access.private_groups` sees private
+repositories; an administrator (a verified email in `auth.admin_emails`, a member of `auth.admin_groups`, or a token with `admin: true`)
+sees them too and the *Admin* page with the portal's status. A session keeps only the groups those lists name.
+
+**Tokens** are for API clients and agents: `Authorization: Bearer <token>` on any request reads as the token's groups (`curl -H
+"Authorization: Bearer $(cat token)" https://scp.example.org/llms-full.txt`); a wrong token is refused with 401, never served as
+anonymous. Remove a token from the configuration to revoke it, the sessions it opened included.
+
+Behind a proxy that names its users, both work: a page from the portal's web UI, then a token or a sign-in cookie, then the proxy's
+headers decide who the viewer is.
 
 ## 3. Run
 

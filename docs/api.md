@@ -1,8 +1,16 @@
 # API guide
 
 Everything the portal shows is readable by scripts: a JSON API, SVG badges, and a Markdown surface for LLM agents. All of it is on the
-public listener and read-only. Without an identity from the trusted proxy every answer covers the public repositories only; a user
-in `access.private_groups` sees the private ones too (operator guide, section 2.1).
+public listener and read-only. Anonymous answers cover the public repositories only; a viewer in `access.private_groups` sees the
+private ones too (operator guide, sections 2.1 and 2.2).
+
+**Tokens.** Send an access token the operator configured as `Authorization: Bearer <token>` on any request below to read as its
+groups. A token that names nobody is refused with `401` and `WWW-Authenticate: Bearer`, never served as anonymous. Answers to an
+identified viewer are `Cache-Control: private`.
+
+```sh
+curl -s -H "Authorization: Bearer $(cat ~/.config/scp/token)" https://scp.example.org/llms-full.txt
+```
 
 ## JSON API (`/api/v1`)
 
@@ -20,6 +28,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/repos/{owner}/{name}/manifests` | the repository's `go.mod`, `package.json` and `pom.xml` files with their dependencies, the technology they state, and the catalogued repositories it uses and is used by |
 | `GET /api/v1/commits[?group=][&repo=owner/name][&automation=false][&page=][&limit=]` | commits newest first, in numbered pages; `automation=false` leaves out bots and release-plugin commits |
 | `GET /api/v1/repos/{owner}/{name}/history[?ref=][&author=][&q=][&automation=false][&page=][&limit=][&at=]` | the stored history (500 default-branch commits, the newest 10 other branches, the newest 100 tags) in graph order with branch and tag labels; `ref` keeps what a branch or tag reaches, `author`, `q` (subject, body, SHA prefix) and `automation` filter and set `filtered`; each commit carries its row of the git graph (`graph`, `null` on a filtered page) and `lanes` is the page's width |
+| `GET /api/v1/me` | the viewer: signed in or not, name, how identified (`proxy`, `oidc`, `token`), whether it sees private repositories and is an administrator, and the ways to sign in |
 | `GET /api/v1/snapshot` | the version and time of the data being served, and readiness |
 | `GET /api/v1/events` | server-sent events: `event: snapshot` with the same JSON as `/api/v1/snapshot`, when the stream opens and whenever the data changes |
 
@@ -56,6 +65,8 @@ the `X-Request-Id` header):
 | Status | `code` |
 |---|---|
 | 400 | `validation-failed`, `unknown-ref` |
+| 401 | `unauthenticated` (a token that names nobody; an administrator's address without a sign-in) |
+| 403 | `forbidden` (an administrator's address), `cross-origin` (a sign-in form posted from another site) |
 | 404 | `not-found` |
 | 405 | `method-not-allowed` |
 | 406 | `not-acceptable` (the API answers `application/json`) |

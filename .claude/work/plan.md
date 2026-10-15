@@ -77,8 +77,8 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 
 | M | Delivers | Done when | State |
 |---|---|---|---|
-| S1 | Sign-in and admin (`design/auth.md`): OIDC with PKCE, bearer tokens, stateless sealed sessions, an admin role | signed in through a fake provider a member of a private group sees a private repository, an admin reads the status, a token reads `/llms.txt` with its groups; forged state, nonce and cookies refused | in progress |
-| A1 | Assistant (`design/assistant.md`): LLM providers (Anthropic, OpenAI, Gemini, OpenRouter, Ollama) and a read-only chat over the snapshot | the adapters pass their recorded fixtures; the loop keeps its budgets and frames every tool result; `/ask` answers with links against a fake provider; a public viewer's assistant never reads a private repository | queued |
+| S1 | Sign-in and admin (`design/auth.md`): OIDC with PKCE, bearer tokens, stateless sealed sessions, an admin role | signed in through a fake provider a member of a private group sees a private repository, an admin reads the status, a token reads `/llms.txt` with its groups; forged state, nonce and cookies refused | done |
+| A1 | Assistant (`design/assistant.md`): LLM providers (Anthropic, OpenAI, Gemini, OpenRouter, Ollama) and a read-only chat over the snapshot | the adapters pass their recorded fixtures; the loop keeps its budgets and frames every tool result; `/ask` answers with links against a fake provider; a public viewer's assistant never reads a private repository | in progress |
 | M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | queued |
 
 Each milestone starts with its design note and lands as small commits on `main`, CI green.

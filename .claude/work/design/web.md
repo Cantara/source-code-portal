@@ -74,6 +74,8 @@ web/
 | `/repos/{owner}/{name}/commits` | commits | the navigator of the repository's history (`design/commits-navigator.md`) |
 | `/repos/{owner}/{name}/docs/{path}` | docs | rendered doc with a file list and heading outline; `{path}` is the repository path without its extension |
 | `/commits` | commits | the timeline across all repositories or of one product (`?group=`, with its repositories), filter by repository and automation, commits by day in UTC |
+| `/signin` | signin | the ways to sign in the portal has (single sign-on, the token form), the reason of a failed attempt, `return_to` kept (auth.md); not indexed |
+| `/admin` | admin | the signed-in viewer and, for an administrator, the status (`/api/v1/admin/status`, outside the contract, read with `Get`); not indexed |
 | `/sitemap.xml`, `/robots.txt` | app | the dashboard, the commit log, every group and repository of the viewer's view, absolute |
 | anything else | app | 404 page (also for an unknown group or repository from a 404 problem) |
 

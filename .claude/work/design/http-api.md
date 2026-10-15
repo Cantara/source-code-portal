@@ -34,7 +34,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/repos/{o}/{n}` | llms | `Accept: text/markdown` gets the README Markdown with the technology and internal dependencies; else the page |
 | P | GET | `/repos/{o}/{n}/docs/{path...}` | llms | path ends `.md`: raw Markdown; else the page (negotiated like above) |
 | P | GET | `/repos/{o}/{n}/readme.md` | llms | raw README Markdown with `scp:` front matter |
-| P | GET | `/{path...}` | httpapi | every other path: `httpapi.Pages`, the proxy to the web UI server (pages, `/_next/static`, `/sitemap.xml`, `/robots.txt`, the 404 page); the reserved prefixes `/badges/`, `/images/`, `/webhooks/`, `/.well-known/` answer a plain 404 |
+| P | GET | `/{path...}` | httpapi | every other path: `httpapi.Pages`, the proxy to the web UI server (pages, `/_next/static`, `/sitemap.xml`, `/robots.txt`, the 404 page); the reserved prefixes `/auth/`, `/badges/`, `/images/`, `/webhooks/`, `/.well-known/` answer a plain 404 |
 | P | GET | `/api/v1/dashboard` | catalog | groups with counts, latest activity, aggregate freshness |
 | P | GET | `/api/v1/groups` | catalog | all groups (matchers resolved), member counts |
 | P | GET | `/api/v1/groups/{group}` | catalog | one group with its repositories |
@@ -44,6 +44,11 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/api/v1/repos/{o}/{n}/docs/{docId}` | docs | one document: `SafeHTML`, title, blob SHA, freshness |
 | P | GET | `/api/v1/repos/{o}/{n}/manifests` | manifests | manifests with dependencies, technology, uses and used by (`manifests.md`) |
 | P | GET | `/api/v1/commits` | commits | merged default-branch commits; `?group=`, `?repo=owner/name`, numbered pages |
+| P | GET | `/api/v1/me` | httpapi | the viewer: signed in, name, via, private, admin, the sign-in methods (auth.md) |
+| P | GET | `/api/v1/admin/status` | cmd/scp | the admin listener's status for an administrator (`AdminOnly`: 401, 403) |
+| P | GET | `/auth/login`, `/auth/callback` | auth | the OIDC sign-in (with `auth.oidc`) |
+| P | POST | `/auth/logout` | auth | ends the session, then the provider's (with a session key) |
+| P | POST | `/auth/token` | auth | a token for a session (with `auth.tokens`) |
 | P | GET | `/api/v1/snapshot` | httpapi | snapshot version, builtAt, ready flag, sources with their freshness |
 | P | GET | `/api/v1/events` | httpapi | server-sent events: the SnapshotInfo at connect and after every new version (images-events.md) |
 | P | GET | `/images/{o}/{n}/{id}` | docs | the images documents show, through the proxy (images-events.md) |
@@ -59,7 +64,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | A | GET | `/metrics` | cmd/scp | Prometheus exposition |
 | A | GET | `/debug/pprof/` (+ `cmdline`, `profile`, `symbol`, `trace`) | cmd/scp | profiling, when `ops.pprof: true` |
 
-Unknown paths under `/api/` answer a `not-found` problem; under `/badges/`, `/images/`, `/webhooks/` and `/.well-known/` a plain 404;
+Unknown paths under `/api/` answer a `not-found` problem; under `/auth/`, `/badges/`, `/images/`, `/webhooks/` and `/.well-known/` a plain 404;
 every other path is a page, proxied to the web UI server (behaviour 3).
 
 ## Behaviour
@@ -74,7 +79,8 @@ every other path is a page, proxied to the web UI server (behaviour 3).
      `httpapi.Matches` (weak comparison, `*`) is the one matcher; badges, images and llms use it for their strong ETags.
    - Errors: RFC 9457 `application/problem+json`, `Cache-Control: no-store`, members `type` (`urn:scp:problem:<code>`), `title`,
      `status`, `detail` (fixed text), `instance` (`urn:scp:request:<id>`), `code`. Codes: `not-found`, `method-not-allowed`,
-     `validation-failed`, `unknown-ref`, `not-acceptable`, `internal`, `too-many-streams`, `image-unavailable`, and on the webhook
+     `validation-failed`, `unknown-ref`, `not-acceptable`, `internal`, `too-many-streams`, `image-unavailable`, `unauthenticated` (401
+     with `WWW-Authenticate: Bearer realm="scp"`), `forbidden`, `cross-origin` (auth.md), and on the webhook
      `unsupported-media-type`, `bad-signature`, `too-large`, `bad-body`, `bad-delivery`. One `WriteProblem` writes them; it drops `ETag`,
      `Content-Encoding` and `Content-Length`. Under `/api/` the mux's plain-text 405 is rewritten to a problem.
    - `Accept` under `/api/` admitting none of JSON, problem, YAML -> 406. Human URLs answer HTML or Markdown (`Route.Markdown`): Markdown
@@ -93,14 +99,15 @@ every other path is a page, proxied to the web UI server (behaviour 3).
    same-origin only (no CORS headers), and the default CSP `default-src 'none'; frame-ancestors 'none'; sandbox` (API, llms, `.md`).
    HSTS (`max-age=31536000`) when `server.public_url` is https. Pages:
    `default-src 'none'; script-src 'self' 'nonce-<n>'; style-src 'self' 'nonce-<n>'; img-src 'self'; font-src 'self';
-   connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'` with a
-   fresh nonce per request, plus `Permissions-Policy` denying camera, microphone, geolocation, payment, usb; the upstream's own CSP is
+   connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self' <FormTargets>; frame-ancestors 'none'; object-src 'none'`
+   with a fresh nonce per request (`Options.FormTargets` is the OIDC issuer's origin: browsers hold sign-out's redirect to the
+   provider's end session to `form-action`), plus `Permissions-Policy` denying camera, microphone, geolocation, payment, usb; the upstream's own CSP is
    dropped. The UI side that makes it hold is in web.md. Badges and images: content.md, images-events.md. Every Playwright test fails on a
    CSP violation.
    Pages proxy (`Options.Pages(upstream)`, `pages.go`): `httputil.ReverseProxy` to the web UI server on loopback; the request keeps
    its `Host`, gets `X-Forwarded-*`, the request id, the nonce (in `Content-Security-Policy`), `X-Scp-Token` (random per process,
-   `Options.WebToken`), `X-Scp-Viewer` and `X-Scp-Origin` (`server.public_url`, else scheme and host; https from a trusted proxy's
-   `X-Forwarded-Proto`), loses the identity headers; the response loses `X-Powered-By`. Next.js renders `notFound()` from a page as an
+   `Options.WebToken`), `X-Scp-Viewer` (`public`, `private`, `admin`), `X-Scp-Name` (path-escaped), `X-Scp-Via` and `X-Scp-Origin` (`server.public_url`, else scheme and host; https from a trusted proxy's
+   `X-Forwarded-Proto`), loses the identity headers and `Authorization`; the response loses `X-Powered-By`. Next.js renders `notFound()` from a page as an
    empty shell (vercel/next.js#62228), so an upstream 404 to a page request (GET or HEAD, not an RSC request) gets the body of an
    upstream GET of `/_scp/not-found`, the not-found page, with the status kept. An unreachable upstream answers 503 with
    `Retry-After: 5`; without `web.dir` every page answers 503 with a plain note.

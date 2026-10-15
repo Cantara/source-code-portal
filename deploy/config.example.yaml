@@ -27,7 +27,7 @@ github:
       # token_file: /run/secrets/github-token
       include_forks: false
       include_archived: true
-      include_private: false # true needs access.private_groups and server.trusted_proxies
+      include_private: false # true needs access.private_groups and a way to know the viewer: the proxy or auth
 catalog:
   reconcile_interval: 5m
   groups:
@@ -53,6 +53,20 @@ access:
   user_header: X-Forwarded-User
   groups_header: X-Forwarded-Groups
   private_groups: [] # ["*"] admits every authenticated user
+# The portal's own sign-in: single sign-on through an OpenID Connect provider (redirect URI <server.public_url>/auth/callback) and
+# access tokens for API clients. A session is a cookie sealed with session_key_file (32 random bytes, the same on every instance).
+auth:
+  session_key_file: "" # /run/secrets/scp-session-key
+  session_ttl: 12h
+  admin_emails: [] # verified emails of the administrators
+  admin_groups: []
+  tokens: [] # [{name: ci, secret_file: /run/secrets/scp-token-ci, groups: [engineering], admin: false}]
+  oidc:
+    issuer: "" # https://login.example.org
+    client_id: ""
+    client_secret_file: ""
+    scopes: [openid, email, profile]
+    groups_claim: groups
 # Several instances serving one portal through Hazelcast; leave addresses empty for one instance.
 cluster:
   addresses: [] # ["hazelcast:5701"]

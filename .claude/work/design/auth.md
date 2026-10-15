@@ -57,9 +57,13 @@ are exempt.
 ## API and web
 - `GET /api/v1/me` (contract): `{signedIn, name, via, private, admin, signIn: {oidc, token}}`; never an email of another viewer.
 - `GET /api/v1/admin/status` (admins only): the operator status of the admin listener's `/api/v1/status`.
-- Web: a "Sign in" link or the viewer's name with "Sign out" in the header; `/signin` with the provider button and the token form;
-  `/admin` with the status and the assistant's provider (assistant.md). Pages of a signed-in viewer are `Cache-Control: private`.
-- The page proxy passes the viewer to the web UI server as `X-Scp-Viewer` (`public`, `private` or `admin`) and `X-Scp-Name`.
+- Web: a "Sign in" link back to the page, or the viewer's name with "Admin" (administrators) and "Sign out" (not for a proxy's viewer)
+  in the header (`ViewerMenu`, from `/api/v1/me`); `/signin` with the provider button and the token form, the failure explained;
+  `/admin` with the status, asked for only when `/me` says admin, and the assistant's provider (assistant.md). Pages of a signed-in
+  viewer are `Cache-Control: private`.
+- The page proxy passes the viewer to the web UI server as `X-Scp-Viewer` (`public`, `private` or `admin`), `X-Scp-Name` and
+  `X-Scp-Via`; the page CSP's `form-action` admits the issuer's origin, since sign-out's redirect to the end session is held to it.
+  The provider sends the browser back to `public_url/`.
 
 ## Config
 | Key | Default | |
