@@ -67,6 +67,21 @@ auth:
     client_secret_file: ""
     scopes: [openid, email, profile]
     groups_claim: groups
+# The assistant on /ask: a language model answers questions about the catalogue through read-only tools; an empty provider turns it off.
+llm:
+  provider: "" # anthropic, openai, gemini, openrouter, ollama
+  model: "" # empty: the provider's default (claude-haiku-5-5, gpt-4o, ...)
+  base_url: "" # empty: the provider's API
+  api_key_file: "" # /run/secrets/scp-llm-key; not needed for ollama
+assistant:
+  access: signed-in # admin, everyone
+  concurrency: 4
+  max_turns: 8
+  max_tool_calls: 16
+  max_tokens: 16000
+  max_history: 40
+  max_input_chars: 60000
+  tool_result_chars: 12000
 # Several instances serving one portal through Hazelcast; leave addresses empty for one instance.
 cluster:
   addresses: [] # ["hazelcast:5701"]

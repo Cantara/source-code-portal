@@ -17,6 +17,27 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AssistantStatusAccess.
+const (
+	Admin    AssistantStatusAccess = "admin"
+	Everyone AssistantStatusAccess = "everyone"
+	SignedIn AssistantStatusAccess = "signed-in"
+)
+
+// Valid indicates whether the value is a known member of the AssistantStatusAccess enum.
+func (e AssistantStatusAccess) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case Everyone:
+		return true
+	case SignedIn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DependencyScope.
 const (
 	Dev      DependencyScope = "dev"
@@ -406,6 +427,27 @@ func (e ToolchainVersionsName) Valid() bool {
 		return false
 	}
 }
+
+// AssistantStatus defines model for AssistantStatus.
+type AssistantStatus struct {
+	// Access Who may ask
+	Access AssistantStatusAccess `json:"access"`
+
+	// Allowed This viewer may ask
+	Allowed bool `json:"allowed"`
+
+	// Enabled The operator configured a provider
+	Enabled bool `json:"enabled"`
+
+	// Model The model; empty when off
+	Model string `json:"model"`
+
+	// Provider The provider; empty when off
+	Provider string `json:"provider"`
+}
+
+// AssistantStatusAccess Who may ask
+type AssistantStatusAccess string
 
 // Commit defines model for Commit.
 type Commit struct {
@@ -1054,6 +1096,9 @@ type GetHistoryParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetAssistant Whether the assistant is on and the viewer may ask it
+	// (GET /assistant)
+	GetAssistant(w http.ResponseWriter, r *http.Request)
 	// ListCommits Default-branch commits merged across repositories, newest first, one page at a time
 	// (GET /commits)
 	ListCommits(w http.ResponseWriter, r *http.Request, params ListCommitsParams)
@@ -1100,6 +1145,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetAssistant operation middleware
+func (siw *ServerInterfaceWrapper) GetAssistant(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAssistant(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListCommits operation middleware
 func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Request) {
@@ -1711,6 +1770,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/history", wrapper.GetHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assistant", wrapper.GetAssistant)
 
 	return m
 }
@@ -1727,6 +1787,27 @@ type MovedResponse struct {
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
 type NotModifiedResponse struct {
+}
+
+type GetAssistantRequestObject struct {
+}
+
+type GetAssistantResponseObject interface {
+	VisitGetAssistantResponse(w http.ResponseWriter) error
+}
+
+type GetAssistant200JSONResponse AssistantStatus
+
+func (response GetAssistant200JSONResponse) VisitGetAssistantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListCommitsRequestObject struct {
@@ -2385,6 +2466,9 @@ func (response GetSnapshot304Response) VisitGetSnapshotResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetAssistant Whether the assistant is on and the viewer may ask it
+	// (GET /assistant)
+	GetAssistant(ctx context.Context, request GetAssistantRequestObject) (GetAssistantResponseObject, error)
 	// ListCommits Default-branch commits merged across repositories, newest first, one page at a time
 	// (GET /commits)
 	ListCommits(ctx context.Context, request ListCommitsRequestObject) (ListCommitsResponseObject, error)
@@ -2460,6 +2544,30 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetAssistant operation middleware
+func (sh *strictHandler) GetAssistant(w http.ResponseWriter, r *http.Request) {
+	var request GetAssistantRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAssistant(ctx, request.(GetAssistantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAssistant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAssistantResponseObject); ok {
+		if err := validResponse.VisitGetAssistantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListCommits operation middleware

@@ -30,8 +30,8 @@ export function ThemeSelect() {
 const nav =
   "rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-foreground"
 
-/** MainNav is the header navigation; the current section is marked. */
-export function MainNav() {
+/** MainNav is the header navigation, with Ask when the viewer may use the assistant; the current section is marked. */
+export function MainNav({ ask = false }: { ask?: boolean }) {
   const path = usePathname()
   return (
     <nav aria-label="Main" className="flex gap-1 text-sm">
@@ -41,6 +41,11 @@ export function MainNav() {
       <Link href="/commits" className={nav} aria-current={path === "/commits" ? "page" : undefined}>
         Commits
       </Link>
+      {ask && (
+        <Link href="/ask" className={nav} aria-current={path === "/ask" ? "page" : undefined}>
+          Ask
+        </Link>
+      )}
     </nav>
   )
 }

@@ -54,3 +54,19 @@ test("an API client reads with a bearer token; a wrong token is refused", async 
   expect(bad.status()).toBe(401)
   expect((await bad.json()).code).toBe("unauthenticated")
 })
+
+test("a signed-in viewer asks the assistant; its answer streams with what it read", async ({ page }) => {
+  // cmd/scp/e2e_test.go: the fake model reads the repository named by the question's last word and answers with what it read.
+  await page.goto("/ask")
+  await expect(page.getByRole("link", { name: "Ask", exact: true })).toHaveCount(0)
+  await page.getByRole("link", { name: "Sign in", exact: true }).first().click()
+  await page.getByLabel("Token").fill(token)
+  await page.getByRole("button", { name: "Sign in with the token" }).click()
+  await expect(page).toHaveURL(/\/ask$/)
+  await expect(page.getByRole("link", { name: "Ask", exact: true })).toHaveAttribute("aria-current", "page")
+  await page.getByLabel("Your question").fill("Tell me about vault")
+  await page.getByRole("button", { name: "Ask" }).click()
+  await expect(page.getByText("Reading acme/vault")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "acme/vault" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "New conversation" })).toBeVisible()
+})

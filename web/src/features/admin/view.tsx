@@ -1,18 +1,18 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { Alert } from "@/components/ui/alert"
-import { buttonClass } from "@/components/ui/button"
+import { Button, buttonClass } from "@/components/ui/button"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, get, ProblemError } from "@/lib/api/client"
-import { meQuery } from "@/lib/api/queries"
+import { assistantQuery, meQuery } from "@/lib/api/queries"
 import { plural } from "@/lib/format"
 import { PageHeader } from "@/shared/page-header"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
-import { adminStatusQuery, type AdminStatus } from "./api"
+import { adminStatusQuery, testProvider, type AdminStatus } from "./api"
 
 const via: Record<string, string> = { proxy: "the proxy", oidc: "single sign-on", token: "a token" }
 
@@ -127,6 +127,52 @@ export function Status({ s }: { s: AdminStatus }) {
   )
 }
 
+const access: Record<string, string> = { "signed-in": "signed-in viewers", admin: "administrators", everyone: "everyone" }
+
+/** AssistantCard shows the assistant's provider and tests it with one short completion. */
+export function AssistantCard() {
+  const { data: a } = useQuery(assistantQuery(api))
+  const test = useMutation({ mutationFn: testProvider })
+  if (!a) return null
+  const r = test.data
+  return (
+    <Card>
+      <CardTitle>Assistant</CardTitle>
+      <Facts
+        rows={
+          a.enabled
+            ? [
+                ["Provider", a.provider],
+                [
+                  "Model",
+                  <span key="m" className="font-mono">
+                    {a.model}
+                  </span>,
+                ],
+                ["Open to", access[a.access] ?? a.access],
+              ]
+            : [["Configured", "no"]]
+        }
+      />
+      {a.enabled && (
+        <div className="mt-3 flex flex-col gap-2 text-sm">
+          <Button variant="outline" className="self-start" disabled={test.isPending} onClick={() => test.mutate()}>
+            {test.isPending ? "Testing…" : "Test the provider"}
+          </Button>
+          {r && (
+            <p role="status" className={r.ok ? "" : "text-destructive"}>
+              {r.ok
+                ? `The provider answered in ${r.latencyMs} ms.`
+                : `The provider failed (${r.code ?? "error"}): ${r.message ?? ""}`}
+            </p>
+          )}
+          {test.error && <ProblemAlert error={test.error} />}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 /** AdminView is the operator's page: who is signed in and the portal's status. */
 export function AdminView() {
   const { data: me } = useQuery(meQuery(api))
@@ -160,7 +206,14 @@ export function AdminView() {
       ) : error ? (
         <ProblemAlert error={error} />
       ) : (
-        data && <Status s={data} />
+        data && (
+          <>
+            <Status s={data} />
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <AssistantCard />
+            </div>
+          </>
+        )
       )}
     </>
   )

@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 
 	contract "github.com/cantara/source-code-portal/api"
+	"github.com/cantara/source-code-portal/internal/assistant"
 	"github.com/cantara/source-code-portal/internal/auth"
 	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
@@ -82,6 +83,7 @@ type (
 		manifestsAPI
 		httpapi.SnapshotAPI
 		httpapi.MeAPI
+		*assistant.Assistant
 	}
 )
 
@@ -234,8 +236,22 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
 		Repo:      []func(*snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, repoHealthAPI},
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
-	features := api{catalogAPI, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
-		httpapi.SnapshotAPI{Current: view}, me}
+	commitsAPI := commits.API{Current: view}
+	groupNames := func(ctx context.Context) []string {
+		var names []string
+		for _, g := range view(ctx).Groups {
+			names = append(names, g.Name+" (id "+g.ID+")")
+		}
+		return names
+	}
+	ask, err := newAssistant(cfg, assistantReads{catalog: catalogAPI, commits: commitsAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group()},
+		groupNames, m.assistant, log)
+	if err != nil {
+		return nil, err
+	}
+	routes = append(routes, ask.Routes()...)
+	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view},
+		httpapi.SnapshotAPI{Current: view}, me, ask}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}

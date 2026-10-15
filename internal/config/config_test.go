@@ -49,6 +49,8 @@ func TestDefaults(t *testing.T) {
 		Access:  Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{}},
 		Auth: Auth{SessionTTL: 12 * time.Hour, AdminEmails: []string{}, AdminGroups: []string{},
 			OIDC: OIDC{Scopes: []string{"openid", "email", "profile"}, GroupsClaim: "groups"}},
+		Assistant: Assistant{Access: "signed-in", Concurrency: 4, MaxTurns: 8, MaxToolCalls: 16, MaxTokens: 16000, MaxHistory: 40,
+			MaxInputChars: 60000, ToolResultChars: 12000},
 		Cluster: Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},
 		Web:     Web{Node: "node"},
 	}
@@ -138,6 +140,13 @@ func TestRefused(t *testing.T) {
 		"token without secret":   {file: "auth:\n  tokens: [{name: ci}]\n", want: "auth.tokens[0].secret_file: required"},
 		"short token secret":     {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  tokens: [{name: ci, secret_file: TOKEN}]\n", want: "at least 32 characters"},
 		"short session key":      {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  session_key_file: TOKEN\n", want: "at least 32 bytes"},
+		"unknown provider":       {env: map[string]string{"SCP_LLM_PROVIDER": "acme"}, want: "llm.provider"},
+		"provider without key":   {env: map[string]string{"SCP_LLM_PROVIDER": "anthropic", "SCP_ASSISTANT_ACCESS": "everyone"}, want: "llm.api_key_file: required"},
+		"key over http":          {file: "llm: {provider: openai, api_key_file: /x, base_url: 'http://llm.example/v1'}\n", want: "llm.base_url"},
+		"bad model":              {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_LLM_MODEL": "a b"}, want: "llm.model"},
+		"bad assistant access":   {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_ASSISTANT_ACCESS": "anyone"}, want: "assistant.access"},
+		"signed-in without auth": {env: map[string]string{"SCP_LLM_PROVIDER": "ollama"}, want: "needs a way to know the viewer"},
+		"too many turns":         {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_ASSISTANT_ACCESS": "everyone", "SCP_ASSISTANT_MAX_TURNS": "99"}, want: "assistant.max_turns"},
 		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {
@@ -169,6 +178,18 @@ func TestAllProblemsReported(t *testing.T) {
 	var inv *Invalid
 	if !errors.As(err, &inv) || len(inv.Problems) != 2 {
 		t.Fatalf("err = %v, want two problems", err)
+	}
+}
+
+func TestLLM(t *testing.T) {
+	key := write(t, "key", "sk-ant-test\n")
+	cfg, _, err := Load(file(t, "llm: {provider: anthropic, api_key_file: "+key+"}\nassistant: {access: everyone}\n"), nil)
+	if err != nil || string(cfg.LLM.APIKey.Reveal()) != "sk-ant-test" || cfg.Assistant.MaxTurns != 8 {
+		t.Errorf("llm = %+v %+v, %v", cfg.LLM, cfg.Assistant, err)
+	}
+	cfg, _, err = Load(file(t, "llm: {provider: ollama, base_url: 'http://ollama.lan:11434/v1'}\nassistant: {access: everyone}\n"), nil)
+	if err != nil || cfg.LLM.APIKey.IsSet() {
+		t.Errorf("ollama on the network without a key: %+v, %v", cfg.LLM, err)
 	}
 }
 

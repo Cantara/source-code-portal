@@ -336,6 +336,7 @@ func (c *Config) readSecrets() []string {
 		read("webhook.previous_secret_file", c.Webhook.PreviousSecretFile, &c.Webhook.PreviousSecret)
 	}
 	p = append(p, c.Auth.readSecrets(read)...)
+	c.LLM.readSecrets(read)
 	slices.Sort(p)
 	return p
 }

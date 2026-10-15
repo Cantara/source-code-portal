@@ -214,6 +214,41 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
+  /assistant:
+    get:
+      operationId: getAssistant
+      summary: Whether the assistant is on and the viewer may ask it
+      responses:
+        "200":
+          description: The assistant's state for this viewer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantStatus" }
+  /assistant/chat:
+    post:
+      operationId: chatAssistant
+      summary: Ask the assistant; the answer streams as server-sent events
+      description: |
+        The conversation so far, oldest first, ending with the viewer's question. The answer is a `text/event-stream` of `text`
+        (`{"text"}`, a piece of the answer), `tool` (`{"name", "label"}`, a lookup it makes), then `done` (`{"usage": {"input",
+        "output"}}`) or `error` (`{"code", "message"}`), with a comment line every 15 s. The assistant only reads the catalogue, as the
+        viewer sees it. A cookie-carrying request must come from the portal's own pages. Served outside the generated handlers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantChat" }
+      responses:
+        "200":
+          description: The answer as an event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "415": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
   /events:
     get:
       operationId: streamEvents
@@ -261,6 +296,11 @@ components:
           schema: { type: string }
     BadRequest:
       description: The parameters are not valid
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Problem:
+      description: A problem (its code says which)
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -626,6 +666,31 @@ components:
         id: { type: string }
         repos: { type: integer }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    AssistantStatus:
+      type: object
+      additionalProperties: false
+      required: [enabled, allowed, access, provider, model]
+      properties:
+        enabled: { type: boolean, description: The operator configured a provider }
+        allowed: { type: boolean, description: This viewer may ask }
+        access: { type: string, enum: [signed-in, admin, everyone], description: Who may ask }
+        provider: { type: string, description: The provider; empty when off }
+        model: { type: string, description: The model; empty when off }
+    AssistantChat:
+      type: object
+      additionalProperties: false
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              content: { type: string }
     Me:
       type: object
       required: [signedIn, name, via, private, admin, signIn]

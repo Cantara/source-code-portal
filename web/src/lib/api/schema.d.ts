@@ -226,6 +226,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/assistant": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Whether the assistant is on and the viewer may ask it */
+    get: operations["getAssistant"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/assistant/chat": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Ask the assistant; the answer streams as server-sent events
+     * @description The conversation so far, oldest first, ending with the viewer's question. The answer is a `text/event-stream` of `text`
+     *     (`{"text"}`, a piece of the answer), `tool` (`{"name", "label"}`, a lookup it makes), then `done` (`{"usage": {"input",
+     *     "output"}}`) or `error` (`{"code", "message"}`), with a comment line every 15 s. The assistant only reads the catalogue, as the
+     *     viewer sees it. A cookie-carrying request must come from the portal's own pages. Served outside the generated handlers.
+     */
+    post: operations["chatAssistant"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/events": {
     parameters: {
       query?: never
@@ -632,6 +672,28 @@ export interface components {
       repos: number
       freshness: components["schemas"]["Freshness"]
     }
+    AssistantStatus: {
+      /** @description The operator configured a provider */
+      enabled: boolean
+      /** @description This viewer may ask */
+      allowed: boolean
+      /**
+       * @description Who may ask
+       * @enum {string}
+       */
+      access: "signed-in" | "admin" | "everyone"
+      /** @description The provider; empty when off */
+      provider: string
+      /** @description The model; empty when off */
+      model: string
+    }
+    AssistantChat: {
+      messages: {
+        /** @enum {string} */
+        role: "user" | "assistant"
+        content: string
+      }[]
+    }
     Me: {
       signedIn: boolean
       /** @description The viewer's name; empty when anonymous */
@@ -701,6 +763,15 @@ export interface components {
     }
     /** @description The parameters are not valid */
     BadRequest: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        "application/problem+json": components["schemas"]["Problem"]
+      }
+    }
+    /** @description A problem (its code says which) */
+    Problem: {
       headers: {
         [name: string]: unknown
       }
@@ -1041,6 +1112,55 @@ export interface operations {
           "application/json": components["schemas"]["Me"]
         }
       }
+    }
+  }
+  getAssistant: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The assistant's state for this viewer */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["AssistantStatus"]
+        }
+      }
+    }
+  }
+  chatAssistant: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssistantChat"]
+      }
+    }
+    responses: {
+      /** @description The answer as an event stream */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "text/event-stream": string
+        }
+      }
+      400: components["responses"]["Problem"]
+      401: components["responses"]["Problem"]
+      403: components["responses"]["Problem"]
+      415: components["responses"]["Problem"]
+      429: components["responses"]["Problem"]
     }
   }
   streamEvents: {

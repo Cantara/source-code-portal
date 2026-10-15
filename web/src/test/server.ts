@@ -93,6 +93,9 @@ export const me = (over: Partial<S["Me"]> = {}): S["Me"] => ({
 /** defaults answer every page with one group, two repositories and a README. */
 export const defaults = [
   http.get("/me", ({ response }) => response(200).json(me())),
+  http.get("/assistant", ({ response }) =>
+    response(200).json({ enabled: false, allowed: false, access: "signed-in", provider: "", model: "" }),
+  ),
   http.get("/snapshot", ({ response }) => response(200).json(snapshot(1))),
   http.get("/repos", ({ response }) => response(200).json({ repos: [repo("Whydah"), repo("Whydah-Core")] })),
   http.get("/dashboard", ({ response }) =>

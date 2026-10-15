@@ -22,10 +22,14 @@ export const keys = {
     ["commits", "history", lc(owner), lc(name), filter] as const,
   latestCommits: (group: string) => ["commits", "latest", group] as const,
   me: () => ["me"] as const,
+  assistant: () => ["assistant"] as const,
 }
 
 export const meQuery = (api: Api) =>
   queryOptions({ queryKey: keys.me(), queryFn: ({ signal }) => unwrap(api.GET("/me", { signal })) })
+
+export const assistantQuery = (api: Api) =>
+  queryOptions({ queryKey: keys.assistant(), queryFn: ({ signal }) => unwrap(api.GET("/assistant", { signal })) })
 
 export const reposQuery = (api: Api) =>
   queryOptions({ queryKey: keys.repos(), queryFn: ({ signal }) => unwrap(api.GET("/repos", { signal })) })

@@ -22,6 +22,8 @@ type metrics struct {
 	jobs       *prometheus.CounterVec
 	jobTime    *prometheus.HistogramVec
 	github     *prometheus.CounterVec
+	asks       *prometheus.CounterVec
+	askTokens  *prometheus.CounterVec
 }
 
 // gauges are read at scrape time from the live state.
@@ -46,11 +48,15 @@ func newMetrics(g gauges) *metrics {
 		Buckets: []float64{.05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60}}, []string{"kind"})
 	m.github = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_github_requests_total", Help: "GitHub API responses by status."},
 		[]string{"source", "code"})
+	m.asks = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_assistant_requests_total", Help: "Assistant requests by outcome."},
+		[]string{"outcome"})
+	m.askTokens = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_assistant_tokens_total", Help: "Language model tokens the assistant used."},
+		[]string{"kind"})
 	info := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "scp_build_info", Help: "Build of the running binary."},
 		[]string{"version", "commit", "goversion"})
 	info.WithLabelValues(version, build, runtime.Version()).Set(1)
 	m.reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		m.requests, m.durations, m.deliveries, m.jobs, m.jobTime, m.github, info, newLive(g))
+		m.requests, m.durations, m.deliveries, m.jobs, m.jobTime, m.github, m.asks, m.askTokens, info, newLive(g))
 	return m
 }
 
@@ -69,6 +75,12 @@ func (m *metrics) request(listener, pattern, method string, status int, d time.D
 }
 
 func (m *metrics) delivery(event, result string) { m.deliveries.WithLabelValues(event, result).Inc() }
+
+func (m *metrics) assistant(outcome string, input, output int) {
+	m.asks.WithLabelValues(outcome).Inc()
+	m.askTokens.WithLabelValues("input").Add(float64(input))
+	m.askTokens.WithLabelValues("output").Add(float64(output))
+}
 
 func (m *metrics) job(kind, result string, d time.Duration) {
 	m.jobs.WithLabelValues(kind, result).Inc()

@@ -31,9 +31,11 @@ function release(): string {
 /** RootLayout is the shell: skip link, header with navigation, the viewer and theme, status banners and the page. */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Without the API the header leaves the viewer out; the page shows the problem.
-  const me = await serverApi()
-    .then((a) => unwrap(a.GET("/me")))
-    .catch(() => undefined)
+  const server = await serverApi()
+  const [me, assistant] = await Promise.all([
+    unwrap(server.GET("/me")).catch(() => undefined),
+    unwrap(server.GET("/assistant")).catch(() => undefined),
+  ])
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -60,7 +62,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   </span>
                 </span>
               </Link>
-              <MainNav />
+              <MainNav ask={!!assistant?.enabled && assistant.allowed} />
               <div className="ml-auto flex items-center gap-4">
                 <LiveIndicator />
                 <ViewerMenu me={me} />

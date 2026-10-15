@@ -107,6 +107,7 @@ func TestServeForPlaywright(t *testing.T) {
 	}
 	dir := t.TempDir()
 	token, key, e2eToken := filepath.Join(dir, "token"), filepath.Join(dir, "session-key"), filepath.Join(dir, "e2e-token")
+	llmKey, model := filepath.Join(dir, "llm-key"), fakeAnthropic(t)
 	path := filepath.Join(dir, "scp.yaml")
 	body := `store: {path: ` + filepath.Join(dir, "scp.db") + `}
 server: {public_addr: "` + addr + `", admin_addr: "127.0.0.1:0", public_url: "http://` + addr + `"}
@@ -117,6 +118,7 @@ auth:
   admin_emails: [ada@example.org]
   tokens: [{name: e2e, secret_file: ` + e2eToken + `, groups: [staff]}]
   oidc: {issuer: "` + idp.Issuer() + `", client_id: scp-e2e, scopes: [openid, email, profile, groups]}
+llm: {provider: anthropic, model: claude-e2e, base_url: "` + model.URL + `", api_key_file: ` + llmKey + `}
 github:
   sources:
     - {id: gh, base_url: "` + gh.BaseURL() + `", orgs: [acme], token_file: ` + token + `, include_private: true}
@@ -127,7 +129,8 @@ catalog:
 `
 	if os.WriteFile(token, []byte("ghp_e2e"), 0o600) != nil || os.WriteFile(path, []byte(body), 0o600) != nil ||
 		os.WriteFile(key, []byte("e2e-session-key-e2e-session-key-0123"), 0o600) != nil ||
-		os.WriteFile(e2eToken, []byte("e2e-token-0123456789abcdef0123456789abcdef"), 0o600) != nil {
+		os.WriteFile(e2eToken, []byte("e2e-token-0123456789abcdef0123456789abcdef"), 0o600) != nil ||
+		os.WriteFile(llmKey, []byte("sk-test"), 0o600) != nil {
 		t.Fatal("write config")
 	}
 	cfg, _, err := config.Load(path, nil)
