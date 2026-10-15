@@ -28,6 +28,7 @@ type API struct {
 type cursor struct {
 	Group string `json:"g,omitempty"`
 	Repo  string `json:"r,omitempty"`
+	Human bool   `json:"h,omitempty"` // automation left out
 	At    int64  `json:"t"`
 	Key   string `json:"k"`
 	SHA   string `json:"s"`
@@ -86,10 +87,14 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		scope = []snapshot.RepoKey{key}
 	}
 
+	if p.Automation != nil && !*p.Automation {
+		filter.Human = true
+		refs = slices.DeleteFunc(slices.Clone(refs), func(r Ref) bool { return Automated(r.Commit) })
+	}
 	start := 0
 	if p.Cursor != nil {
 		c, ok := decodeCursor(*p.Cursor)
-		if !ok || c.Group != filter.Group || c.Repo != filter.Repo {
+		if !ok || c.Group != filter.Group || c.Repo != filter.Repo || c.Human != filter.Human {
 			return badRequest("invalid-cursor", "the cursor is not valid for this filter"), nil
 		}
 		pos := Ref{Repo: snapshot.RepoKey(c.Key), Commit: &Commit{SHA: c.SHA, CommittedAt: time.Unix(0, c.At)}}
@@ -150,13 +155,19 @@ func scopeFreshness(s *snapshot.Snapshot, scope []snapshot.RepoKey, now time.Tim
 	return out
 }
 
-func encodeCursor(c cursor) string {
-	b, _ := json.Marshal(c) //nolint:errchkjson // plain struct
-	return base64.RawURLEncoding.EncodeToString(b)
-}
+func encodeCursor(c cursor) string { return encodeAny(c) }
 
 func decodeCursor(s string) (cursor, bool) {
 	var c cursor
+	return c, decodeAny(s, &c) && c.Key != "" && c.SHA != ""
+}
+
+func encodeAny(v any) string {
+	b, _ := json.Marshal(v) //nolint:errchkjson // plain structs
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func decodeAny(s string, v any) bool {
 	b, err := base64.RawURLEncoding.DecodeString(s)
-	return c, err == nil && json.Unmarshal(b, &c) == nil && c.Key != "" && c.SHA != ""
+	return err == nil && json.Unmarshal(b, v) == nil
 }

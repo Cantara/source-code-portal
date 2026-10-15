@@ -31,6 +31,7 @@ paths:
       parameters:
         - { name: group, in: query, required: false, schema: { type: string } }
         - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
+        - { name: automation, in: query, required: false, description: "false leaves out commits made by automation", schema: { type: boolean, default: true } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: cursor, in: query, required: false, schema: { type: string } }
       responses:
@@ -154,6 +155,35 @@ paths:
               schema: { $ref: "#/components/schemas/Manifests" }
         "304": { $ref: "#/components/responses/NotModified" }
         "308": { $ref: "#/components/responses/Moved" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /repos/{owner}/{name}/history:
+    get:
+      operationId: getHistory
+      summary: The repository's stored history in graph order, one page at a time
+      description: |
+        The default branch (its latest 500 commits) and the commits of up to 10 other branches, newest first by commit time with a
+        parent never before its child. `ref` keeps the commits reachable from a branch or tag; `author`, `q` and `automation=false`
+        filter further and mark the page `filtered`, which draws no graph. Pass `page.nextCursor` as `cursor` for the next page; a
+        cursor is bound to its filter and stays valid when new commits arrive.
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: ref, in: query, required: false, description: A branch or tag of the history, schema: { type: string } }
+        - { name: author, in: query, required: false, description: Login or name, case-insensitive, schema: { type: string } }
+        - { name: q, in: query, required: false, description: "Text in the subject or body, or a SHA prefix", schema: { type: string, maxLength: 200 } }
+        - { name: automation, in: query, required: false, description: "false leaves out commits made by automation", schema: { type: boolean, default: true } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: One page of the history
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HistoryPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "308": { $ref: "#/components/responses/Moved" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
   /snapshot:
     get:
@@ -339,6 +369,34 @@ components:
           items: { type: string }
           maxItems: 8
           description: SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge
+    Label:
+      type: object
+      required: [name, kind, sha, default]
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [branch, tag] }
+        sha: { type: string, description: The commit it points at }
+        default: { type: boolean, description: The default branch }
+    HistoryCommit:
+      allOf:
+        - $ref: "#/components/schemas/Commit"
+        - type: object
+          required: [body, committerName, automated, labels]
+          properties:
+            body: { type: string, description: The message after its subject line; empty when there is none }
+            committerName: { type: string }
+            automated: { type: boolean, description: "Made by automation: a [bot] author or a release plugin" }
+            labels: { type: array, items: { $ref: "#/components/schemas/Label" }, description: "The branches and tags at this commit, the default branch first" }
+    HistoryPage:
+      type: object
+      required: [commits, labels, filtered, total, page, freshness]
+      properties:
+        commits: { type: array, items: { $ref: "#/components/schemas/HistoryCommit" } }
+        labels: { type: array, items: { $ref: "#/components/schemas/Label" }, description: Every branch and tag of the history }
+        filtered: { type: boolean, description: "author, q or automation left commits out: the page is a list, not a graph" }
+        total: { type: integer, description: Commits matching the filter in the stored history }
+        page: { $ref: "#/components/schemas/Page" }
+        freshness: { $ref: "#/components/schemas/Freshness" }
     CommitPage:
       type: object
       required: [commits, page, freshness]

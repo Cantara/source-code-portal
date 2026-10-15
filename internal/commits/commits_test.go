@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"slices"
 	"strings"
 	"testing"
@@ -67,9 +69,12 @@ type fetcher struct {
 	err error
 }
 
-func (f fetcher) Commits(context.Context, string, string, int) ([]CommitInfo, error) {
-	return f.cs, f.err
+func (f fetcher) Commits(context.Context, string, string, string, int) ([]CommitInfo, bool, error) {
+	return f.cs, false, f.err
 }
+
+func (f fetcher) Branches(context.Context, string, string) ([]RefInfo, error) { return nil, nil }
+func (f fetcher) Tags(context.Context, string, string) ([]RefInfo, error)     { return nil, nil }
 
 func TestRunStates(t *testing.T) {
 	ok := fetcher{cs: []CommitInfo{{SHA: sha('a'), Message: "m", Date: time.Now()}}}
@@ -95,7 +100,7 @@ func TestRunStates(t *testing.T) {
 				return
 			}
 			var p payload
-			if res.State != tc.state || json.Unmarshal(res.Payload, &p) != nil || len(p.Commits) != tc.commits {
+			if res.State != tc.state || json.Unmarshal(res.Payload, &p) != nil || len(p.Main) != tc.commits {
 				t.Errorf("result = %+v", res)
 			}
 			again, _ := spec.Run(t.Context(), sync.Job{Key: Kind + "/acme/x", Source: "gh", Repo: "acme/x",
@@ -110,7 +115,7 @@ func TestRunStates(t *testing.T) {
 func TestPublish(t *testing.T) {
 	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
 	r := snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x"}
-	b, _ := json.Marshal(payload{Schema: payloadSchema, Commits: []Commit{{SHA: sha('a'), CommittedAt: time.Now()}}})
+	b, _ := json.Marshal(payload{Schema: payloadSchema, Main: []Commit{{SHA: sha('a'), CommittedAt: time.Now()}}})
 	p.Update(func(bd *snapshot.Builder) {
 		bd.ReplaceSource("gh", []*snapshot.RepoEntry{{Repo: r}}, nil, snapshot.SourceStatus{ID: "gh"})
 		publish(bd, store.Item{Repo: "acme/x", State: snapshot.StateOK, Payload: b}, snapshot.Freshness{State: snapshot.StateOK})
@@ -139,9 +144,56 @@ func TestLastAuthored(t *testing.T) {
 		"none":                      {nil, time.Time{}, false},
 	} {
 		e := &snapshot.RepoEntry{}
-		facet.Set(e, tc.cs, snapshot.Freshness{State: snapshot.StateOK})
+		facet.Set(e, newHistory(tc.cs, nil, nil, "main"), snapshot.Freshness{State: snapshot.StateOK})
 		if at, before := LastAuthored(e); !at.Equal(tc.at) || before != tc.before {
 			t.Errorf("%s: %v %v, want %v %v", name, at, before, tc.at, tc.before)
+		}
+	}
+}
+
+// TestGraphOrder: on random histories (merges, octopus merges, criss-cross merges, clocks that disagree) every commit comes before
+// its parents and every commit is listed once.
+func TestGraphOrder(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for round := range 200 {
+		n := 2 + rng.IntN(60)
+		cs := make([]Commit, n) // cs[i] is younger than cs[j] for i < j in the DAG; parents point to higher indexes
+		for i := range cs {
+			cs[i].SHA = fmt.Sprintf("%040x", round*1000+i)
+			// Dates mostly follow the DAG, a fifth of them skewed by up to two days.
+			cs[i].CommittedAt = base.Add(-time.Duration(i) * time.Hour)
+			if rng.IntN(5) == 0 {
+				cs[i].CommittedAt = cs[i].CommittedAt.Add(time.Duration(rng.IntN(96)-48) * time.Hour)
+			}
+		}
+		for i := range n - 1 {
+			parents := 1
+			if rng.IntN(4) == 0 {
+				parents = 2 + rng.IntN(3)
+			}
+			for range parents {
+				p := cs[i+1+rng.IntN(n-i-1)].SHA
+				if !slices.Contains(cs[i].Parents, p) {
+					cs[i].Parents = append(cs[i].Parents, p)
+				}
+			}
+		}
+		split := rng.IntN(n)
+		order := graphOrder(cs[:split], cs[split:])
+		pos := map[string]int{}
+		for i, c := range order {
+			pos[c.SHA] = i
+		}
+		if len(order) != n || len(pos) != n {
+			t.Fatalf("round %d: %d of %d commits ordered", round, len(order), n)
+		}
+		for _, c := range order {
+			for _, p := range c.Parents {
+				if pos[p] <= pos[c.SHA] {
+					t.Fatalf("round %d: parent %s at %d before its child at %d", round, p[34:], pos[p], pos[c.SHA])
+				}
+			}
 		}
 	}
 }

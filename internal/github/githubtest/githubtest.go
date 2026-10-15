@@ -42,8 +42,10 @@ type Server struct {
 	installs map[int64]string  // installation id -> account login
 	issued   map[string]string // installation token -> account login
 	orgs     map[string][]*gh.Repository
-	commits  map[int64][]Commit          // by repository id, newest first
-	files    map[int64]map[string]string // by repository id: path -> content
+	commits  map[int64][]Commit            // by repository id, newest first
+	branches map[int64]map[string][]Commit // by repository id: branch name -> its own commits, newest first
+	tags     map[int64]map[string]string   // by repository id: tag name -> commit SHA
+	files    map[int64]map[string]string   // by repository id: path -> content
 	releases map[int64]*gh.RepositoryRelease
 	nextID   int64
 	used     map[string]int // credential -> requests charged this window
@@ -67,7 +69,8 @@ func New(t testing.TB) *Server {
 		t.Fatal(err)
 	}
 	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
-		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, files: map[int64]map[string]string{},
+		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
+		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
 		releases: map[int64]*gh.RepositoryRelease{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
@@ -80,6 +83,8 @@ func New(t testing.TB) *Server {
 	mux.HandleFunc("GET /installation/repositories", s.listRepos)
 	mux.HandleFunc("GET /repos/{owner}/{name}", s.getRepo)
 	mux.HandleFunc("GET /repos/{owner}/{name}/commits", s.listCommits)
+	mux.HandleFunc("GET /repos/{owner}/{name}/branches", s.listRefs)
+	mux.HandleFunc("GET /repos/{owner}/{name}/tags", s.listRefs)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/trees/{ref}", s.getTree)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/blobs/{sha}", s.getBlob)
 	mux.HandleFunc("GET /repos/{owner}/{name}/releases/latest", s.latestRelease)
@@ -523,6 +528,35 @@ func (s *Server) SetCommits(id int64, cs ...Commit) {
 	s.commits[id] = cs
 }
 
+// SetBranch sets a branch of the repository with id to its own commits, newest first; the last one names its parents in the
+// default branch (or another branch). No commits deletes the branch.
+func (s *Server) SetBranch(id int64, name string, cs ...Commit) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.branches[id] == nil {
+		s.branches[id] = map[string][]Commit{}
+	}
+	if len(cs) == 0 {
+		delete(s.branches[id], name)
+		return
+	}
+	s.branches[id][name] = cs
+}
+
+// SetTag points a tag of the repository with id at a commit; an empty SHA deletes it.
+func (s *Server) SetTag(id int64, name, sha string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tags[id] == nil {
+		s.tags[id] = map[string]string{}
+	}
+	if sha == "" {
+		delete(s.tags[id], name)
+		return
+	}
+	s.tags[id][name] = sha
+}
+
 // SetFile writes a file on the default branch of the repository with id; an empty content deletes it.
 func (s *Server) SetFile(id int64, path, content string) {
 	s.mu.Lock()
@@ -582,36 +616,33 @@ func (s *Server) listCommits(w http.ResponseWriter, req *http.Request) {
 	if cred == "" {
 		return
 	}
+	ref := req.URL.Query().Get("sha")
 	s.mu.Lock()
 	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
 	var cs []Commit
 	if r != nil {
-		cs = slices.Clone(s.commits[r.GetID()])
+		cs = s.history(r, ref)
 	}
 	s.mu.Unlock()
 	switch {
 	case r == nil:
 		writeError(w, http.StatusNotFound, "Not Found")
 		return
-	case len(cs) == 0:
+	case len(cs) == 0 && ref == "":
 		writeError(w, http.StatusConflict, "Git Repository is empty.")
 		return
+	case len(cs) == 0:
+		writeError(w, http.StatusNotFound, "No commit found for SHA: "+ref)
+		return
 	}
-	per, _ := strconv.Atoi(req.URL.Query().Get("per_page"))
-	if per <= 0 || per > 100 {
-		per = 30
-	}
-	out := make([]*gh.RepositoryCommit, 0, min(per, len(cs)))
-	for i, c := range cs[:min(per, len(cs))] {
+	lo, hi := s.page(w, req, len(cs))
+	out := make([]*gh.RepositoryCommit, 0, hi-lo)
+	for _, c := range cs[lo:hi] {
 		date := &gh.Timestamp{Time: c.Date}
-		parents := c.Parents
-		if parents == nil && i+1 < len(cs) {
-			parents = []string{cs[i+1].SHA}
-		}
 		rc := &gh.RepositoryCommit{SHA: new(c.SHA), HTMLURL: new(r.GetHTMLURL() + "/commit/" + c.SHA),
 			Commit: &gh.Commit{Message: new(c.Message), Author: &gh.CommitAuthor{Name: new(c.AuthorName), Date: date},
 				Committer: &gh.CommitAuthor{Name: new(c.AuthorName), Date: date}}}
-		for _, p := range parents {
+		for _, p := range c.Parents {
 			rc.Parents = append(rc.Parents, &gh.Commit{SHA: new(p)})
 		}
 		if c.AuthorLogin != "" {
@@ -620,6 +651,121 @@ func (s *Server) listCommits(w http.ResponseWriter, req *http.Request) {
 		out = append(out, rc)
 	}
 	s.respond(w, req, cred, out)
+}
+
+// page reads per_page (default 30, at most 100) and page, sets the Link header to the next page and returns the bounds of n items.
+func (s *Server) page(w http.ResponseWriter, req *http.Request, n int) (lo, hi int) {
+	per, _ := strconv.Atoi(req.URL.Query().Get("per_page"))
+	if per <= 0 || per > 100 {
+		per = 30
+	}
+	page, _ := strconv.Atoi(req.URL.Query().Get("page"))
+	page = max(page, 1)
+	lo, hi = min((page-1)*per, n), min(page*per, n)
+	if hi < n {
+		next := *req.URL
+		q := next.Query()
+		q.Set("page", strconv.Itoa(page+1))
+		next.RawQuery = q.Encode()
+		w.Header().Set("Link", fmt.Sprintf(`<%s%s>; rel="next"`, s.URL, next.RequestURI()))
+	}
+	return lo, hi
+}
+
+// history is the commits reachable from ref, newest first, each with its parents filled in. The default branch ("" or its name)
+// lists in the order SetCommits gave; another branch, a tag or a SHA walks the parents and orders by date. Callers hold s.mu.
+func (s *Server) history(r *gh.Repository, ref string) []Commit {
+	id := r.GetID()
+	all := map[string]Commit{}
+	line := func(cs []Commit) []Commit {
+		out := slices.Clone(cs)
+		for i := range out {
+			if out[i].Parents == nil && i+1 < len(out) {
+				out[i].Parents = []string{out[i+1].SHA}
+			}
+			all[out[i].SHA] = out[i]
+		}
+		return out
+	}
+	main := line(s.commits[id])
+	heads := map[string]string{}
+	for name, cs := range s.branches[id] {
+		heads[name] = line(cs)[0].SHA
+	}
+	if ref == "" || ref == r.GetDefaultBranch() {
+		return main
+	}
+	head, ok := heads[ref]
+	if !ok {
+		head, ok = s.tags[id][ref]
+	}
+	if !ok {
+		head = ref
+	}
+	var out []Commit
+	seen := map[string]bool{}
+	for stack := []string{head}; len(stack) > 0; {
+		sha := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		c, known := all[sha]
+		if !known || seen[sha] {
+			continue
+		}
+		seen[sha] = true
+		out = append(out, c)
+		stack = append(stack, c.Parents...)
+	}
+	slices.SortStableFunc(out, func(a, b Commit) int {
+		if c := b.Date.Compare(a.Date); c != 0 {
+			return c
+		}
+		return strings.Compare(b.SHA, a.SHA)
+	})
+	return out
+}
+
+// listRefs answers GET /repos/{owner}/{name}/branches (the default branch first, then by name) and .../tags (by name, descending).
+func (s *Server) listRefs(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
+	type ref struct {
+		Name   string `json:"name"`
+		Commit struct {
+			SHA string `json:"sha"`
+		} `json:"commit"`
+	}
+	var refs []ref
+	add := func(name, sha string) {
+		var x ref
+		x.Name, x.Commit.SHA = name, sha
+		refs = append(refs, x)
+	}
+	if r != nil {
+		id := r.GetID()
+		if strings.HasSuffix(req.URL.Path, "/branches") {
+			if cs := s.commits[id]; len(cs) > 0 {
+				add(r.GetDefaultBranch(), cs[0].SHA)
+			}
+			for _, name := range slices.Sorted(maps.Keys(s.branches[id])) {
+				add(name, s.branches[id][name][0].SHA)
+			}
+		} else {
+			for _, name := range slices.Backward(slices.Sorted(maps.Keys(s.tags[id]))) {
+				add(name, s.tags[id][name])
+			}
+		}
+	}
+	s.mu.Unlock()
+	if r == nil {
+		writeError(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	lo, hi := s.page(w, req, len(refs))
+	s.respond(w, req, cred, refs[lo:hi])
 }
 
 // tree builds the git tree at dir ("" is the root) from the repository's files. Callers hold s.mu.

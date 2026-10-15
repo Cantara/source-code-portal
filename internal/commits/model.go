@@ -1,6 +1,7 @@
 package commits
 
 import (
+	"container/heap"
 	"maps"
 	"slices"
 	"strings"
@@ -10,15 +11,135 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
-// Commit is one default-branch commit.
+// Commit is one commit of a repository's history.
 type Commit struct {
-	SHA         string    `json:"sha"`
-	Subject     string    `json:"subject"` // first line of the message
-	AuthorName  string    `json:"authorName"`
-	AuthorLogin string    `json:"authorLogin,omitempty"`
-	URL         string    `json:"url"`
-	CommittedAt time.Time `json:"committedAt"`
-	Parents     []string  `json:"parents"` // first parent first
+	SHA           string    `json:"sha"`
+	Subject       string    `json:"subject"`        // first line of the message
+	Body          string    `json:"body,omitempty"` // the rest of the message
+	AuthorName    string    `json:"authorName"`
+	AuthorLogin   string    `json:"authorLogin,omitempty"`
+	CommitterName string    `json:"committerName,omitempty"`
+	URL           string    `json:"url"`
+	CommittedAt   time.Time `json:"committedAt"`
+	Parents       []string  `json:"parents"` // first parent first
+}
+
+// Label is a branch or a tag at a commit of the history.
+type Label struct {
+	Name    string `json:"name"`
+	Kind    string `json:"kind"` // branch | tag
+	SHA     string `json:"sha"`
+	Default bool   `json:"-"` // the default branch; set at publish
+}
+
+// History is a repository's stored history: the default branch, the commits only on other branches, their labels, and the graph
+// order the navigator pages through (newest first by commit time, a parent never before its child).
+type History struct {
+	Main   []Commit
+	Side   []Commit
+	Labels []Label
+	Order  []*Commit
+	pos    map[string]int     // SHA -> index in Order
+	at     map[string][]Label // SHA -> its labels, the default branch first, then branches, then tags
+}
+
+// newHistory indexes a history; defaultBranch marks the default branch's label.
+func newHistory(main, side []Commit, labels []Label, defaultBranch string) *History {
+	h := &History{Main: main, Side: side, Labels: labels, pos: map[string]int{}, at: map[string][]Label{}}
+	for i := range h.Labels {
+		l := &h.Labels[i]
+		l.Default = l.Kind == "branch" && l.Name == defaultBranch
+	}
+	for _, l := range h.Labels {
+		h.at[l.SHA] = append(h.at[l.SHA], l)
+	}
+	for sha, ls := range h.at {
+		slices.SortStableFunc(ls, func(a, b Label) int { return rank(a) - rank(b) })
+		h.at[sha] = ls
+	}
+	h.Order = graphOrder(main, side)
+	for i, c := range h.Order {
+		h.pos[c.SHA] = i
+	}
+	return h
+}
+
+func rank(l Label) int {
+	switch {
+	case l.Default:
+		return 0
+	case l.Kind == "branch":
+		return 1
+	}
+	return 2
+}
+
+// LabelsAt returns the labels of the commit sha.
+func (h *History) LabelsAt(sha string) []Label { return h.at[sha] }
+
+// Position returns the index of sha in the graph order.
+func (h *History) Position(sha string) (int, bool) {
+	i, ok := h.pos[sha]
+	return i, ok
+}
+
+// graphOrder orders the commits newest first, a parent only after all its children (git log --date-order): a topological order by
+// Kahn's algorithm that always takes the newest ready commit.
+func graphOrder(main, side []Commit) []*Commit {
+	by := make(map[string]*Commit, len(main)+len(side))
+	for _, cs := range [][]Commit{main, side} {
+		for i := range cs {
+			if _, dup := by[cs[i].SHA]; !dup {
+				by[cs[i].SHA] = &cs[i]
+			}
+		}
+	}
+	children := make(map[string]int, len(by))
+	for _, c := range by {
+		for _, p := range c.Parents {
+			if _, ok := by[p]; ok {
+				children[p]++
+			}
+		}
+	}
+	ready := &newest{}
+	for _, c := range by {
+		if children[c.SHA] == 0 {
+			heap.Push(ready, c)
+		}
+	}
+	out := make([]*Commit, 0, len(by))
+	for ready.Len() > 0 {
+		c := heap.Pop(ready).(*Commit) //nolint:forcetypeassert // the heap holds commits
+		out = append(out, c)
+		for _, p := range c.Parents {
+			if pc, ok := by[p]; ok {
+				if children[p]--; children[p] == 0 {
+					heap.Push(ready, pc)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// newest is a heap of commits, the newest (then the greatest SHA) on top.
+type newest []*Commit
+
+func (h newest) Len() int { return len(h) }
+func (h newest) Less(i, j int) bool {
+	if !h[i].CommittedAt.Equal(h[j].CommittedAt) {
+		return h[i].CommittedAt.After(h[j].CommittedAt)
+	}
+	return h[i].SHA > h[j].SHA
+}
+func (h newest) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *newest) Push(x any)   { *h = append(*h, x.(*Commit)) } //nolint:forcetypeassert // the heap holds commits
+func (h *newest) Pop() any {
+	old := *h
+	c := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return c
 }
 
 // Ref is a commit in a merged feed.
@@ -34,12 +155,21 @@ type feeds struct {
 }
 
 const (
-	facet     snapshot.Facet[[]Commit] = "commits" // newest first
+	facet     snapshot.Facet[*History] = "commits" // nil when there is none
 	feedIndex snapshot.Index[feeds]    = "commits"
 )
 
-// Of returns the commits of e, newest first, with their freshness.
-func Of(e *snapshot.RepoEntry) ([]Commit, snapshot.Freshness) { return facet.Get(e) }
+// Of returns the default-branch commits of e, newest first, with their freshness.
+func Of(e *snapshot.RepoEntry) ([]Commit, snapshot.Freshness) {
+	h, f := facet.Get(e)
+	if h == nil {
+		return nil, f
+	}
+	return h.Main, f
+}
+
+// HistoryOf returns the history of e (nil when there is none) with its freshness.
+func HistoryOf(e *snapshot.RepoEntry) (*History, snapshot.Freshness) { return facet.Get(e) }
 
 // Feeds is the indexer of the merged commit feeds, for snapshot.NewPublisher.
 func Feeds() snapshot.Indexer {
@@ -165,12 +295,15 @@ func Repo(e *snapshot.RepoEntry, r *oapi.Repo) {
 	}
 }
 
-// Detail adds the commits and their freshness to a repository's detail.
+// detailCommits is how many of the newest default-branch commits a repository's detail carries.
+const detailCommits = 30
+
+// Detail adds the newest commits and their freshness to a repository's detail.
 func Detail(e *snapshot.RepoEntry, d *oapi.RepoDetail) {
 	cs, fresh := Of(e)
 	d.CommitsFreshness = oapi.FreshnessOf(fresh, time.Now())
 	key := e.Repo.Key()
-	for i := range cs {
+	for i := range cs[:min(len(cs), detailCommits)] {
 		d.Commits = append(d.Commits, commitOf(key, &cs[i]))
 	}
 }

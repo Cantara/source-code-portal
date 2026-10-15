@@ -272,6 +272,24 @@ func (e HealthLevel) Valid() bool {
 	}
 }
 
+// Defines values for LabelKind.
+const (
+	Branch LabelKind = "branch"
+	Tag    LabelKind = "tag"
+)
+
+// Valid indicates whether the value is a known member of the LabelKind enum.
+func (e LabelKind) Valid() bool {
+	switch e {
+	case Branch:
+		return true
+	case Tag:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ManifestEcosystem.
 const (
 	ManifestEcosystemGo    ManifestEcosystem = "go"
@@ -614,6 +632,67 @@ type Health struct {
 // HealthLevel good from 80, watch from 50, attention below
 type HealthLevel string
 
+// HistoryCommit defines model for HistoryCommit.
+type HistoryCommit struct {
+	// AuthorLogin GitHub login; empty when unknown
+	AuthorLogin string `json:"authorLogin"`
+	AuthorName  string `json:"authorName"`
+
+	// Automated Made by automation: a [bot] author or a release plugin
+	Automated bool `json:"automated"`
+
+	// Body The message after its subject line; empty when there is none
+	Body          string    `json:"body"`
+	CommittedAt   time.Time `json:"committedAt"`
+	CommitterName string    `json:"committerName"`
+
+	// Labels The branches and tags at this commit, the default branch first
+	Labels []Label `json:"labels"`
+
+	// Parents SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge
+	Parents []string `json:"parents"`
+
+	// Repo Repository address
+	Repo string `json:"repo"`
+	Sha  string `json:"sha"`
+
+	// Subject First line of the message
+	Subject string `json:"subject"`
+
+	// Url Commit page; empty when unknown
+	Url string `json:"url"`
+}
+
+// HistoryPage defines model for HistoryPage.
+type HistoryPage struct {
+	Commits []HistoryCommit `json:"commits"`
+
+	// Filtered author, q or automation left commits out: the page is a list, not a graph
+	Filtered  bool      `json:"filtered"`
+	Freshness Freshness `json:"freshness"`
+
+	// Labels Every branch and tag of the history
+	Labels []Label `json:"labels"`
+	Page   Page    `json:"page"`
+
+	// Total Commits matching the filter in the stored history
+	Total int `json:"total"`
+}
+
+// Label defines model for Label.
+type Label struct {
+	// Default The default branch
+	Default bool      `json:"default"`
+	Kind    LabelKind `json:"kind"`
+	Name    string    `json:"name"`
+
+	// Sha The commit it points at
+	Sha string `json:"sha"`
+}
+
+// LabelKind defines model for Label.Kind.
+type LabelKind string
+
 // Link defines model for Link.
 type Link struct {
 	Title string `json:"title"`
@@ -844,14 +923,34 @@ type ListCommitsParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
 
 	// Repo owner/name
-	Repo   *string `form:"repo,omitempty" json:"repo,omitempty"`
-	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Repo *string `form:"repo,omitempty" json:"repo,omitempty"`
+
+	// Automation false leaves out commits made by automation
+	Automation *bool   `form:"automation,omitempty" json:"automation,omitempty"`
+	Limit      *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor     *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // ListReposParams defines parameters for ListRepos.
 type ListReposParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
+}
+
+// GetHistoryParams defines parameters for GetHistory.
+type GetHistoryParams struct {
+	// Ref A branch or tag of the history
+	Ref *string `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Author Login or name
+	Author *string `form:"author,omitempty" json:"author,omitempty"`
+
+	// Q Text in the subject or body, or a SHA prefix
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Automation false leaves out commits made by automation
+	Automation *bool   `form:"automation,omitempty" json:"automation,omitempty"`
+	Limit      *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor     *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // ServerInterface represents all server handlers.
@@ -880,6 +979,9 @@ type ServerInterface interface {
 	// GetDoc One rendered document
 	// (GET /repos/{owner}/{name}/docs/{docId})
 	GetDoc(w http.ResponseWriter, r *http.Request, owner string, name string, docId string)
+	// GetHistory The repository's stored history in graph order, one page at a time
+	// (GET /repos/{owner}/{name}/history)
+	GetHistory(w http.ResponseWriter, r *http.Request, owner string, name string, params GetHistoryParams)
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(w http.ResponseWriter, r *http.Request, owner string, name string)
@@ -928,6 +1030,19 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "repo"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repo", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "automation" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "automation", r.URL.Query(), &params.Automation, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "automation"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "automation", Err: err})
 		}
 		return
 	}
@@ -1170,6 +1285,122 @@ func (siw *ServerInterfaceWrapper) GetDoc(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// GetHistory operation middleware
+func (siw *ServerInterfaceWrapper) GetHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "owner" -------------
+	var owner string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", r.PathValue("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "owner", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", r.PathValue("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetHistoryParams
+
+	// ------------- Optional query parameter "ref" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ref", r.URL.Query(), &params.Ref, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ref"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ref", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "author" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "author", r.URL.Query(), &params.Author, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "author"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "author", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "automation" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "automation", r.URL.Query(), &params.Automation, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "automation"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "automation", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetHistory(w, r, owner, name, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetManifests operation middleware
 func (siw *ServerInterfaceWrapper) GetManifests(w http.ResponseWriter, r *http.Request) {
 
@@ -1348,6 +1579,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/docs", wrapper.ListDocs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/docs/{docId}", wrapper.GetDoc)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/manifests", wrapper.GetManifests)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/history", wrapper.GetHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 
 	return m
@@ -1817,6 +2049,87 @@ func (response GetDoc404ApplicationProblemPlusJSONResponse) VisitGetDocResponse(
 	return err
 }
 
+type GetHistoryRequestObject struct {
+	Owner  string `json:"owner"`
+	Name   string `json:"name"`
+	Params GetHistoryParams
+}
+
+type GetHistoryResponseObject interface {
+	VisitGetHistoryResponse(w http.ResponseWriter) error
+}
+
+type GetHistory200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetHistory200JSONResponse struct {
+	Body    HistoryPage
+	Headers GetHistory200ResponseHeaders
+}
+
+func (response GetHistory200JSONResponse) VisitGetHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHistory304Response = NotModifiedResponse
+
+func (response GetHistory304Response) VisitGetHistoryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetHistory308Response = MovedResponse
+
+func (response GetHistory308Response) VisitGetHistoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Location", fmt.Sprint(response.Headers.Location))
+	w.WriteHeader(308)
+	return nil
+}
+
+type GetHistory400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetHistory400ApplicationProblemPlusJSONResponse) VisitGetHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHistory404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetHistory404ApplicationProblemPlusJSONResponse) VisitGetHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetManifestsRequestObject struct {
 	Owner string `json:"owner"`
 	Name  string `json:"name"`
@@ -1945,6 +2258,9 @@ type StrictServerInterface interface {
 	// GetDoc One rendered document
 	// (GET /repos/{owner}/{name}/docs/{docId})
 	GetDoc(ctx context.Context, request GetDocRequestObject) (GetDocResponseObject, error)
+	// GetHistory The repository's stored history in graph order, one page at a time
+	// (GET /repos/{owner}/{name}/history)
+	GetHistory(ctx context.Context, request GetHistoryRequestObject) (GetHistoryResponseObject, error)
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(ctx context.Context, request GetManifestsRequestObject) (GetManifestsResponseObject, error)
@@ -2193,6 +2509,34 @@ func (sh *strictHandler) GetDoc(w http.ResponseWriter, r *http.Request, owner st
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetDocResponseObject); ok {
 		if err := validResponse.VisitGetDocResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetHistory operation middleware
+func (sh *strictHandler) GetHistory(w http.ResponseWriter, r *http.Request, owner string, name string, params GetHistoryParams) {
+	var request GetHistoryRequestObject
+
+	request.Owner = owner
+	request.Name = name
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetHistory(ctx, request.(GetHistoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetHistory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetHistoryResponseObject); ok {
+		if err := validResponse.VisitGetHistoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

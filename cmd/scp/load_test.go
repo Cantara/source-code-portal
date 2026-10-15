@@ -51,6 +51,14 @@ func TestLoad1000(t *testing.T) {
 		name := fmt.Sprintf("g%d-svc-%03d", i%10, i)
 		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new("public"), Description: new("Service " + name)})
 		gh.SetCommits(id, commit(i, 3), commit(i, 2), commit(i, 1))
+		if i%100 == 0 { // a long history: 600 commits, of which the newest 500 are kept
+			long := make([]githubtest.Commit, 600)
+			for n := range long {
+				long[n] = githubtest.Commit{SHA: fmt.Sprintf("%040x", 1<<40+i*1000+600-n), Message: fmt.Sprint("change ", 600-n),
+					AuthorName: "Ann", Date: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(600-n) * time.Minute)}
+			}
+			gh.SetCommits(id, long...)
+		}
 		gh.SetFile(id, "README.md", "# "+name+"\n\nWhat "+name+" does.\n\n## Use\n\nRun it.\n")
 		if i%2 == 0 {
 			gh.SetRelease(id, "v1.0."+fmt.Sprint(i), "Release", time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC))
@@ -117,8 +125,9 @@ func TestLoad1000(t *testing.T) {
 		if limited >= 0 {
 			t.Errorf("the rate limit was hit: %s", ledger[limited])
 		}
-		if charged > 5*loadRepos {
-			t.Errorf("cold start was charged %d calls, want at most %d", charged, 5*loadRepos)
+		// Per repository: the listing share, commits, branches, tags, README, descriptor, release and the long histories' pages.
+		if charged > 7*loadRepos {
+			t.Errorf("cold start was charged %d calls, want at most %d", charged, 7*loadRepos)
 		}
 	})
 
@@ -146,7 +155,8 @@ func TestLoad1000(t *testing.T) {
 	t.Logf("warm start: %v", time.Since(warm))
 	pages := []string{"/api/v1/dashboard", "/api/v1/groups", "/api/v1/groups/g3", "/api/v1/repos", "/api/v1/repos?group=g5",
 		"/api/v1/repos/acme/g3-svc-003", "/api/v1/repos/acme/g3-svc-003/docs", "/api/v1/commits?limit=200",
-		"/api/v1/commits?group=g7&limit=50", "/api/v1/snapshot", "/badges/repos/acme/g4-svc-004/last-commit.svg",
+		"/api/v1/commits?group=g7&limit=50", "/api/v1/repos/acme/g0-svc-100/history", "/api/v1/repos/acme/g0-svc-100/history?q=change+4",
+		"/api/v1/snapshot", "/badges/repos/acme/g4-svc-004/last-commit.svg",
 		"/badges/groups/all/repos.svg", "/llms.txt", "/llms-full.txt", "/repos/acme/g0-svc-010/readme.md"}
 	var mu gosync.Mutex
 	took := map[string][]time.Duration{}
@@ -178,7 +188,11 @@ func TestLoad1000(t *testing.T) {
 		ds := took[p]
 		slices.Sort(ds)
 		p99 := ds[len(ds)*99/100]
-		if bound := 100 * time.Millisecond * slowdown; p99 > bound {
+		bound := 100 * time.Millisecond * slowdown
+		if strings.Contains(p, "/history") {
+			bound = 50 * time.Millisecond * slowdown
+		}
+		if p99 > bound {
 			t.Errorf("%s: p99 %v over %v", p, p99, bound)
 		}
 	}
@@ -212,7 +226,7 @@ func loaded(s *snapshot.Snapshot) bool {
 	for _, e := range s.Repos {
 		cs, _ := commits.Of(e)
 		ds, _ := docs.Of(e)
-		if len(cs) != 3 || len(ds) == 0 || !ds[0].README {
+		if (len(cs) != 3 && len(cs) != 500) || len(ds) == 0 || !ds[0].README {
 			return false
 		}
 	}

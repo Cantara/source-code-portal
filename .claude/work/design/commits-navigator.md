@@ -1,5 +1,5 @@
 # Commit navigator (C1)
-Status: planned. Binding order: ../plan.md > this note.
+Status: in progress (data and API built; web next). Binding order: ../plan.md > this note.
 
 ## Goal
 `/commits` is where an owner follows the work of a product: the product's commits as one timeline, and for any of its repositories a
@@ -26,12 +26,13 @@ Today: the latest 30 default-branch commits, subject only. The `commits` job gro
 only from the snapshot by the handlers:
 1. Default branch: up to 500 commits (`per_page=100`). A cold run reads 5 pages; a later run reads page 1 (ETag, a 304 is free) and
    follows pages only until it reaches a SHA it holds.
-2. Branches: `GET /branches` (one page, 100). Each branch whose head is not in the stored history, at most 10 by head date, reads up
-   to 100 commits, stopping at a SHA already held.
+2. Branches: `GET /branches` (one page, 100). The 10 newest branches by head date, without `renovate/` and `dependabot/` (automation
+   branches merge themselves within hours and would push people's branches out), read up to 100 commits each, stopping at a SHA
+   already held; a full re-read every 24 hours drops what was deleted.
 3. Tags: `GET /tags` (one page, 100): labels for commits in the history.
 4. A commit gains its message body (cleaned with `untrusted.Strip`, at most 4 KiB) and its committer; parents as today.
 5. Payload schema 3; the facet holds commits (deduplicated by SHA) and refs (`{name, kind: branch|tag, sha, default}`).
-   Budget: at 1,000 repositories about 1,000 x 600 commits x 400 B, 240 MB worst case; the caps above hold it, and the load test
+   A cold start costs about 7 calls per repository (the load test's bound). Budget: at 1,000 repositories about 1,000 x 600 commits x 400 B, 240 MB worst case; the caps above hold it, and the load test
    measures it.
 
 ## API

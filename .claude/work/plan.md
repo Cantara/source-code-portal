@@ -76,7 +76,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 
 | M | Delivers | Done when | State |
 |---|---|---|---|
-| C1 | Commit navigator: product timelines and a git graph navigator per repository over the stored history (`design/commits-navigator.md`) | the ten acceptance criteria in the note pass in CI | next |
+| C1 | Commit navigator: product timelines and a git graph navigator per repository over the stored history (`design/commits-navigator.md`) | the ten acceptance criteria in the note pass in CI | in progress: history data and API built |
 | M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | queued |
 
 Each milestone starts with its design note and lands as small commits on `main`, CI green.

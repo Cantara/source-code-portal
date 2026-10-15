@@ -162,6 +162,29 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/repos/{owner}/{name}/history": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The repository's stored history in graph order, one page at a time
+     * @description The default branch (its latest 500 commits) and the commits of up to 10 other branches, newest first by commit time with a
+     *     parent never before its child. `ref` keeps the commits reachable from a branch or tag; `author`, `q` and `automation=false`
+     *     filter further and mark the page `filtered`, which draws no graph. Pass `page.nextCursor` as `cursor` for the next page; a
+     *     cursor is bound to its filter and stays valid when new commits arrive.
+     */
+    get: operations["getHistory"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/snapshot": {
     parameters: {
       query?: never
@@ -351,6 +374,35 @@ export interface components {
       committedAt: string
       /** @description SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge */
       parents: string[]
+    }
+    Label: {
+      name: string
+      /** @enum {string} */
+      kind: "branch" | "tag"
+      /** @description The commit it points at */
+      sha: string
+      /** @description The default branch */
+      default: boolean
+    }
+    HistoryCommit: components["schemas"]["Commit"] & {
+      /** @description The message after its subject line; empty when there is none */
+      body: string
+      committerName: string
+      /** @description Made by automation: a [bot] author or a release plugin */
+      automated: boolean
+      /** @description The branches and tags at this commit, the default branch first */
+      labels: components["schemas"]["Label"][]
+    }
+    HistoryPage: {
+      commits: components["schemas"]["HistoryCommit"][]
+      /** @description Every branch and tag of the history */
+      labels: components["schemas"]["Label"][]
+      /** @description author, q or automation left commits out: the page is a list, not a graph */
+      filtered: boolean
+      /** @description Commits matching the filter in the stored history */
+      total: number
+      page: components["schemas"]["Page"]
+      freshness: components["schemas"]["Freshness"]
     }
     CommitPage: {
       commits: components["schemas"]["Commit"][]
@@ -621,6 +673,8 @@ export interface operations {
         group?: string
         /** @description owner/name */
         repo?: string
+        /** @description false leaves out commits made by automation */
+        automation?: boolean
         limit?: number
         cursor?: string
       }
@@ -824,6 +878,45 @@ export interface operations {
       }
       304: components["responses"]["NotModified"]
       308: components["responses"]["Moved"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  getHistory: {
+    parameters: {
+      query?: {
+        /** @description A branch or tag of the history */
+        ref?: string
+        /** @description Login or name */
+        author?: string
+        /** @description Text in the subject or body, or a SHA prefix */
+        q?: string
+        /** @description false leaves out commits made by automation */
+        automation?: boolean
+        limit?: number
+        cursor?: string
+      }
+      header?: never
+      path: {
+        owner: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description One page of the history */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["HistoryPage"]
+        }
+      }
+      304: components["responses"]["NotModified"]
+      308: components["responses"]["Moved"]
+      400: components["responses"]["BadRequest"]
       404: components["responses"]["NotFound"]
     }
   }

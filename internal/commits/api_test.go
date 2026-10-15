@@ -21,7 +21,7 @@ func feedSnapshot(t *testing.T) *snapshot.Snapshot {
 		for i := range n {
 			cs = append(cs, Commit{SHA: sha(byte('a' + int(id)*5 + i)), CommittedAt: at.Add(-time.Duration(i) * time.Hour)})
 		}
-		facet.Set(e, cs, f)
+		facet.Set(e, newHistory(cs, nil, nil, "main"), f)
 		return e
 	}
 	p.Update(func(b *snapshot.Builder) {
@@ -94,5 +94,20 @@ func TestListCommitsPages(t *testing.T) {
 		if _, ok := list(p).(oapi.ListCommits404ApplicationProblemPlusJSONResponse); !ok {
 			t.Errorf("unknown %s: not a 404", name)
 		}
+	}
+}
+
+func TestListCommitsAutomation(t *testing.T) {
+	s := feedSnapshot(t)
+	a := API{Current: func(context.Context) *snapshot.Snapshot { return s }}
+	res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: oapi.ListCommitsParams{Automation: new(false), Limit: new(2)}})
+	page := res.(oapi.ListCommits200JSONResponse).Body
+	if len(page.Commits) != 2 || page.Page.NextCursor == nil {
+		t.Fatalf("page: %+v", page)
+	}
+	if res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: oapi.ListCommitsParams{Cursor: page.Page.NextCursor}}); res == nil {
+		t.Fatal("no answer")
+	} else if _, ok := res.(oapi.ListCommits400ApplicationProblemPlusJSONResponse); !ok {
+		t.Errorf("a cursor without automation used with it: %T", res)
 	}
 }
