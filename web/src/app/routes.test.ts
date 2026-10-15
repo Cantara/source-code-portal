@@ -11,7 +11,7 @@ import { NavigationSignal } from "@/test/navigation"
 import { descriptor, http, repo, server } from "@/test/server"
 import { panels } from "./repos/[owner]/[name]/panels"
 
-const ctx = <P>(params: P, search = {}): Ctx<P> => ({ api, qc: newServerQueryClient(), params, search })
+const ctx = <P>(params: P, search = {}): Ctx<P> => ({ api, qc: newServerQueryClient(), params, search, cookies: {} })
 
 /** signal is what a load threw, or undefined when it did not. */
 async function signal(p: Promise<unknown>): Promise<NavigationSignal | undefined> {
@@ -45,6 +45,7 @@ describe("route modules", () => {
         response(200).json({
           repo: repo("Core"),
           title: "",
+          group: null,
           descriptor,
           commits: [],
           commitsFreshness: repo("Core").freshness,
@@ -52,19 +53,19 @@ describe("route modules", () => {
       ),
     )
     const old = { owner: "acme", name: "old-core" }
-    expect((await signal(repoRoute(panels).load(ctx(old))))?.to).toBe("/repos/acme/Core")
-    expect((await signal(repoCommitsRoute.load(ctx(old))))?.to).toBe("/repos/acme/Core/commits")
-    expect((await signal(docRoute.load(ctx({ ...old, path: ["docs", "setup"] }))))?.to).toBe("/repos/acme/Core/docs/docs/setup")
+    expect((await signal(repoRoute(panels).load(ctx(old))))?.to).toBe("/repos/acme/core")
+    expect((await signal(repoCommitsRoute.load(ctx(old))))?.to).toBe("/repos/acme/core/commits")
+    expect((await signal(docRoute.load(ctx({ ...old, path: ["docs", "setup"] }))))?.to).toBe("/repos/acme/core/docs/docs/setup")
     // Another casing of the current address renders.
     expect(await signal(repoCommitsRoute.load(ctx({ owner: "ACME", name: "CORE" })))).toBeUndefined()
   })
 
-  it("name canonicals after the repository and the group, whatever the request's casing", async () => {
-    const lower = { owner: "acme", name: "core" }
-    expect((await repoRoute(panels).metadata(ctx(lower))).alternates?.canonical).toBe("/repos/acme/Core")
-    expect((await repoCommitsRoute.metadata(ctx(lower))).alternates?.canonical).toBe("/repos/acme/Core/commits")
+  it("name canonicals with the repository's lower-case address, whatever the request's casing", async () => {
+    const lower = { owner: "ACME", name: "Core" }
+    expect((await repoRoute(panels).metadata(ctx(lower))).alternates?.canonical).toBe("/repos/acme/core")
+    expect((await repoCommitsRoute.metadata(ctx(lower))).alternates?.canonical).toBe("/repos/acme/core/commits")
     expect((await docRoute.metadata(ctx({ ...lower, path: ["docs", "setup"] }))).alternates?.canonical).toBe(
-      "/repos/acme/Core/docs/docs/setup",
+      "/repos/acme/core/docs/docs/setup",
     )
     expect(await groupCommitsRoute.metadata(ctx({ group: "iam" }))).toMatchObject({ title: "Commits in IAM" })
     expect(await allCommitsRoute.metadata(ctx({}))).toMatchObject({ alternates: { canonical: "/commits" } })

@@ -15,7 +15,7 @@ import (
 // core are the shared packages under internal/. Every other package there is a feature: features never import each other and core
 // packages import none of them, so a new package is a feature unless it is added here.
 var core = []string{ //nolint:gochecknoglobals // test table
-	"cluster", "config", "github", "health", "httpapi", "safehtml", "snapshot", "store", "sync", "untrusted", "webui",
+	"cluster", "config", "github", "health", "httpapi", "llm", "safehtml", "snapshot", "store", "sync", "untrusted", "webui",
 }
 
 const internalPrefix = "github.com/cantara/source-code-portal/internal/"

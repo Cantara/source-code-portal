@@ -41,6 +41,25 @@ export const api: Api = createClient<paths>({
   fetch: (r) => globalThis.fetch(r),
 })
 
+/** Get reads a path of /api/v1 outside the contract (the operator's status) as JSON, failing as unwrap does. */
+export type Get = <T>(path: string, signal?: AbortSignal) => Promise<T>
+
+/** getter is a Get against base with headers. */
+export function getter(base: string, headers: Record<string, string> = {}): Get {
+  return <T>(path: string, signal?: AbortSignal) =>
+    unwrap<T>(
+      globalThis
+        .fetch(`${base}${path}`, { headers: { Accept: "application/json", ...headers }, signal })
+        .then(async (response) => {
+          const body: unknown = await response.json().catch(() => undefined)
+          return response.ok ? { data: body as T, response } : { error: body, response }
+        }),
+    )
+}
+
+/** get is the browser's Get. */
+export const get: Get = (path, signal) => getter(`${globalThis.location?.origin ?? "http://localhost"}/api/v1`)(path, signal)
+
 interface Result<T> {
   data?: T
   error?: unknown

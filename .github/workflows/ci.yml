@@ -1,4 +1,4 @@
-# One required status check protects main: "gate". Actions are pinned by commit SHA (Renovate updates SHA and comment together);
+# The "gate" job sums up the others. Actions are pinned by commit SHA (Renovate updates SHA and comment together);
 # the token is read-only.
 name: ci
 
@@ -21,7 +21,7 @@ env:
 
 jobs:
   go:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -56,7 +56,7 @@ jobs:
       - run: go tool govulncheck ./...
 
   web:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -78,7 +78,7 @@ jobs:
       - run: pnpm -C web build
 
   e2e:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -107,7 +107,7 @@ jobs:
           retention-days: 7
 
   image:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -125,7 +125,7 @@ jobs:
   gate:
     if: always()
     needs: [go, web, e2e, image]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - name: all jobs succeeded

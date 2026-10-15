@@ -79,8 +79,23 @@ export const descriptor: S["Descriptor"] = {
 
 export const snapshot = (version: number, ready = true): S["SnapshotInfo"] => ({ version, builtAt: at, ready, sources: [] })
 
+/** me is the viewer: anonymous on a portal with both ways to sign in, unless over says otherwise. */
+export const me = (over: Partial<S["Me"]> = {}): S["Me"] => ({
+  signedIn: false,
+  name: "",
+  via: "none",
+  private: false,
+  admin: false,
+  signIn: { oidc: true, token: true },
+  ...over,
+})
+
 /** defaults answer every page with one group, two repositories and a README. */
 export const defaults = [
+  http.get("/me", ({ response }) => response(200).json(me())),
+  http.get("/assistant", ({ response }) =>
+    response(200).json({ enabled: false, allowed: false, access: "signed-in", provider: "", model: "" }),
+  ),
   http.get("/snapshot", ({ response }) => response(200).json(snapshot(1))),
   http.get("/repos", ({ response }) => response(200).json({ repos: [repo("Whydah"), repo("Whydah-Core")] })),
   http.get("/dashboard", ({ response }) =>
@@ -143,6 +158,7 @@ export const defaults = [
       ? response(200).json({
           repo: repo("Core"),
           title: "Core identity",
+          group: null,
           descriptor,
           commits: [commit(1)],
           commitsFreshness: fresh,
@@ -225,7 +241,32 @@ export const defaults = [
     }),
   ),
   http.get("/commits", ({ response }) =>
-    response(200).json({ commits: [commit(1)], page: { nextCursor: null, limit: 50 }, freshness: fresh }),
+    response(200).json({ commits: [commit(1)], page: { number: 1, size: 50, total: 1, pages: 1 }, freshness: fresh }),
+  ),
+  http.get("/repos/{owner}/{name}/history", ({ params, response }) =>
+    response(200).json({
+      commits: [1, 0].map((i) => ({
+        ...commit(i, `${params.owner}/${params.name}`),
+        body: "",
+        committerName: "",
+        automated: false,
+        labels: [],
+        beyond: [],
+        graph: {
+          lane: 0,
+          color: 0,
+          merge: false,
+          above: i === 1 ? [] : [{ from: 0, to: 0, color: 0, open: false }],
+          below: i === 1 ? [{ from: 0, to: 0, color: 0, open: false }] : [],
+        },
+      })),
+      labels: [],
+      filtered: false,
+      lanes: 1,
+      at: null,
+      page: { number: 1, size: 30, total: 2, pages: 1 },
+      freshness: fresh,
+    }),
   ),
 ]
 

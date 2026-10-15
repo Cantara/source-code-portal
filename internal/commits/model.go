@@ -37,8 +37,9 @@ type Label struct {
 type History struct {
 	Main   []Commit
 	Side   []Commit
-	Labels []Label
+	Labels []Label // the default branch first, then branches, then tags
 	Order  []*Commit
+	Rows   []Row              // the git graph of Order
 	pos    map[string]int     // SHA -> index in Order
 	at     map[string][]Label // SHA -> its labels, the default branch first, then branches, then tags
 }
@@ -50,6 +51,7 @@ func newHistory(main, side []Commit, labels []Label, defaultBranch string) *Hist
 		l := &h.Labels[i]
 		l.Default = l.Kind == "branch" && l.Name == defaultBranch
 	}
+	slices.SortStableFunc(h.Labels, func(a, b Label) int { return rank(a) - rank(b) })
 	for _, l := range h.Labels {
 		h.at[l.SHA] = append(h.at[l.SHA], l)
 	}
@@ -61,6 +63,7 @@ func newHistory(main, side []Commit, labels []Label, defaultBranch string) *Hist
 	for i, c := range h.Order {
 		h.pos[c.SHA] = i
 	}
+	h.Rows = layout(h.Order, h.held)
 	return h
 }
 
@@ -72,6 +75,12 @@ func rank(l Label) int {
 		return 1
 	}
 	return 2
+}
+
+// held reports whether sha is in the history.
+func (h *History) held(sha string) bool {
+	_, ok := h.pos[sha]
+	return ok
 }
 
 // LabelsAt returns the labels of the commit sha.

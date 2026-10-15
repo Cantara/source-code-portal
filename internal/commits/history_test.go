@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,25 +38,30 @@ func getHistory(t *testing.T, a API, p oapi.GetHistoryParams) oapi.GetHistoryRes
 	return res
 }
 
-// walk reads every page and returns the SHAs in order.
+// walk reads every page and returns the SHAs in order, checking the page descriptions.
 func walk(t *testing.T, a API, p oapi.GetHistoryParams) []string {
 	t.Helper()
 	var out []string
-	for range 1000 {
+	for n := 1; ; n++ {
+		p.Page = new(n)
 		page, ok := getHistory(t, a, p).(oapi.GetHistory200JSONResponse)
 		if !ok {
-			t.Fatalf("page: %+v", page)
+			t.Fatalf("page %d: %+v", n, page)
+		}
+		pg := page.Body.Page
+		if pg.Number != n || pg.Pages != max(1, (pg.Total+pg.Size-1)/pg.Size) || (n < pg.Pages && len(page.Body.Commits) != pg.Size) {
+			t.Fatalf("page %d: %+v with %d commits", n, pg, len(page.Body.Commits))
 		}
 		for _, c := range page.Body.Commits {
 			out = append(out, c.Sha)
 		}
-		if page.Body.Page.NextCursor == nil {
+		if n >= pg.Pages {
+			if len(out) != pg.Total {
+				t.Fatalf("%d commits over %d pages, total %d", len(out), pg.Pages, pg.Total)
+			}
 			return out
 		}
-		p.Cursor = page.Body.Page.NextCursor
 	}
-	t.Fatal("no end of pages")
-	return nil
 }
 
 // randomDAG is n commits, cs[i] younger than cs[j] for i < j, with merges and skewed clocks.
@@ -113,22 +120,56 @@ func TestHistoryPages(t *testing.T) {
 	}
 }
 
-// TestHistoryPush: a page read after a push continues where the last one ended, neither repeating nor skipping a commit.
-func TestHistoryPush(t *testing.T) {
+// TestHistoryGraph: every page carries its rows of the graph laid out over the whole history, the same rows whatever the page
+// size; a branch's history is laid out on its own; a filtered page has none.
+func TestHistoryGraph(t *testing.T) {
 	cs := randomDAG(rand.New(rand.NewPCG(5, 6)), 0, 80)
-	before := historyAPI(t, newHistory(cs, nil, nil, "main"))
-	first := getHistory(t, before, oapi.GetHistoryParams{Limit: new(30)}).(oapi.GetHistory200JSONResponse).Body
-	pushed := []Commit{{SHA: sha('f'), Parents: []string{sha('e')}, CommittedAt: cs[0].CommittedAt.Add(2 * time.Hour)},
-		{SHA: sha('e'), Parents: []string{cs[0].SHA}, CommittedAt: cs[0].CommittedAt.Add(time.Hour)}}
-	after := historyAPI(t, newHistory(append(pushed, cs...), nil, nil, "main"))
-	got := slices.Collect(func(yield func(string) bool) {
-		for _, c := range first.Commits {
-			yield(c.Sha)
+	h := newHistory(cs, nil, nil, "main")
+	a := historyAPI(t, h)
+	rows := func(limit int) []oapi.GraphRow {
+		var out []oapi.GraphRow
+		for n := 1; n <= (80+limit-1)/limit; n++ {
+			page := getHistory(t, a, oapi.GetHistoryParams{Limit: new(limit), Page: new(n)}).(oapi.GetHistory200JSONResponse).Body
+			if page.Lanes < 1 || page.Lanes > maxLanes {
+				t.Fatalf("lanes = %d", page.Lanes)
+			}
+			for _, c := range page.Commits {
+				out = append(out, *c.Graph)
+			}
 		}
-	})
-	got = append(got, walk(t, after, oapi.GetHistoryParams{Limit: new(30), Cursor: first.Page.NextCursor})...)
-	if want := walk(t, before, oapi.GetHistoryParams{Limit: new(200)}); !slices.Equal(got, want) {
-		t.Errorf("pages across a push = %d commits, want the %d held before it in order", len(got), len(want))
+		return out
+	}
+	whole := rows(200)
+	for _, limit := range []int{1, 7, 30} {
+		if got := rows(limit); !reflect.DeepEqual(got, whole) {
+			t.Fatalf("rows paged by %d differ from the whole history's", limit)
+		}
+	}
+	if !reflect.DeepEqual(whole[0], *rowOf(h.Rows[0])) {
+		t.Errorf("first row %+v, want %+v", whole[0], h.Rows[0])
+	}
+	page := getHistory(t, a, oapi.GetHistoryParams{Automation: new(false)}).(oapi.GetHistory200JSONResponse).Body
+	if page.Lanes != 0 || page.Commits[0].Graph != nil {
+		t.Errorf("a filtered page draws a graph: lanes %d", page.Lanes)
+	}
+}
+
+// TestHistoryAt: at answers the page holding the commit, by SHA or prefix, and names it; an unknown one leaves the page asked for.
+func TestHistoryAt(t *testing.T) {
+	cs := randomDAG(rand.New(rand.NewPCG(9, 9)), 0, 50)
+	a := historyAPI(t, newHistory(cs, nil, nil, "main"))
+	order := walk(t, a, oapi.GetHistoryParams{Limit: new(200)})
+	for _, i := range []int{0, 9, 10, 49} {
+		for _, at := range []string{order[i], strings.ToUpper(order[i])} {
+			page := getHistory(t, a, oapi.GetHistoryParams{Limit: new(10), At: new(at), Page: new(3)}).(oapi.GetHistory200JSONResponse).Body
+			if page.Page.Number != i/10+1 || page.At == nil || *page.At != order[i] || page.Commits[i%10].Sha != order[i] {
+				t.Errorf("at %s (commit %d): page %d, at %v", at, i, page.Page.Number, page.At)
+			}
+		}
+	}
+	page := getHistory(t, a, oapi.GetHistoryParams{Limit: new(10), At: new("ffffffff"), Page: new(2)}).(oapi.GetHistory200JSONResponse).Body
+	if page.Page.Number != 2 || page.At != nil {
+		t.Errorf("an unknown commit: page %d, at %v", page.Page.Number, page.At)
 	}
 }
 
@@ -137,7 +178,7 @@ func TestHistoryFilters(t *testing.T) {
 	cs := []Commit{
 		{SHA: sha('d'), Subject: "Merge feature", AuthorName: "Ada", AuthorLogin: "ada", Parents: []string{sha('c'), sha('b')}, CommittedAt: at.Add(3 * time.Hour)},
 		{SHA: sha('c'), Subject: "chore(deps): update", AuthorName: "renovate[bot]", Parents: []string{sha('a')}, CommittedAt: at.Add(2 * time.Hour)},
-		{SHA: sha('a'), Subject: "Initial", AuthorName: "Bob", Body: "the parser", Parents: []string{}, CommittedAt: at},
+		{SHA: sha('a'), Subject: "Initial", AuthorName: "Bob", Body: "the parser", Parents: []string{sha('0')}, CommittedAt: at},
 	}
 	side := []Commit{{SHA: sha('b'), Subject: "Add feature", AuthorName: "Ada", Parents: []string{sha('a')}, CommittedAt: at.Add(time.Hour)}}
 	labels := []Label{{Name: "main", Kind: "branch", SHA: sha('d')}, {Name: "feature", Kind: "branch", SHA: sha('b')}, {Name: "v1", Kind: "tag", SHA: sha('a')}}
@@ -160,29 +201,34 @@ func TestHistoryFilters(t *testing.T) {
 		for _, c := range page.Commits {
 			got += c.Sha[:1]
 		}
-		if got != tc.want || page.Filtered != tc.filtered || page.Total != len(tc.want) || len(page.Labels) != 3 {
-			t.Errorf("%s: %q filtered %v total %d labels %d, want %q filtered %v", name, got, page.Filtered, page.Total, len(page.Labels), tc.want, tc.filtered)
+		if got != tc.want || page.Filtered != tc.filtered || page.Page.Total != len(tc.want) || len(page.Labels) != 3 ||
+			(page.Lanes == 0) != tc.filtered {
+			t.Errorf("%s: %q filtered %v total %d labels %d lanes %d, want %q filtered %v", name, got, page.Filtered, page.Page.Total,
+				len(page.Labels), page.Lanes, tc.want, tc.filtered)
 		}
 	}
 	page := getHistory(t, a, oapi.GetHistoryParams{}).(oapi.GetHistory200JSONResponse).Body
-	if d := page.Commits[0]; len(d.Labels) != 1 || !d.Labels[0].Default || d.Automated || !page.Commits[1].Automated {
+	if d := page.Commits[0]; len(d.Labels) != 1 || !d.Labels[0].Default || d.Automated || !page.Commits[1].Automated || len(d.Beyond) != 0 {
 		t.Errorf("labels and automation: %+v", page.Commits[:2])
 	}
+	if a := page.Commits[3]; len(a.Beyond) != 1 || a.Beyond[0] != sha('0') {
+		t.Errorf("a parent older than the history: %+v", a.Beyond)
+	}
 
-	next := getHistory(t, a, oapi.GetHistoryParams{Limit: new(1)}).(oapi.GetHistory200JSONResponse).Body.Page.NextCursor
+	branch := getHistory(t, a, oapi.GetHistoryParams{Ref: new("feature")}).(oapi.GetHistory200JSONResponse).Body
+	if branch.Commits[0].Graph == nil || branch.Commits[0].Graph.Lane != 0 || branch.Lanes != 1 {
+		t.Errorf("a branch's own graph: %+v, lanes %d", branch.Commits[0].Graph, branch.Lanes)
+	}
 	for name, p := range map[string]oapi.GetHistoryParams{
-		"unknown ref":         {Ref: new("nope")},
-		"limit":               {Limit: new(201)},
-		"cursor of a filter":  {Cursor: next, Author: new("ada")},
-		"cursor of no commit": {Cursor: new(encodeAny(historyCursor{F: digest("", "", "", true), S: sha('9')}))},
-		"garbage cursor":      {Cursor: new("!!")},
+		"unknown ref":  {Ref: new("nope")},
+		"limit":        {Limit: new(201)},
+		"page":         {Page: new(0)},
+		"at too short": {At: new("abc")},
+		"at not hex":   {At: new("xyzxyz")},
 	} {
 		if _, ok := getHistory(t, a, p).(oapi.GetHistory400ApplicationProblemPlusJSONResponse); !ok {
 			t.Errorf("%s: not refused", name)
 		}
-	}
-	if _, ok := getHistory(t, a, oapi.GetHistoryParams{Cursor: next}).(oapi.GetHistory200JSONResponse); !ok {
-		t.Error("its own cursor refused")
 	}
 	if res, _ := a.GetHistory(t.Context(), oapi.GetHistoryRequestObject{Owner: "acme", Name: "nope"}); res == nil {
 		t.Error("no answer for an unknown repository")

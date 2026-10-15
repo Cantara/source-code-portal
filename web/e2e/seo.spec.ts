@@ -12,19 +12,19 @@ const pages = [
     "/groups/whydah/commits",
     "Change 30",
   ],
-  ["/repos/acme/whydah-core", "Whydah Core", "Whydah Core · Source Code Portal", "/repos/acme/Whydah-Core", "Identity. See"],
+  ["/repos/acme/whydah-core", "Whydah Core", "Whydah Core · Source Code Portal", "/repos/acme/whydah-core", "Identity. See"],
   [
     "/repos/acme/whydah-core/commits",
     "Commits in acme/Whydah-Core",
     "Commits in acme/Whydah-Core · Source Code Portal",
-    "/repos/acme/Whydah-Core/commits",
+    "/repos/acme/whydah-core/commits",
     "Change 30 of repository 0",
   ],
   [
     "/repos/acme/whydah-core/docs/docs/setup",
     "Setup",
     "Setup · Source Code Portal",
-    "/repos/acme/Whydah-Core/docs/docs/setup",
+    "/repos/acme/whydah-core/docs/docs/setup",
     "Run it.",
   ],
 ] as const
@@ -44,6 +44,25 @@ test.describe("without JavaScript", () => {
         "href",
         `${baseURL}${canonical === "/" ? "" : canonical}`,
       )
+      await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+        "content",
+        title.replace(" · Source Code Portal", ""),
+      )
+    })
+  }
+
+  for (const path of ["/commits", "/repos/acme/tool/commits"]) {
+    test(`${path} pages through numbered pages`, async ({ page }) => {
+      await page.goto(path)
+      await expect(page.getByText("Change 30 of repository 2").first()).toBeVisible()
+      const pager = page.getByRole("navigation", { name: "Pages", exact: true })
+      await pager.getByRole("link", { name: "Next" }).click()
+      await expect(page).toHaveURL(/page=2/)
+      await expect(pager.locator("[aria-current=page]")).toHaveText("2")
+      await expect(page.getByText("Change 30 of repository 2")).toHaveCount(0)
+      await expect(page.getByText(/Old change \d+ of repository 2/).first()).toBeVisible()
+      await pager.getByRole("link", { name: "Page 1", exact: true }).click()
+      await expect(page.getByText("Change 30 of repository 2").first()).toBeVisible()
     })
   }
 
@@ -54,18 +73,75 @@ test.describe("without JavaScript", () => {
   })
 })
 
-test("the sitemap lists every page and robots.txt points to it", async ({ request, baseURL }) => {
-  const sitemap = await (await request.get("/sitemap.xml")).text()
+test("the sitemap lists every page with its newest commit and robots.txt points to it", async ({ request, baseURL }) => {
+  const res = await request.get("/sitemap.xml")
+  expect(res.headers()["content-type"]).toBe("application/xml; charset=utf-8")
+  expect(res.headers()["cache-control"]).toContain("s-maxage=3600")
+  const sitemap = await res.text()
   for (const p of [
     "/",
     "/commits",
     "/groups/whydah",
     "/groups/other",
-    "/repos/acme/Whydah-Core",
+    "/repos/acme/whydah-core",
+    "/repos/acme/whydah-core/docs/docs/setup",
     "/repos/acme/whydah-sso",
     "/repos/acme/tool",
   ]) {
     expect(sitemap).toContain(`<loc>${baseURL}${p}</loc>`)
   }
-  expect(await (await request.get("/robots.txt")).text()).toContain(`Sitemap: ${baseURL}/sitemap.xml`)
+  expect(sitemap).not.toContain("vault") // private
+  const robots = await (await request.get("/robots.txt")).text()
+  expect(robots).toContain(`Sitemap: ${baseURL}/sitemap.xml`)
+  expect(robots).toContain("Disallow: /api/")
+})
+
+type Node = Record<string, unknown> & { "@type": string }
+
+test.describe("every page of the sitemap, as a crawler reads it", () => {
+  test.use({ javaScriptEnabled: false })
+
+  test("answers 200 with its canonical, one h1, a lastmod and a JSON-LD graph whose trail is the one shown", async ({
+    page,
+    request,
+  }) => {
+    const xml = await (await request.get("/sitemap.xml")).text()
+    const urls = [...xml.matchAll(/<url><loc>([^<]+)<\/loc>(<lastmod>[^<]+<\/lastmod>)?<\/url>/g)]
+    expect(urls.length).toBeGreaterThan(5)
+    for (const [, loc = "", lastmod] of urls) {
+      expect(lastmod, `${loc} has a lastmod`).toBeTruthy()
+      const res = await page.goto(loc)
+      expect(res?.status(), loc).toBe(200)
+      expect((await page.locator('link[rel="canonical"]').getAttribute("href"))?.replace(/\/$/, ""), loc).toBe(
+        loc.replace(/\/$/, ""),
+      )
+      await expect(page.locator("h1"), loc).toHaveCount(1)
+      const blocks = await page.locator('script[type="application/ld+json"]').allTextContents()
+      expect(blocks, loc).toHaveLength(1)
+      const graph = (JSON.parse(blocks[0] ?? "{}") as { "@context": string; "@graph": Node[] })["@graph"]
+      const types = graph.map((n) => n["@type"])
+      expect(types, loc).toContain("WebSite")
+      const self = graph.find((n) => n["@id"] === loc)
+      expect(self?.url, `${loc} has its page node`).toBe(loc)
+      const trail = graph.find((n) => n["@type"] === "BreadcrumbList")
+      if (new URL(loc).pathname === "/") {
+        expect(trail).toBeUndefined()
+        continue
+      }
+      const items = trail?.itemListElement as { position: number; name: string; item: string }[]
+      expect(items.at(-1)?.item, loc).toBe(loc)
+      expect(items.map((i) => i.position)).toEqual(items.map((_, i) => i + 1))
+      const shown = await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("listitem").allTextContents()
+      expect(
+        shown.map((t) => t.replace(/^\//, "").trim()),
+        loc,
+      ).toEqual(items.map((i) => i.name))
+      if (loc.includes("/docs/")) expect(types, loc).toContain("TechArticle")
+      else if (loc.includes("/repos/")) {
+        const code = graph.find((n) => n["@type"] === "SoftwareSourceCode")
+        expect(code?.codeRepository, loc).toMatch(/^https?:\/\//)
+        expect(code?.dateModified, loc).toBeTruthy()
+      } else if (loc.includes("/groups/")) expect(types, loc).toContain("CollectionPage")
+    }
+  })
 })

@@ -45,3 +45,10 @@ units:
     audience: [agent, developer]
     validated: "2026-10-01"
     depends_on: [repo-acme-core]
+  - id: repo-acme-core-doc-docs-getting-started
+    path: "repos/acme/core/docs/docs/Getting%20Started.md"
+    intent: "What does docs/Getting Started.markdown in acme/core cover?"
+    scope: module
+    audience: [agent, developer]
+    validated: "2026-10-01"
+    depends_on: [repo-acme-core]

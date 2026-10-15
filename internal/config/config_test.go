@@ -47,6 +47,10 @@ func TestDefaults(t *testing.T) {
 		}}},
 		Catalog: Catalog{ReconcileInterval: 5 * time.Minute},
 		Access:  Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{}},
+		Auth: Auth{SessionTTL: 12 * time.Hour, AdminEmails: []string{}, AdminGroups: []string{},
+			OIDC: OIDC{Scopes: []string{"openid", "email", "profile"}, GroupsClaim: "groups"}},
+		Assistant: Assistant{Access: "signed-in", Concurrency: 4, MaxTurns: 8, MaxToolCalls: 16, MaxTokens: 16000, MaxHistory: 40,
+			MaxInputChars: 60000, ToolResultChars: 12000},
 		Cluster: Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},
 		Web:     Web{Node: "node"},
 	}
@@ -125,6 +129,24 @@ func TestRefused(t *testing.T) {
 		"cluster namespace":      {env: map[string]string{"SCP_CLUSTER_NAMESPACE": "SCP_Prod"}, want: "cluster.namespace"},
 		"web dir without server": {env: map[string]string{"SCP_WEB_DIR": "/nonexistent"}, want: "web.dir"},
 		"web node empty":         {env: map[string]string{"SCP_WEB_NODE": " "}, want: "web.node"},
+		"short session ttl":      {env: map[string]string{"SCP_AUTH_SESSION_TTL": "1m"}, want: "auth.session_ttl"},
+		"oidc without key":       {file: "auth:\n  oidc: {issuer: 'https://id.example', client_id: scp}\nserver:\n  public_url: https://scp.example\n", want: "auth.session_key_file: required"},
+		"oidc without client":    {env: map[string]string{"SCP_AUTH_OIDC_ISSUER": "https://id.example"}, want: "auth.oidc.client_id"},
+		"oidc without url":       {env: map[string]string{"SCP_AUTH_OIDC_ISSUER": "https://id.example"}, want: "server.public_url: required"},
+		"oidc over http":         {env: map[string]string{"SCP_AUTH_OIDC_ISSUER": "http://id.example"}, want: "auth.oidc.issuer"},
+		"oidc without openid":    {file: "auth:\n  oidc: {issuer: 'https://id.example', scopes: [email]}\n", want: "must include openid"},
+		"bad admin email":        {file: "auth:\n  admin_emails: [root]\n", want: "auth.admin_emails"},
+		"bad token name":         {file: "auth:\n  tokens: [{name: 'CI bot', secret_file: /x}]\n", want: "auth.tokens[0].name"},
+		"token without secret":   {file: "auth:\n  tokens: [{name: ci}]\n", want: "auth.tokens[0].secret_file: required"},
+		"short token secret":     {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  tokens: [{name: ci, secret_file: TOKEN}]\n", want: "at least 32 characters"},
+		"short session key":      {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  session_key_file: TOKEN\n", want: "at least 32 bytes"},
+		"unknown provider":       {env: map[string]string{"SCP_LLM_PROVIDER": "acme"}, want: "llm.provider"},
+		"provider without key":   {env: map[string]string{"SCP_LLM_PROVIDER": "anthropic", "SCP_ASSISTANT_ACCESS": "everyone"}, want: "llm.api_key_file: required"},
+		"key over http":          {file: "llm: {provider: openai, api_key_file: /x, base_url: 'http://llm.example/v1'}\n", want: "llm.base_url"},
+		"bad model":              {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_LLM_MODEL": "a b"}, want: "llm.model"},
+		"bad assistant access":   {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_ASSISTANT_ACCESS": "anyone"}, want: "assistant.access"},
+		"signed-in without auth": {env: map[string]string{"SCP_LLM_PROVIDER": "ollama"}, want: "needs a way to know the viewer"},
+		"too many turns":         {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_ASSISTANT_ACCESS": "everyone", "SCP_ASSISTANT_MAX_TURNS": "99"}, want: "assistant.max_turns"},
 		"unknown group source":   {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {
@@ -156,6 +178,18 @@ func TestAllProblemsReported(t *testing.T) {
 	var inv *Invalid
 	if !errors.As(err, &inv) || len(inv.Problems) != 2 {
 		t.Fatalf("err = %v, want two problems", err)
+	}
+}
+
+func TestLLM(t *testing.T) {
+	key := write(t, "key", "sk-ant-test\n")
+	cfg, _, err := Load(file(t, "llm: {provider: anthropic, api_key_file: "+key+"}\nassistant: {access: everyone}\n"), nil)
+	if err != nil || string(cfg.LLM.APIKey.Reveal()) != "sk-ant-test" || cfg.Assistant.MaxTurns != 8 {
+		t.Errorf("llm = %+v %+v, %v", cfg.LLM, cfg.Assistant, err)
+	}
+	cfg, _, err = Load(file(t, "llm: {provider: ollama, base_url: 'http://ollama.lan:11434/v1'}\nassistant: {access: everyone}\n"), nil)
+	if err != nil || cfg.LLM.APIKey.IsSet() {
+		t.Errorf("ollama on the network without a key: %+v, %v", cfg.LLM, err)
 	}
 }
 
@@ -193,5 +227,20 @@ func TestSecretRedacted(t *testing.T) {
 		if strings.Contains(strings.ToLower(k), "token") && !strings.Contains(k, "file") {
 			t.Errorf("settings expose %s = %v", k, v)
 		}
+	}
+}
+
+func TestAuth(t *testing.T) {
+	key, secret := write(t, "key", strings.Repeat("k", 32)+"\n"), write(t, "ci", strings.Repeat("s", 40))
+	cfg, _, err := Load(write(t, "scp.yaml", "server:\n  public_url: https://scp.example\ngithub:\n  sources:\n    - {id: gh, orgs: [a], token_file: "+
+		write(t, "t", "ghp")+", include_private: true}\naccess:\n  private_groups: [staff]\nauth:\n  session_key_file: "+key+
+		"\n  admin_emails: [ada@example.org]\n  tokens: [{name: ci, secret_file: "+secret+", groups: [staff]}]\n"+
+		"  oidc: {issuer: 'http://127.0.0.1:5556/dex', client_id: scp}\n"), nil) // include_private without a proxy: sign-in identifies
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := cfg.Auth
+	if !a.SignIn() || len(a.SessionKey.Reveal()) != 32 || len(a.Tokens[0].Secret.Reveal()) != 40 || a.OIDC.GroupsClaim != "groups" {
+		t.Errorf("auth = %+v", a)
 	}
 }

@@ -270,7 +270,7 @@ func TestPrivateViewer(t *testing.T) {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, r)
 		cc := "public, max-age=300"
-		if tc.want {
+		if tc.user != "" && strings.HasPrefix(tc.peer, "10.") { // an identified viewer: no shared cache, private or not
 			cc = "private, max-age=300"
 		}
 		if seen != tc.want || rec.Header().Get("Cache-Control") != cc || !strings.Contains(rec.Header().Get("Vary"), "X-Forwarded-Groups") {
@@ -303,12 +303,101 @@ func TestPrivateViewer(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.RemoteAddr = "10.0.0.1:1"
 	r.Header.Set("X-Forwarded-User", "bob")
-	if !o.private(r) {
-		t.Error("* does not admit an authenticated user")
+	if v, _ := o.viewer(httptest.NewRecorder(), r); !v.Private || v.Admin || v.Via != "proxy" {
+		t.Errorf("* does not admit an authenticated user: %+v", v)
 	}
 	sw := &statusWriter{ResponseWriter: httptest.NewRecorder(), private: true}
 	sw.WriteHeader(http.StatusOK)
 	if got := sw.Header().Get("Cache-Control"); got != "private, no-cache" {
 		t.Errorf("no Cache-Control: %q", got)
+	}
+}
+
+type fakeAuth struct {
+	id  Identity
+	ok  bool
+	err error
+}
+
+func (f fakeAuth) Identify(http.ResponseWriter, *http.Request) (Identity, bool, error) {
+	return f.id, f.ok, f.err
+}
+
+func TestViewerSources(t *testing.T) {
+	o := testOptions()
+	o.WebToken = "t0ken"
+	o.Access = Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{"staff"},
+		AdminEmails: []string{"Ada@Example.org"}, AdminGroups: []string{"ops"}}
+	view := func(auth Authenticator, header ...string) (Viewer, *httptest.ResponseRecorder) {
+		o.Auth = auth
+		var v Viewer
+		h := o.wrap("public", http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { v = ViewerOf(r.Context()) }))
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.RemoteAddr = "10.0.0.1:1"
+		for i := 0; i+1 < len(header); i += 2 {
+			r.Header.Set(header[i], header[i+1])
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return v, rec
+	}
+	signedIn := fakeAuth{id: Identity{User: "u-1", Name: "Ada", Email: "ada@example.org", Via: "oidc"}, ok: true}
+	// The web UI server's word comes first, then the authenticator, then the proxy.
+	if v, _ := view(signedIn, headerToken, "t0ken", headerViewer, "admin", headerName, "Ada%20L", headerVia, "oidc"); !v.Admin || !v.Private ||
+		v.Name != "Ada L" || v.Via != "oidc" {
+		t.Errorf("web UI server: %+v", v)
+	}
+	if v, _ := view(signedIn, "X-Forwarded-User", "bob", "X-Forwarded-Groups", "staff"); v.User != "u-1" || !v.Admin || !v.Private {
+		t.Errorf("session before proxy: %+v", v)
+	}
+	if v, rec := view(fakeAuth{}, "X-Forwarded-User", "bob", "X-Forwarded-Groups", "ops"); v.Via != "proxy" || !v.Admin ||
+		!strings.Contains(strings.Join(rec.Header().Values("Vary"), ","), "Cookie, Authorization") {
+		t.Errorf("proxy with an admin group: %+v %v", v, rec.Header())
+	}
+	if v, _ := view(fakeAuth{id: Identity{User: "u-2", Groups: []string{"staff"}, Via: "oidc"}, ok: true}); v.Admin || !v.Private {
+		t.Errorf("a member of a private group: %+v", v)
+	}
+	if v, _ := view(fakeAuth{id: Identity{User: "token:ci", Admin: true, Via: "token"}, ok: true}); !v.Admin || !v.Private {
+		t.Errorf("an admin token: %+v", v)
+	}
+	if v, _ := view(fakeAuth{id: Identity{User: "u-3", Via: "oidc"}, ok: true}); v.Private || v.Admin || !v.SignedIn() {
+		t.Errorf("a signed-in viewer without lists: %+v", v)
+	}
+	if _, rec := view(fakeAuth{err: ErrUnauthenticated}); rec.Code != http.StatusUnauthorized ||
+		rec.Header().Get("WWW-Authenticate") == "" || !strings.Contains(rec.Body.String(), "unauthenticated") {
+		t.Errorf("a wrong bearer: %d %v", rec.Code, rec.Header())
+	}
+}
+
+func TestSameOriginAndAdminOnly(t *testing.T) {
+	for _, tc := range []struct {
+		cookie, site, origin string
+		want                 bool
+	}{
+		{"", "", "", true}, // a bearer client
+		{"s=1", "same-origin", "", true},
+		{"s=1", "same-site", "", false},
+		{"s=1", "", "https://scp.example", true},
+		{"s=1", "", "https://evil.example", false},
+		{"s=1", "", "", false},
+	} {
+		r := httptest.NewRequest(http.MethodPost, "/auth/logout", nil)
+		for k, v := range map[string]string{"Cookie": tc.cookie, "Sec-Fetch-Site": tc.site, "Origin": tc.origin} {
+			if v != "" {
+				r.Header.Set(k, v)
+			}
+		}
+		if got := SameOrigin(r, "https://scp.example/portal"); got != tc.want {
+			t.Errorf("%+v: %v", tc, got)
+		}
+	}
+	h := AdminOnly(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }))
+	for v, want := range map[*Viewer]int{{}: 401, {Identity: Identity{Via: "oidc"}, Private: true}: 403,
+		{Identity: Identity{Via: "token"}, Admin: true}: http.StatusTeapot} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil).WithContext(WithViewer(t.Context(), *v)))
+		if rec.Code != want {
+			t.Errorf("%+v: %d, want %d", *v, rec.Code, want)
+		}
 	}
 }

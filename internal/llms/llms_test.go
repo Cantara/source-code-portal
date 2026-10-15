@@ -192,6 +192,8 @@ func TestKCP(t *testing.T) {
 	techFacet.Set(s.Repos["acme/evil"], Technology{Uses: []snapshot.RepoKey{"acme/core", "acme/none"}}, snapshot.Freshness{})
 	s.Repos["acme/evil"].Repo.Description = "x\"\n  - id: forged\n    path: /etc/passwd"
 	s.Repos["acme/evil"].Repo.Topics = []string{"Beta", "alpha"}
+	docs, fresh := docsFacet.Get(s.Repos["acme/core"])
+	docsFacet.Set(s.Repos["acme/core"], append(docs, Doc{Path: "docs/Getting Started.markdown", Source: []byte("# Start\n")}), fresh)
 	h := New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", options())
 	mux := handler(h)
 
@@ -200,7 +202,7 @@ func TestKCP(t *testing.T) {
 		t.Fatalf("knowledge.yaml: %d %v", rec.Code, rec.Header())
 	}
 	golden(t, "knowledge.yaml", rec.Body.String())
-	if got := rec.Body.String(); strings.Count(got, "\n  - id: ") != 5 || strings.Contains(got, "\n  - id: forged") ||
+	if got := rec.Body.String(); strings.Count(got, "\n  - id: ") != 6 || strings.Contains(got, "\n  - id: forged") ||
 		!strings.Contains(got, "depends_on: [repo-acme-core]\n") {
 		t.Errorf("units or dependencies wrong:\n%s", got)
 	}

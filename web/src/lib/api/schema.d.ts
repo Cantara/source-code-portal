@@ -30,9 +30,10 @@ export interface paths {
     }
     /**
      * Default-branch commits merged across repositories, newest first, one page at a time
-     * @description Order is committedAt descending, then repository address, then SHA. `group` and `repo` intersect. Pass `page.nextCursor`
-     *     as `cursor` for the next page; a cursor is bound to its filter and stays valid when new commits arrive. The freshness covers
-     *     every repository in scope: fresh when all are fresh, stale otherwise, with the oldest times.
+     * @description Order is committedAt descending, then repository address, then SHA. `group` and `repo` intersect. Pages are numbered from 1
+     *     over the current snapshot, `limit` commits each; a page past the last is empty, and `page` says how many there are. New
+     *     commits move the older ones to later pages. The freshness covers every repository in scope: fresh when all are fresh, stale
+     *     otherwise, with the oldest times.
      */
     get: operations["listCommits"]
     put?: never
@@ -173,8 +174,10 @@ export interface paths {
      * The repository's stored history in graph order, one page at a time
      * @description The default branch (its latest 500 commits) and the commits of up to 10 other branches, newest first by commit time with a
      *     parent never before its child. `ref` keeps the commits reachable from a branch or tag; `author`, `q` and `automation=false`
-     *     filter further and mark the page `filtered`, which draws no graph. Pass `page.nextCursor` as `cursor` for the next page; a
-     *     cursor is bound to its filter and stays valid when new commits arrive.
+     *     filter further and mark the page `filtered`, which draws no graph. Pages are numbered from 1, `limit` commits each; `at`
+     *     (a SHA or its prefix) answers the page holding that commit instead of `page`, and names it in `at`. Each commit of an
+     *     unfiltered page carries its row of the git graph, laid out over the whole history (or what `ref` reaches), so every page
+     *     draws on from the one before.
      */
     get: operations["getHistory"]
     put?: never
@@ -196,6 +199,67 @@ export interface paths {
     get: operations["getSnapshot"]
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/me": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The viewer, its roles and how one signs in
+     * @description Who the request comes from, as the trusted proxy, the session or a bearer token names it, and what that admits: private
+     *     repositories, the admin surfaces. `signIn` says which ways of signing in the portal offers. Never cached by a shared cache.
+     */
+    get: operations["getMe"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/assistant": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Whether the assistant is on and the viewer may ask it */
+    get: operations["getAssistant"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/assistant/chat": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Ask the assistant; the answer streams as server-sent events
+     * @description The conversation so far, oldest first, ending with the viewer's question. The answer is a `text/event-stream` of `text`
+     *     (`{"text"}`, a piece of the answer), `tool` (`{"name", "label"}`, a lookup it makes), then `done` (`{"usage": {"input",
+     *     "output"}}`) or `error` (`{"code", "message"}`), with a comment line every 15 s. The assistant only reads the catalogue, as the
+     *     viewer sees it. A cookie-carrying request must come from the portal's own pages. Served outside the generated handlers.
+     */
+    post: operations["chatAssistant"]
     delete?: never
     options?: never
     head?: never
@@ -326,12 +390,18 @@ export interface components {
     }
     RepoDetail: {
       repo: components["schemas"]["Repo"]
+      /** @description The first of its groups in configuration order, the page above it; null when it is in none */
+      group: components["schemas"]["GroupRef"] | null
       /** @description The descriptor title */
       title: string
       descriptor: components["schemas"]["Descriptor"]
       /** @description The latest default-branch commits */
       commits: components["schemas"]["Commit"][]
       commitsFreshness: components["schemas"]["Freshness"]
+    }
+    GroupRef: {
+      id: string
+      name: string
     }
     /** @description The repository's own scp.yaml. It changes display only. */
     Descriptor: {
@@ -392,6 +462,28 @@ export interface components {
       automated: boolean
       /** @description The branches and tags at this commit, the default branch first */
       labels: components["schemas"]["Label"][]
+      /** @description The parents older than the stored history */
+      beyond: string[]
+      /** @description The commit's row of the git graph; null on a filtered page */
+      graph: components["schemas"]["GraphRow"] | null
+    }
+    /** @description A line through a row, from a lane at its top (or its node) to a lane at its bottom (or its node) */
+    GraphEdge: {
+      from: number
+      to: number
+      /** @description The lane's colour, 0 to 5 */
+      color: number
+      /** @description The line leads to a parent older than the stored history */
+      open: boolean
+    }
+    /** @description How a commit's row of the git graph draws, like git log --graph: its node, the lines in from above and out below. Lanes never shift; draw at most 8, a lane beyond them in the last */
+    GraphRow: {
+      lane: number
+      /** @description 0 to 5 */
+      color: number
+      merge: boolean
+      above: components["schemas"]["GraphEdge"][]
+      below: components["schemas"]["GraphEdge"][]
     }
     HistoryPage: {
       commits: components["schemas"]["HistoryCommit"][]
@@ -399,8 +491,10 @@ export interface components {
       labels: components["schemas"]["Label"][]
       /** @description author, q or automation left commits out: the page is a list, not a graph */
       filtered: boolean
-      /** @description Commits matching the filter in the stored history */
-      total: number
+      /** @description The graph's width over this page's rows, at most 8; 0 on a filtered page */
+      lanes: number
+      /** @description The commit `at` named, when it is on this page */
+      at: string | null
       page: components["schemas"]["Page"]
       freshness: components["schemas"]["Freshness"]
     }
@@ -410,8 +504,14 @@ export interface components {
       freshness: components["schemas"]["Freshness"]
     }
     Page: {
-      nextCursor: string | null
-      limit: number
+      /** @description This page */
+      number: number
+      /** @description Items per page (the limit) */
+      size: number
+      /** @description Items matching the filter */
+      total: number
+      /** @description Pages in all, at least 1 */
+      pages: number
     }
     /** @description Repositories by the freshness of their commits */
     FreshnessCounts: {
@@ -578,6 +678,48 @@ export interface components {
       repos: number
       freshness: components["schemas"]["Freshness"]
     }
+    AssistantStatus: {
+      /** @description The operator configured a provider */
+      enabled: boolean
+      /** @description This viewer may ask */
+      allowed: boolean
+      /**
+       * @description Who may ask
+       * @enum {string}
+       */
+      access: "signed-in" | "admin" | "everyone"
+      /** @description The provider; empty when off */
+      provider: string
+      /** @description The model; empty when off */
+      model: string
+    }
+    AssistantChat: {
+      messages: {
+        /** @enum {string} */
+        role: "user" | "assistant"
+        content: string
+      }[]
+    }
+    Me: {
+      signedIn: boolean
+      /** @description The viewer's name; empty when anonymous */
+      name: string
+      /**
+       * @description How the viewer is identified; none when anonymous
+       * @enum {string}
+       */
+      via: "none" | "proxy" | "oidc" | "token"
+      /** @description Sees private and internal repositories */
+      private: boolean
+      /** @description Sees the operator surfaces */
+      admin: boolean
+      signIn: {
+        /** @description GET /auth/login signs in at the provider */
+        oidc: boolean
+        /** @description POST /auth/token exchanges a token for a session */
+        token: boolean
+      }
+    }
     SnapshotInfo: {
       /**
        * Format: int64
@@ -634,8 +776,20 @@ export interface components {
         "application/problem+json": components["schemas"]["Problem"]
       }
     }
+    /** @description A problem (its code says which) */
+    Problem: {
+      headers: {
+        [name: string]: unknown
+      }
+      content: {
+        "application/problem+json": components["schemas"]["Problem"]
+      }
+    }
   }
-  parameters: never
+  parameters: {
+    /** @description The page, from 1 */
+    PageNumber: number
+  }
   requestBodies: never
   headers: {
     /** @description Weak validator of the response body */
@@ -675,8 +829,9 @@ export interface operations {
         repo?: string
         /** @description false leaves out commits made by automation */
         automation?: boolean
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
         limit?: number
-        cursor?: string
       }
       header?: never
       path?: never
@@ -892,8 +1047,11 @@ export interface operations {
         q?: string
         /** @description false leaves out commits made by automation */
         automation?: boolean
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
         limit?: number
-        cursor?: string
+        /** @description A SHA or a prefix of at least 4 hex digits: the page holding it */
+        at?: string
       }
       header?: never
       path: {
@@ -940,6 +1098,75 @@ export interface operations {
         }
       }
       304: components["responses"]["NotModified"]
+    }
+  }
+  getMe: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The viewer */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Me"]
+        }
+      }
+    }
+  }
+  getAssistant: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The assistant's state for this viewer */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["AssistantStatus"]
+        }
+      }
+    }
+  }
+  chatAssistant: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssistantChat"]
+      }
+    }
+    responses: {
+      /** @description The answer as an event stream */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "text/event-stream": string
+        }
+      }
+      400: components["responses"]["Problem"]
+      401: components["responses"]["Problem"]
+      403: components["responses"]["Problem"]
+      415: components["responses"]["Problem"]
+      429: components["responses"]["Problem"]
     }
   }
   streamEvents: {

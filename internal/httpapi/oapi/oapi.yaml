@@ -6,4 +6,4 @@ generate:
   strict-server: true
 output-options:
   skip-prune: false
-  exclude-operation-ids: [streamEvents]
+  exclude-operation-ids: [streamEvents, chatAssistant]

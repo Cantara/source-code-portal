@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/cobra"
 
 	contract "github.com/cantara/source-code-portal/api"
+	"github.com/cantara/source-code-portal/internal/assistant"
+	"github.com/cantara/source-code-portal/internal/auth"
 	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/cluster"
@@ -80,6 +82,8 @@ type (
 		docsAPI
 		manifestsAPI
 		httpapi.SnapshotAPI
+		httpapi.MeAPI
+		*assistant.Assistant
 	}
 )
 
@@ -187,7 +191,13 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		st.cluster = s.member
 	}
 
-	md := llms.New(view, cfg.Server.PublicURL, llmsOptions())
+	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
+	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
+		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
+		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
+			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
+		Observe: m.request}
+	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin))
 	external := d.images
 	if external == nil {
 		external = docs.Guarded()
@@ -197,10 +207,13 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /knowledge.yaml", Handler: md.KCP()}, {Pattern: "GET /.well-known/kcp.json", Handler: md.WellKnown()},
+		{Pattern: "GET /sitemap.xml", Handler: md.Sitemap()}, {Pattern: "GET /sitemaps/{file}", Handler: md.Sitemap()},
+		{Pattern: "GET /robots.txt", Handler: md.Robots()},
 		{Pattern: "GET /repos/{owner}/{name}/readme.md", Handler: md.Readme()},
 		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
+	routes = append(routes, catalog.Legacy(view)...)
 	if cfg.Webhook.Secret.IsSet() {
 		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.deliver, cfg.GitHub.Sources), log)
 		if s.member != nil {
@@ -209,19 +222,40 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
-	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
-	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
-		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
-		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
-			Vary: private},
-		Observe: m.request}
+	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
+	me := httpapi.MeAPI{}
+	if cfg.Auth.SignIn() || len(cfg.Auth.Tokens) > 0 {
+		a, err := newAuth(cfg, log)
+		if err != nil {
+			return nil, err
+		}
+		opts.Auth, me.SignIn = a, a.Methods
+		if u, err := url.Parse(cfg.Auth.OIDC.Issuer); err == nil && u.Host != "" { // sign-out ends at the provider's end session
+			opts.FormTargets = []string{u.Scheme + "://" + u.Host}
+		}
+		routes = append(routes, a.Routes()...)
+	}
 	catalogAPI := catalog.API{Current: view,
 		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
 		Repo:      []func(*snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, repoHealthAPI},
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
-	features := api{catalogAPI, commits.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
-		httpapi.SnapshotAPI{Current: view}}
+	commitsAPI := commits.API{Current: view}
+	groupNames := func(ctx context.Context) []string {
+		var names []string
+		for _, g := range view(ctx).Groups {
+			names = append(names, g.Name+" (id "+g.ID+")")
+		}
+		return names
+	}
+	ask, err := newAssistant(cfg, assistantReads{catalog: catalogAPI, commits: commitsAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group()},
+		groupNames, m.assistant, log)
+	if err != nil {
+		return nil, err
+	}
+	routes = append(routes, ask.Routes()...)
+	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view},
+		httpapi.SnapshotAPI{Current: view}, me, ask}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}
@@ -247,15 +281,38 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	return s, nil
 }
 
+// newAuth builds sign-in from the config. A session keeps only the provider's groups the access lists name, so it fits a cookie;
+// a group added to a list applies at the next sign-in, one removed at once.
+func newAuth(cfg config.Config, log *slog.Logger) (*auth.Auth, error) {
+	a := cfg.Auth
+	named := slices.Concat(cfg.Access.PrivateGroups, a.AdminGroups)
+	o := auth.Options{SessionTTL: a.SessionTTL, PublicURL: cfg.Server.PublicURL, Log: log,
+		Keep: func(groups []string) []string {
+			return slices.DeleteFunc(slices.Clone(groups), func(g string) bool { return !slices.Contains(named, g) })
+		}}
+	if a.SignIn() {
+		o.SessionKey = a.SessionKey.Reveal()
+	}
+	for _, t := range a.Tokens {
+		o.Tokens = append(o.Tokens, auth.Token{Name: t.Name, Secret: t.Secret.Reveal(), Groups: t.Groups, Admin: t.Admin})
+	}
+	if a.OIDC.Issuer != "" {
+		o.OIDC = &auth.OIDC{Issuer: a.OIDC.Issuer, ClientID: a.OIDC.ClientID, ClientSecret: string(a.OIDC.ClientSecret.Reveal()),
+			Scopes: a.OIDC.Scopes, GroupsClaim: a.OIDC.GroupsClaim}
+	}
+	return auth.New(o)
+}
+
 // llmsOptions is what the Markdown surface shows of the other features: documents, the descriptor, the manifests' summary and the
 // commits' freshness.
-func llmsOptions() llms.Options {
+func llmsOptions(origin func(*http.Request) string) llms.Options {
 	return llms.Options{
 		Docs: func(e *snapshot.RepoEntry) ([]llms.Doc, snapshot.Freshness) {
 			ds, fresh := docs.Of(e)
 			out := make([]llms.Doc, 0, len(ds))
 			for _, d := range ds {
-				out = append(out, llms.Doc{Path: d.Path, BlobSHA: d.BlobSHA, README: d.README, Truncated: d.Truncated, Source: d.Source})
+				out = append(out, llms.Doc{Path: d.Path, BlobSHA: d.BlobSHA, README: d.README, Truncated: d.Truncated, Hidden: d.Hidden,
+					Source: d.Source})
 			}
 			return out, fresh
 		},
@@ -273,7 +330,9 @@ func llmsOptions() llms.Options {
 			}
 			return t
 		},
-		Freshness: func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
+		Freshness:  func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
+		LastCommit: func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
+		Origin:     origin,
 	}
 }
 

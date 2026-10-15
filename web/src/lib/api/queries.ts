@@ -16,9 +16,20 @@ export const keys = {
   manifests: (owner: string, name: string) => ["manifests", lc(owner), lc(name)] as const,
   groups: () => ["groups"] as const,
   group: (group: string) => ["group", group] as const,
-  commitLog: (group = "", repo = "") => ["commits", "log", group, repo] as const,
+  commitLog: (group = "", repo = "", automation = true, size = 50, page = 1) =>
+    ["commits", "log", group, repo, automation, size, page] as const,
+  history: (owner: string, name: string, filter: Record<string, string | number | boolean | undefined>) =>
+    ["commits", "history", lc(owner), lc(name), filter] as const,
   latestCommits: (group: string) => ["commits", "latest", group] as const,
+  me: () => ["me"] as const,
+  assistant: () => ["assistant"] as const,
 }
+
+export const meQuery = (api: Api) =>
+  queryOptions({ queryKey: keys.me(), queryFn: ({ signal }) => unwrap(api.GET("/me", { signal })) })
+
+export const assistantQuery = (api: Api) =>
+  queryOptions({ queryKey: keys.assistant(), queryFn: ({ signal }) => unwrap(api.GET("/assistant", { signal })) })
 
 export const reposQuery = (api: Api) =>
   queryOptions({ queryKey: keys.repos(), queryFn: ({ signal }) => unwrap(api.GET("/repos", { signal })) })

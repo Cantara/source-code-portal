@@ -17,6 +17,27 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AssistantStatusAccess.
+const (
+	Admin    AssistantStatusAccess = "admin"
+	Everyone AssistantStatusAccess = "everyone"
+	SignedIn AssistantStatusAccess = "signed-in"
+)
+
+// Valid indicates whether the value is a known member of the AssistantStatusAccess enum.
+func (e AssistantStatusAccess) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case Everyone:
+		return true
+	case SignedIn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DependencyScope.
 const (
 	Dev      DependencyScope = "dev"
@@ -311,6 +332,30 @@ func (e ManifestEcosystem) Valid() bool {
 	}
 }
 
+// Defines values for MeVia.
+const (
+	None  MeVia = "none"
+	Oidc  MeVia = "oidc"
+	Proxy MeVia = "proxy"
+	Token MeVia = "token"
+)
+
+// Valid indicates whether the value is a known member of the MeVia enum.
+func (e MeVia) Valid() bool {
+	switch e {
+	case None:
+		return true
+	case Oidc:
+		return true
+	case Proxy:
+		return true
+	case Token:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RepoFindingCode.
 const (
 	RepoFindingCodeDormant    RepoFindingCode = "dormant"
@@ -382,6 +427,27 @@ func (e ToolchainVersionsName) Valid() bool {
 		return false
 	}
 }
+
+// AssistantStatus defines model for AssistantStatus.
+type AssistantStatus struct {
+	// Access Who may ask
+	Access AssistantStatusAccess `json:"access"`
+
+	// Allowed This viewer may ask
+	Allowed bool `json:"allowed"`
+
+	// Enabled The operator configured a provider
+	Enabled bool `json:"enabled"`
+
+	// Model The model; empty when off
+	Model string `json:"model"`
+
+	// Provider The provider; empty when off
+	Provider string `json:"provider"`
+}
+
+// AssistantStatusAccess Who may ask
+type AssistantStatusAccess string
 
 // Commit defines model for Commit.
 type Commit struct {
@@ -577,6 +643,28 @@ type FreshnessCounts struct {
 	Unknown int `json:"unknown"`
 }
 
+// GraphEdge A line through a row, from a lane at its top (or its node) to a lane at its bottom (or its node)
+type GraphEdge struct {
+	// Color The lane's colour, 0 to 5
+	Color int `json:"color"`
+	From  int `json:"from"`
+
+	// Open The line leads to a parent older than the stored history
+	Open bool `json:"open"`
+	To   int  `json:"to"`
+}
+
+// GraphRow How a commit's row of the git graph draws, like git log --graph: its node, the lines in from above and out below. Lanes never shift; draw at most 8, a lane beyond them in the last
+type GraphRow struct {
+	Above []GraphEdge `json:"above"`
+	Below []GraphEdge `json:"below"`
+
+	// Color 0 to 5
+	Color int  `json:"color"`
+	Lane  int  `json:"lane"`
+	Merge bool `json:"merge"`
+}
+
 // Group defines model for Group.
 type Group struct {
 	DefaultRepo      *string               `json:"defaultRepo"`
@@ -597,6 +685,12 @@ type GroupDefaultRepoState string
 // GroupList defines model for GroupList.
 type GroupList struct {
 	Groups []GroupSummary `json:"groups"`
+}
+
+// GroupRef defines model for GroupRef.
+type GroupRef struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // GroupSummary defines model for GroupSummary.
@@ -641,10 +735,16 @@ type HistoryCommit struct {
 	// Automated Made by automation: a [bot] author or a release plugin
 	Automated bool `json:"automated"`
 
+	// Beyond The parents older than the stored history
+	Beyond []string `json:"beyond"`
+
 	// Body The message after its subject line; empty when there is none
 	Body          string    `json:"body"`
 	CommittedAt   time.Time `json:"committedAt"`
 	CommitterName string    `json:"committerName"`
+
+	// Graph The commit's row of the git graph; null on a filtered page
+	Graph *GraphRow `json:"graph"`
 
 	// Labels The branches and tags at this commit, the default branch first
 	Labels []Label `json:"labels"`
@@ -665,6 +765,8 @@ type HistoryCommit struct {
 
 // HistoryPage defines model for HistoryPage.
 type HistoryPage struct {
+	// At The commit `at` named, when it is on this page
+	At      *string         `json:"at"`
 	Commits []HistoryCommit `json:"commits"`
 
 	// Filtered author, q or automation left commits out: the page is a list, not a graph
@@ -673,10 +775,10 @@ type HistoryPage struct {
 
 	// Labels Every branch and tag of the history
 	Labels []Label `json:"labels"`
-	Page   Page    `json:"page"`
 
-	// Total Commits matching the filter in the stored history
-	Total int `json:"total"`
+	// Lanes The graph's width over this page's rows, at most 8; 0 on a filtered page
+	Lanes int  `json:"lanes"`
+	Page  Page `json:"page"`
 }
 
 // Label defines model for Label.
@@ -732,10 +834,45 @@ type Manifests struct {
 	Uses []RepoLink `json:"uses"`
 }
 
+// Me defines model for Me.
+type Me struct {
+	// Admin Sees the operator surfaces
+	Admin bool `json:"admin"`
+
+	// Name The viewer's name; empty when anonymous
+	Name string `json:"name"`
+
+	// Private Sees private and internal repositories
+	Private bool `json:"private"`
+	SignIn  struct {
+		// Oidc GET /auth/login signs in at the provider
+		Oidc bool `json:"oidc"`
+
+		// Token POST /auth/token exchanges a token for a session
+		Token bool `json:"token"`
+	} `json:"signIn"`
+	SignedIn bool `json:"signedIn"`
+
+	// Via How the viewer is identified; none when anonymous
+	Via MeVia `json:"via"`
+}
+
+// MeVia How the viewer is identified; none when anonymous
+type MeVia string
+
 // Page defines model for Page.
 type Page struct {
-	Limit      int     `json:"limit"`
-	NextCursor *string `json:"nextCursor"`
+	// Number This page
+	Number int `json:"number"`
+
+	// Pages Pages in all, at least 1
+	Pages int `json:"pages"`
+
+	// Size Items per page (the limit)
+	Size int `json:"size"`
+
+	// Total Items matching the filter
+	Total int `json:"total"`
 }
 
 // Problem defines model for Problem.
@@ -830,7 +967,10 @@ type RepoDetail struct {
 
 	// Descriptor The repository's own scp.yaml. It changes display only.
 	Descriptor Descriptor `json:"descriptor"`
-	Repo       Repo       `json:"repo"`
+
+	// Group The first of its groups in configuration order, the page above it; null when it is in none
+	Group *GroupRef `json:"group"`
+	Repo  Repo      `json:"repo"`
 
 	// Title The descriptor title
 	Title string `json:"title"`
@@ -912,6 +1052,9 @@ type ToolchainVersions struct {
 // ToolchainVersionsName defines model for ToolchainVersions.Name.
 type ToolchainVersionsName string
 
+// PageNumber defines model for PageNumber.
+type PageNumber = int
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Problem
 
@@ -926,9 +1069,11 @@ type ListCommitsParams struct {
 	Repo *string `form:"repo,omitempty" json:"repo,omitempty"`
 
 	// Automation false leaves out commits made by automation
-	Automation *bool   `form:"automation,omitempty" json:"automation,omitempty"`
-	Limit      *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor     *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Automation *bool `form:"automation,omitempty" json:"automation,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListReposParams defines parameters for ListRepos.
@@ -948,13 +1093,21 @@ type GetHistoryParams struct {
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 
 	// Automation false leaves out commits made by automation
-	Automation *bool   `form:"automation,omitempty" json:"automation,omitempty"`
-	Limit      *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor     *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Automation *bool `form:"automation,omitempty" json:"automation,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// At A SHA or a prefix of at least 4 hex digits: the page holding it
+	At *string `form:"at,omitempty" json:"at,omitempty"`
 }
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetAssistant Whether the assistant is on and the viewer may ask it
+	// (GET /assistant)
+	GetAssistant(w http.ResponseWriter, r *http.Request)
 	// ListCommits Default-branch commits merged across repositories, newest first, one page at a time
 	// (GET /commits)
 	ListCommits(w http.ResponseWriter, r *http.Request, params ListCommitsParams)
@@ -967,6 +1120,9 @@ type ServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(w http.ResponseWriter, r *http.Request, group string)
+	// GetMe The viewer, its roles and how one signs in
+	// (GET /me)
+	GetMe(w http.ResponseWriter, r *http.Request)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(w http.ResponseWriter, r *http.Request, params ListReposParams)
@@ -998,6 +1154,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetAssistant operation middleware
+func (siw *ServerInterfaceWrapper) GetAssistant(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAssistant(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListCommits operation middleware
 func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Request) {
@@ -1047,6 +1217,19 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "limit" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
@@ -1056,19 +1239,6 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "cursor" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
 		}
 		return
 	}
@@ -1129,6 +1299,20 @@ func (siw *ServerInterfaceWrapper) GetGroup(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGroup(w, r, group)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1364,6 +1548,19 @@ func (siw *ServerInterfaceWrapper) GetHistory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "limit" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
@@ -1377,15 +1574,15 @@ func (siw *ServerInterfaceWrapper) GetHistory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// ------------- Optional query parameter "cursor" -------------
+	// ------------- Optional query parameter "at" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
 		}
 		return
 	}
@@ -1581,6 +1778,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/manifests", wrapper.GetManifests)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/history", wrapper.GetHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assistant", wrapper.GetAssistant)
 
 	return m
 }
@@ -1597,6 +1796,27 @@ type MovedResponse struct {
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
 type NotModifiedResponse struct {
+}
+
+type GetAssistantRequestObject struct {
+}
+
+type GetAssistantResponseObject interface {
+	VisitGetAssistantResponse(w http.ResponseWriter) error
+}
+
+type GetAssistant200JSONResponse AssistantStatus
+
+func (response GetAssistant200JSONResponse) VisitGetAssistantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListCommitsRequestObject struct {
@@ -1797,6 +2017,27 @@ func (response GetGroup404ApplicationProblemPlusJSONResponse) VisitGetGroupRespo
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse Me
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2234,6 +2475,9 @@ func (response GetSnapshot304Response) VisitGetSnapshotResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetAssistant Whether the assistant is on and the viewer may ask it
+	// (GET /assistant)
+	GetAssistant(ctx context.Context, request GetAssistantRequestObject) (GetAssistantResponseObject, error)
 	// ListCommits Default-branch commits merged across repositories, newest first, one page at a time
 	// (GET /commits)
 	ListCommits(ctx context.Context, request ListCommitsRequestObject) (ListCommitsResponseObject, error)
@@ -2246,6 +2490,9 @@ type StrictServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(ctx context.Context, request GetGroupRequestObject) (GetGroupResponseObject, error)
+	// GetMe The viewer, its roles and how one signs in
+	// (GET /me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(ctx context.Context, request ListReposRequestObject) (ListReposResponseObject, error)
@@ -2306,6 +2553,30 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetAssistant operation middleware
+func (sh *strictHandler) GetAssistant(w http.ResponseWriter, r *http.Request) {
+	var request GetAssistantRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAssistant(ctx, request.(GetAssistantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAssistant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAssistantResponseObject); ok {
+		if err := validResponse.VisitGetAssistantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListCommits operation middleware
@@ -2401,6 +2672,30 @@ func (sh *strictHandler) GetGroup(w http.ResponseWriter, r *http.Request, group 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetGroupResponseObject); ok {
 		if err := validResponse.VisitGetGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

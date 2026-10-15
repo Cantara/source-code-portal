@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://scp.example/</loc><lastmod>2026-10-12T06:30:00Z</lastmod></url>
+<url><loc>https://scp.example/commits</loc><lastmod>2026-10-12T06:30:00Z</lastmod></url>
+<url><loc>https://scp.example/groups/iam</loc><lastmod>2026-10-12T06:30:00Z</lastmod></url>
+<url><loc>https://scp.example/repos/acme/core</loc><lastmod>2026-10-12T06:30:00Z</lastmod></url>
+<url><loc>https://scp.example/repos/acme/core/docs/docs/setup</loc><lastmod>2026-10-12T06:30:00Z</lastmod></url>
+<url><loc>https://scp.example/repos/acme/core/docs/docs/a%20b</loc><lastmod>2026-10-12T06:30:00Z</lastmod></url>
+<url><loc>https://scp.example/repos/acme/evil</loc></url>
+</urlset>

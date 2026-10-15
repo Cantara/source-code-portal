@@ -111,9 +111,9 @@ each with its freshness (sync-snapshot-store.md). The merged feeds are `Latest` 
 5. Storage: the commits are the item's payload, replaced on each successful run; a removed repository's item cascades.
 6. Aggregation at snapshot build: `Latest` merges every repository's commits, and each group has its own merged feed; a repository in
    several groups appears in each group feed.
-7. API `GET /api/v1/commits?group=&repo=&limit=&cursor=` (`repo` is `owner/name`): `limit` 1..200 (default 50); pages are slices of the
-   feed in order `(committedAt desc, repo asc, sha desc)`; the cursor is an opaque position bound to the filter (survives new commits at
-   the top); `repo` and `group` intersect.
+7. API `GET /api/v1/commits?group=&repo=&automation=&page=&limit=` (`repo` is `owner/name`): `limit` 1..200 (default 50), `page`
+   1..100000; numbered pages are slices of the feed in order `(committedAt desc, repo asc, sha desc)` with `{number, size, total, pages}`;
+   `repo` and `group` intersect.
 8. Freshness of a page: the repository's own when `repo` is set; else `fresh` only when the commits of every repository in scope are
    fresh, `unknown` for an empty scope, otherwise `stale`.
 9. Day grouping happens in the web UI in the viewer's time zone; the server returns UTC.
@@ -149,6 +149,6 @@ No keys: the limits (50 documents, 1 MiB per file, 512 KiB rendered, 30 commits,
 - `internal/safehtml`: `TestSanitize` (scripts, event handlers, schemes, ids, classes), `FuzzSanitizeFixpoint`
   (`Sanitize(Sanitize(x)) == Sanitize(x)`).
 - `internal/commits`: `TestNormalise` (bad SHA, no date, future date, bidi subject, long subject), `TestRunStates`, `TestPublish`,
-  `TestListCommitsPages` (filters, cursor bound to the filter, cursor across new commits).
+  `TestListCommitsPages` (filters, numbered pages, the page past the last, bounds), `TestListCommitsAutomation`.
 - `internal/badges`: `TestRenderGolden` (`testdata/last-commit.golden.svg`), `TestRenderHostile`, `TestWidths`, `TestFormat`,
   `TestHandler` (status, cache and ETag per case), `TestReleaseJob`.

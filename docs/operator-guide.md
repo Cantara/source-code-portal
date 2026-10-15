@@ -96,6 +96,28 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `access.user_header` | `X-Forwarded-User` | header in which the authenticating proxy names the user |
 | `access.groups_header` | `X-Forwarded-Groups` | header with the user's groups, comma-separated |
 | `access.private_groups` | `[]` | groups whose members see private repositories; `"*"` is every authenticated user |
+| `auth.session_key_file` | empty | at least 32 random bytes that seal the sign-in cookies; the same file on every instance; needed for sign-in (section 2.2) |
+| `auth.session_ttl` | `12h` | how long a sign-in lasts, `5m` to `720h`; it is renewed while in use |
+| `auth.admin_emails` | `[]` | verified email addresses of the administrators (case-insensitive) |
+| `auth.admin_groups` | `[]` | groups whose members are administrators |
+| `auth.tokens[]` | `[]` | access tokens: `name` (`[a-z0-9-]`), `secret_file` (at least 32 characters), `groups`, `admin` |
+| `auth.oidc.issuer` | empty | the OpenID Connect provider (https; http only on loopback); empty: no single sign-on |
+| `auth.oidc.client_id` | empty | the portal's client at the provider |
+| `auth.oidc.client_secret_file` | empty | the client's secret; empty for a public client (PKCE only) |
+| `auth.oidc.scopes` | `[openid, email, profile]` | the scopes asked for; `openid` is required |
+| `auth.oidc.groups_claim` | `groups` | the claim, in the ID token or from userinfo, that lists the user's groups |
+| `llm.provider` | empty | the assistant's language model provider: `anthropic`, `openai`, `gemini`, `openrouter` or `ollama`; empty: no assistant (section 2.3) |
+| `llm.model` | the provider's | the model, for example `claude-haiku-5-5` (anthropic), `gpt-4o` (openai) |
+| `llm.base_url` | the provider's | the provider's API base (https; http only on loopback or without a key), for a proxy or a local Ollama |
+| `llm.api_key_file` | empty | the provider's API key; required except for `ollama` |
+| `assistant.access` | `signed-in` | who may ask: `signed-in`, `admin` or `everyone` |
+| `assistant.concurrency` | `4` | answers at once per instance; more are refused with 429 |
+| `assistant.max_turns` | `8` | model turns for one answer (1 to 32); the last turn must answer without tools |
+| `assistant.max_tool_calls` | `16` | tool calls for one answer (0 to 64) |
+| `assistant.max_tokens` | `16000` | tokens for one answer, input and output, before the last turn (256 to 200,000) |
+| `assistant.max_history` | `40` | messages of a conversation (1 to 200) |
+| `assistant.max_input_chars` | `60000` | characters of a conversation (1,000 to 1,000,000) |
+| `assistant.tool_result_chars` | `12000` | characters of one tool result given to the model (1,000 to 200,000) |
 | `webhook.secret_file` | empty | webhook secret; the receiver is served only when set |
 | `webhook.previous_secret_file` | empty | the old secret, accepted too while you rotate |
 | `cluster.addresses` | `[]` | Hazelcast members `host:port`; set to run as one of several instances (section 3.1) |
@@ -129,8 +151,9 @@ scp config groups -c scp.yaml --repos repos.json
 
 ### 2.1 Private repositories
 
-The portal can show private and internal repositories to people your authenticating proxy (oauth2-proxy, an OIDC ingress, an SSO
-gateway) lets through, and keep them from everyone else. The portal does not log anyone in; it believes the proxy.
+The portal can show private and internal repositories to some people and keep them from everyone else. It learns who someone is from
+its own sign-in (section 2.2) or from your authenticating proxy (oauth2-proxy, an OIDC ingress, an SSO gateway), which it believes.
+The steps below are for a proxy; with the portal's sign-in, step 2 needs no `server.trusted_proxies` and step 3 falls away.
 
 1. Give the credential access: a GitHub App installed on the repositories (its *Contents* and *Metadata* read permissions cover private
    ones), or a token that can read them.
@@ -152,7 +175,8 @@ github:
 A request whose user is in one of `access.private_groups` sees everything; any other request sees the public repositories only, on
 every page, in the API, badges, `/llms.txt` and the Markdown answers. The two headers are believed only from an address in
 `server.trusted_proxies` and dropped from any other. Answers to a permitted user are marked `Cache-Control: private`, and every answer
-varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and `server.trusted_proxies`.
+varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and a way to know the viewer: `server.trusted_proxies`,
+`auth.oidc` or `auth.tokens`.
 Images in private READMEs load from GitHub and show for users signed in there.
 
 **Public and private on one address.** Visitors without a session should reach the portal directly and see the public repositories,
@@ -161,6 +185,79 @@ higher-priority router sends ``Host(`scp.example.org`) && (PathPrefix(`/oauth2`)
 to oauth2-proxy, whose upstream is the portal. Let oauth2-proxy reach the portal over a network of its own and put only that network in
 `server.trusted_proxies`, so identity headers that arrive through Traefik are dropped. Sign in at `/oauth2/start?rd=/`, sign out at
 `/oauth2/sign_out?rd=/`.
+
+### 2.2 Sign-in and administrators
+
+The portal signs people in itself through your organisation's OpenID Connect provider (Entra ID, Google, Okta, Keycloak, Authentik,
+...) and lets scripts and people without the provider in with access tokens. Nothing about a user is stored: a sign-in is a cookie
+sealed with `auth.session_key_file`, so every instance with the same key file accepts it. Replacing the key signs everyone out.
+
+1. Make the key: `head -c 32 /dev/urandom | base64 > /run/secrets/scp-session-key` (keep it with the other secrets).
+2. Register the portal at the provider as a web application with the redirect URI `<server.public_url>/auth/callback` and the
+   sign-out redirect `<server.public_url>/`; have it put the user's groups in a claim (`groups` unless you set `auth.oidc.groups_claim`).
+3. Configure it:
+
+```yaml
+server:
+  public_url: https://scp.example.org
+access:
+  private_groups: [engineering]
+auth:
+  session_key_file: /run/secrets/scp-session-key
+  admin_emails: [ops@example.org]
+  oidc:
+    issuer: https://login.example.org
+    client_id: source-code-portal
+    client_secret_file: /run/secrets/scp-oidc-secret
+    scopes: [openid, email, profile, groups]
+  tokens:
+    - { name: ci, secret_file: /run/secrets/scp-token-ci, groups: [engineering] }
+```
+
+**Sign in** from the header's *Sign in*: `/signin` offers single sign-on and, when tokens are configured, a form that takes a token. A
+failed attempt comes back to `/signin` with what went wrong. *Sign out* ends the portal's session and the provider's.
+
+**Roles** follow from the configuration on every request, so a change applies at once: a member of `access.private_groups` sees private
+repositories; an administrator (a verified email in `auth.admin_emails`, a member of `auth.admin_groups`, or a token with `admin: true`)
+sees them too and the *Admin* page with the portal's status. A session keeps only the groups those lists name.
+
+**Tokens** are for API clients and agents: `Authorization: Bearer <token>` on any request reads as the token's groups (`curl -H
+"Authorization: Bearer $(cat token)" https://scp.example.org/llms-full.txt`); a wrong token is refused with 401, never served as
+anonymous. Remove a token from the configuration to revoke it, the sessions it opened included.
+
+Behind a proxy that names its users, both work: a page from the portal's web UI, then a token or a sign-in cookie, then the proxy's
+headers decide who the viewer is.
+
+### 2.3 The assistant
+
+The portal can answer questions about its catalogue in plain language on its *Ask* page (`/ask`): which repositories use a library,
+what a group holds, what changed lately, why a repository's health is low. A language model reads the catalogue through read-only
+tools (search the repositories, list and read groups, read a repository's README and technology, read a document, the recent commits,
+a repository's health) and answers in Markdown with links into the portal. It sees exactly what the person asking may see: a private
+repository only for a viewer who sees private repositories.
+
+Nothing is stored: the conversation lives in the browser's page and is sent with each question. What the tools read is sent to the
+provider you configure, so choose one your organisation may send its repository contents to (for private repositories especially).
+
+1. Get an API key from the provider and put it in a file, for example `/run/secrets/scp-llm-key`.
+2. Configure it:
+
+```yaml
+llm:
+  provider: anthropic                 # openai, gemini, openrouter, or ollama (no key) for a model on your own machines
+  model: claude-haiku-5-5             # optional: the provider's default
+  api_key_file: /run/secrets/scp-llm-key
+assistant:
+  access: signed-in                   # admin, or everyone (also anonymous visitors: mind the provider's bill)
+```
+
+3. Restart, sign in as an administrator and press *Test the provider* on the *Admin* page: it asks the model for one short completion
+   and shows the time it took or the provider's error.
+
+The header shows *Ask* to the viewers `assistant.access` admits. `signed-in` and `admin` need a way to know the viewer (section 2.2 or
+a proxy, section 2.1). Each answer is bounded by the `assistant.*` budgets; `assistant.concurrency` limits the answers in progress on
+one instance. Everything a tool returns is marked to the model as repository content written by others, never instructions. Watch the
+cost with `scp_assistant_tokens_total` (section 5).
 
 ## 3. Run
 
@@ -278,6 +375,12 @@ unreadable, the portal rebuilds it like a first start. There is nothing to back 
 **Rotating the webhook secret.** Set the new secret in `webhook.secret_file` and the old one in `webhook.previous_secret_file`,
 restart, change the secret on GitHub, then remove the previous one.
 
+**Replacing the Java portal.** On the same host name, the Java portal's addresses keep working: `/dashboard`, `/group/{id}`,
+`/contents/...` and `/commits/...` redirect (308) to the new pages, and the badges in other repositories' READMEs
+(`/badge/license|shields-issues|shields-commits|shields-releases/{repo}/{branch}`) to `/badges/repos/{owner}/{repo}/...svg`. A group is
+found by its old id with case and dashes ignored, a repository by its name. Jenkins and Snyk badges and the wiki answer 410 Gone. The old webhook
+`POST /github/webhook` answers 410: point the GitHub webhook at `/webhooks/github` with a new secret (SHA-256 signatures).
+
 ## 5. Monitor
 
 | Endpoint (admin) | Answers |
@@ -304,6 +407,8 @@ Metrics:
 | `scp_items` | `kind`, `freshness` | repositories by data kind and freshness |
 | `scp_build_info` | `version`, `commit`, `goversion` | the running build |
 | `scp_cluster_leader` | | 1 on the instance that leads the cluster, 0 on the others (only with `cluster.addresses`) |
+| `scp_assistant_requests_total` | `outcome` | assistant questions: `answered`, `refused` (access, validation, busy), `budget`, `aborted` (the viewer left) or the provider's error (`auth`, `rate_limited`, `overloaded`, `bad_request`, `tools_unsupported`, `network`, `provider`) |
+| `scp_assistant_tokens_total` | `kind` | language model tokens the assistant used, `input` and `output` |
 | `scp_event_streams` | | open `/api/v1/events` streams (at most 1,000 per instance; beyond that browsers poll) |
 
 Useful alerts: `scp_github_rate_remaining_ratio < 0.1` for 15 minutes; `scp_items{freshness="error"}` above zero for an hour;
@@ -321,4 +426,5 @@ steps, and job failures. Secrets are never logged.
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
 | A repository is missing | it must be public, not a fork (unless `include_forks`), and in a configured account; a deleted or private repository disappears after two listings |
 | Pushes show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository, `scp_webhook_deliveries_total` by result |
+| The assistant answers with an error | *Test the provider* on the *Admin* page; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |

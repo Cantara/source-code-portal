@@ -14,7 +14,9 @@ import (
 // The headers a proxied page request carries to the web UI server, which sends the first three back on its API calls.
 const (
 	headerToken  = "X-Scp-Token"  //nolint:gosec // a header name; proves that a request comes from the web UI server
-	headerViewer = "X-Scp-Viewer" // private or public: the viewer the page is rendered for
+	headerViewer = "X-Scp-Viewer" // public, private or admin: the viewer the page is rendered for
+	headerName   = "X-Scp-Name"   // the signed-in viewer's name, path-escaped
+	headerVia    = "X-Scp-Via"    // how the viewer is identified: proxy, oidc, token; empty when anonymous
 	headerOrigin = "X-Scp-Origin" // the portal's public origin, for canonical URLs
 )
 
@@ -22,7 +24,7 @@ const (
 const notFoundPath = "/_scp/not-found"
 
 // reserved prefixes answer a plain 404 instead of a page.
-var reserved = []string{"/badges/", "/images/", "/webhooks/", "/.well-known/"} //nolint:gochecknoglobals // lookup table
+var reserved = []string{"/auth/", "/badges/", "/images/", "/webhooks/", "/.well-known/"} //nolint:gochecknoglobals // lookup table
 
 type pageKey struct{}
 
@@ -48,19 +50,15 @@ func (o Options) Pages(upstream *url.URL) http.Handler {
 			pr.Out.Host = pr.In.Host
 			p, _ := pr.In.Context().Value(pageKey{}).(pageRequest)
 			h := pr.Out.Header
-			if o.Access.UserHeader != "" {
-				h.Del(o.Access.UserHeader)
-				h.Del(o.Access.GroupsHeader)
-			}
-			viewer := "public"
-			if Private(pr.In.Context()) {
-				viewer = "private"
-			}
-			h.Set("Content-Security-Policy", cspPage(p.nonce))
+			v := ViewerOf(pr.In.Context())
+			h.Set("Content-Security-Policy", o.cspPage(p.nonce))
 			h.Set("X-Request-Id", p.id)
 			h.Set(headerToken, o.WebToken)
-			h.Set(headerViewer, viewer)
-			h.Set(headerOrigin, o.origin(pr.In))
+			h.Set(headerViewer, v.headerValue())
+			h.Set(headerName, url.PathEscape(v.Name))
+			h.Set(headerVia, v.Via)
+			h.Del("Authorization") // the web UI server needs only the viewer
+			h.Set(headerOrigin, o.Origin(pr.In))
 		},
 		Transport: transport,
 		ModifyResponse: func(res *http.Response) error {
@@ -86,7 +84,7 @@ func (o Options) Pages(upstream *url.URL) http.Handler {
 			return
 		}
 		p := pageRequest{nonce: newNonce(), id: w.Header().Get("X-Request-Id")}
-		w.Header().Set("Content-Security-Policy", cspPage(p.nonce))
+		w.Header().Set("Content-Security-Policy", o.cspPage(p.nonce))
 		w.Header().Set("Permissions-Policy", permissionsPage)
 		rp.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), pageKey{}, p)))
 	})
@@ -116,10 +114,12 @@ func notFoundPage(rt http.RoundTripper, res *http.Response) {
 	res.Body, res.Header, res.ContentLength = nf.Body, nf.Header, nf.ContentLength
 }
 
-// cspPage is the policy of a page: scripts and styles from the portal or carrying the page's nonce.
-func cspPage(nonce string) string {
+// cspPage is the policy of a page: scripts and styles from the portal or carrying the page's nonce; forms post to the portal, whose
+// answer may lead on to a FormTargets origin (browsers hold a form's redirects to form-action).
+func (o Options) cspPage(nonce string) string {
+	forms := strings.Join(append([]string{"'self'"}, o.FormTargets...), " ")
 	return "default-src 'none'; script-src 'self' 'nonce-" + nonce + "'; style-src 'self' 'nonce-" + nonce + "'; img-src 'self'; " +
-		"font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; " +
+		"font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action " + forms + "; frame-ancestors 'none'; " +
 		"object-src 'none'"
 }
 
@@ -129,9 +129,9 @@ func newNonce() string {
 	return base64.StdEncoding.EncodeToString(b[:])
 }
 
-// origin is the portal's public origin: server.public_url, else the scheme and host the request arrived with (the scheme from a
+// Origin is the portal's public origin: server.public_url, else the scheme and host the request arrived with (the scheme from a
 // trusted proxy's X-Forwarded-Proto).
-func (o Options) origin(r *http.Request) string {
+func (o Options) Origin(r *http.Request) string {
 	if o.PublicURL != "" {
 		if u, err := url.Parse(o.PublicURL); err == nil {
 			return u.Scheme + "://" + u.Host

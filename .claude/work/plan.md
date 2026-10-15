@@ -14,7 +14,7 @@ later releases bump the patch version unless the owner decides otherwise.
 Built: GitHub App or token sources with discovery and reconcile; groups by matchers (exact, prefix, glob, regexp, topic, catch-all);
 dashboard, group, repository, document and commit-log pages; README and `docs/` rendered and sanitised; the `scp.yaml` descriptor;
 `go.mod`, `package.json` and `pom.xml` manifests with internal dependency links; local SVG badges; freshness on every item; signed and
-de-duplicated webhooks; `/api/v1` from an OpenAPI 3.1 contract; `/llms.txt` and Markdown answers; private repositories behind a trusted
+de-duplicated webhooks; `/api/v1` from an OpenAPI 3.1 contract; `/llms.txt` and Markdown answers; a sitemap, canonical addresses, JSON-LD and breadcrumbs for search engines; private repositories behind a trusted
 proxy; several instances on Hazelcast; the image proxy; live updates by server-sent events; `/livez`, `/readyz`, Prometheus metrics and
 a status page on the admin port; a signed multi-platform image and release archives.
 
@@ -65,19 +65,22 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | API | OpenAPI 3.1, `oapi-codegen` v2 (strict server), `openapi-typescript` and `openapi-fetch` for the web |
 | GitHub | `google/go-github` v92, `bradleyfalzon/ghinstallation` v2, an own ETag and rate transport |
 | Storage | `modernc.org/sqlite` |
-| Markdown | `yuin/goldmark`, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` |
+| Markdown | `yuin/goldmark` v2, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` |
 | Metrics | `prometheus/client_golang` |
 | Distributed state | `hazelcast/hazelcast-go-client` |
+| Sign-in | `coreos/go-oidc` v3, `golang.org/x/oauth2` |
+| Language models | own `net/http` adapters for the Anthropic Messages and OpenAI Chat Completions wire formats (P-28) |
 | Tests | `testing`, `testing/synctest`, `go-cmp`, `goleak` |
-| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, Vitest, MSW, Playwright with axe; pnpm 12, Node.js 24 |
+| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, react-markdown with remark-gfm (the assistant's answers), Vitest, MSW, Playwright with axe; pnpm 12, Node.js 24 |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, cosign, Renovate |
 
 ## 4. Work
 
 | M | Delivers | Done when | State |
 |---|---|---|---|
-| C1 | Commit navigator: product timelines and a git graph navigator per repository over the stored history (`design/commits-navigator.md`) | the ten acceptance criteria in the note pass in CI | in progress: history data and API built |
-| M13 | Search engines (`design/seo.md`) | every sitemap page answers 200 with its canonical, a valid JSON-LD graph and a `lastmod`; Lighthouse SEO and accessibility 100 on the dashboard, a group and a repository | queued |
+| S1 | Sign-in and admin (`design/auth.md`): OIDC with PKCE, bearer tokens, stateless sealed sessions, an admin role | signed in through a fake provider a member of a private group sees a private repository, an admin reads the status, a token reads `/llms.txt` with its groups; forged state, nonce and cookies refused | done |
+| A1 | Assistant (`design/assistant.md`): LLM providers (Anthropic, OpenAI, Gemini, OpenRouter, Ollama) and a read-only chat over the snapshot | the adapters pass their recorded fixtures; the loop keeps its budgets and frames every tool result; `/ask` answers with links against a fake provider; a public viewer's assistant never reads a private repository | done |
+| M13 | Search engines (`design/seo.md`): canonical addresses, sitemap, robots.txt, JSON-LD with breadcrumbs, Open Graph text | every sitemap page answers 200 with its canonical, one h1, a JSON-LD graph with its trail and a `lastmod` | done |
 
 Each milestone starts with its design note and lands as small commits on `main`, CI green.
 

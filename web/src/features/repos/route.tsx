@@ -5,6 +5,8 @@ import type { Panel, Route } from "@/lib/page"
 import { repoPath } from "@/lib/paths"
 import { readmeOf } from "./readme"
 import { RepoView } from "./view"
+import { crumbs } from "@/lib/crumbs"
+import { ld } from "@/lib/seo"
 
 type Params = { owner: string; name: string }
 
@@ -29,6 +31,17 @@ export function repoRoute(panels: Panel<Params>[]): Route<Params> {
         description: data?.descriptor.description || repo?.description || `The repository ${owner}/${name}.`,
         alternates: { canonical: repo ? repoPath(repo.owner, repo.name) : repoPath(owner, name) },
       }
+    },
+    async structured({ api, qc, params: { owner, name } }, base) {
+      const data = await peek(qc, repoQuery(api, owner, name))
+      if (!data) return []
+      const { owner: o, name: n } = data.repo
+      const path = repoPath(o, n)
+      return [
+        ld.page(base, path, data.title || `${o}/${n}`),
+        ld.repo(base, path, data),
+        ld.breadcrumbs(base, crumbs.repo(o, n, data.group)),
+      ]
     },
     render: ({ params }) => (
       <RepoView owner={params.owner} name={params.name} main={column("main", params)} side={column("side", params)} />

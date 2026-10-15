@@ -1,0 +1,4 @@
+data: {"choices":[{"delta":{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"owner_name\":\"acme/core\"}","name":"get_repository"},"id":"function-call-1","type":"function","extra_content":{"google":{"thought_signature":"CiQBVKhc7g=="}}}]},"finish_reason":"tool_calls","index":0}],"created":1760000000,"model":"gemini-3.6-flash","object":"chat.completion.chunk","usage":{"completion_tokens":20,"prompt_tokens":700,"total_tokens":720}}
+
+data: [DONE]
+

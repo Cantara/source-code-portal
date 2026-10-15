@@ -65,7 +65,7 @@ func (l *LLMs) buildKCP(s *snapshot.Snapshot) []byte {
 		quote("What does this portal hold, how are its repositories grouped into products, and where do I start?"), updated)
 	for _, g := range s.Groups {
 		fmt.Fprintf(&b, "  - id: %s\n    path: %s\n    intent: %s\n    scope: project\n    audience: [agent, developer]\n    validated: %q\n    triggers: [%s]\n",
-			ids.add("group-"+slug(g.ID)), quote("groups/"+g.ID+".md"),
+			ids.add("group-"+slug(g.ID)), quote(rel(snapshot.GroupPage(g.ID)+".md")),
 			quote(fmt.Sprintf("What does the %s product consist of, and which repositories belong to it?", g.Name)), updated,
 			joinQuoted([]string{g.ID, g.Name}))
 		count++
@@ -94,7 +94,7 @@ func (l *LLMs) buildKCP(s *snapshot.Snapshot) []byte {
 			intent = fmt.Sprintf("What is %s (%s) and how is it used?", k, strings.TrimRight(d, ".!?"))
 		}
 		fmt.Fprintf(&b, "  - id: %s\n    path: %s\n    intent: %s\n    scope: module\n    audience: [agent, developer]\n    validated: %q\n",
-			repoID[k], quote("repos/"+string(k)+"/readme.md"), quote(intent), seen)
+			repoID[k], quote(rel(snapshot.RepoPage(k)+"/readme.md")), quote(intent), seen)
 		if t := triggers(e, about); len(t) > 0 {
 			fmt.Fprintf(&b, "    triggers: [%s]\n", joinQuoted(t))
 		}
@@ -118,12 +118,15 @@ func (l *LLMs) buildKCP(s *snapshot.Snapshot) []byte {
 			docN++
 			fmt.Fprintf(&docUnits, "  - id: %s\n    path: %s\n    intent: %s\n    scope: module\n    audience: [agent, developer]\n    validated: %q\n    depends_on: [%s]\n",
 				ids.add(repoID[k]+"-doc-"+slug(strings.TrimSuffix(d.Path, path.Ext(d.Path)))),
-				quote("repos/"+string(k)+"/docs/"+d.Path), quote(fmt.Sprintf("What does %s in %s cover?", d.Path, k)), seen, repoID[k])
+				quote(rel(snapshot.DocPage(k, d.Path)+".md")), quote(fmt.Sprintf("What does %s in %s cover?", d.Path, k)), seen, repoID[k])
 		}
 	}
 	b.Write(docUnits.Bytes())
 	return b.Bytes()
 }
+
+// rel is a page address relative to the manifest, as KCP paths are.
+func rel(page string) string { return strings.TrimPrefix(page, "/") }
 
 func hasReadme(docs func(*snapshot.RepoEntry) ([]Doc, snapshot.Freshness), e *snapshot.RepoEntry) bool {
 	ds, _ := docs(e)

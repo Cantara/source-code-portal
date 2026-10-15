@@ -110,6 +110,11 @@ func (a API) detail(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) 
 	if d.Title != "" {
 		out.Title = d.Title
 	}
+	if ids := s.GroupsOf(e.Repo.Key()); len(ids) > 0 {
+		if g, ok := s.Group(ids[0]); ok {
+			out.Group = &oapi.GroupRef{Id: g.ID, Name: g.Name}
+		}
+	}
 	for _, l := range d.Links {
 		out.Descriptor.Links = append(out.Descriptor.Links, oapi.Link{Title: l.Title, Url: l.URL})
 	}

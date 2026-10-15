@@ -37,8 +37,10 @@ type Options struct {
 	HSTS           bool           // the public URL is https
 	PublicURL      string         // server.public_url: the origin of canonical URLs; empty: the request's
 	WebToken       string         // the secret the web UI server shows on its API calls to name the page's viewer (Pages)
+	FormTargets    []string       // origins a page's form may end at beyond the portal: the sign-in provider's end session
 	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For, and the Access headers, are believed
 	Access         Access
+	Auth           Authenticator // SCP's own sign-in and bearer tokens; nil without them
 	// Observe, when set, receives every request: listener, matched pattern ("unmatched" when none), method, status, duration.
 	Observe func(listener, pattern, method string, status int, d time.Duration)
 }
@@ -65,11 +67,15 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		if o.HSTS {
 			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}
-		private := o.private(r)
 		if o.Access.Vary {
 			h.Add("Vary", o.Access.UserHeader+", "+o.Access.GroupsHeader)
 		}
-		base := context.WithValue(r.Context(), privateKey{}, private)
+		if o.Auth != nil {
+			h.Add("Vary", "Cookie, Authorization")
+		}
+		viewer, verr := o.viewer(w, r)
+		private := viewer.Private || viewer.SignedIn() // what a signed-in viewer sees names them: no shared cache may store it
+		base := context.WithValue(r.Context(), viewerKey{}, viewer)
 		ctx, cancel := context.WithTimeout(context.WithValue(base, baseKey{}, base), requestTimeout)
 		defer cancel()
 		r = r.WithContext(ctx)
@@ -100,6 +106,11 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 			o.Log.Info("request", "listener", listener, "pattern", pattern, "method", r.Method, "status", status, "bytes", sw.bytes,
 				"duration_ms", d.Milliseconds(), "request_id", id, "client_ip", o.clientIP(r))
 		}()
+		if verr != nil {
+			sw.Header().Set("WWW-Authenticate", `Bearer realm="scp"`)
+			WriteProblem(sw, http.StatusUnauthorized, "unauthenticated", "The credential names nobody.")
+			return
+		}
 		gz := &gzipWriter{ResponseWriter: sw, accept: r.Method != http.MethodHead && acceptsGzip(r.Header.Get("Accept-Encoding"))}
 		defer gz.close()
 		next.ServeHTTP(gz, r)

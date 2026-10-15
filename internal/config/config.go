@@ -19,17 +19,20 @@ import (
 
 // Config is the typed configuration. A key is added here together with the code that reads it.
 type Config struct {
-	Server  Server  `mapstructure:"server"`
-	Log     Log     `mapstructure:"log"`
-	Store   Store   `mapstructure:"store"`
-	Sync    Sync    `mapstructure:"sync"`
-	GitHub  GitHub  `mapstructure:"github"`
-	Catalog Catalog `mapstructure:"catalog"`
-	Webhook Webhook `mapstructure:"webhook"`
-	Access  Access  `mapstructure:"access"`
-	Cluster Cluster `mapstructure:"cluster"`
-	Web     Web     `mapstructure:"web"`
-	Ops     Ops     `mapstructure:"ops"`
+	Server    Server    `mapstructure:"server"`
+	Log       Log       `mapstructure:"log"`
+	Store     Store     `mapstructure:"store"`
+	Sync      Sync      `mapstructure:"sync"`
+	GitHub    GitHub    `mapstructure:"github"`
+	Catalog   Catalog   `mapstructure:"catalog"`
+	Webhook   Webhook   `mapstructure:"webhook"`
+	Access    Access    `mapstructure:"access"`
+	Auth      Auth      `mapstructure:"auth"`
+	LLM       LLM       `mapstructure:"llm"`
+	Assistant Assistant `mapstructure:"assistant"`
+	Cluster   Cluster   `mapstructure:"cluster"`
+	Web       Web       `mapstructure:"web"`
+	Ops       Ops       `mapstructure:"ops"`
 }
 
 // Server configures the two listeners.
@@ -74,6 +77,27 @@ func defaults() map[string]any {
 		"access.user_header":           "X-Forwarded-User",
 		"access.groups_header":         "X-Forwarded-Groups",
 		"access.private_groups":        []string{},
+		"auth.session_key_file":        "",
+		"auth.session_ttl":             "12h",
+		"auth.admin_emails":            []string{},
+		"auth.admin_groups":            []string{},
+		"auth.oidc.issuer":             "",
+		"auth.oidc.client_id":          "",
+		"auth.oidc.client_secret_file": "",
+		"auth.oidc.scopes":             []string{"openid", "email", "profile"},
+		"auth.oidc.groups_claim":       "groups",
+		"llm.provider":                 "",
+		"llm.model":                    "",
+		"llm.base_url":                 "",
+		"llm.api_key_file":             "",
+		"assistant.access":             "signed-in",
+		"assistant.concurrency":        4,
+		"assistant.max_turns":          8,
+		"assistant.max_tool_calls":     16,
+		"assistant.max_tokens":         16000,
+		"assistant.max_history":        40,
+		"assistant.max_input_chars":    60000,
+		"assistant.tool_result_chars":  12000,
 		"cluster.addresses":            []string{},
 		"cluster.name":                 "dev",
 		"cluster.namespace":            "scp",
@@ -207,7 +231,10 @@ func (c Config) validate() []string {
 	if c.Webhook.PreviousSecretFile != "" && c.Webhook.SecretFile == "" {
 		p = append(p, "webhook.previous_secret_file: needs webhook.secret_file")
 	}
-	p = append(p, c.Access.validate(c.GitHub, len(c.Server.TrustedProxies) > 0)...)
+	identified := len(c.Server.TrustedProxies) > 0 || c.Auth.SignIn() || len(c.Auth.Tokens) > 0
+	p = append(p, c.Access.validate(c.GitHub, identified)...)
+	p = append(p, c.LLM.validate(c.Assistant, identified)...)
+	p = append(p, c.Auth.validate(c.Server.PublicURL)...)
 	p = append(p, c.Cluster.validate()...)
 	p = append(p, c.Web.validate()...)
 	slices.Sort(p)

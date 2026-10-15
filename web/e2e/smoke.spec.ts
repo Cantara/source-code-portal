@@ -10,7 +10,11 @@ const pages = [
   ["/groups/whydah/commits", "Commits in Whydah"],
   ["/repos/acme/whydah-core", "Whydah Core"],
   ["/repos/acme/whydah-core/commits", "Commits in acme/Whydah-Core"],
+  ["/repos/acme/whydah-core/commits?sha=0000000000000000000000000000000000000029", "Commits in acme/Whydah-Core"],
+  ["/commits?group=whydah", "Commits"],
   ["/repos/acme/whydah-core/docs/docs/setup", "Setup"],
+  ["/signin", "Sign in"],
+  ["/admin", "Admin"],
 ] as const
 
 async function axe(page: Page) {
@@ -51,12 +55,23 @@ test("navigation moves focus to the new page's h1", async ({ page }) => {
   await expect(page).toHaveTitle("Whydah · Source Code Portal")
 })
 
-test("the commit log loads more", async ({ page }) => {
+test("the commit log pages by number and remembers the page size", async ({ page }) => {
   await page.goto("/commits")
-  await expect(page.getByRole("listitem")).toHaveCount(50)
-  await page.getByRole("button", { name: "Load more" }).click()
-  await expect(page.getByRole("listitem")).toHaveCount(90)
-  await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0)
+  const commits = page.getByRole("region", { name: "Commit log" }).locator("ol > li")
+  const pager = page.getByRole("navigation", { name: "Pages", exact: true })
+  await expect(commits).toHaveCount(50)
+  await expect(pager.locator("[aria-current=page]")).toHaveText("1")
+  await pager.getByRole("link", { name: "Page 2", exact: true }).click()
+  await expect(page).toHaveURL("/commits?page=2")
+  await expect(pager.locator("[aria-current=page]")).toHaveText("2")
+  await expect(pager.getByText(/^51–100 of /)).toBeVisible()
+  await page.getByRole("navigation", { name: "Pages, at the end" }).getByRole("link", { name: "Previous" }).click()
+  await expect(page).toHaveURL("/commits")
+  await page.getByLabel("Per page").selectOption("100")
+  await expect(commits).toHaveCount(100)
+  await page.reload()
+  await expect(commits).toHaveCount(100) // the choice is remembered
+  await expect(page.getByLabel("Per page")).toHaveValue("100")
 })
 
 test("the README renders with highlighting and no script", async ({ page }) => {
@@ -113,12 +128,12 @@ test("the theme menu switches light and dark, and system follows the system pref
   await expect(theme).toHaveValue("system")
 })
 
-for (const path of ["/repos/acme/whydah-core", "/repos/acme/whydah-core/commits"]) {
+for (const path of ["/repos/acme/whydah-core"]) {
   test(`${path} draws its commits as a git graph, the merge in a second lane`, async ({ page }) => {
     await page.goto(path)
     const merge = page.locator("main li", { hasText: "Merge pull request #7" }).first()
     const graph = merge.locator("svg")
-    await expect(graph).toHaveAttribute("viewBox", "0 0 32 52") // two lanes
+    await expect(graph).toHaveAttribute("viewBox", "0 0 48 52") // three lanes: main, the merged branch and feature/sso
     await expect(graph.locator("circle")).toHaveAttribute("fill", "none") // a ring, not a dot
     await expect(graph.locator("path")).toHaveCount(3) // in from above, out to both parents
     const branch = page.locator("main li", { hasText: "Change 26 of repository 0" }).first() // on the feature branch

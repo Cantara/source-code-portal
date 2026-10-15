@@ -3,6 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useRef } from "react"
+import { buttonClass } from "@/components/ui/button"
+import type { Schemas } from "@/lib/api/client"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 
 /** ThemeSelect picks system, light or dark (lib/theme.ts, public/theme-init.js). */
@@ -28,8 +30,8 @@ export function ThemeSelect() {
 const nav =
   "rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-foreground"
 
-/** MainNav is the header navigation; the current section is marked. */
-export function MainNav() {
+/** MainNav is the header navigation, with Ask when the viewer may use the assistant; the current section is marked. */
+export function MainNav({ ask = false }: { ask?: boolean }) {
   const path = usePathname()
   return (
     <nav aria-label="Main" className="flex gap-1 text-sm">
@@ -39,7 +41,47 @@ export function MainNav() {
       <Link href="/commits" className={nav} aria-current={path === "/commits" ? "page" : undefined}>
         Commits
       </Link>
+      {ask && (
+        <Link href="/ask" className={nav} aria-current={path === "/ask" ? "page" : undefined}>
+          Ask
+        </Link>
+      )}
     </nav>
+  )
+}
+
+/**
+ * ViewerMenu is the header's viewer: the signed-in name with Admin and Sign out, or Sign in back to this page when the portal has
+ * sign-in. A viewer named by the proxy signs out there.
+ */
+export function ViewerMenu({ me }: { me: Schemas["Me"] | undefined }) {
+  const path = usePathname()
+  if (!me) return null
+  if (me.signedIn)
+    return (
+      <div className="flex items-center gap-1 text-sm">
+        <span className="max-w-40 truncate px-1" title={`Signed in as ${me.name}`}>
+          {me.name}
+        </span>
+        {me.admin && (
+          <Link href="/admin" className={nav} aria-current={path === "/admin" ? "page" : undefined}>
+            Admin
+          </Link>
+        )}
+        {me.via !== "proxy" && (
+          <form method="post" action="/auth/logout">
+            <button type="submit" className={buttonClass("ghost", "min-h-8 px-2.5")}>
+              Sign out
+            </button>
+          </form>
+        )}
+      </div>
+    )
+  if ((!me.signIn.oidc && !me.signIn.token) || path === "/signin") return null
+  return (
+    <Link href={`/signin?return_to=${encodeURIComponent(path)}`} className={nav}>
+      Sign in
+    </Link>
   )
 }
 

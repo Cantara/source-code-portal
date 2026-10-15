@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -269,6 +270,9 @@ catalog:
 			len(repo.Commits) != 3 || repo.Commits[0].Subject != "change a" || repo.CommitsFreshness.Status != "fresh" {
 			t.Errorf("repo detail: title %q, descriptor %+v, commits %+v", repo.Title, repo.Descriptor, repo.Commits)
 		}
+		if repo.Group == nil || repo.Group.Id != "whydah" || repo.Group.Name != "Whydah" {
+			t.Errorf("repo detail: group %+v, want its first group whydah", repo.Group)
+		}
 		var dash oapi.Dashboard
 		if code := fetch(public+"/api/v1/dashboard", &dash); code != http.StatusOK || dash.RepoCount != 3 || len(dash.Latest) != 6 ||
 			dash.Latest[0].Sha != strings.Repeat("a", 40) || len(dash.Groups) != 2 || dash.Groups[0].LastActivity == nil ||
@@ -276,25 +280,21 @@ catalog:
 			t.Errorf("dashboard: %d %+v", code, dash)
 		}
 		var shas []string
-		url := public + "/api/v1/commits?group=whydah&limit=2"
-		for pages := 0; ; pages++ {
+		for n := 1; n <= 3; n++ {
 			var page oapi.CommitPage
-			if code := fetch(url, &page); code != http.StatusOK || pages > 3 || page.Freshness.Status != "fresh" {
-				t.Fatalf("commit page %d: %d %+v", pages, code, page)
+			if code := fetch(public+"/api/v1/commits?group=whydah&limit=2&page="+strconv.Itoa(n), &page); code != http.StatusOK ||
+				page.Freshness.Status != "fresh" || page.Page != (oapi.Page{Number: n, Size: 2, Total: 5, Pages: 3}) {
+				t.Fatalf("commit page %d: %d %+v", n, code, page)
 			}
 			for _, c := range page.Commits {
 				shas = append(shas, c.Sha[:1])
 			}
-			if page.Page.NextCursor == nil {
-				break
-			}
-			url = public + "/api/v1/commits?group=whydah&limit=2&cursor=" + *page.Page.NextCursor
 		}
 		if got := strings.Join(shas, ""); got != "adbec" {
 			t.Errorf("whydah feed = %s, want adbec", got)
 		}
-		if code := fetch(public+"/api/v1/commits?group=other&cursor=eyJrIjoieCIsInMiOiJ5IiwidCI6MH0", nil); code != http.StatusBadRequest {
-			t.Errorf("a cursor of another filter: %d, want 400", code)
+		if code := fetch(public+"/api/v1/commits?group=other&page=0", nil); code != http.StatusBadRequest {
+			t.Errorf("page 0: %d, want 400", code)
 		}
 		if code := fetch(public+"/api/v1/repos/acme/secret", nil); code != http.StatusNotFound {
 			t.Errorf("private repository: %d, want 404", code)

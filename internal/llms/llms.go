@@ -38,13 +38,16 @@ type Options struct {
 	About      func(*snapshot.RepoEntry) About
 	Technology func(*snapshot.Snapshot, *snapshot.RepoEntry) Technology
 	Freshness  func(*snapshot.RepoEntry) snapshot.Freshness // what the freshness counts and a group's status follow
+	LastCommit func(*snapshot.RepoEntry) time.Time          // the newest commit: the sitemap's lastmod; zero when unknown
+	// Origin is the request's public origin, for the sitemap's absolute URLs when there is no server.public_url.
+	Origin func(*http.Request) string
 }
 
 // Doc is a document as the surface serves it.
 type Doc struct {
-	Path, BlobSHA     string
-	README, Truncated bool
-	Source            []byte // Markdown
+	Path, BlobSHA             string
+	README, Truncated, Hidden bool
+	Source                    []byte // Markdown
 }
 
 // About is what the repository says about itself (its scp.yaml).
@@ -66,7 +69,8 @@ type LLMs struct {
 	opts    Options
 
 	mu    gosync.Mutex
-	built [2]files // the last views the files were built for: the public one and the full one
+	built [2]files   // the last views the files were built for: the public one and the full one
+	maps  [2]sitemap // the same for the sitemap
 }
 
 // files are /llms.txt and /llms-full.txt of one view of a snapshot.
@@ -85,6 +89,9 @@ func New(current func(context.Context) *snapshot.Snapshot, base string, opts Opt
 	}
 	if opts.Technology == nil {
 		opts.Technology = func(*snapshot.Snapshot, *snapshot.RepoEntry) Technology { return Technology{} }
+	}
+	if opts.LastCommit == nil {
+		opts.LastCommit = func(*snapshot.RepoEntry) time.Time { return time.Time{} }
 	}
 	if opts.Freshness == nil {
 		opts.Freshness = func(*snapshot.RepoEntry) snapshot.Freshness { return snapshot.Freshness{} }
@@ -272,7 +279,7 @@ func (l *LLMs) buildIndex(s *snapshot.Snapshot) []byte {
 	fmt.Fprintf(&b, "%s Last sync: %s. Freshness: %s.\n\n", untrustedNote, lastSync(s), l.freshnessCounts(s, keys, now))
 	b.WriteString("## Groups\n\n")
 	for _, g := range s.Groups {
-		fmt.Fprintf(&b, "- [%s](%s): %d repositories\n", line(g.Name, maxDescription), l.url("/groups/"+g.ID), len(g.Members))
+		fmt.Fprintf(&b, "- [%s](%s): %d repositories\n", line(g.Name, maxDescription), l.url(snapshot.GroupPage(g.ID)), len(g.Members))
 	}
 	var repos bytes.Buffer
 	repos.WriteString("\n## Repositories\n\n")
@@ -455,19 +462,24 @@ func (l *LLMs) feedStatus(s *snapshot.Snapshot, members []snapshot.RepoKey, now 
 
 // serve writes body with a strong ETag and answers 304 to a matching If-None-Match.
 func serve(w http.ResponseWriter, r *http.Request, contentType string, body []byte) {
+	w.Header().Set("Link", `</llms.txt>; rel="describedby"`)
+	serveAs(w, r, contentType, cacheControl, body)
+}
+
+// serveAs answers body with a strong ETag and its caching.
+func serveAs(w http.ResponseWriter, r *http.Request, contentType, cache string, body []byte) {
 	sum := sha256.Sum256(body)
 	etag := `"` + hex.EncodeToString(sum[:16]) + `"`
 	h := w.Header()
 	h.Set("ETag", etag)
-	h.Set("Cache-Control", cacheControl)
-	h.Set("Link", `</llms.txt>; rel="describedby"`)
+	h.Set("Cache-Control", cache)
 	if httpapi.Matches(r.Header.Get("If-None-Match"), etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 	h.Set("Content-Type", contentType)
 	if r.Method != http.MethodHead {
-		_, _ = w.Write(body)
+		_, _ = w.Write(body) //nolint:gosec // G705: the request's origin only, XML-escaped in the sitemap, plain text in robots.txt
 	}
 }
 

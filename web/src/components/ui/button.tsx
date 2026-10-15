@@ -7,21 +7,18 @@ const variants = {
   ghost: "hover:bg-accent hover:text-accent-foreground",
 }
 
+const base =
+  "inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none"
+
+/** buttonClass is the look of a button, for a link that acts as one. */
+export const buttonClass = (variant: keyof typeof variants = "default", className?: string) =>
+  cn(base, variants[variant], className)
+
 export function Button({
   variant = "default",
   className,
   type = "button",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants }) {
-  return (
-    <button
-      type={type}
-      className={cn(
-        "inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none",
-        variants[variant],
-        className,
-      )}
-      {...props}
-    />
-  )
+  return <button type={type} className={buttonClass(variant, className)} {...props} />
 }

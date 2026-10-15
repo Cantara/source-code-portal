@@ -3,7 +3,7 @@ info:
   title: Source Code Portal API
   version: "1"
   description: |
-    Read API over the portal's snapshot. Lists are returned whole, except commits, which page by cursor. Every 200 response carries a weak ETag; send it back in
+    Read API over the portal's snapshot. Lists are returned whole, except commits, which come in numbered pages. Every 200 response carries a weak ETag; send it back in
     If-None-Match to get 304 Not Modified. Errors are RFC 9457 problems.
 servers:
   - url: /api/v1
@@ -25,15 +25,16 @@ paths:
       operationId: listCommits
       summary: Default-branch commits merged across repositories, newest first, one page at a time
       description: |
-        Order is committedAt descending, then repository address, then SHA. `group` and `repo` intersect. Pass `page.nextCursor`
-        as `cursor` for the next page; a cursor is bound to its filter and stays valid when new commits arrive. The freshness covers
-        every repository in scope: fresh when all are fresh, stale otherwise, with the oldest times.
+        Order is committedAt descending, then repository address, then SHA. `group` and `repo` intersect. Pages are numbered from 1
+        over the current snapshot, `limit` commits each; a page past the last is empty, and `page` says how many there are. New
+        commits move the older ones to later pages. The freshness covers every repository in scope: fresh when all are fresh, stale
+        otherwise, with the oldest times.
       parameters:
         - { name: group, in: query, required: false, schema: { type: string } }
         - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
         - { name: automation, in: query, required: false, description: "false leaves out commits made by automation", schema: { type: boolean, default: true } }
+        - { $ref: "#/components/parameters/PageNumber" }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
-        - { name: cursor, in: query, required: false, schema: { type: string } }
       responses:
         "200":
           description: One page of commits
@@ -163,8 +164,10 @@ paths:
       description: |
         The default branch (its latest 500 commits) and the commits of up to 10 other branches, newest first by commit time with a
         parent never before its child. `ref` keeps the commits reachable from a branch or tag; `author`, `q` and `automation=false`
-        filter further and mark the page `filtered`, which draws no graph. Pass `page.nextCursor` as `cursor` for the next page; a
-        cursor is bound to its filter and stays valid when new commits arrive.
+        filter further and mark the page `filtered`, which draws no graph. Pages are numbered from 1, `limit` commits each; `at`
+        (a SHA or its prefix) answers the page holding that commit instead of `page`, and names it in `at`. Each commit of an
+        unfiltered page carries its row of the git graph, laid out over the whole history (or what `ref` reaches), so every page
+        draws on from the one before.
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -172,8 +175,9 @@ paths:
         - { name: author, in: query, required: false, description: Login or name, case-insensitive, schema: { type: string } }
         - { name: q, in: query, required: false, description: "Text in the subject or body, or a SHA prefix", schema: { type: string, maxLength: 200 } }
         - { name: automation, in: query, required: false, description: "false leaves out commits made by automation", schema: { type: boolean, default: true } }
+        - { $ref: "#/components/parameters/PageNumber" }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
-        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: at, in: query, required: false, description: "A SHA or a prefix of at least 4 hex digits: the page holding it", schema: { type: string, pattern: "^[0-9a-fA-F]{4,40}$" } }
       responses:
         "200":
           description: One page of the history
@@ -197,6 +201,54 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SnapshotInfo" }
         "304": { $ref: "#/components/responses/NotModified" }
+  /me:
+    get:
+      operationId: getMe
+      summary: The viewer, its roles and how one signs in
+      description: |
+        Who the request comes from, as the trusted proxy, the session or a bearer token names it, and what that admits: private
+        repositories, the admin surfaces. `signIn` says which ways of signing in the portal offers. Never cached by a shared cache.
+      responses:
+        "200":
+          description: The viewer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+  /assistant:
+    get:
+      operationId: getAssistant
+      summary: Whether the assistant is on and the viewer may ask it
+      responses:
+        "200":
+          description: The assistant's state for this viewer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssistantStatus" }
+  /assistant/chat:
+    post:
+      operationId: chatAssistant
+      summary: Ask the assistant; the answer streams as server-sent events
+      description: |
+        The conversation so far, oldest first, ending with the viewer's question. The answer is a `text/event-stream` of `text`
+        (`{"text"}`, a piece of the answer), `tool` (`{"name", "label"}`, a lookup it makes), then `done` (`{"usage": {"input",
+        "output"}}`) or `error` (`{"code", "message"}`), with a comment line every 15 s. The assistant only reads the catalogue, as the
+        viewer sees it. A cookie-carrying request must come from the portal's own pages. Served outside the generated handlers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssistantChat" }
+      responses:
+        "200":
+          description: The answer as an event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "415": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
   /events:
     get:
       operationId: streamEvents
@@ -217,6 +269,13 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
 components:
+  parameters:
+    PageNumber:
+      name: page
+      in: query
+      required: false
+      description: The page, from 1
+      schema: { type: integer, minimum: 1, maximum: 100000, default: 1 }
   headers:
     ETag:
       description: Weak validator of the response body
@@ -237,6 +296,11 @@ components:
           schema: { type: string }
     BadRequest:
       description: The parameters are not valid
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Problem:
+      description: A problem (its code says which)
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -318,13 +382,22 @@ components:
         publishedAt: { type: string, format: date-time }
     RepoDetail:
       type: object
-      required: [repo, title, descriptor, commits, commitsFreshness]
+      required: [repo, title, group, descriptor, commits, commitsFreshness]
       properties:
         repo: { $ref: "#/components/schemas/Repo" }
+        group:
+          oneOf: [{ $ref: "#/components/schemas/GroupRef" }, { type: "null" }]
+          description: The first of its groups in configuration order, the page above it; null when it is in none
         title: { type: string, description: The descriptor title, else the repository name }
         descriptor: { $ref: "#/components/schemas/Descriptor" }
         commits: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: The latest default-branch commits }
         commitsFreshness: { $ref: "#/components/schemas/Freshness" }
+    GroupRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
     Descriptor:
       type: object
       description: The repository's own scp.yaml. It changes display only.
@@ -381,20 +454,42 @@ components:
       allOf:
         - $ref: "#/components/schemas/Commit"
         - type: object
-          required: [body, committerName, automated, labels]
+          required: [body, committerName, automated, labels, beyond, graph]
           properties:
             body: { type: string, description: The message after its subject line; empty when there is none }
             committerName: { type: string }
             automated: { type: boolean, description: "Made by automation: a [bot] author or a release plugin" }
             labels: { type: array, items: { $ref: "#/components/schemas/Label" }, description: "The branches and tags at this commit, the default branch first" }
+            beyond: { type: array, items: { type: string }, description: The parents older than the stored history }
+            graph: { oneOf: [{ $ref: "#/components/schemas/GraphRow" }, { type: "null" }], description: "The commit's row of the git graph; null on a filtered page" }
+    GraphEdge:
+      type: object
+      description: A line through a row, from a lane at its top (or its node) to a lane at its bottom (or its node)
+      required: [from, to, color, open]
+      properties:
+        from: { type: integer }
+        to: { type: integer }
+        color: { type: integer, description: "The lane's colour, 0 to 5" }
+        open: { type: boolean, description: The line leads to a parent older than the stored history }
+    GraphRow:
+      type: object
+      description: "How a commit's row of the git graph draws, like git log --graph: its node, the lines in from above and out below. Lanes never shift; draw at most 8, a lane beyond them in the last"
+      required: [lane, color, merge, above, below]
+      properties:
+        lane: { type: integer }
+        color: { type: integer, description: "0 to 5" }
+        merge: { type: boolean }
+        above: { type: array, items: { $ref: "#/components/schemas/GraphEdge" } }
+        below: { type: array, items: { $ref: "#/components/schemas/GraphEdge" } }
     HistoryPage:
       type: object
-      required: [commits, labels, filtered, total, page, freshness]
+      required: [commits, labels, filtered, lanes, at, page, freshness]
       properties:
         commits: { type: array, items: { $ref: "#/components/schemas/HistoryCommit" } }
         labels: { type: array, items: { $ref: "#/components/schemas/Label" }, description: Every branch and tag of the history }
         filtered: { type: boolean, description: "author, q or automation left commits out: the page is a list, not a graph" }
-        total: { type: integer, description: Commits matching the filter in the stored history }
+        lanes: { type: integer, description: "The graph's width over this page's rows, at most 8; 0 on a filtered page" }
+        at: { type: [string, "null"], description: "The commit `at` named, when it is on this page" }
         page: { $ref: "#/components/schemas/Page" }
         freshness: { $ref: "#/components/schemas/Freshness" }
     CommitPage:
@@ -406,10 +501,12 @@ components:
         freshness: { $ref: "#/components/schemas/Freshness" }
     Page:
       type: object
-      required: [nextCursor, limit]
+      required: [number, size, total, pages]
       properties:
-        nextCursor: { type: [string, "null"] }
-        limit: { type: integer }
+        number: { type: integer, description: This page, from 1 }
+        size: { type: integer, description: Items per page (the limit) }
+        total: { type: integer, description: Items matching the filter }
+        pages: { type: integer, description: "Pages in all, at least 1" }
     FreshnessCounts:
       type: object
       description: Repositories by the freshness of their commits
@@ -578,6 +675,46 @@ components:
         id: { type: string }
         repos: { type: integer }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    AssistantStatus:
+      type: object
+      additionalProperties: false
+      required: [enabled, allowed, access, provider, model]
+      properties:
+        enabled: { type: boolean, description: The operator configured a provider }
+        allowed: { type: boolean, description: This viewer may ask }
+        access: { type: string, enum: [signed-in, admin, everyone], description: Who may ask }
+        provider: { type: string, description: The provider; empty when off }
+        model: { type: string, description: The model; empty when off }
+    AssistantChat:
+      type: object
+      additionalProperties: false
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [user, assistant] }
+              content: { type: string }
+    Me:
+      type: object
+      required: [signedIn, name, via, private, admin, signIn]
+      properties:
+        signedIn: { type: boolean }
+        name: { type: string, description: "The viewer's name; empty when anonymous" }
+        via: { type: string, enum: [none, proxy, oidc, token], description: "How the viewer is identified; none when anonymous" }
+        private: { type: boolean, description: Sees private and internal repositories }
+        admin: { type: boolean, description: Sees the operator surfaces }
+        signIn:
+          type: object
+          required: [oidc, token]
+          properties:
+            oidc: { type: boolean, description: "GET /auth/login signs in at the provider" }
+            token: { type: boolean, description: "POST /auth/token exchanges a token for a session" }
     SnapshotInfo:
       type: object
       required: [version, builtAt, ready, sources]

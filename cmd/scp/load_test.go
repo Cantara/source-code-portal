@@ -155,7 +155,7 @@ func TestLoad1000(t *testing.T) {
 	t.Logf("warm start: %v", time.Since(warm))
 	pages := []string{"/api/v1/dashboard", "/api/v1/groups", "/api/v1/groups/g3", "/api/v1/repos", "/api/v1/repos?group=g5",
 		"/api/v1/repos/acme/g3-svc-003", "/api/v1/repos/acme/g3-svc-003/docs", "/api/v1/commits?limit=200",
-		"/api/v1/commits?group=g7&limit=50", "/api/v1/repos/acme/g0-svc-100/history", "/api/v1/repos/acme/g0-svc-100/history?q=change+4",
+		"/api/v1/commits?group=g7&limit=50", "/api/v1/repos/acme/g0-svc-100/history", "/api/v1/repos/acme/g0-svc-100/history?q=change+4", "/api/v1/repos/acme/g0-svc-100/history?page=4&limit=25",
 		"/api/v1/snapshot", "/badges/repos/acme/g4-svc-004/last-commit.svg",
 		"/badges/groups/all/repos.svg", "/llms.txt", "/llms-full.txt", "/repos/acme/g0-svc-010/readme.md"}
 	var mu gosync.Mutex
