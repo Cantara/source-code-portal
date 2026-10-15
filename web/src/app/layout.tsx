@@ -2,9 +2,10 @@ import type { Metadata, Viewport } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
 import { LiveIndicator, StatusBanners } from "@/features/status/banners"
-import { origin, privateViewer, renderedAt } from "@/lib/api/server"
+import { unwrap } from "@/lib/api/client"
+import { origin, privateViewer, renderedAt, serverApi } from "@/lib/api/server"
 import { Providers } from "./providers"
-import { FocusOnNavigation, MainNav, Mark, ThemeSelect } from "./shell"
+import { FocusOnNavigation, MainNav, Mark, ThemeSelect, ViewerMenu } from "./shell"
 import "@/styles/index.css"
 import "@/styles/docs.css"
 
@@ -21,14 +22,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const viewport: Viewport = { colorScheme: "light dark", width: "device-width", initialScale: 1 }
 
-/** RootLayout is the shell: skip link, header with navigation and theme, status banners and the page. */
 /** release is the portal's release as the header shows it: v2.0.1, or dev for a local build. */
 function release(): string {
   const v = process.env.SCP_VERSION ?? "dev"
   return /^\d/.test(v) ? `v${v}` : v
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/** RootLayout is the shell: skip link, header with navigation, the viewer and theme, status banners and the page. */
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Without the API the header leaves the viewer out; the page shows the problem.
+  const me = await serverApi()
+    .then((a) => unwrap(a.GET("/me")))
+    .catch(() => undefined)
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -58,6 +63,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <MainNav />
               <div className="ml-auto flex items-center gap-4">
                 <LiveIndicator />
+                <ViewerMenu me={me} />
                 <ThemeSelect />
               </div>
             </div>

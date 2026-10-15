@@ -224,6 +224,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 			return nil, err
 		}
 		opts.Auth, me.SignIn = a, a.Methods
+		if u, err := url.Parse(cfg.Auth.OIDC.Issuer); err == nil && u.Host != "" { // sign-out ends at the provider's end session
+			opts.FormTargets = []string{u.Scheme + "://" + u.Host}
+		}
 		routes = append(routes, a.Routes()...)
 	}
 	catalogAPI := catalog.API{Current: view,

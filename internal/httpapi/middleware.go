@@ -37,6 +37,7 @@ type Options struct {
 	HSTS           bool           // the public URL is https
 	PublicURL      string         // server.public_url: the origin of canonical URLs; empty: the request's
 	WebToken       string         // the secret the web UI server shows on its API calls to name the page's viewer (Pages)
+	FormTargets    []string       // origins a page's form may end at beyond the portal: the sign-in provider's end session
 	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For, and the Access headers, are believed
 	Access         Access
 	Auth           Authenticator // SCP's own sign-in and bearer tokens; nil without them

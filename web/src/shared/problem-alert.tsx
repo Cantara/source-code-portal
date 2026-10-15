@@ -7,6 +7,8 @@ const titles: Record<string, string> = {
   "queue-full": "The portal is busy",
   internal: "Something went wrong on the server",
   network: "The portal could not be reached",
+  unauthenticated: "Sign in first",
+  forbidden: "Not allowed",
 }
 
 /** problemTitle maps a problem code to its title. */

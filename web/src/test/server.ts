@@ -79,8 +79,20 @@ export const descriptor: S["Descriptor"] = {
 
 export const snapshot = (version: number, ready = true): S["SnapshotInfo"] => ({ version, builtAt: at, ready, sources: [] })
 
+/** me is the viewer: anonymous on a portal with both ways to sign in, unless over says otherwise. */
+export const me = (over: Partial<S["Me"]> = {}): S["Me"] => ({
+  signedIn: false,
+  name: "",
+  via: "none",
+  private: false,
+  admin: false,
+  signIn: { oidc: true, token: true },
+  ...over,
+})
+
 /** defaults answer every page with one group, two repositories and a README. */
 export const defaults = [
+  http.get("/me", ({ response }) => response(200).json(me())),
   http.get("/snapshot", ({ response }) => response(200).json(snapshot(1))),
   http.get("/repos", ({ response }) => response(200).json({ repos: [repo("Whydah"), repo("Whydah-Core")] })),
   http.get("/dashboard", ({ response }) =>

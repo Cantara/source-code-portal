@@ -13,6 +13,8 @@ const pages = [
   ["/repos/acme/whydah-core/commits?sha=0000000000000000000000000000000000000029", "Commits in acme/Whydah-Core"],
   ["/commits?group=whydah", "Commits"],
   ["/repos/acme/whydah-core/docs/docs/setup", "Setup"],
+  ["/signin", "Sign in"],
+  ["/admin", "Admin"],
 ] as const
 
 async function axe(page: Page) {

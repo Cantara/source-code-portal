@@ -58,7 +58,7 @@ func New(clientID string) *Provider {
 	mux.HandleFunc("GET /authorize", p.authorize)
 	mux.HandleFunc("POST /token", p.token)
 	mux.HandleFunc("GET /userinfo", p.userinfo)
-	mux.HandleFunc("GET /end_session", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	mux.HandleFunc("GET /end_session", p.endSession)
 	p.Server = httptest.NewServer(mux)
 	return p
 }
@@ -158,6 +158,16 @@ func (p *Provider) userinfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"sub": u.Subject, "email": u.Email, "name": u.Name, "groups": u.Groups})
+}
+
+// endSession signs out and sends the browser back to post_logout_redirect_uri, as providers do.
+func (p *Provider) endSession(w http.ResponseWriter, r *http.Request) {
+	back := r.URL.Query().Get("post_logout_redirect_uri")
+	if back == "" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, back, http.StatusFound) //nolint:gosec // G710: a test provider
 }
 
 func (p *Provider) sign(claims map[string]any) string {

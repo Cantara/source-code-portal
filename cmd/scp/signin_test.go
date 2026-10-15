@@ -137,8 +137,10 @@ github:
 	if code, b := do(ada.Client, http.MethodGet, "/api/v1/admin/status"); code != http.StatusOK || !strings.Contains(b, `"ready"`) {
 		t.Errorf("Ada's status: %d %s", code, b)
 	}
-	if code, _ := do(ada.Client, http.MethodPost, "/auth/logout", "Sec-Fetch-Site", "same-origin"); code != http.StatusNoContent {
-		t.Errorf("sign-out does not reach the provider's end session: %d", code)
+	stay := *ada.Client
+	stay.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	if code, _ := do(&stay, http.MethodPost, "/auth/logout", "Sec-Fetch-Site", "same-origin"); code != http.StatusSeeOther {
+		t.Errorf("sign-out: %d", code)
 	}
 	if m := me(ada.Client); m.SignedIn {
 		t.Errorf("Ada after sign-out: %+v", m)

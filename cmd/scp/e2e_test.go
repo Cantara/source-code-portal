@@ -18,6 +18,7 @@ import (
 
 	gogh "github.com/google/go-github/v92/github"
 
+	"github.com/cantara/source-code-portal/internal/auth/oidctest"
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -31,6 +32,8 @@ const logoPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9
 // e2e suite (web/playwright.config.ts runs it), with the web UI server of web/bundle (`pnpm -C web build`) as its child. Without
 // E2E_SCP_ADDR it is skipped. E2E_CONTROL_ADDR, when set,
 // serves POST /push?repo={name}&message={text}: a new commit on the fake GitHub and a push to the engine, as a webhook would.
+// Sign-in is on: a fake provider signs in Ada Lovelace (ada@example.org, an admin, in staff), the token e2e-token-… is in staff,
+// and staff sees the private repository vault.
 func TestServeForPlaywright(t *testing.T) {
 	addr := os.Getenv("E2E_SCP_ADDR")
 	if addr == "" {
@@ -42,6 +45,10 @@ func TestServeForPlaywright(t *testing.T) {
 		Visibility: new("public"), Topics: []string{"iam"}, License: &gogh.License{SPDXID: new("Apache-2.0")}})
 	sso := gh.AddRepo("acme", gogh.Repository{Name: new("whydah-sso"), Description: new("Single sign-on"), Visibility: new("public")})
 	tool := gh.AddRepo("acme", gogh.Repository{Name: new("tool"), Description: new("A tool"), Visibility: new("public")})
+	gh.AddRepo("acme", gogh.Repository{Name: new("vault"), Description: new("Secrets of the staff"), Visibility: new("private")})
+	idp := oidctest.New("scp-e2e")
+	defer idp.Close()
+	idp.SetUser(oidctest.User{Subject: "u-1", Email: "ada@example.org", Name: "Ada Lovelace", Groups: []string{"staff"}})
 	start := time.Now().Add(-48 * time.Hour)
 	history := map[int64][]githubtest.Commit{}
 	for i, id := range []int64{core, sso, tool} {
@@ -99,20 +106,28 @@ func TestServeForPlaywright(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	token := filepath.Join(dir, "token")
+	token, key, e2eToken := filepath.Join(dir, "token"), filepath.Join(dir, "session-key"), filepath.Join(dir, "e2e-token")
 	path := filepath.Join(dir, "scp.yaml")
 	body := `store: {path: ` + filepath.Join(dir, "scp.db") + `}
-server: {public_addr: "` + addr + `", admin_addr: "127.0.0.1:0"}
+server: {public_addr: "` + addr + `", admin_addr: "127.0.0.1:0", public_url: "http://` + addr + `"}
 web: {dir: ` + bundle + `}
+access: {private_groups: [staff]}
+auth:
+  session_key_file: ` + key + `
+  admin_emails: [ada@example.org]
+  tokens: [{name: e2e, secret_file: ` + e2eToken + `, groups: [staff]}]
+  oidc: {issuer: "` + idp.Issuer() + `", client_id: scp-e2e, scopes: [openid, email, profile, groups]}
 github:
   sources:
-    - {id: gh, base_url: "` + gh.BaseURL() + `", orgs: [acme], token_file: ` + token + `}
+    - {id: gh, base_url: "` + gh.BaseURL() + `", orgs: [acme], token_file: ` + token + `, include_private: true}
 catalog:
   groups:
     - {id: whydah, name: Whydah, description: Identity and access, default_repo: Whydah-Core, match: [{prefix: whydah-}]}
     - {id: other, name: Other, default_repo: tool, match: [{catch_all: true}]}
 `
-	if os.WriteFile(token, []byte("ghp_e2e"), 0o600) != nil || os.WriteFile(path, []byte(body), 0o600) != nil {
+	if os.WriteFile(token, []byte("ghp_e2e"), 0o600) != nil || os.WriteFile(path, []byte(body), 0o600) != nil ||
+		os.WriteFile(key, []byte("e2e-session-key-e2e-session-key-0123"), 0o600) != nil ||
+		os.WriteFile(e2eToken, []byte("e2e-token-0123456789abcdef0123456789abcdef"), 0o600) != nil {
 		t.Fatal("write config")
 	}
 	cfg, _, err := config.Load(path, nil)

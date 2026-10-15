@@ -26,7 +26,7 @@ func TestPages(t *testing.T) {
 	defer upstream.Close()
 	u, _ := url.Parse(upstream.URL)
 	o := testOptions()
-	o.PublicURL, o.WebToken = "https://scp.example/portal", "t0ken"
+	o.PublicURL, o.WebToken, o.FormTargets = "https://scp.example/portal", "t0ken", []string{"https://id.example"}
 	o.Access = Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{"*"}}
 	h := Public(o, o.Pages(u), nil, stub{})
 
@@ -41,7 +41,8 @@ func TestPages(t *testing.T) {
 	nonce := regexp.MustCompile(`'nonce-([A-Za-z0-9+/=]{24})'`).FindStringSubmatch(csp)
 	if rec.Code != http.StatusOK || rec.Body.String() != "<!doctype html>portal.local/repos/acme/core?tab=1" || nonce == nil ||
 		len(rec.Header().Values("Content-Security-Policy")) != 1 || rec.Header().Get("X-Powered-By") != "" ||
-		rec.Header().Get("Permissions-Policy") != permissionsPage || !strings.HasPrefix(rec.Header().Get("Cache-Control"), "private") {
+		rec.Header().Get("Permissions-Policy") != permissionsPage || !strings.HasPrefix(rec.Header().Get("Cache-Control"), "private") ||
+		!strings.Contains(csp, "; form-action 'self' https://id.example;") {
 		t.Fatalf("page: %d %q %v", rec.Code, rec.Body, rec.Header())
 	}
 	for k, want := range map[string]string{"Content-Security-Policy": csp, headerToken: "t0ken", headerViewer: "private",
@@ -61,7 +62,7 @@ func TestPages(t *testing.T) {
 		t.Errorf("a 404 client navigation: %d %q, want its own answer", rec.Code, rec.Body)
 	}
 	seen = nil
-	for _, p := range []string{"/badges/x", "/images/a/b/c/d", "/webhooks/github", "/.well-known/security.txt"} {
+	for _, p := range []string{"/auth/login", "/badges/x", "/images/a/b/c/d", "/webhooks/github", "/.well-known/security.txt"} {
 		if rec := get(h, p); rec.Code != http.StatusNotFound || seen != nil {
 			t.Errorf("%s: %d, proxied %v", p, rec.Code, seen != nil)
 		}
