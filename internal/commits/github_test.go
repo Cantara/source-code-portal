@@ -66,6 +66,7 @@ func TestHistory(t *testing.T) {
 	srv.SetBranch(id, "feature/a", side(5000, 3, hex(11))...)
 	srv.SetBranch(id, "feature/b", side(6000, 2, hex(401))...)
 	srv.SetBranch(id, "renovate/lib-2.x", side(7000, 1, hex(1))...)
+	srv.SetBranch(id, "snyk-fix-0123abcd", side(8000, 1, hex(2))...)
 	srv.SetBranch(id, "old", main[5])
 	srv.SetTag(id, "v1", hex(1))
 	srv.SetTag(id, "v0", hex(601)) // beyond the kept history

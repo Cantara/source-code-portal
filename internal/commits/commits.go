@@ -66,7 +66,12 @@ func (c *Commits) Spec() sync.Spec {
 
 // automationBranch reports whether a branch is a bot's update branch: those come and go with every dependency update.
 func automationBranch(name string) bool {
-	return strings.HasPrefix(name, "renovate/") || strings.HasPrefix(name, "dependabot/")
+	for _, p := range []string{"renovate/", "dependabot/", "snyk-fix-", "snyk-upgrade-"} {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Commits) run(ctx context.Context, j sync.Job) (sync.Result, error) {

@@ -37,7 +37,7 @@ type Label struct {
 type History struct {
 	Main   []Commit
 	Side   []Commit
-	Labels []Label
+	Labels []Label // the default branch first, then branches, then tags
 	Order  []*Commit
 	pos    map[string]int     // SHA -> index in Order
 	at     map[string][]Label // SHA -> its labels, the default branch first, then branches, then tags
@@ -50,6 +50,7 @@ func newHistory(main, side []Commit, labels []Label, defaultBranch string) *Hist
 		l := &h.Labels[i]
 		l.Default = l.Kind == "branch" && l.Name == defaultBranch
 	}
+	slices.SortStableFunc(h.Labels, func(a, b Label) int { return rank(a) - rank(b) })
 	for _, l := range h.Labels {
 		h.at[l.SHA] = append(h.at[l.SHA], l)
 	}
