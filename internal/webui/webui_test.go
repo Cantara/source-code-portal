@@ -72,12 +72,6 @@ func TestServer(t *testing.T) {
 	if err := os.WriteFile(dir+"/crash", nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(dir+"/.next", 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(dir+"/.next/BUILD_ID", []byte("b1\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.WriteFile(dir+"/BUILD", []byte("commit-1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -114,14 +108,12 @@ func TestServer(t *testing.T) {
 	if got := s.Build(); got != "commit-1" {
 		t.Errorf("Build = %q, want the bundle's commit-1", got)
 	}
-	// A new bundle written under the running server restarts it at once, and Build names the new one.
-	if err := os.WriteFile(dir+"/BUILD", []byte("commit-2\n"), 0o600); err != nil {
+	// A new bundle written under the running server restarts it at once, and Build names the new one. A rebuild of the same commit
+	// rewrites BUILD with the same content: its new modification time still counts.
+	if err := os.WriteFile(dir+"/BUILD", []byte("commit-1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.Build(); got != "commit-1" {
-		t.Errorf("Build = %q before the restart, want the running commit-1", got)
-	}
-	if err := os.WriteFile(dir+"/.next/BUILD_ID", []byte("b2\n"), 0o600); err != nil {
+	if err := os.Chtimes(dir+"/BUILD", time.Time{}, time.Now().Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	deadline = time.Now().Add(10 * time.Second)
@@ -131,8 +123,15 @@ func TestServer(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if got := s.Build(); got != "commit-2" {
-		t.Errorf("Build = %q after the restart, want commit-2", got)
+	if err := os.WriteFile(dir+"/BUILD", []byte("commit-2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	deadline = time.Now().Add(10 * time.Second)
+	for s.Build() != "commit-2" {
+		if time.Now().After(deadline) {
+			t.Fatalf("Build = %q after a new commit's bundle, want commit-2; log:\n%s", s.Build(), out)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	cancel()
 	select {

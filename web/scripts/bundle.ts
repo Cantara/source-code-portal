@@ -10,7 +10,8 @@ rmSync(out, { recursive: true, force: true })
 cpSync(join(web, ".next/standalone"), out, { recursive: true, verbatimSymlinks: true })
 cpSync(join(web, ".next/static"), join(out, ".next/static"), { recursive: true })
 cpSync(join(web, "public"), join(out, "public"), { recursive: true })
-// The build the pages know (NEXT_PUBLIC_BUILD_ID); scp sends the running bundle's as X-SCP-Build.
+// The build the pages know (NEXT_PUBLIC_BUILD_ID), written last: scp sends the running bundle's as X-SCP-Build, and restarts the web
+// UI server when the file is rewritten.
 writeFileSync(join(out, "BUILD"), `${process.env.BUILD_ID ?? "dev"}\n`)
 
 const kb = 1000

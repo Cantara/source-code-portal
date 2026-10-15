@@ -25,7 +25,7 @@ const (
 	steady     = time.Minute     // a child that ran this long restarts after minBackoff again
 	stopGrace  = 5 * time.Second // SIGTERM to SIGKILL at shutdown
 	probeEvery = 100 * time.Millisecond
-	buildEvery = 2 * time.Second // how often the bundle's build id is compared
+	buildEvery = 2 * time.Second // how often the bundle on disk is compared with the running one
 )
 
 // errReplaced ends a run whose bundle was replaced: the next one starts at once from the new files.
@@ -66,8 +66,8 @@ func (s *Server) Build() string {
 // Ready reports whether the server accepts connections.
 func (s *Server) Ready() bool { return s.ready.Load() }
 
-// Run starts the server and restarts it after every exit (1 s doubling to 30 s), and at once when the bundle is replaced (its
-// .next/BUILD_ID changes: a running server cannot load the files of another build), until ctx ends, then stops it: SIGTERM, and
+// Run starts the server and restarts it after every exit (1 s doubling to 30 s), and at once when the bundle is replaced (its BUILD
+// file is rewritten: a running server cannot load the files of another build), until ctx ends, then stops it: SIGTERM, and
 // SIGKILL after 5 s. api is the portal's API base the server calls (SCP_API, for example http://127.0.0.1:9090).
 func (s *Server) Run(ctx context.Context, api string) error {
 	backoff := minBackoff
@@ -101,7 +101,7 @@ func (s *Server) once(ctx context.Context, api string) error {
 	out := &lines{log: s.log}
 	run, stop := context.WithCancelCause(ctx)
 	defer stop(nil)
-	build := s.build()
+	stamp := s.stamp()
 	served := s.read("BUILD")
 	s.served.Store(&served)
 	cmd := exec.CommandContext(run, s.node, "server.js") //nolint:gosec // G204: the operator's web.node runs the operator's web.dir
@@ -118,7 +118,7 @@ func (s *Server) once(ctx context.Context, api string) error {
 	s.log.Info("web UI server started", "pid", cmd.Process.Pid, "addr", s.addr)
 	done := make(chan struct{})
 	go s.probe(run, done)
-	go s.watch(build, done, stop)
+	go s.watch(stamp, done, stop)
 	err := cmd.Wait()
 	close(done)
 	if errors.Is(context.Cause(run), errReplaced) {
@@ -132,8 +132,15 @@ func (s *Server) once(ctx context.Context, api string) error {
 	return err
 }
 
-// build is the id of the bundle's Next.js build (new on every build); empty when it cannot be read.
-func (s *Server) build() string { return s.read(filepath.Join(".next", "BUILD_ID")) }
+// stamp identifies the bundle on disk: its BUILD file's content and modification time, new with every assembly (Next.js's own
+// .next/BUILD_ID is not); empty without the file, as while a bundle is being replaced.
+func (s *Server) stamp() string {
+	fi, err := os.Stat(filepath.Join(s.dir, "BUILD")) //nolint:gosec // G703: the operator's web.dir
+	if err != nil {
+		return ""
+	}
+	return s.read("BUILD") + "@" + fi.ModTime().String()
+}
 
 // read is a one-line file of the bundle, trimmed; empty when it cannot be read.
 func (s *Server) read(name string) string {
@@ -141,8 +148,8 @@ func (s *Server) read(name string) string {
 	return string(bytes.TrimSpace(b))
 }
 
-// watch ends the run when the build id changes from build (a new bundle has been written in place).
-func (s *Server) watch(build string, done <-chan struct{}, stop context.CancelCauseFunc) {
+// watch ends the run when the bundle's stamp changes (a new bundle has been written in place).
+func (s *Server) watch(stamp string, done <-chan struct{}, stop context.CancelCauseFunc) {
 	t := time.NewTicker(buildEvery)
 	defer t.Stop()
 	for {
@@ -151,7 +158,7 @@ func (s *Server) watch(build string, done <-chan struct{}, stop context.CancelCa
 			return
 		case <-t.C:
 		}
-		if now := s.build(); now != build && now != "" {
+		if now := s.stamp(); now != stamp && now != "" {
 			stop(errReplaced)
 			return
 		}
