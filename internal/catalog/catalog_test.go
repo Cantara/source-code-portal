@@ -170,3 +170,23 @@ func TestPushedAtNotifies(t *testing.T) {
 		t.Errorf("after a push to b: notified %v, err %v", pushed, err)
 	}
 }
+
+// TestMissConfirmedSoon: a listing that misses a tracked repository (deleted, transferred) asks to run again within confirmAfter,
+// and that listing removes it; a listing with no miss keeps the interval.
+func TestMissConfirmedSoon(t *testing.T) {
+	l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a"), pub(2, "gone")}}}
+	c := newCatalog(t, l)
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	it, res, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+	if err != nil || res.Again != 0 {
+		t.Fatalf("first listing: again %v, err %v", res.Again, err)
+	}
+	l.repos["acme"] = l.repos["acme"][:1]
+	it, res, err = runAndPublish(t, c, p, it)
+	if err != nil || res.Again != confirmAfter || len(p.Current().Repos) != 2 {
+		t.Fatalf("missed once: again %v, repos %d, err %v", res.Again, len(p.Current().Repos), err)
+	}
+	if _, res, err = runAndPublish(t, c, p, it); err != nil || res.Again != 0 || len(p.Current().Repos) != 1 {
+		t.Errorf("confirmed: again %v, repos %d, err %v", res.Again, len(p.Current().Repos), err)
+	}
+}

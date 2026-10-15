@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"time"
 
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -14,7 +15,8 @@ import (
 const (
 	maxAliases     = 8
 	missesToRemove = 2
-	maxDescription = 1000 // runes
+	confirmAfter   = 30 * time.Second // the listing that confirms a miss runs this soon after it
+	maxDescription = 1000             // runes
 	maxTopics      = 20
 )
 

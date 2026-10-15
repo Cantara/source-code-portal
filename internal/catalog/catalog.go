@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -146,6 +147,9 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		res.Catalogue = append(res.Catalogue, store.Repo{Key: t.Repo.Key(), ID: t.Repo.ID})
 	}
 	res.Unchanged = j.Prev.State == snapshot.StateOK && bytes.Equal(payload, j.Prev.Payload)
+	if slices.ContainsFunc(next.Repos, func(t Tracked) bool { return t.Misses > 0 }) {
+		res.Again = confirmAfter // a repository the listing missed (deleted, transferred) leaves at the confirming listing
+	}
 	return res, nil
 }
 

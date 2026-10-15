@@ -71,7 +71,7 @@ package sync
 type Priority uint8 // PrioEvent=1, PrioScheduled=2, PrioBackfill=3; lower runs first
 type Event string   // a name: EventPush "push", EventTag "tag", EventSourceChanged "source", or another GitHub event name (github.md behaviour 9)
 type Job struct { Key, Source string; Repo snapshot.RepoKey; Prev store.Item } // key "<kind>/<owner>/<name>" or "<kind>/<source>"
-type Result struct { State snapshot.State; Unchanged bool; ContentSHA string; Payload []byte; Catalogue []store.Repo } // Catalogue: listing jobs
+type Result struct { State snapshot.State; Unchanged bool; ContentSHA string; Payload []byte; Catalogue []store.Repo; Again time.Duration } // Catalogue: listing jobs; Again (< TTL): run again that soon
 type Spec struct {
 	Kind string; PerSource, Lists bool; Prio Priority; TTL, Timeout time.Duration // Timeout default 2 m
 	On      []Event                                                        // events that make this kind due for the repository or source

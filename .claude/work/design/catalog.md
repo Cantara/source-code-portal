@@ -19,7 +19,9 @@ aliases to the snapshot. It owns the removal rule; the listing every `catalog.re
 - Membership is many to many; group display order is config order: operators control the dashboard.
 - A `default_repo` not among the members degrades the group card (`defaultRepoState: missing`) and the group stays visible.
 - Removal rule (the one statement; github.md refers here): a repository is removed after two consecutive complete listings miss it; an
-  empty listing for a source that had repositories fails the run; a listed repository that is no longer admitted is removed at once.
+  empty listing for a source that had repositories fails the run; a listed repository that is no longer admitted is removed at once. A
+  listing with a miss asks to run again after 30 s (`Result.Again`, `confirmAfter`), so a deleted or transferred repository leaves
+  within about 30 s of the webhook's listing, still after two complete listings.
 - The descriptor is catalogue metadata read by pages, `llms` and the API: `catalog` fetches it in its own job and parses it bounded and
   field by field; it affects display only, membership and access come from config.
 - Groups config is validated completely at startup (and by `scp config check`); any error refuses start.

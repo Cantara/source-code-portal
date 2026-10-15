@@ -148,6 +148,30 @@ func TestRunsAndReschedules(t *testing.T) {
 	})
 }
 
+func TestAgainRunsSooner(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := &counter{result: Result{Payload: []byte("v1"), Again: 30 * time.Second}}
+		r := newRig(t, t.TempDir(), nil, 4, sourceSpec(c, time.Hour))
+		r.run()
+		time.Sleep(31 * time.Second)
+		if c.n.Load() != 2 {
+			t.Errorf("runs 31s after a result asking again in 30s = %d, want 2", c.n.Load())
+		}
+		c.mu.Lock()
+		c.result.Again = 0
+		c.mu.Unlock()
+		time.Sleep(31 * time.Second)
+		if c.n.Load() != 3 {
+			t.Errorf("runs = %d, want 3", c.n.Load())
+		}
+		time.Sleep(10 * time.Minute)
+		if c.n.Load() != 3 {
+			t.Errorf("without Again the TTL holds: runs = %d", c.n.Load())
+		}
+		r.stop()
+	})
+}
+
 func TestTransientKeepsPayloadAndBacksOff(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		c := &counter{result: Result{Payload: []byte("good")}}

@@ -25,9 +25,11 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   `/api/v1/status` carry no repository names: patterns, counts and source ids only.
 - `serve` and `config check` warn (stderr, `loadConfig`) when `include_private` is on, the public listener is not loopback and
   `trusted_proxies` holds a range wider than /24 (IPv4) or /64 (IPv6) (`trustWarnings`).
-- A verified `repository` `deleted` delivery removes the repository at once; otherwise two complete listings must miss it.
+- Removal stays at two complete listings (a partial listing never drops data), but a listing that misses a repository runs again
+  after 30 s (`Result.Again`): with the webhook's `deleted` or `transferred` delivery starting the first, the repository leaves within
+  about 30 s; without a webhook, within one interval plus 30 s. A repository turned private leaves the public view at the next publish.
 - `docs/security-model.md` states the guarantees, what the operator provides (an encrypted or tmpfs volume for `store.path`, the
   network layout, the App's permissions, key rotation) and what is out of scope.
 
 ## Order
-Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> audit log (built) -> start warning (built) -> removal on `deleted` -> `security-model.md`.
+Leak test (built) -> `require_auth` (built) -> `exclude` (built) -> audit log (built) -> start warning (built) -> confirming listing (built) -> `security-model.md`.

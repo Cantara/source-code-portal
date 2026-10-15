@@ -83,6 +83,8 @@ type Result struct {
 	// Catalogue, when not nil, is the complete list of the source's repositories (per-source jobs only). Repositories that left are
 	// deleted with their items; new ones get entries for every per-repository kind.
 	Catalogue []store.Repo
+	// Again, when shorter than the TTL, runs the job again after it: a result that wants confirming soon.
+	Again time.Duration
 }
 
 // Spec is one kind of job.
@@ -666,6 +668,9 @@ func (e *Engine) succeeded(en *entry, r Result, now time.Time) {
 	it.CheckedAt, it.Attempts, it.ErrCode = now, 0, ""
 	en.item = it
 	en.due, en.prio, en.backoff = now.Add(withJitter(en.spec.TTL)), en.spec.Prio, false
+	if r.Again > 0 && r.Again < en.spec.TTL {
+		en.due = now.Add(r.Again)
+	}
 	if p := e.pauses[en.source]; p != nil {
 		p.rateStreak, p.authStreak = 0, 0
 	}
