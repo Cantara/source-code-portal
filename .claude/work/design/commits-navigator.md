@@ -13,10 +13,10 @@ panel and pagination through the stored history.
 - Gitea and Forgejo `/{owner}/{repo}/graph`: a server-rendered graph with pagination and a branch filter: the closest model to a
   server-rendered portal.
 - JetBrains Git log, Fork, GitKraken, Sourcetree: one compact row per commit (graph, refs and subject, author, date, hash), filters
-  (branch, author, text, date), selection with a details pane, keyboard navigation, virtual scrolling over long histories.
+  (branch, author, text, date), selection with a details pane, keyboard navigation, scrolling over long histories.
 
 Kept: the compact row with aligned columns, labels at heads, branch, author, text and automation filters, the details panel,
-keyboard, virtual scrolling, cursor pagination with the server rendering the first page. Left out: write actions (checkout, merge,
+keyboard, numbered pages (Gitea's model) of a size the reader chooses, with the server rendering the page asked for. Left out: write actions (checkout, merge,
 cherry-pick: the portal reads), diffs and changed files (one GitHub call per commit viewed and a request-time fetch; the panel links to
 GitHub's diff), compare. A graph across repositories is not drawn: commits of different repositories share no parents, so a product
 is a timeline, and a repository is a graph.
@@ -37,11 +37,13 @@ only from the snapshot by the handlers:
    measures it.
 
 ## API
-- `GET /api/v1/repos/{owner}/{name}/history?ref=&author=&q=&automation=&cursor=&limit=` (limit 1..200, default 100): the commits in
-  graph order (newest first by committer date, a parent never before its child), each with its refs; the cursor is a keyset over the
-  graph order bound to the filter. `ref` limits to the commits reachable from that branch or tag; `author`, `q` (subject and body) and
+- `GET /api/v1/repos/{owner}/{name}/history?ref=&author=&q=&automation=&page=&limit=&at=` (limit 1..200, default 100; page
+  1..100000): the commits in graph order (newest first by committer date, a parent never before its child), each with its refs and its
+  row of the git graph, in numbered pages (`{number, size, total, pages}`); `at` (a SHA or prefix) answers the page holding that commit
+  and names it in `at`. The graph is laid out on the server (`graph.go`) once per snapshot over the whole history, so every page
+  starts with the lanes the pages before it left open and a row is the same whatever the page size; `lanes` is the page's width. `ref` limits to the commits reachable from that branch or tag (laid out as a history of its own); `author`, `q` (subject and body) and
   `automation=false` filter, and a filtered page says so (`filtered: true`), because a filtered list draws no graph.
-- `GET /api/v1/commits?group=` (exists) gains `automation=false` and serves the product timeline.
+- `GET /api/v1/commits?group=` gains `automation=false` and numbered pages and serves the product timeline.
 - Contract in `api/openapi.yaml`; `make gen`.
 
 ## Web
@@ -49,33 +51,40 @@ only from the snapshot by the handlers:
   timeline is the merged feed grouped by day, a repository chip per row, filters for repository and automation. Choosing a
   repository opens its navigator (`/repos/{o}/{n}/commits`, which the repository page links to as today).
 - Navigator (`features/commits/navigator.tsx`, `history.ts`): a listbox of rows 32 px with columns graph | refs and subject | author |
-  date | hash, each row's graph cell drawn from `graph.ts` (lanes never shift, freed lanes reused, merge rings, dashed lines to
+  date | hash, each row's graph cell drawn from the row the API laid out (lanes never shift, freed lanes reused, merge rings, dashed lines to
   parents in the API's `beyond`); branch and tag pills with their icons at their commits (the default branch marked, `+N` past
-  three); window virtual scrolling (`@tanstack/react-virtual`) with spacers sized through the DOM (the CSP allows no style
-  attribute), the first render drawing the whole first page; infinite loading on scroll and an "Older commits" link; selecting a
+  three); numbered pages (`shared/pager.tsx`: first, last and two either side of the current page, previous and next, the range shown)
+  above and below the list, 25, 50, 100 or 200 rows (the reader's choice, kept in the cookie `scp-per-history` for a year; 100 until
+  chosen), every row in the DOM (a page holds at most 200, so nothing is virtualised); a new page size keeps the first commit shown in
+  view; the first page follows new snapshots, a later one stays and offers "New commits"; selecting a
   commit highlights its lane and opens the details panel (message, author and committer, exact UTC time, parents and children that
   select their commit, refs, GitHub links to the commit and its files). A filtered page is a list without a graph.
-- URL state: `group`, `ref`, `author`, `q`, `automation`, `sha` (the selected commit; a prefix of 4 or more hex digits selects too),
-  filters pushed and the selection replaced through `history` (no server round trip); back and forward restore. A `sha` not yet loaded
-  pages until it is; one outside the stored history says so and links to GitHub.
-- Keyboard: up and down or j and k move the selection, Home and End, Enter opens the panel, Escape closes it, `/` focuses the search.
-- Without JavaScript the first page renders on the server with older and newer links.
+- URL state: `group`, `ref`, `author`, `q`, `automation`, `page`, `per` (only when it differs from the reader's size), `sha` (the
+  selected commit; a prefix of 4 or more hex digits selects too), filters and pages pushed and the selection replaced through `history`
+  (no server round trip); back and forward restore. A `sha` without `page` asks the API for the page holding it (`at`); one outside the
+  stored history says so and links to GitHub. A page past the last says so and links to the last.
+- Timelines (`/commits`, `/groups/{g}/commits`): the same pager and page sizes (cookie `scp-per-commits`, 50 until chosen).
+- The repository page's "Latest commits" is the commits feature's side panel (`features/commits/panels.tsx`): the first 30 of the
+  history with their graph rows and a link to the navigator.
+- Keyboard: up and down or j and k move the selection (past a page's last row to the next page's first, before its first to the
+  previous page's last), Home and End, Enter opens the panel, Escape closes it, `/` focuses the search.
+- Without JavaScript the page asked for renders on the server; the pager's links page.
 
 ## Acceptance criteria
 1. History: the fake GitHub's ledger proves the reads above: a cold run of a 700-commit repository with 3 branches stores 500 + its
    branch commits and the 100 newest tags; a warm run with no change makes only 304s and the branch and tag listings; a push reads
    page 1 and stops at the first held SHA. A warm start serves the history from the store before any GitHub call.
 2. Order and pages: on random DAGs (merges, octopus merges, criss-cross, branches off and back) every page keeps a parent after its
-   child; a page fetched after a push neither repeats nor skips a commit; a cursor of another filter is refused.
-3. Layout: for every random DAG and page split, the rows of the earlier pages are identical after more pages load (prefix stability);
-   every edge starts and ends at a node or a page end; at most 8 lanes, a commit beyond them sits in the last.
+   child; numbered pages cover the history once, a page past the last is empty, and `at` finds the page of any held commit.
+3. Layout: for every random DAG the rows are identical whatever the page size; every line meets a node or continues into the next
+   row; at most 8 lanes, a commit beyond them sits in the last.
 4. Labels: every branch and tag of the history shows at its commit; the default branch is marked; four or more labels show three and
    `+N`.
-5. Performance: with a whole stored history loaded (500 rows in the e2e suite; the caps allow 1,500), at most 120 rows are in the DOM
-   and a scroll through them has no long task over 50 ms; the history API answers p99 under 50 ms at 1,000 repositories in the load test; the JavaScript stays within the
+5. Performance: a page of 200 rows renders without a long task over 50 ms; the history API answers p99 under 50 ms at 1,000 repositories in the load test; the JavaScript stays within the
    300 KB budget.
-6. Navigation: product, repository, branch, author, text and automation filters work from the URL alone; back and forward restore;
-   `?sha=` selects and scrolls to the commit or says it is older than the stored history.
+6. Navigation: product, repository, branch, author, text, automation, page and page-size filters work from the URL alone; back and
+   forward restore; the chosen page size is remembered across visits; `?sha=` opens the page holding the commit, selects and scrolls to
+   it, or says it is older than the stored history; the keyboard crosses page ends.
 7. Details: the panel shows the message body, author, committer, exact time, parents and children (each selects its commit when
    loaded), refs and the GitHub links.
 8. Accessibility: axe clean in both themes on the timeline, the navigator and the panel; the whole flow works by keyboard; each row

@@ -2,11 +2,8 @@ package commits
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -17,21 +14,12 @@ import (
 const (
 	defaultLimit = 50
 	maxLimit     = 200
+	maxPage      = 100000
 )
 
 // API serves the merged commit feeds from the current snapshot. It implements the commits methods of the strict server.
 type API struct {
 	Current func(context.Context) *snapshot.Snapshot // the viewer's view
-}
-
-// cursor is the position after the last commit of a page, bound to the filter it was issued for.
-type cursor struct {
-	Group string `json:"g,omitempty"`
-	Repo  string `json:"r,omitempty"`
-	Human bool   `json:"h,omitempty"` // automation left out
-	At    int64  `json:"t"`
-	Key   string `json:"k"`
-	SHA   string `json:"s"`
 }
 
 func badRequest(code, detail string) oapi.ListCommits400ApplicationProblemPlusJSONResponse {
@@ -46,14 +34,10 @@ func notFound(detail string) oapi.ListCommits404ApplicationProblemPlusJSONRespon
 
 func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject) (oapi.ListCommitsResponseObject, error) {
 	s, now, p := a.Current(ctx), time.Now(), req.Params
-	limit := defaultLimit
-	if p.Limit != nil {
-		limit = *p.Limit
+	number, limit, bad := pageParams(p.Page, p.Limit, defaultLimit)
+	if bad != "" {
+		return badRequest("validation-failed", bad), nil
 	}
-	if limit < 1 || limit > maxLimit {
-		return badRequest("validation-failed", "limit must be 1 to 200"), nil
-	}
-	var filter cursor
 	var scope []snapshot.RepoKey
 	var refs []Ref
 	if p.Group != nil {
@@ -61,7 +45,7 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		if !ok {
 			return notFound("no such group"), nil
 		}
-		filter.Group, scope = g.ID, g.Members
+		scope = g.Members
 		refs, _ = feed(s, g.ID)
 	} else {
 		refs, _ = feed(s, "")
@@ -76,7 +60,7 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 			return notFound("no such repository"), nil
 		}
 		key := e.Repo.Key()
-		filter.Repo, refs = string(key), nil
+		refs = nil
 		if slices.Contains(scope, key) {
 			cs, _ := Of(e)
 			for i := range cs {
@@ -87,30 +71,30 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		scope = []snapshot.RepoKey{key}
 	}
 
-	if p.Automation != nil && !*p.Automation {
-		filter.Human = true
-		refs = slices.DeleteFunc(slices.Clone(refs), func(r Ref) bool { return Automated(r.Commit) })
-	}
-	start := 0
-	if p.Cursor != nil {
-		c, ok := decodeCursor(*p.Cursor)
-		if !ok || c.Group != filter.Group || c.Repo != filter.Repo || c.Human != filter.Human {
-			return badRequest("invalid-cursor", "the cursor is not valid for this filter"), nil
+	people := p.Automation != nil && !*p.Automation
+	total := len(refs)
+	if people {
+		total = 0
+		for _, r := range refs {
+			if !Automated(r.Commit) {
+				total++
+			}
 		}
-		pos := Ref{Repo: snapshot.RepoKey(c.Key), Commit: &Commit{SHA: c.SHA, CommittedAt: time.Unix(0, c.At)}}
-		start = sort.Search(len(refs), func(i int) bool { return compareRefs(refs[i], pos) > 0 })
 	}
-	end := min(start+limit, len(refs))
-	page := oapi.CommitPage{Commits: make([]oapi.Commit, 0, end-start), Page: oapi.Page{Limit: limit},
-		Freshness: scopeFreshness(s, scope, now)}
-	for _, r := range refs[start:end] {
-		page.Commits = append(page.Commits, commitOf(r.Repo, r.Commit))
-	}
-	if end < len(refs) {
-		last := refs[end-1]
-		next := filter
-		next.At, next.Key, next.SHA = last.Commit.CommittedAt.UnixNano(), string(last.Repo), last.Commit.SHA
-		page.Page.NextCursor = new(encodeCursor(next))
+	start, end, pg := paging(total, number, limit)
+	page := oapi.CommitPage{Commits: make([]oapi.Commit, 0, end-start), Page: pg, Freshness: scopeFreshness(s, scope, now)}
+	i := 0 // the position among the commits the filter keeps
+	for _, r := range refs {
+		if i >= end {
+			break
+		}
+		if people && Automated(r.Commit) {
+			continue
+		}
+		if i >= start {
+			page.Commits = append(page.Commits, commitOf(r.Repo, r.Commit))
+		}
+		i++
 	}
 	return oapi.ListCommits200JSONResponse{Body: page}, nil
 }
@@ -155,19 +139,27 @@ func scopeFreshness(s *snapshot.Snapshot, scope []snapshot.RepoKey, now time.Tim
 	return out
 }
 
-func encodeCursor(c cursor) string { return encodeAny(c) }
-
-func decodeCursor(s string) (cursor, bool) {
-	var c cursor
-	return c, decodeAny(s, &c) && c.Key != "" && c.SHA != ""
+// pageParams are the page number and size asked for (def when no limit), or what is wrong with them.
+func pageParams(page, limit *int, def int) (number, size int, problem string) {
+	number, size = 1, def
+	if page != nil {
+		number = *page
+	}
+	if limit != nil {
+		size = *limit
+	}
+	switch {
+	case number < 1 || number > maxPage:
+		return 0, 0, "page must be 1 to 100000"
+	case size < 1 || size > maxLimit:
+		return 0, 0, "limit must be 1 to 200"
+	}
+	return number, size, ""
 }
 
-func encodeAny(v any) string {
-	b, _ := json.Marshal(v) //nolint:errchkjson // plain structs
-	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func decodeAny(s string, v any) bool {
-	b, err := base64.RawURLEncoding.DecodeString(s)
-	return err == nil && json.Unmarshal(b, v) == nil
+// paging is page number of total items, size per page: its bounds in the list (empty past the last page) and its description.
+func paging(total, number, size int) (start, end int, p oapi.Page) {
+	start = min((number-1)*size, total)
+	end = min(start+size, total)
+	return start, end, oapi.Page{Number: number, Size: size, Total: total, Pages: max(1, (total+size-1)/size)}
 }

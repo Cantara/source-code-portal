@@ -1,37 +1,36 @@
 import Link from "next/link"
-import { useMemo, type Ref } from "react"
-import type { Commit } from "@/lib/api/client"
+import type { Ref } from "react"
+import type { Commit, Schemas } from "@/lib/api/client"
 import { addressPath } from "@/lib/paths"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { RelativeTime } from "@/shared/relative-time"
 import { EmptyState } from "@/shared/empty-state"
-import { graph as layout } from "./graph"
 import { GraphCell } from "./graph-cell"
 
 /**
- * CommitList is commits newest first: subject, repository, author and time. With graph (the commits of one repository) each row
- * draws its part of the git graph, and the subject keeps to one line.
+ * CommitList is commits newest first: subject, repository, author and time. With graph (the rows the API laid out for one
+ * repository's history, one per commit, and their width) each row draws its part of the git graph, and the subject keeps to one line.
  */
 export function CommitList({
   commits,
   showRepo = true,
-  graph = false,
+  graph,
   firstRef,
   repoHref = addressPath,
 }: {
   commits: Commit[]
   showRepo?: boolean
-  graph?: boolean
+  graph?: { rows: (Schemas["GraphRow"] | null)[]; lanes: number }
   firstRef?: Ref<HTMLLIElement>
   /** where a commit's repository links to */
   repoHref?: (address: string) => string
 }) {
-  const g = useMemo(() => (graph ? layout(commits) : undefined), [graph, commits])
+  const g = graph && graph.lanes > 0 ? graph : undefined
   if (commits.length === 0) return <EmptyState title="No commits yet" />
   return (
     <ol className={g ? undefined : "divide-y divide-border"}>
       {commits.map((c, i) => {
-        const row = g?.rows[i]
+        const row = g?.rows[i] ?? undefined
         return (
           <li
             key={c.repo + c.sha}

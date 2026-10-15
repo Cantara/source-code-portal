@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.2",
-    "@tanstack/react-virtual": "3.14.19",
     "next": "16.4.0",
     "openapi-fetch": "0.17.0",
     "react": "19.3.0",

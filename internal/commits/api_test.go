@@ -3,6 +3,7 @@ package commits
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,9 @@ func feedSnapshot(t *testing.T) *snapshot.Snapshot {
 		var cs []Commit
 		for i := range n {
 			cs = append(cs, Commit{SHA: sha(byte('a' + int(id)*5 + i)), CommittedAt: at.Add(-time.Duration(i) * time.Hour)})
+			if id == 0 && i == 1 {
+				cs[i].AuthorName = "renovate[bot]"
+			}
 		}
 		facet.Set(e, newHistory(cs, nil, nil, "main"), f)
 		return e
@@ -44,19 +48,17 @@ func TestListCommitsPages(t *testing.T) {
 		return res
 	}
 	var all []string
-	p := oapi.ListCommitsParams{Group: new("g"), Limit: new(2)}
-	for {
-		page, ok := list(p).(oapi.ListCommits200JSONResponse)
-		if !ok || page.Body.Freshness.Status != "fresh" || len(all) > 5 {
-			t.Fatalf("page: %+v", page)
+	for n := 1; n <= 4; n++ {
+		page, ok := list(oapi.ListCommitsParams{Group: new("g"), Limit: new(2), Page: new(n)}).(oapi.ListCommits200JSONResponse)
+		if !ok || page.Body.Freshness.Status != "fresh" || page.Body.Page != (oapi.Page{Number: n, Size: 2, Total: 5, Pages: 3}) {
+			t.Fatalf("page %d: %+v", n, page)
+		}
+		if n == 4 && len(page.Body.Commits) != 0 {
+			t.Errorf("a page past the last: %+v", page.Body.Commits)
 		}
 		for _, c := range page.Body.Commits {
 			all = append(all, c.Repo+"@"+c.Sha[:1])
 		}
-		if page.Body.Page.NextCursor == nil {
-			break
-		}
-		p.Cursor = page.Body.Page.NextCursor
 	}
 	want := []string{"acme/x@a", "acme/y@f", "acme/x@b", "acme/y@g", "acme/x@c"}
 	if len(all) != len(want) {
@@ -79,12 +81,11 @@ func TestListCommitsPages(t *testing.T) {
 	if page := list(oapi.ListCommitsParams{Group: new("g"), Repo: new("acme/z")}).(oapi.ListCommits200JSONResponse); len(page.Body.Commits) != 0 {
 		t.Errorf("a repository outside the group: %+v", page.Body)
 	}
-	other := list(oapi.ListCommitsParams{Limit: new(1)}).(oapi.ListCommits200JSONResponse).Body.Page.NextCursor
 	for name, p := range map[string]oapi.ListCommitsParams{
-		"limit 0":           {Limit: new(0)},
-		"limit 201":         {Limit: new(201)},
-		"garbage cursor":    {Cursor: new("!!")},
-		"cursor of another": {Group: new("g"), Cursor: other},
+		"limit 0":     {Limit: new(0)},
+		"limit 201":   {Limit: new(201)},
+		"page 0":      {Page: new(0)},
+		"page 100001": {Page: new(100001)},
 	} {
 		if _, ok := list(p).(oapi.ListCommits400ApplicationProblemPlusJSONResponse); !ok {
 			t.Errorf("%s: not a 400", name)
@@ -100,14 +101,18 @@ func TestListCommitsPages(t *testing.T) {
 func TestListCommitsAutomation(t *testing.T) {
 	s := feedSnapshot(t)
 	a := API{Current: func(context.Context) *snapshot.Snapshot { return s }}
-	res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: oapi.ListCommitsParams{Automation: new(false), Limit: new(2)}})
-	page := res.(oapi.ListCommits200JSONResponse).Body
-	if len(page.Commits) != 2 || page.Page.NextCursor == nil {
-		t.Fatalf("page: %+v", page)
+	var shas []string
+	for n := 1; n <= 3; n++ {
+		res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: oapi.ListCommitsParams{Automation: new(false), Limit: new(2), Page: new(n)}})
+		page := res.(oapi.ListCommits200JSONResponse).Body
+		if page.Page != (oapi.Page{Number: n, Size: 2, Total: 5, Pages: 3}) {
+			t.Fatalf("page %d: %+v", n, page.Page)
+		}
+		for _, c := range page.Commits {
+			shas = append(shas, c.Sha[:1])
+		}
 	}
-	if res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: oapi.ListCommitsParams{Cursor: page.Page.NextCursor}}); res == nil {
-		t.Fatal("no answer")
-	} else if _, ok := res.(oapi.ListCommits400ApplicationProblemPlusJSONResponse); !ok {
-		t.Errorf("a cursor without automation used with it: %T", res)
+	if strings.Join(shas, "") != "afkgc" { // b, by automation, is left out
+		t.Errorf("commits without automation = %v", shas)
 	}
 }

@@ -225,7 +225,32 @@ export const defaults = [
     }),
   ),
   http.get("/commits", ({ response }) =>
-    response(200).json({ commits: [commit(1)], page: { nextCursor: null, limit: 50 }, freshness: fresh }),
+    response(200).json({ commits: [commit(1)], page: { number: 1, size: 50, total: 1, pages: 1 }, freshness: fresh }),
+  ),
+  http.get("/repos/{owner}/{name}/history", ({ params, response }) =>
+    response(200).json({
+      commits: [1, 0].map((i) => ({
+        ...commit(i, `${params.owner}/${params.name}`),
+        body: "",
+        committerName: "",
+        automated: false,
+        labels: [],
+        beyond: [],
+        graph: {
+          lane: 0,
+          color: 0,
+          merge: false,
+          above: i === 1 ? [] : [{ from: 0, to: 0, color: 0, open: false }],
+          below: i === 1 ? [{ from: 0, to: 0, color: 0, open: false }] : [],
+        },
+      })),
+      labels: [],
+      filtered: false,
+      lanes: 1,
+      at: null,
+      page: { number: 1, size: 30, total: 2, pages: 1 },
+      freshness: fresh,
+    }),
   ),
 ]
 

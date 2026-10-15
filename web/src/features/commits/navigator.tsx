@@ -1,39 +1,39 @@
 "use client"
 
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useWindowVirtualizer } from "@tanstack/react-virtual"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
 import { Alert } from "@/components/ui/alert"
-import { Button, buttonClass } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api/client"
 import { repoQuery } from "@/lib/api/queries"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { count, exactUTC } from "@/lib/format"
+import { firstPageOf, rememberSize } from "@/lib/paging"
 import { repoPath } from "@/lib/paths"
-import { graph, maxLanes } from "@/entities/commit/graph"
-import { GraphCell } from "@/entities/commit/graph-cell"
+import { GraphCell, maxLanes } from "@/entities/commit/graph-cell"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
+import { Pager, PageSizeField } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
-import { historyFilter, historyQuery, search, type HistoryCommit, type HistoryFilter, type Label } from "./history"
+import {
+  historyQuery,
+  historyState,
+  request,
+  search,
+  type HistoryCommit,
+  type HistoryFilter,
+  type HistoryState,
+  type Label,
+} from "./history"
 
-/** rowHeight is a row's height in pixels (h-8). */
-const rowHeight = 32
 const searchId = "history-search"
 
-/** selectedSha is the commit the URL selects: a SHA or a prefix of at least 4 hex digits. */
-function selectedSha(v: string | null): string | undefined {
-  const s = v?.trim().toLowerCase()
-  return s && /^[0-9a-f]{4,40}$/.test(s) ? s : undefined
-}
-
-/** NavigatorView is a repository's history as a git graph: filters, the rows, the details of the selected commit. */
-export function NavigatorView({ owner, name }: { owner: string; name: string }) {
-  const params = useSearchParams()
-  const filter = historyFilter(Object.fromEntries(params))
+/** NavigatorView is a repository's history as a git graph in numbered pages: filters, the rows, the selected commit's details. */
+export function NavigatorView({ owner, name, defaultSize }: { owner: string; name: string; defaultSize: number }) {
+  const st = historyState(Object.fromEntries(useSearchParams()), defaultSize)
   const repo = useQuery(repoQuery(api, owner, name)).data?.repo
   return (
     <>
@@ -43,11 +43,11 @@ export function NavigatorView({ owner, name }: { owner: string; name: string }) 
         </Link>
       </PageHeader>
       <Navigator
-        key={search(filter)}
+        key={search({ filter: st.filter, size: defaultSize }, defaultSize)}
         owner={owner}
         name={name}
-        filter={filter}
-        sha={selectedSha(params.get("sha"))}
+        st={st}
+        defaultSize={defaultSize}
         github={repo?.htmlUrl}
       />
     </>
@@ -57,81 +57,50 @@ export function NavigatorView({ owner, name }: { owner: string; name: string }) 
 function Navigator({
   owner,
   name,
-  filter,
-  sha,
+  st,
+  defaultSize,
   github,
 }: {
   owner: string
   name: string
-  filter: HistoryFilter
-  sha?: string
+  st: HistoryState
+  defaultSize: number
   github?: string
 }) {
   const qc = useQueryClient()
   const path = usePathname()
-  const options = historyQuery(api, qc, owner, name, filter)
-  const { data, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(options)
+  const r = request(st)
+  const options = historyQuery(api, qc, owner, name, st.filter, st.size, r)
+  const { data, error, isPlaceholderData, refetch } = useQuery(options)
   const version = useSnapshotVersion()
-  const pages = useMemo(() => data?.pages ?? [], [data])
-  const top = pages[0]
-  const commits = useMemo(() => pages.flatMap((p) => p.commits), [pages])
-  const drawn = top !== undefined && !top.filtered
-  const layout = useMemo(() => (drawn ? graph(commits) : undefined), [drawn, commits])
+  const commits = useMemo(() => data?.commits ?? [], [data])
   const index = useMemo(() => new Map(commits.map((c, i) => [c.sha, i])), [commits])
   const children = useMemo(() => {
     const m = new Map<string, string[]>()
     for (const c of commits) for (const p of c.parents) m.set(p, [...(m.get(p) ?? []), c.sha])
     return m
   }, [commits])
-  const at = sha === undefined ? undefined : (index.get(sha) ?? commits.findIndex((c) => c.sha.startsWith(sha)))
-  const selected = at !== undefined && at >= 0 ? at : undefined
+  const sha = st.sha
+  const found = sha === undefined ? -1 : commits.findIndex((c) => c.sha.startsWith(sha))
+  const selected = found >= 0 ? found : undefined
   const [open, setOpen] = useState(sha !== undefined)
-  const newer = pages.length > 1 && top !== undefined && top.version !== 0 && version !== 0 && version !== top.version
-
-  // The list's distance from the top of the page, for the window virtualizer.
   const list = useRef<HTMLDivElement>(null)
-  const [margin, setMargin] = useState(0)
-  useLayoutEffect(() => {
-    const el = list.current
-    if (el) setMargin(el.getBoundingClientRect().top + window.scrollY)
-  }, [])
-  const v = useWindowVirtualizer({
-    count: commits.length,
-    estimateSize: () => rowHeight,
-    overscan: 12,
-    scrollMargin: margin,
-    // The first render (the server's too) draws the whole first page, so the page reads without JavaScript.
-    initialRect: { width: 1024, height: rowHeight * 100 },
-  })
-  const items = v.getVirtualItems()
-  const last = items.at(-1)
-  const before = items[0] ? items[0].start - margin : 0
-  const after = last ? v.getTotalSize() - (last.end - margin) : 0
-  const above = useRef<HTMLDivElement>(null)
-  const below = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => {
-    // Set through the DOM: the CSP allows no style attribute.
-    if (above.current) above.current.style.height = `${before}px`
-    if (below.current) below.current.style.height = `${after}px`
-  })
+  const number = data?.page.number ?? r.page
 
-  // Infinite loading once the reader scrolls near the end of the loaded rows.
-  const scrolled = (v.scrollOffset ?? 0) > margin
+  // The page `at` found is the page by its number too: going to it later reads no more.
   useEffect(() => {
-    if (scrolled && last && last.index >= commits.length - 20 && hasNextPage && !isFetchingNextPage) void fetchNextPage()
-  }, [scrolled, last, commits.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+    if (data && r.at && !isPlaceholderData)
+      qc.setQueryData(historyQuery(api, qc, owner, name, st.filter, st.size, { page: data.page.number }).queryKey, data)
+  }, [data, r.at, isPlaceholderData, qc, owner, name, st.filter, st.size])
 
-  // A selected commit not loaded yet: page until it is, or the history ends.
+  // A commit `at` found is scrolled to, once.
+  const shown = useRef<string | undefined>(undefined)
   useEffect(() => {
-    if (sha !== undefined && selected === undefined && hasNextPage && !isFetchingNextPage) void fetchNextPage()
-  }, [sha, selected, hasNextPage, isFetchingNextPage, fetchNextPage])
-  const scrolledTo = useRef<string | undefined>(undefined)
-  useEffect(() => {
-    if (selected !== undefined && sha !== undefined && scrolledTo.current !== sha) {
-      scrolledTo.current = sha
-      v.scrollToIndex(selected, { align: "center" })
+    if (selected !== undefined && sha !== undefined && r.at && shown.current !== sha) {
+      shown.current = sha
+      document.getElementById(`commit-${commits[selected]?.sha}`)?.scrollIntoView({ block: "center" })
     }
-  }, [selected, sha, v])
+  }, [selected, sha, r.at, commits])
 
   // "/" focuses the search.
   useEffect(() => {
@@ -145,75 +114,104 @@ function Navigator({
     return () => document.removeEventListener("keydown", onKey)
   }, [])
 
+  // The URL is the state: filters and pages are pushed (back returns to them), the selection replaced; no server round trip.
+  function write(next: HistoryState, push: boolean) {
+    const url = path + search(next, defaultSize)
+    if (push) window.history.pushState(null, "", url)
+    else window.history.replaceState(null, "", url)
+  }
+
   // The selection keys move from: the last one chosen, until the URL has caught up with it.
   const moving = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (moving.current === selected) moving.current = undefined
   }, [selected])
-
   function select(i: number, panel?: boolean) {
     const c = commits[i]
     if (!c) return
     moving.current = i
-    scrolledTo.current = c.sha
-    window.history.replaceState(null, "", path + search(filter, c.sha))
-    v.scrollToIndex(i, { align: "auto" })
+    write({ ...st, page: number, sha: c.sha }, false)
+    document.getElementById(`commit-${c.sha}`)?.scrollIntoView({ block: "nearest" })
     if (panel !== undefined) setOpen(panel)
   }
   function selectSha(s: string) {
     const i = index.get(s)
     if (i !== undefined) select(i, true)
-    else window.history.replaceState(null, "", path + search(filter, s))
+    else write({ ...st, page: undefined, sha: s }, true) // on another page: the API finds it
+  }
+
+  // Going to another page; a keyboard move across the edge selects the first or last row once it loads.
+  const edge = useRef<"first" | "last" | undefined>(undefined)
+  function goPage(n: number, to?: "first" | "last") {
+    edge.current = to
+    moving.current = undefined
+    write({ ...st, page: n, sha: undefined }, true)
+    if (!to) list.current?.scrollIntoView({ block: "start" })
+  }
+  useEffect(() => {
+    if (!edge.current || isPlaceholderData || commits.length === 0) return
+    const i = edge.current === "first" ? 0 : commits.length - 1
+    edge.current = undefined
+    select(i)
+  })
+
+  function setSize(n: number) {
+    rememberSize("history", n)
+    write({ ...st, size: n, page: firstPageOf(number, st.size, n), sha: undefined }, true)
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const n = commits.length
-    if (n === 0) return
+    if (n === 0 || !data) return
     const i = moving.current ?? selected ?? -1
-    const move: Record<string, number> = { ArrowDown: i + 1, j: i + 1, ArrowUp: i - 1, k: i - 1, Home: 0, End: n - 1 }
-    if (e.key in move) {
-      e.preventDefault()
-      const to = Math.max(0, Math.min(n - 1, move[e.key] ?? 0))
-      select(to)
-      if (to >= n - 5 && hasNextPage && !isFetchingNextPage) void fetchNextPage()
-    } else if (e.key === "Enter" && selected !== undefined) {
+    const down = e.key === "ArrowDown" || e.key === "j"
+    const up = e.key === "ArrowUp" || e.key === "k"
+    if (down || up || e.key === "Home" || e.key === "End") e.preventDefault()
+    if (down && i >= n - 1 && number < data.page.pages) goPage(number + 1, "first")
+    else if (up && i === 0 && number > 1) goPage(number - 1, "last")
+    else if (down) select(Math.min(n - 1, i + 1))
+    else if (up) select(Math.max(0, i - 1))
+    else if (e.key === "Home") select(0)
+    else if (e.key === "End") select(n - 1)
+    else if (e.key === "Enter" && selected !== undefined) {
       e.preventDefault()
       setOpen(true)
-    } else if (e.key === "Escape") {
-      setOpen(false)
-    }
+    } else if (e.key === "Escape") setOpen(false)
   }
 
   if (error && !data) return <ProblemAlert error={error} />
-  if (!data || !top) return <p className="text-muted-foreground">Loading commits…</p>
+  if (!data) return <p className="text-muted-foreground">Loading commits…</p>
   const current = selected === undefined ? undefined : commits[selected]
-  const lane =
-    current && layout && selected !== undefined && layout.rows[selected]
-      ? { lane: Math.min(layout.rows[selected].lane, maxLanes - 1), color: layout.rows[selected].color }
-      : undefined
-  const missing = sha !== undefined && selected === undefined && !hasNextPage
-  const nextCursor = pages.at(-1)?.page.nextCursor ?? undefined
+  const currentRow = current?.graph
+  const lane = currentRow ? { lane: Math.min(currentRow.lane, maxLanes - 1), color: currentRow.color } : undefined
+  const missing = sha !== undefined && r.at !== undefined && !isPlaceholderData && data.at === null
+  const newer = data.page.number > 1 && data.version !== 0 && version !== 0 && version !== data.version
+  const href = (n: number) => path + search({ ...st, page: n, sha: undefined }, defaultSize)
 
   return (
     <section aria-label="History" className="flex flex-col gap-3">
-      <FilterForm path={path} filter={filter} labels={top.labels} />
+      <FilterForm
+        path={path}
+        st={st}
+        defaultSize={defaultSize}
+        labels={data.labels}
+        onFilter={(f) => write({ filter: f, size: st.size }, true)}
+        onSize={setSize}
+      />
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span>
-          {count(top.total)} {top.total === 1 ? "commit" : "commits"}
-          {top.filtered ? " match, shown as a list" : ""}
-        </span>
-        <FreshnessBadge freshness={top.freshness} />
+        <FreshnessBadge freshness={data.freshness} />
+        {data.filtered && (
+          <span>
+            {count(data.page.total)} {data.page.total === 1 ? "commit matches" : "commits match"}, shown as a list
+          </span>
+        )}
         {newer && (
-          <Button variant="outline" onClick={() => void qc.resetQueries({ queryKey: options.queryKey })}>
+          <Button variant="outline" onClick={() => void refetch()}>
             New commits
           </Button>
         )}
-        {filter.cursor && (
-          <a href={path + search({ ...filter, cursor: undefined })} className="hover:underline">
-            Newest commits
-          </a>
-        )}
       </div>
+      <Pager page={data.page} href={href} onPage={(n) => goPage(n)} />
       {missing && (
         <Alert>
           Commit <span className="font-mono">{sha.slice(0, 7)}</span> is not in the stored history: it is older, or on a branch
@@ -226,51 +224,50 @@ function Navigator({
         </Alert>
       )}
       <div className={`grid gap-4 ${open && current ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col gap-3">
           {commits.length === 0 ? (
-            <p className="text-muted-foreground">No commits match.</p>
+            <p className="text-muted-foreground">
+              {data.page.total === 0 ? (
+                "No commits match."
+              ) : (
+                <>
+                  Page {data.page.number} is past the last.{" "}
+                  <a
+                    href={href(data.page.pages)}
+                    onClick={(e) => (e.preventDefault(), goPage(data.page.pages))}
+                    className="underline"
+                  >
+                    Go to page {data.page.pages}
+                  </a>
+                </>
+              )}
+            </p>
           ) : (
             <div
               ref={list}
               role="listbox"
               aria-label="Commits"
+              aria-busy={isPlaceholderData}
               tabIndex={0}
               aria-activedescendant={current ? `commit-${current.sha}` : undefined}
               onKeyDown={onKeyDown}
-              className="rounded-md border border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className={`scroll-mt-4 rounded-md border border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${isPlaceholderData ? "opacity-60" : ""}`}
             >
-              <div ref={above} aria-hidden="true" />
-              {items.map((it) => {
-                const c = commits[it.index]
-                if (!c) return null
-                return (
-                  <Row
-                    key={c.sha}
-                    commit={c}
-                    pos={it.index + 1}
-                    size={top.total}
-                    graph={layout ? { row: layout.rows[it.index], lanes: layout.lanes, lane } : undefined}
-                    selected={it.index === selected}
-                    onSelect={() => select(it.index, true)}
-                  />
-                )
-              })}
-              <div ref={below} aria-hidden="true" />
+              {commits.map((c, i) => (
+                <Row
+                  key={c.sha}
+                  commit={c}
+                  pos={(data.page.number - 1) * data.page.size + i + 1}
+                  size={data.page.total}
+                  lanes={data.lanes}
+                  lane={lane}
+                  selected={i === selected}
+                  onSelect={() => select(i, true)}
+                />
+              ))}
             </div>
           )}
-          {hasNextPage && nextCursor && (
-            <a
-              href={path + search({ ...filter, cursor: nextCursor })}
-              aria-disabled={isFetchingNextPage}
-              onClick={(e) => {
-                e.preventDefault()
-                if (!isFetchingNextPage) void fetchNextPage()
-              }}
-              className={buttonClass("outline", "mt-3")}
-            >
-              {isFetchingNextPage ? "Loading…" : "Older commits"}
-            </a>
-          )}
+          <Pager page={data.page} href={href} onPage={(n) => goPage(n)} label="Pages, at the end" />
           {error && <ProblemAlert error={error} />}
         </div>
         {open && current && (
@@ -291,12 +288,26 @@ function Navigator({
   )
 }
 
-function FilterForm({ path, filter, labels }: { path: string; filter: HistoryFilter; labels: Label[] }) {
+function FilterForm({
+  path,
+  st,
+  defaultSize,
+  labels,
+  onFilter,
+  onSize,
+}: {
+  path: string
+  st: HistoryState
+  defaultSize: number
+  labels: Label[]
+  onFilter: (f: HistoryFilter) => void
+  onSize: (n: number) => void
+}) {
+  const filter = st.filter
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
-    const f = historyFilter(Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)])))
-    window.history.pushState(null, "", path + search(f))
+    onFilter(historyState(Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)])), st.size).filter)
   }
   const field = "mt-1 min-h-9 rounded-md border border-input bg-background px-2"
   return (
@@ -324,10 +335,11 @@ function FilterForm({ path, filter, labels }: { path: string; filter: HistoryFil
         <input type="checkbox" name="automation" value="false" defaultChecked={filter.automation === false} />
         Hide automation
       </label>
+      <PageSizeField value={st.size} onSize={onSize} />
       <Button type="submit" variant="outline">
         Apply
       </Button>
-      {search(filter) !== "" && (
+      {search({ filter, size: defaultSize }, defaultSize) !== "" && (
         <a href={path} className="min-h-9 content-center hover:underline">
           Clear
         </a>
@@ -340,14 +352,16 @@ function Row({
   commit: c,
   pos,
   size,
-  graph: g,
+  lanes,
+  lane,
   selected,
   onSelect,
 }: {
   commit: HistoryCommit
   pos: number
   size: number
-  graph?: { row: ReturnType<typeof graph>["rows"][number] | undefined; lanes: number; lane?: { lane: number; color: number } }
+  lanes: number
+  lane?: { lane: number; color: number }
   selected: boolean
   onSelect: () => void
 }) {
@@ -366,9 +380,9 @@ function Row({
       aria-posinset={pos}
       aria-setsize={size}
       onClick={onSelect}
-      className={`flex h-8 cursor-pointer items-center gap-2 px-2 text-sm ${selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
+      className={`flex h-8 cursor-pointer scroll-my-12 items-center gap-2 px-2 text-sm ${selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
     >
-      {g?.row && <GraphCell row={g.row} lanes={g.lanes} height={32} nodeY={16} className="h-8" lane={g.lane} />}
+      {c.graph && lanes > 0 && <GraphCell row={c.graph} lanes={lanes} height={32} nodeY={16} className="h-8" lane={lane} />}
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
         <Labels labels={c.labels} row />
         <span className={`min-w-24 flex-1 truncate ${c.automated ? "text-muted-foreground" : ""}`}>{c.subject}</span>
@@ -459,6 +473,7 @@ function Details({
 }) {
   const sha = (s: string) => {
     if (known.has(s) || !c.beyond.includes(s))
+      // on this page or another: selecting it finds it
       return (
         <Button variant="ghost" className="min-h-0 px-1 font-mono" onClick={() => onSelect(s)}>
           {s.slice(0, 7)}

@@ -11,7 +11,7 @@ import { NavigationSignal } from "@/test/navigation"
 import { descriptor, http, repo, server } from "@/test/server"
 import { panels } from "./repos/[owner]/[name]/panels"
 
-const ctx = <P>(params: P, search = {}): Ctx<P> => ({ api, qc: newServerQueryClient(), params, search })
+const ctx = <P>(params: P, search = {}): Ctx<P> => ({ api, qc: newServerQueryClient(), params, search, cookies: {} })
 
 /** signal is what a load threw, or undefined when it did not. */
 async function signal(p: Promise<unknown>): Promise<NavigationSignal | undefined> {

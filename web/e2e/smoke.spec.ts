@@ -53,13 +53,23 @@ test("navigation moves focus to the new page's h1", async ({ page }) => {
   await expect(page).toHaveTitle("Whydah · Source Code Portal")
 })
 
-test("the commit log loads older commits", async ({ page }) => {
+test("the commit log pages by number and remembers the page size", async ({ page }) => {
   await page.goto("/commits")
-  await expect(page.getByRole("listitem")).toHaveCount(50)
-  await page.getByRole("link", { name: "Older commits" }).click()
-  await expect(page.getByRole("listitem")).toHaveCount(100)
-  await expect(page).toHaveURL("/commits") // loaded in place
-  await expect(page.getByRole("link", { name: "Older commits" })).toBeVisible()
+  const commits = page.getByRole("region", { name: "Commit log" }).locator("ol > li")
+  const pager = page.getByRole("navigation", { name: "Pages", exact: true })
+  await expect(commits).toHaveCount(50)
+  await expect(pager.locator("[aria-current=page]")).toHaveText("1")
+  await pager.getByRole("link", { name: "Page 2", exact: true }).click()
+  await expect(page).toHaveURL("/commits?page=2")
+  await expect(pager.locator("[aria-current=page]")).toHaveText("2")
+  await expect(pager.getByText(/^51–100 of /)).toBeVisible()
+  await page.getByRole("navigation", { name: "Pages, at the end" }).getByRole("link", { name: "Previous" }).click()
+  await expect(page).toHaveURL("/commits")
+  await page.getByLabel("Per page").selectOption("100")
+  await expect(commits).toHaveCount(100)
+  await page.reload()
+  await expect(commits).toHaveCount(100) // the choice is remembered
+  await expect(page.getByLabel("Per page")).toHaveValue("100")
 })
 
 test("the README renders with highlighting and no script", async ({ page }) => {
@@ -121,7 +131,7 @@ for (const path of ["/repos/acme/whydah-core"]) {
     await page.goto(path)
     const merge = page.locator("main li", { hasText: "Merge pull request #7" }).first()
     const graph = merge.locator("svg")
-    await expect(graph).toHaveAttribute("viewBox", "0 0 32 52") // two lanes
+    await expect(graph).toHaveAttribute("viewBox", "0 0 48 52") // three lanes: main, the merged branch and feature/sso
     await expect(graph.locator("circle")).toHaveAttribute("fill", "none") // a ring, not a dot
     await expect(graph.locator("path")).toHaveCount(3) // in from above, out to both parents
     const branch = page.locator("main li", { hasText: "Change 26 of repository 0" }).first() // on the feature branch

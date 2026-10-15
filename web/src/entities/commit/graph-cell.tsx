@@ -1,4 +1,10 @@
-import { maxLanes, type Edge, type GraphRow } from "./graph"
+import type { Schemas } from "@/lib/api/client"
+
+type Edge = Schemas["GraphEdge"]
+type GraphRow = Schemas["GraphRow"]
+
+/** maxLanes is how many lanes the graph draws; a lane beyond them draws in the last. */
+export const maxLanes = 8
 
 // The graph in viewBox units: lanes `unit` apart, the node `nodeY` from the row's top.
 const unit = 16

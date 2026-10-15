@@ -30,9 +30,10 @@ export interface paths {
     }
     /**
      * Default-branch commits merged across repositories, newest first, one page at a time
-     * @description Order is committedAt descending, then repository address, then SHA. `group` and `repo` intersect. Pass `page.nextCursor`
-     *     as `cursor` for the next page; a cursor is bound to its filter and stays valid when new commits arrive. The freshness covers
-     *     every repository in scope: fresh when all are fresh, stale otherwise, with the oldest times.
+     * @description Order is committedAt descending, then repository address, then SHA. `group` and `repo` intersect. Pages are numbered from 1
+     *     over the current snapshot, `limit` commits each; a page past the last is empty, and `page` says how many there are. New
+     *     commits move the older ones to later pages. The freshness covers every repository in scope: fresh when all are fresh, stale
+     *     otherwise, with the oldest times.
      */
     get: operations["listCommits"]
     put?: never
@@ -173,8 +174,10 @@ export interface paths {
      * The repository's stored history in graph order, one page at a time
      * @description The default branch (its latest 500 commits) and the commits of up to 10 other branches, newest first by commit time with a
      *     parent never before its child. `ref` keeps the commits reachable from a branch or tag; `author`, `q` and `automation=false`
-     *     filter further and mark the page `filtered`, which draws no graph. Pass `page.nextCursor` as `cursor` for the next page; a
-     *     cursor is bound to its filter and stays valid when new commits arrive.
+     *     filter further and mark the page `filtered`, which draws no graph. Pages are numbered from 1, `limit` commits each; `at`
+     *     (a SHA or its prefix) answers the page holding that commit instead of `page`, and names it in `at`. Each commit of an
+     *     unfiltered page carries its row of the git graph, laid out over the whole history (or what `ref` reaches), so every page
+     *     draws on from the one before.
      */
     get: operations["getHistory"]
     put?: never
@@ -394,6 +397,26 @@ export interface components {
       labels: components["schemas"]["Label"][]
       /** @description The parents older than the stored history */
       beyond: string[]
+      /** @description The commit's row of the git graph; null on a filtered page */
+      graph: components["schemas"]["GraphRow"] | null
+    }
+    /** @description A line through a row, from a lane at its top (or its node) to a lane at its bottom (or its node) */
+    GraphEdge: {
+      from: number
+      to: number
+      /** @description The lane's colour, 0 to 5 */
+      color: number
+      /** @description The line leads to a parent older than the stored history */
+      open: boolean
+    }
+    /** @description How a commit's row of the git graph draws, like git log --graph: its node, the lines in from above and out below. Lanes never shift; draw at most 8, a lane beyond them in the last */
+    GraphRow: {
+      lane: number
+      /** @description 0 to 5 */
+      color: number
+      merge: boolean
+      above: components["schemas"]["GraphEdge"][]
+      below: components["schemas"]["GraphEdge"][]
     }
     HistoryPage: {
       commits: components["schemas"]["HistoryCommit"][]
@@ -401,8 +424,10 @@ export interface components {
       labels: components["schemas"]["Label"][]
       /** @description author, q or automation left commits out: the page is a list, not a graph */
       filtered: boolean
-      /** @description Commits matching the filter in the stored history */
-      total: number
+      /** @description The graph's width over this page's rows, at most 8; 0 on a filtered page */
+      lanes: number
+      /** @description The commit `at` named, when it is on this page */
+      at: string | null
       page: components["schemas"]["Page"]
       freshness: components["schemas"]["Freshness"]
     }
@@ -412,8 +437,14 @@ export interface components {
       freshness: components["schemas"]["Freshness"]
     }
     Page: {
-      nextCursor: string | null
-      limit: number
+      /** @description This page */
+      number: number
+      /** @description Items per page (the limit) */
+      size: number
+      /** @description Items matching the filter */
+      total: number
+      /** @description Pages in all, at least 1 */
+      pages: number
     }
     /** @description Repositories by the freshness of their commits */
     FreshnessCounts: {
@@ -637,7 +668,10 @@ export interface components {
       }
     }
   }
-  parameters: never
+  parameters: {
+    /** @description The page, from 1 */
+    PageNumber: number
+  }
   requestBodies: never
   headers: {
     /** @description Weak validator of the response body */
@@ -677,8 +711,9 @@ export interface operations {
         repo?: string
         /** @description false leaves out commits made by automation */
         automation?: boolean
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
         limit?: number
-        cursor?: string
       }
       header?: never
       path?: never
@@ -894,8 +929,11 @@ export interface operations {
         q?: string
         /** @description false leaves out commits made by automation */
         automation?: boolean
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
         limit?: number
-        cursor?: string
+        /** @description A SHA or a prefix of at least 4 hex digits: the page holding it */
+        at?: string
       }
       header?: never
       path: {

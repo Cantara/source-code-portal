@@ -18,8 +18,8 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/repos/{owner}/{name}/docs` | the repository's documents, README first |
 | `GET /api/v1/repos/{owner}/{name}/docs/{docId}` | one rendered document; `docId` is its path, percent-encoded into one segment (`docs%2Fsetup.md`); the path without its extension also matches |
 | `GET /api/v1/repos/{owner}/{name}/manifests` | the repository's `go.mod`, `package.json` and `pom.xml` files with their dependencies, the technology they state, and the catalogued repositories it uses and is used by |
-| `GET /api/v1/commits[?group=][&repo=owner/name][&automation=false][&limit=][&cursor=]` | commits newest first, a page at a time; `automation=false` leaves out bots and release-plugin commits |
-| `GET /api/v1/repos/{owner}/{name}/history[?ref=][&author=][&q=][&automation=false][&limit=][&cursor=]` | the stored history (500 default-branch commits, the newest 10 other branches, the newest 100 tags) in graph order with branch and tag labels; `ref` keeps what a branch or tag reaches, `author`, `q` (subject, body, SHA prefix) and `automation` filter and set `filtered` |
+| `GET /api/v1/commits[?group=][&repo=owner/name][&automation=false][&page=][&limit=]` | commits newest first, in numbered pages; `automation=false` leaves out bots and release-plugin commits |
+| `GET /api/v1/repos/{owner}/{name}/history[?ref=][&author=][&q=][&automation=false][&page=][&limit=][&at=]` | the stored history (500 default-branch commits, the newest 10 other branches, the newest 100 tags) in graph order with branch and tag labels; `ref` keeps what a branch or tag reaches, `author`, `q` (subject, body, SHA prefix) and `automation` filter and set `filtered`; each commit carries its row of the git graph (`graph`, `null` on a filtered page) and `lanes` is the page's width |
 | `GET /api/v1/snapshot` | the version and time of the data being served, and readiness |
 | `GET /api/v1/events` | server-sent events: `event: snapshot` with the same JSON as `/api/v1/snapshot`, when the stream opens and whenever the data changes |
 
@@ -34,8 +34,10 @@ one in `Location`; clients that follow redirects need nothing else.
 example during a GitHub outage), `error` (the last attempts failed; the data shown is the last good one) or `unknown` (not read yet);
 `fetchedAt` is when the content was last read, `checkedAt` when it was last confirmed. Data is never dropped because GitHub fails.
 
-**Paging commits.** `limit` is 1 to 200 (default 50; 100 for a history). A page's `page.nextCursor` is passed as `cursor` for the next page and is `null`
-on the last one. A cursor belongs to its filter and stays valid while new commits arrive.
+**Paging commits.** `page` is 1 to 100000 (default 1) and `limit` 1 to 200 (default 50; 100 for a history). The answer's `page` is
+`{number, size, total, pages}`; a page past the last is empty. Pages count from the newest commit, so new commits move older ones to
+later pages. On a history, `at` (a SHA or a prefix of 4 to 40 hex digits) returns the page holding that commit instead, and names it
+in `at` (`null` when it is not in the stored history).
 
 **Caching.** Responses have a weak `ETag` and `Cache-Control: no-cache`; send `If-None-Match` to get `304 Not Modified` when nothing
 changed. To learn about new data, listen to `GET /api/v1/events` (or poll `GET /api/v1/snapshot` about every 30 seconds) and refetch
@@ -53,7 +55,7 @@ the `X-Request-Id` header):
 
 | Status | `code` |
 |---|---|
-| 400 | `validation-failed`, `invalid-cursor` |
+| 400 | `validation-failed`, `unknown-ref` |
 | 404 | `not-found` |
 | 405 | `method-not-allowed` |
 | 406 | `not-acceptable` (the API answers `application/json`) |

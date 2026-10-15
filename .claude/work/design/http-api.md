@@ -43,7 +43,7 @@ Listener P = public, A = admin. `{o}/{n}` = owner/name. All GET routes also answ
 | P | GET | `/api/v1/repos/{o}/{n}/docs` | docs | document list (README first, then `docs/` in navigation order) |
 | P | GET | `/api/v1/repos/{o}/{n}/docs/{docId}` | docs | one document: `SafeHTML`, title, blob SHA, freshness |
 | P | GET | `/api/v1/repos/{o}/{n}/manifests` | manifests | manifests with dependencies, technology, uses and used by (`manifests.md`) |
-| P | GET | `/api/v1/commits` | commits | merged default-branch commits; `?group=`, `?repo=owner/name`, cursor-paginated |
+| P | GET | `/api/v1/commits` | commits | merged default-branch commits; `?group=`, `?repo=owner/name`, numbered pages |
 | P | GET | `/api/v1/snapshot` | httpapi | snapshot version, builtAt, ready flag, sources with their freshness |
 | P | GET | `/api/v1/events` | httpapi | server-sent events: the SnapshotInfo at connect and after every new version (images-events.md) |
 | P | GET | `/images/{o}/{n}/{id}` | docs | the images documents show, through the proxy (images-events.md) |
@@ -67,14 +67,14 @@ every other path is a page, proxied to the web UI server (behaviour 3).
    - JSON, camelCase, UTC RFC 3339 with `Z`; absent vs `null` is declared per field; arrays are always arrays.
    - Every item and list carries `freshness {status: fresh|stale|unknown|error, fetchedAt, checkedAt}`; status is derived at request time
      (stale after 1.5 x TTL).
-   - Pagination (commits; other lists are config-bounded and returned whole): `limit` (default 50, max 200) and opaque `cursor`
-     (keyset by value, bound to the filter); response `page {nextCursor|null, limit}`.
+   - Pagination (commits; other lists are config-bounded and returned whole): numbered pages: `page` (1..100000, default 1)
+     and `limit` (default 50, max 200) over the snapshot's order; response `page {number, size, total, pages}`, a page past the last empty.
    - Conditional GET: every 200 under `/api/` (except streams) is buffered and gets a weak `ETag` over the body (SHA-256, 12 bytes), so a
      change of a derived status changes it; `If-None-Match` match -> 304 with the same `ETag`. `Cache-Control: no-cache`.
      `httpapi.Matches` (weak comparison, `*`) is the one matcher; badges, images and llms use it for their strong ETags.
    - Errors: RFC 9457 `application/problem+json`, `Cache-Control: no-store`, members `type` (`urn:scp:problem:<code>`), `title`,
      `status`, `detail` (fixed text), `instance` (`urn:scp:request:<id>`), `code`. Codes: `not-found`, `method-not-allowed`,
-     `validation-failed`, `invalid-cursor`, `not-acceptable`, `internal`, `too-many-streams`, `image-unavailable`, and on the webhook
+     `validation-failed`, `unknown-ref`, `not-acceptable`, `internal`, `too-many-streams`, `image-unavailable`, and on the webhook
      `unsupported-media-type`, `bad-signature`, `too-large`, `bad-body`, `bad-delivery`. One `WriteProblem` writes them; it drops `ETag`,
      `Content-Encoding` and `Content-Length`. Under `/api/` the mux's plain-text 405 is rewritten to a problem.
    - `Accept` under `/api/` admitting none of JSON, problem, YAML -> 406. Human URLs answer HTML or Markdown (`Route.Markdown`): Markdown

@@ -577,6 +577,28 @@ type FreshnessCounts struct {
 	Unknown int `json:"unknown"`
 }
 
+// GraphEdge A line through a row, from a lane at its top (or its node) to a lane at its bottom (or its node)
+type GraphEdge struct {
+	// Color The lane's colour, 0 to 5
+	Color int `json:"color"`
+	From  int `json:"from"`
+
+	// Open The line leads to a parent older than the stored history
+	Open bool `json:"open"`
+	To   int  `json:"to"`
+}
+
+// GraphRow How a commit's row of the git graph draws, like git log --graph: its node, the lines in from above and out below. Lanes never shift; draw at most 8, a lane beyond them in the last
+type GraphRow struct {
+	Above []GraphEdge `json:"above"`
+	Below []GraphEdge `json:"below"`
+
+	// Color 0 to 5
+	Color int  `json:"color"`
+	Lane  int  `json:"lane"`
+	Merge bool `json:"merge"`
+}
+
 // Group defines model for Group.
 type Group struct {
 	DefaultRepo      *string               `json:"defaultRepo"`
@@ -649,6 +671,9 @@ type HistoryCommit struct {
 	CommittedAt   time.Time `json:"committedAt"`
 	CommitterName string    `json:"committerName"`
 
+	// Graph The commit's row of the git graph; null on a filtered page
+	Graph *GraphRow `json:"graph"`
+
 	// Labels The branches and tags at this commit, the default branch first
 	Labels []Label `json:"labels"`
 
@@ -668,6 +693,8 @@ type HistoryCommit struct {
 
 // HistoryPage defines model for HistoryPage.
 type HistoryPage struct {
+	// At The commit `at` named, when it is on this page
+	At      *string         `json:"at"`
 	Commits []HistoryCommit `json:"commits"`
 
 	// Filtered author, q or automation left commits out: the page is a list, not a graph
@@ -676,10 +703,10 @@ type HistoryPage struct {
 
 	// Labels Every branch and tag of the history
 	Labels []Label `json:"labels"`
-	Page   Page    `json:"page"`
 
-	// Total Commits matching the filter in the stored history
-	Total int `json:"total"`
+	// Lanes The graph's width over this page's rows, at most 8; 0 on a filtered page
+	Lanes int  `json:"lanes"`
+	Page  Page `json:"page"`
 }
 
 // Label defines model for Label.
@@ -737,8 +764,17 @@ type Manifests struct {
 
 // Page defines model for Page.
 type Page struct {
-	Limit      int     `json:"limit"`
-	NextCursor *string `json:"nextCursor"`
+	// Number This page
+	Number int `json:"number"`
+
+	// Pages Pages in all, at least 1
+	Pages int `json:"pages"`
+
+	// Size Items per page (the limit)
+	Size int `json:"size"`
+
+	// Total Items matching the filter
+	Total int `json:"total"`
 }
 
 // Problem defines model for Problem.
@@ -915,6 +951,9 @@ type ToolchainVersions struct {
 // ToolchainVersionsName defines model for ToolchainVersions.Name.
 type ToolchainVersionsName string
 
+// PageNumber defines model for PageNumber.
+type PageNumber = int
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Problem
 
@@ -929,9 +968,11 @@ type ListCommitsParams struct {
 	Repo *string `form:"repo,omitempty" json:"repo,omitempty"`
 
 	// Automation false leaves out commits made by automation
-	Automation *bool   `form:"automation,omitempty" json:"automation,omitempty"`
-	Limit      *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor     *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Automation *bool `form:"automation,omitempty" json:"automation,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListReposParams defines parameters for ListRepos.
@@ -951,9 +992,14 @@ type GetHistoryParams struct {
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 
 	// Automation false leaves out commits made by automation
-	Automation *bool   `form:"automation,omitempty" json:"automation,omitempty"`
-	Limit      *int    `form:"limit,omitempty" json:"limit,omitempty"`
-	Cursor     *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Automation *bool `form:"automation,omitempty" json:"automation,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// At A SHA or a prefix of at least 4 hex digits: the page holding it
+	At *string `form:"at,omitempty" json:"at,omitempty"`
 }
 
 // ServerInterface represents all server handlers.
@@ -1050,6 +1096,19 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "limit" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
@@ -1059,19 +1118,6 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "cursor" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
 		}
 		return
 	}
@@ -1367,6 +1413,19 @@ func (siw *ServerInterfaceWrapper) GetHistory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "limit" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
@@ -1380,15 +1439,15 @@ func (siw *ServerInterfaceWrapper) GetHistory(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// ------------- Optional query parameter "cursor" -------------
+	// ------------- Optional query parameter "at" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
 		}
 		return
 	}

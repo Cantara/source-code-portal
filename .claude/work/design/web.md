@@ -92,9 +92,11 @@ contrast in both themes. The header shows whether the live stream is open (`Live
 2. Snapshot sync: one `useSnapshotSync()` in the providers opens an `EventSource` on `/api/v1/events`; each `snapshot` event replaces
    the snapshot query's data. While the stream is not open it polls `GET /api/v1/snapshot` every 30 s while the tab is visible. A
    different `version` (equality) invalidates every other query; active ones refetch. Readiness `warming` shows a banner.
-3. Commit logs page with "Older commits", a link to the next page's cursor that loads it in place (50 rows; 100 in the navigator);
-   the server renders the first page, so without JavaScript the link pages and "Newest commits" returns. With more than one page loaded a snapshot
-   change leaves the log as it is; a "New commits" button refetches and moves focus to the first row.
+3. Commit logs come in numbered pages (`shared/pager.tsx`, `lib/paging.ts`): the pager above and below the list, links that load in
+   place with `pushState` and work as plain links without JavaScript; the page size is the reader's choice (25, 50, 100, 200; 50 in
+   the timelines, 100 in the navigator until chosen), remembered in the cookies `scp-per-commits` and `scp-per-history` (a year,
+   `SameSite=Lax`) that the server reads, so it renders the page at the reader's size. The first page follows snapshot changes; a
+   later page stays as it is and offers "New commits", which reloads it and moves focus to the first row.
 4. Freshness: every view shows a `FreshnessBadge` (icon plus text). Relative ages re-render on one 30 s ticker, paused while hidden. The
    server passes its instant (`renderedAt`, on the 30 s grid) to `NowProvider`, so hydration renders against the same clock; then the
    ticker takes over. A view reads the clock once (`useNow`) and hands `now` to the entity components.
@@ -121,14 +123,15 @@ contrast in both themes. The header shows whether the live stream is open (`Live
     a catch-all encoded per segment (`lib/paths.ts`).
 13. Commit graph: where the commits share one history (the repository page's "Latest commits" and the navigator) they
     draw as a git graph, like `git log --graph`; the merged feeds (dashboard, group, all repositories) stay a plain list, since their
-    commits are unrelated. `entities/commit/graph.ts` lays the rows out from each commit's `parents`, newest first: a commit takes the
+    commits are unrelated. The server lays the rows out (`internal/commits/graph.go`) over the whole history, newest first, so a
+    numbered page starts with the lanes the pages before it left open: a commit takes the
     lane that expects it (else the first free one), every other lane expecting it converges into it, its first parent continues the
     lane and each further parent opens a lane (or joins the one already expecting it); freed lanes are reused, lanes never shift. Each
     row draws its own `aria-hidden` SVG (`entities/commit/graph-cell.tsx`; lanes 16 units apart, the node on the subject line, `h-13` or `h-8` with the width from the viewBox, so
     it scales with the text and needs no style attribute under the CSP): lines in from above, the node (a ring for a merge, filled
     otherwise), lines out to the parents' lanes, pass-through lanes straight. Lines to parents older than the stored history (the
-    navigator's `beyond`; elsewhere outside the rows) run dashed. A row depends only on the rows above it, so loading more never
-    changes the rows already drawn. Colours are six `--lane-*` tokens per theme (at least 3:1 against the card), the first lane `--primary`; at most 8 lanes
+    navigator's `beyond`; elsewhere outside the rows) run dashed. A row depends only on the rows above it, so it is the same on
+    every page size. Colours are six `--lane-*` tokens per theme (at least 3:1 against the card), the first lane `--primary`; at most 8 lanes
     are drawn, a commit beyond them sits in the last. Rows have a fixed height: the subject is one line, truncated with the full text in
     `title`. The timelines head each day in UTC, the zone the server renders in.
 

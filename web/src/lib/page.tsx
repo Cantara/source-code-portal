@@ -1,6 +1,7 @@
 import "server-only"
 import { HydrationBoundary, type QueryClient } from "@tanstack/react-query"
 import type { Metadata } from "next"
+import { cookies } from "next/headers"
 import type { ReactNode } from "react"
 import type { Api } from "./api/client"
 import { serverApi } from "./api/server"
@@ -15,6 +16,8 @@ export interface Ctx<P> {
   qc: QueryClient
   params: P
   search: Search
+  /** the portal's own cookies (`scp-*`): the reader's preferences */
+  cookies: Record<string, string>
 }
 
 /**
@@ -38,8 +41,9 @@ export interface Panel<P> {
 type Props<P> = { params: Promise<P>; searchParams: Promise<Search> }
 
 async function context<P>({ params, searchParams }: Props<P>): Promise<Ctx<P>> {
-  const [api, p, search] = await Promise.all([serverApi(), params, searchParams])
-  return { api, qc: serverQueryClient(), params: p, search }
+  const [api, p, search, jar] = await Promise.all([serverApi(), params, searchParams, cookies()])
+  const own = Object.fromEntries(jar.getAll().flatMap((c) => (c.name.startsWith("scp-") ? [[c.name, c.value]] : [])))
+  return { api, qc: serverQueryClient(), params: p, search, cookies: own }
 }
 
 /** page turns a route module into the exports of an app/ page file. */

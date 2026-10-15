@@ -48,14 +48,16 @@ test.describe("without JavaScript", () => {
   }
 
   for (const path of ["/commits", "/repos/acme/tool/commits"]) {
-    test(`${path} pages through older and newer commits`, async ({ page }) => {
+    test(`${path} pages through numbered pages`, async ({ page }) => {
       await page.goto(path)
       await expect(page.getByText("Change 30 of repository 2").first()).toBeVisible()
-      await page.getByRole("link", { name: "Older commits" }).click()
-      await expect(page).toHaveURL(/cursor=/)
+      const pager = page.getByRole("navigation", { name: "Pages", exact: true })
+      await pager.getByRole("link", { name: "Next" }).click()
+      await expect(page).toHaveURL(/page=2/)
+      await expect(pager.locator("[aria-current=page]")).toHaveText("2")
       await expect(page.getByText("Change 30 of repository 2")).toHaveCount(0)
       await expect(page.getByText(/Old change \d+ of repository 2/).first()).toBeVisible()
-      await page.getByRole("link", { name: "Newest commits" }).click()
+      await pager.getByRole("link", { name: "Page 1", exact: true }).click()
       await expect(page.getByText("Change 30 of repository 2").first()).toBeVisible()
     })
   }

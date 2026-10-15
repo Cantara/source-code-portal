@@ -10,11 +10,11 @@ type SnapshotInfo = components["schemas"]["SnapshotInfo"]
 /** pollInterval is how often the snapshot is read while the event stream is not open. */
 export const pollInterval = 30_000
 
-/** keep says whether a query stays as it is on a new snapshot: a paged log with more than one page loaded. */
+/** keep says whether a query stays as it is on a new snapshot: a page of a paged list past the first, which offers to reload. */
 export function keep(q: Query): boolean {
   if (q.queryKey[0] === snapshotKey[0]) return true
-  const pages = (q.state.data as { pages?: unknown[] } | undefined)?.pages
-  return q.meta?.keepWhenPaged === true && (pages?.length ?? 0) > 1
+  const number = (q.state.data as { page?: { number?: number } } | undefined)?.page?.number
+  return q.meta?.keepPaged === true && (number ?? 1) > 1
 }
 
 /**

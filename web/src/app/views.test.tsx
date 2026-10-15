@@ -118,31 +118,43 @@ describe("commit log", () => {
   function pages() {
     server.use(
       http.get("/commits", ({ query, response }) => {
-        const second = query.get("cursor") === "c2"
-        const commits = Array.from({ length: second ? 5 : 50 }, (_, i) => commit(second ? 50 + i : i))
-        return response(200).json({ commits, page: { nextCursor: second ? null : "c2", limit: 50 }, freshness: fresh })
+        const number = Number(query.get("page") ?? 1)
+        const size = Number(query.get("limit") ?? 50)
+        const total = 55
+        const from = (number - 1) * size
+        const commits = Array.from({ length: Math.max(0, Math.min(size, total - from)) }, (_, i) => commit(from + i))
+        return response(200).json({ commits, page: { number, size, total, pages: Math.ceil(total / size) }, freshness: fresh })
       }),
     )
   }
 
-  it("loads more pages and offers new commits after a snapshot change", async () => {
+  it("pages by number, changes the page size and offers new commits on a later page", async () => {
     pages()
     const user = userEvent.setup()
     const qc = client()
-    show(<AllCommitsView />, "/commits", qc)
+    show(<AllCommitsView defaultSize={50} />, "/commits", qc)
     await screen.findByText("Commit 0")
     await waitFor(() => expect(qc.getQueryData(["snapshot"])).toBeDefined())
-    await user.click(screen.getByRole("link", { name: "Older commits" }))
+    const pager = screen.getByRole("navigation", { name: "Pages" })
+    expect(within(pager).getByText("1–50 of 55 commits")).toBeInTheDocument()
+    expect(within(pager).getByRole("link", { current: "page" })).toHaveTextContent("1")
+    await user.click(within(pager).getByRole("link", { name: "Page 2" }))
     expect(await screen.findByText("Commit 54")).toBeInTheDocument()
-    expect(screen.queryByRole("link", { name: "Older commits" })).not.toBeInTheDocument()
+    expect(screen.queryByText("Commit 0")).not.toBeInTheDocument()
+    expect(window.location.search).toBe("?page=2")
+    expect(within(screen.getByRole("navigation", { name: "Pages" })).getByText("51–55 of 55 commits")).toBeInTheDocument()
 
     server.use(http.get("/snapshot", ({ response }) => response(200).json(snapshot(2))))
     await qc.refetchQueries({ queryKey: ["snapshot"] })
     const button = await screen.findByRole("button", { name: "New commits" })
-    expect(screen.getByText("Commit 54")).toBeInTheDocument() // the loaded log stays as it is
+    expect(screen.getByText("Commit 54")).toBeInTheDocument() // the page stays as it is
     await user.click(button)
-    await waitFor(() => expect(screen.queryByText("Commit 54")).not.toBeInTheDocument())
-    await waitFor(() => expect(screen.getAllByRole("listitem")[0]).toHaveFocus())
+    await waitFor(() => expect(screen.queryByRole("button", { name: "New commits" })).not.toBeInTheDocument())
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Per page" }), "25")
+    expect(window.location.search).toBe("?page=3&per=25") // the first commit shown, 51, is on page 3 of 25
+    expect(await within(screen.getByRole("navigation", { name: "Pages" })).findByText("51–55 of 55 commits")).toBeInTheDocument()
+    expect(document.cookie).toContain("scp-per-commits=25")
   })
 
   it("refetches a one-page view when the snapshot changes", async () => {

@@ -8,8 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Schemas } from "@/lib/api/client"
 import { withoutLeadingH1 } from "@/lib/docs"
-import { docPath, repoCommitsPath } from "@/lib/paths"
-import { CommitList } from "@/entities/commit/commit-list"
+import { docPath } from "@/lib/paths"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
@@ -23,7 +22,7 @@ import { RepoBadges } from "./badges"
 import { readmeOf } from "./readme"
 
 /**
- * RepoView is a repository: descriptor, badges, README, documents and the latest commits, with the panels other features contribute
+ * RepoView is a repository: descriptor, badges, README and documents, with the panels other features contribute
  * (composed in app/) in the main and side columns.
  */
 export function RepoView({ owner, name, main, side }: { owner: string; name: string; main?: ReactNode; side?: ReactNode }) {
@@ -71,16 +70,6 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
             <PanelBoundary>
               <DocsCard owner={owner} name={name} />
             </PanelBoundary>
-            <Card aria-labelledby="latest">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <CardTitle id="latest">Latest commits</CardTitle>
-                <FreshnessBadge freshness={data.commitsFreshness} />
-              </div>
-              <CommitList commits={data.commits} showRepo={false} graph />
-              <Link href={repoCommitsPath(owner, name)} className="mt-2 inline-block text-sm hover:underline">
-                Commit log
-              </Link>
-            </Card>
           </div>
         </div>
       )}

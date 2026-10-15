@@ -61,7 +61,7 @@ test("the navigator's filters work from the URL, and back restores them", async 
   await expect(rows.filter({ hasText: "Merge pull request #7" })).toHaveCount(0)
 
   await page.goto("/repos/acme/whydah-core/commits?q=merge")
-  await expect(page.getByText("1 commit match, shown as a list")).toBeVisible()
+  await expect(page.getByText("1 commit matches, shown as a list")).toBeVisible()
   await expect(rows).toHaveCount(1)
   await expect(rows.locator("svg")).toHaveCount(0)
 
@@ -87,16 +87,39 @@ test("?sha= selects a commit beyond the first page, or says it is not kept", asy
   await expect(row).toHaveAttribute("aria-selected", "true")
   await expect(row).toBeInViewport()
   await expect(page.getByRole("complementary", { name: "Commit details" })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Pages", exact: true }).locator("[aria-current=page]")).toHaveText("5") // 451 of 100 a page
 
   await page.goto("/repos/acme/tool/commits?sha=deadbeef")
   await expect(page.getByText(/is not in the stored history/)).toBeVisible()
   await expect(page.getByRole("link", { name: "Open it on GitHub" })).toHaveAttribute("href", /\/commit\/deadbeef$/)
 })
 
-test("the navigator keeps few rows in the page and scrolls without long tasks", async ({ page }) => {
+test("the navigator pages by number, remembers the page size and moves by keyboard across a page's end", async ({ page }) => {
   await page.goto("/repos/acme/tool/commits")
   const rows = page.getByRole("listbox", { name: "Commits" }).getByRole("option")
-  await expect(page.getByText("500 commits")).toBeVisible()
+  const pager = page.getByRole("navigation", { name: "Pages", exact: true })
+  await expect(pager.getByText("1–100 of 500 commits")).toBeVisible()
+  await expect(rows).toHaveCount(100)
+  await pager.getByRole("link", { name: "Page 3", exact: true }).click()
+  await expect(page).toHaveURL("/repos/acme/tool/commits?page=3")
+  await expect(pager.getByText("201–300 of 500 commits")).toBeVisible()
+  await expect(rows.first()).toHaveAttribute("aria-posinset", "201")
+  // The graph goes on across pages: the first row of a later page has a line from above.
+  await expect(rows.first().locator("svg line, svg path").first()).toBeAttached()
+
+  // By keyboard: on the last row, j goes to the next page and selects its first row; k comes back.
+  await rows.last().click()
+  await page.keyboard.press("j")
+  await expect(pager.locator("[aria-current=page]")).toHaveText("4")
+  await expect(rows.first()).toHaveAttribute("aria-selected", "true")
+  await page.keyboard.press("k")
+  await expect(pager.locator("[aria-current=page]")).toHaveText("3")
+  await expect(rows.last()).toHaveAttribute("aria-selected", "true")
+  await page.goBack()
+  await expect(pager.locator("[aria-current=page]")).toHaveText("4")
+
+  // The page size is a choice, kept for the next visit; the first commit shown stays in view.
+  await page.goto("/repos/acme/tool/commits?page=3")
   await page.evaluate(() => {
     const w = window as unknown as { longTasks: number[] }
     w.longTasks = []
@@ -104,20 +127,22 @@ test("the navigator keeps few rows in the page and scrolls without long tasks", 
       for (const e of l.getEntries()) w.longTasks.push(e.duration)
     }).observe({ type: "longtask", buffered: false })
   })
-  // Scroll to the end until the whole history is loaded.
-  for (let i = 0; i < 40; i++) {
-    await page.mouse.wheel(0, 2000)
-    await page.waitForTimeout(50)
-    if ((await page.getByRole("link", { name: "Older commits" }).count()) === 0) break
-  }
-  await expect(page.getByRole("link", { name: "Older commits" })).toHaveCount(0)
-  for (let i = 0; i < 20; i++) {
-    await page.mouse.wheel(0, -1500)
-    await page.waitForTimeout(30)
-  }
-  expect(await rows.count()).toBeLessThanOrEqual(120)
+  await page.getByLabel("Per page").selectOption("200")
+  await expect(page).toHaveURL("/repos/acme/tool/commits?page=2&per=200")
+  await expect(rows).toHaveCount(200)
+  await expect(pager.getByText("201–400 of 500 commits")).toBeVisible()
   const longTasks = await page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)
   expect(longTasks.filter((d) => d > 50)).toEqual([])
+  await page.goto("/repos/acme/tool/commits")
+  await expect(rows).toHaveCount(200)
+  await expect(pager.getByText("1–200 of 500 commits")).toBeVisible()
+  await expect(page).toHaveURL("/repos/acme/tool/commits")
+  await page.context().clearCookies()
+
+  await page.goto("/repos/acme/tool/commits?page=9")
+  await expect(page.getByText("Page 9 is past the last.")).toBeVisible()
+  await page.getByRole("link", { name: "Go to page 5" }).click()
+  await expect(pager.getByText("401–500 of 500 commits")).toBeVisible()
 })
 
 test("a product's timeline lists its repositories and its commits by day", async ({ page }) => {

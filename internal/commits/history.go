@@ -2,9 +2,9 @@ package commits
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,11 +14,7 @@ import (
 
 const defaultHistoryLimit = 100
 
-// historyCursor is the commit after which the next page starts, bound to the filter by its digest.
-type historyCursor struct {
-	F string `json:"f"`
-	S string `json:"s"`
-}
+var atPattern = regexp.MustCompile(`^[0-9a-f]{4,40}$`)
 
 func historyProblem(status int, code, detail string) oapi.Problem {
 	return oapi.NewProblem(status, code, http.StatusText(status), detail)
@@ -39,16 +35,17 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 		return oapi.GetHistory400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: oapi.BadRequestApplicationProblemPlusJSONResponse(
 			historyProblem(http.StatusBadRequest, code, detail))}, nil
 	}
-	limit := defaultHistoryLimit
-	if p.Limit != nil {
-		limit = *p.Limit
-	}
-	if limit < 1 || limit > maxLimit {
-		return bad("validation-failed", "limit must be 1 to 200")
+	number, limit, problem := pageParams(p.Page, p.Limit, defaultHistoryLimit)
+	if problem != "" {
+		return bad("validation-failed", problem)
 	}
 	ref, author, q := deref(p.Ref), strings.ToLower(strings.TrimSpace(deref(p.Author))), strings.ToLower(strings.TrimSpace(deref(p.Q)))
-	if len(q) > 200 {
+	at := strings.ToLower(deref(p.At))
+	switch {
+	case len(q) > 200:
 		return bad("validation-failed", "q is at most 200 characters")
+	case p.At != nil && !atPattern.MatchString(at):
+		return bad("validation-failed", "at is a SHA or a prefix of 4 to 40 hex digits")
 	}
 	automation := p.Automation == nil || *p.Automation
 	h, fresh := HistoryOf(e)
@@ -59,8 +56,8 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 	if !ok {
 		return bad("unknown-ref", "no branch or tag "+ref+" in the stored history")
 	}
-	filter := digest(ref, author, q, automation)
-	match := func(c *Commit) bool {
+	filtered := author != "" || q != "" || !automation
+	keep := func(c *Commit) bool {
 		switch {
 		case reach != nil && !reach[c.SHA]:
 			return false
@@ -72,43 +69,49 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 		return q == "" || strings.HasPrefix(c.SHA, q) || strings.Contains(strings.ToLower(c.Subject), q) ||
 			strings.Contains(strings.ToLower(c.Body), q)
 	}
-	start := 0
-	if p.Cursor != nil {
-		var c historyCursor
-		at, known := -1, false
-		if decodeAny(*p.Cursor, &c) && c.F == filter {
-			at, known = h.Position(c.S)
+	list, rows := h.Order, h.Rows
+	if reach != nil || filtered {
+		list = slices.DeleteFunc(slices.Clone(h.Order), func(c *Commit) bool { return !keep(c) })
+		rows = nil
+		if !filtered { // what a branch or tag reaches is a history of its own: lay it out
+			rows = layout(list, h.held)
 		}
-		if !known {
-			return bad("invalid-cursor", "the cursor is not valid for this filter")
-		}
-		start = at + 1
 	}
-	key := e.Repo.Key()
-	out := oapi.HistoryPage{Commits: []oapi.HistoryCommit{}, Labels: make([]oapi.Label, 0, len(h.Labels)),
-		Filtered: author != "" || q != "" || !automation, Page: oapi.Page{Limit: limit}, Freshness: oapi.FreshnessOf(fresh, time.Now())}
+	out := oapi.HistoryPage{Commits: []oapi.HistoryCommit{}, Labels: make([]oapi.Label, 0, len(h.Labels)), Filtered: filtered,
+		Freshness: oapi.FreshnessOf(fresh, time.Now())}
+	if at != "" {
+		if i := slices.IndexFunc(list, func(c *Commit) bool { return strings.HasPrefix(c.SHA, at) }); i >= 0 {
+			number, out.At = i/limit+1, &list[i].SHA
+		}
+	}
+	start, end, pg := paging(len(list), number, limit)
+	out.Page = pg
 	for _, l := range h.Labels {
 		out.Labels = append(out.Labels, labelOf(l))
 	}
-	var last *Commit
-	for i, c := range h.Order {
-		if !match(c) {
-			continue
+	key := e.Repo.Key()
+	for i, c := range list[start:end] {
+		hc := h.commitOf(key, c)
+		if rows != nil {
+			hc.Graph = rowOf(rows[start+i])
 		}
-		out.Total++
-		if i < start {
-			continue
-		}
-		if len(out.Commits) == limit {
-			if out.Page.NextCursor == nil {
-				out.Page.NextCursor = new(encodeAny(historyCursor{F: filter, S: last.SHA}))
-			}
-			continue
-		}
-		last = c
-		out.Commits = append(out.Commits, h.commitOf(key, c))
+		out.Commits = append(out.Commits, hc)
+	}
+	if rows != nil {
+		out.Lanes = width(rows[start:end])
 	}
 	return oapi.GetHistory200JSONResponse{Body: out}, nil
+}
+
+func rowOf(r Row) *oapi.GraphRow {
+	edges := func(es []Edge) []oapi.GraphEdge {
+		out := make([]oapi.GraphEdge, len(es))
+		for i, e := range es {
+			out[i] = oapi.GraphEdge{From: e.From, To: e.To, Color: e.Color, Open: e.Open}
+		}
+		return out
+	}
+	return &oapi.GraphRow{Lane: r.Lane, Color: r.Color, Merge: r.Merge, Above: edges(r.Above), Below: edges(r.Below)}
 }
 
 // reachable is the set of commits reachable from ref through the stored history; nil for no ref, false when ref is not a label.
@@ -149,7 +152,7 @@ func (h *History) commitOf(key snapshot.RepoKey, c *Commit) oapi.HistoryCommit {
 		AuthorLogin: c.AuthorLogin, CommitterName: c.CommitterName, Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents,
 		Automated: Automated(c), Labels: []oapi.Label{}, Beyond: []string{}}
 	for _, p := range c.Parents {
-		if _, held := h.Position(p); !held {
+		if !h.held(p) {
 			out.Beyond = append(out.Beyond, p)
 		}
 	}
@@ -161,29 +164,6 @@ func (h *History) commitOf(key snapshot.RepoKey, c *Commit) oapi.HistoryCommit {
 
 func labelOf(l Label) oapi.Label {
 	return oapi.Label{Name: l.Name, Kind: oapi.LabelKind(l.Kind), Sha: l.SHA, Default: l.Default}
-}
-
-// digest binds a cursor to its filter.
-func digest(parts ...any) string {
-	sum := sha256.New()
-	for _, p := range parts {
-		_, _ = sum.Write([]byte(strings.ReplaceAll(toString(p), "\x00", "")))
-		_, _ = sum.Write([]byte{0})
-	}
-	return hex.EncodeToString(sum.Sum(nil)[:8])
-}
-
-func toString(v any) string {
-	switch x := v.(type) {
-	case string:
-		return x
-	case bool:
-		if x {
-			return "1"
-		}
-		return "0"
-	}
-	return ""
 }
 
 func deref(s *string) string {

@@ -28,11 +28,13 @@ export function useSearchParams(): URLSearchParams {
   return useLocation().searchParams
 }
 
-// Next.js follows history.replaceState into useSearchParams; so does the stand-in.
-const replaceState = window.history.replaceState.bind(window.history)
-window.history.replaceState = (data, unused, url) => {
-  replaceState(data, unused, url)
-  if (url !== undefined && url !== null) setLocation(String(url))
+// Next.js follows history.pushState and replaceState into useSearchParams; so does the stand-in.
+for (const name of ["pushState", "replaceState"] as const) {
+  const original = window.history[name].bind(window.history)
+  window.history[name] = (data, unused, url) => {
+    original(data, unused, url)
+    if (url !== undefined && url !== null) setLocation(String(url))
+  }
 }
 
 const router = {
