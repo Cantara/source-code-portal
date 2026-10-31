@@ -4,8 +4,29 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
-## Unreleased
+## 2.1.0
 
+The web UI moves to Next.js and the portal gains the features around it. Upgrading a binary install needs the web UI bundle and Node.js 24
+(see "Web UI bundle"); the container image already holds both.
+
+- Web UI bundle: the pages are rendered by a Next.js server that `scp serve` supervises and proxies (`web.dir`, `web.node`; a release
+  ships `scp-web_<version>.tar.gz` next to the binaries, checksummed and signed with them). With `web.dir` empty every page answers 503;
+  the API, badges, `llms.txt` and webhooks still work.
+- A mission-control dashboard with the health badges of every repository per product; badges on the dashboard cards and in the group
+  table; the portal's release shown next to its name.
+- A health score for every repository, weighed into a score per product.
+- Manifests: `go.mod`, `package.json` and `pom.xml` per repository, with technology, dependencies and internal links.
+- Commit history: 500 default-branch commits kept per repository, a commit navigator with a git graph and numbered pages of a chosen
+  size, product timelines.
+- Sign-in through OIDC with PKCE or a bearer token, with administrators (`docs/production.md`, operator guide).
+- An assistant at `/ask` that answers from the catalogue through Anthropic, OpenAI, Gemini, OpenRouter or Ollama. Off by default.
+- Private repositories for permitted groups behind a trusted authenticating proxy.
+- Several instances on Hazelcast with one leader, shared outcomes and webhook de-duplication.
+- Live updates: server-sent snapshot events, a content-derived snapshot version and an image proxy for document images.
+- Search-engine and link-preview support: one page address in Go and the web, JSON-LD graphs, Open Graph text, complete breadcrumbs.
+- `scp config groups` previews the groups on a repository list; user accounts are listed too (an App's user installation).
+- Fixes: overlapping snapshot builds no longer drop updates; the web UI server restarts when its bundle is replaced; the system theme
+  follows the system preference.
 - `GET /knowledge.yaml` and `GET /.well-known/kcp.json`: the catalogue as a Knowledge Context Protocol manifest, so an agent that
   knows only the portal's address finds a map of groups, repositories and documents with intents and reading order. `GET
   /groups/{group}.md` answers like the other `.md` addresses.
