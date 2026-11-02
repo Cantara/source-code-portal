@@ -28,9 +28,10 @@ var (
 type matcher func(r *snapshot.Repo) bool
 
 type group struct {
-	cfg     config.Group
-	sources map[string]bool // empty: all
-	match   []matcher
+	cfg       config.Group
+	sources   map[string]bool // empty: all
+	match     []matcher
+	unclaimed bool // also selects what no other group selects
 }
 
 // Groups are the compiled group definitions, in config order.
@@ -66,6 +67,10 @@ func Compile(cfg []config.Group) (*Groups, []Finding) {
 		hasTopic := false
 		for j, m := range gc.Match {
 			kind, value, _ := m.Kind() // one key: checked by config
+			if kind == "unclaimed" {
+				g.unclaimed = true
+				continue
+			}
 			fn, err := compileMatcher(kind, value)
 			if err != nil {
 				add(true, "%s.match[%d]: %v", at, j, err)
@@ -83,6 +88,8 @@ func Compile(cfg []config.Group) (*Groups, []Finding) {
 		switch {
 		case !namePattern.MatchString(gc.DefaultRepo):
 			add(true, "%s.default_repo: %q is not a repository name", at, gc.DefaultRepo)
+		case g.unclaimed:
+			// The default is whatever no other group claims: known only from a listing.
 		case len(g.match) == len(gc.Match) && !g.matches(&snapshot.Repo{Name: gc.DefaultRepo}):
 			add(!hasTopic, "%s.default_repo: %q is not selected by the group's matchers", at, gc.DefaultRepo)
 		}
@@ -154,20 +161,36 @@ func compileMatcher(kind, value string) (matcher, error) {
 }
 
 func (g *group) selects(r *snapshot.Repo) bool {
-	return (len(g.sources) == 0 || g.sources[r.ID.Source]) && g.matches(r)
+	return g.inSources(r) && g.matches(r)
+}
+
+func (g *group) inSources(r *snapshot.Repo) bool {
+	return len(g.sources) == 0 || g.sources[r.ID.Source]
 }
 
 func (g *group) matches(r *snapshot.Repo) bool {
 	return slices.ContainsFunc(g.match, func(m matcher) bool { return m(r) })
 }
 
-// Resolve returns the groups with their members among repos.
+// Resolve returns the groups with their members among repos. A group with the unclaimed matcher also takes, within its sources, the
+// repositories no other group selects.
 func (gs *Groups) Resolve(repos map[snapshot.RepoKey]*snapshot.RepoEntry) []snapshot.Group {
+	claimed := map[snapshot.RepoKey]bool{}
+	for _, g := range gs.groups {
+		if g.unclaimed {
+			continue
+		}
+		for k, e := range repos {
+			if g.selects(&e.Repo) {
+				claimed[k] = true
+			}
+		}
+	}
 	out := make([]snapshot.Group, 0, len(gs.groups))
 	for _, g := range gs.groups {
 		sg := snapshot.Group{ID: g.cfg.ID, Name: g.cfg.Name, Description: g.cfg.Description, Members: []snapshot.RepoKey{}}
 		for k, e := range repos {
-			if g.selects(&e.Repo) {
+			if g.selects(&e.Repo) || g.unclaimed && !claimed[k] && g.inSources(&e.Repo) {
 				sg.Members = append(sg.Members, k)
 				if strings.EqualFold(e.Repo.Name, g.cfg.DefaultRepo) && (sg.DefaultRepo == "" || k < sg.DefaultRepo) {
 					sg.DefaultRepo = k

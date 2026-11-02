@@ -174,6 +174,8 @@ type Match struct {
 	Regexp   string `mapstructure:"regexp"`
 	Topic    string `mapstructure:"topic"`
 	CatchAll bool   `mapstructure:"catch_all"`
+	// Unclaimed selects the repositories no other group selects; at most one group uses it.
+	Unclaimed bool `mapstructure:"unclaimed"`
 }
 
 // Kind returns the matcher kind and its value; ok is false unless exactly one field is set.
@@ -187,9 +189,14 @@ func (m Match) Kind() (kind, value string, ok bool) {
 			n++
 		}
 	}
-	if m.CatchAll {
-		kind, value = "catch_all", ""
-		n++
+	for _, f := range []struct {
+		kind string
+		set  bool
+	}{{"catch_all", m.CatchAll}, {"unclaimed", m.Unclaimed}} {
+		if f.set {
+			kind, value = f.kind, ""
+			n++
+		}
 	}
 	return kind, value, n == 1
 }
@@ -250,7 +257,7 @@ func (g GitHub) validate() []string {
 			p = append(p, at+".exclude: at most 64 matchers")
 		}
 		for j, m := range s.Exclude {
-			if kind, _, ok := m.Kind(); !ok || kind == "catch_all" {
+			if kind, _, ok := m.Kind(); !ok || kind == "catch_all" || kind == "unclaimed" {
 				p = append(p, fmt.Sprintf("%s.exclude[%d]: exactly one of exact, prefix, glob, regexp, topic", at, j))
 			}
 		}
@@ -284,6 +291,7 @@ func (c Catalog) validate(g GitHub) []string {
 		sources[s.ID] = true
 	}
 	ids := map[string]bool{}
+	unclaimed := 0
 	for i, gr := range c.Groups {
 		at := fmt.Sprintf("catalog.groups[%d]", i)
 		if !idPattern.MatchString(gr.ID) || len(gr.ID) > 63 {
@@ -311,10 +319,17 @@ func (c Catalog) validate(g GitHub) []string {
 			p = append(p, at+".match: 1..64 matchers")
 		}
 		for j, m := range gr.Match {
-			if _, _, ok := m.Kind(); !ok {
-				p = append(p, fmt.Sprintf("%s.match[%d]: exactly one of exact, prefix, glob, regexp, topic, catch_all: true", at, j))
+			kind, _, ok := m.Kind()
+			if !ok {
+				p = append(p, fmt.Sprintf("%s.match[%d]: exactly one of exact, prefix, glob, regexp, topic, catch_all: true, unclaimed: true", at, j))
+			}
+			if kind == "unclaimed" {
+				unclaimed++
 			}
 		}
+	}
+	if unclaimed > 1 {
+		p = append(p, "catalog.groups: unclaimed: true in at most one group")
 	}
 	return p
 }

@@ -62,7 +62,7 @@ catalog:
     - id: other
       name: Other
       default_repo: source-code-portal
-      match: [ { catch_all: true } ]
+      match: [ { unclaimed: true } ]
 ```
 
 Matchers (each entry has exactly one):
@@ -74,7 +74,8 @@ Matchers (each entry has exactly one):
 | `glob: "*-service"` | whole name, `*` any run, `?` one character (at most 6 `*`) | insensitive |
 | `regexp: 'Config(Service\|-.*)'` | **whole name** against an RE2 expression (it is anchored for you: `^(?:...)$`), at most 256 bytes | sensitive; start with `(?i)` for insensitive |
 | `topic: iam` | repositories with that GitHub topic | lower-case topics |
-| `catch_all: true` | everything (use once, typically last) | |
+| `catch_all: true` | everything (an "all repositories" group) | |
+| `unclaimed: true` | what no other group selects (at most one group) | |
 
 - A repository can be in several groups; the order of groups is the dashboard order.
 - `sources: [github]` on a group limits it to repositories of those sources (only needed with several sources).
@@ -91,7 +92,7 @@ Typical wishes:
 | "the services" (names ending in -service) | `glob: "*-service"` |
 | "ConfigService and the JAU tools" | `regexp: 'ConfigService.*\|JAU\|Java-Auto-Update'` |
 | "anything tagged iot" | `topic: iot` |
-| "the rest in Other" | a last group with `catch_all: true` |
+| "the rest in Other" | a last group with `unclaimed: true` |
 | "no forks / no archived ones" | `github.sources[].include_forks: false` / `include_archived: false` (source filters, not groups) |
 | "never show the client repositories" | `github.sources[].exclude: [{glob: 'client-*'}]` (or `topic:`): kept out of the catalogue, not just ungrouped |
 

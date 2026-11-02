@@ -53,7 +53,7 @@ catalog:
       description: Identity and access management
       default_repo: Whydah-UserAdminService
       match: [{ prefix: whydah- }, { topic: iam }]
-    - { id: other, name: Other, default_repo: source-code-portal, match: [{ catch_all: true }] }
+    - { id: other, name: Other, default_repo: source-code-portal, match: [{ unclaimed: true }] }
 webhook:
   secret_file: /run/secrets/webhook-secret
 ```
@@ -139,6 +139,7 @@ Matchers (each has exactly one field) see the repository name, except `topic`:
 | `regexp: "^scp-(api\|web)$"` | the whole name against an RE2 expression (case-sensitive unless `(?i)`) |
 | `topic: iam` | repositories with that GitHub topic |
 | `catch_all: true` | every repository |
+| `unclaimed: true` | the repositories no other group selects (in at most one group): the ones that still need a home |
 
 A repository can be in several groups. Repositories in no group are counted on the dashboard and listed by the API.
 

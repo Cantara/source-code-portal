@@ -53,6 +53,7 @@ func TestMatcherRefused(t *testing.T) {
 		{"regexp", strings.Repeat("a", 257)},
 		{"regexp", "(a{100}){100}"},
 		{"topic", "Not A Topic"},
+		{"unclaimed", ""}, // not a matcher of its own: Compile and Resolve handle it
 	} {
 		if _, err := compileMatcher(tc.kind, tc.value); err == nil {
 			t.Errorf("%s %q compiled", tc.kind, tc.value)
@@ -77,6 +78,7 @@ func TestCompileFindings(t *testing.T) {
 		"empty-name glob":      {groups: []config.Group{g("a", "x", config.Match{Glob: "*"})}, want: "empty name"},
 		"two catch-alls": {groups: []config.Group{g("a", "x", config.Match{CatchAll: true}), g("b", "x", config.Match{CatchAll: true})},
 			want: "catch_all"},
+		"unclaimed default": {groups: []config.Group{g("a", "anything", config.Match{Unclaimed: true})}},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -112,6 +114,27 @@ func TestResolve(t *testing.T) {
 	}
 	if len(got[1].Members) != 0 || !got[1].DefaultMissing {
 		t.Errorf("group x (another source only) = %+v", got[1])
+	}
+}
+
+func TestResolveUnclaimed(t *testing.T) {
+	gs, fs := Compile([]config.Group{
+		{ID: "w", Name: "W", DefaultRepo: "whydah-core", Match: []config.Match{{Prefix: "whydah-"}}},
+		{ID: "other", Name: "Other", DefaultRepo: "tools", Match: []config.Match{{Unclaimed: true}, {Exact: "whydah-b"}}},
+		{ID: "t", Name: "T", DefaultRepo: "tools", Match: []config.Match{{Topic: "tooling"}}},
+	})
+	if gs == nil {
+		t.Fatal(fs)
+	}
+	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
+	for _, r := range []snapshot.Repo{{Name: "whydah-core"}, {Name: "whydah-b"}, {Name: "tools", Topics: []string{"tooling"}}, {Name: "lone"}} {
+		r.ID, r.Owner = snapshot.RepoID{Source: "gh"}, "acme"
+		repos[r.Key()] = &snapshot.RepoEntry{Repo: r}
+	}
+	got := gs.Resolve(repos)
+	// A later group's claim counts too, and the group's own other matchers still select.
+	if m := strings.Join(keys(got[1].Members), ","); m != "acme/lone,acme/whydah-b" || !got[1].DefaultMissing {
+		t.Errorf("unclaimed group = %s (default missing %v)", m, got[1].DefaultMissing)
 	}
 }
 

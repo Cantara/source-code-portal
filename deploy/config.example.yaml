@@ -42,7 +42,7 @@ catalog:
       name: Other
       default_repo: whydah
       match:
-        - catch_all: true
+        - unclaimed: true   # what no other group selects; catch_all: true selects every repository
 # GitHub webhook (content type application/json; events push, release, repository, installation, installation_repositories) at
 # POST /webhooks/github. The receiver is registered only when secret_file is set; previous_secret_file keeps deliveries signed with
 # the old secret valid during a rotation.

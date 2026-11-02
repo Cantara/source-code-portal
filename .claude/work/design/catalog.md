@@ -82,7 +82,8 @@ func ParseDescriptor(b []byte) Descriptor                                  // pu
    unresolved sets `DefaultMissing`.
 9. Matchers: `exact`, `prefix` (case-insensitive); `glob` with `*` and `?`, whole name, case-insensitive, compiled to RE2, at most
    6 `*`; `regexp` RE2 wrapped as `^(?:p)$` after parsing `p` alone (an unbalanced `)` cannot close the wrapper), case-sensitive unless
-   `(?i)`, pattern at most 256 bytes and program at most 1,000 instructions; `topic` by the topic grammar above; `catch_all: true`.
+   `(?i)`, pattern at most 256 bytes and program at most 1,000 instructions; `topic` by the topic grammar above; `catch_all: true`; `unclaimed: true` (P-37: in at most one group, it adds within
+   the group's sources the repositories no other group selects, resolved after the others; no `default_repo` check).
 10. Commit: the job returns `Result.Catalogue` (the source's repositories) and `sync` writes and publishes it (sync-snapshot-store.md 6);
     the catalog `Publish` replaces the source's repositories and aliases and resolves the groups. The snapshot is `Catalogued` once every
     source has a listing. The warm start publishes the stored rows (checked again for visibility) before the first listing.
@@ -103,7 +104,7 @@ func ParseDescriptor(b []byte) Descriptor                                  // pu
 `catalog.reconcile_interval` (5m, 1m..24h),
 `catalog.groups[]` (`id` `^[a-z0-9]+(-[a-z0-9]+)*$` max 63, unique; `name` required max 120; `description` max 500; `default_repo`
 required; `sources` (ids from `github.sources[]`); `match` 1..64 entries of exactly one of `exact`, `prefix`, `glob`, `regexp`, `topic`,
-`catch_all: true`); at most 500 groups. Sources and admission filters are `github.sources[]` (github.md Config). Startup errors: a bad or
+`catch_all: true`, `unclaimed: true` (at most one group)); at most 500 groups. Sources and admission filters are `github.sources[]` (github.md Config). Startup errors: a bad or
 duplicate id, a matcher that does not compile, an unknown source, a `default_repo` that is not a legal name or not selected by its own
 matchers (a warning when the group has a `topic` matcher). Warnings: more than one `catch_all`, a matcher that matches the empty name.
 ```yaml

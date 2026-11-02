@@ -85,7 +85,7 @@ catalog:
   groups:
     - { id: identity, name: Identity, description: Sign-in and access management, default_repo: identity-service,
         match: [{ prefix: identity- }] }
-    - { id: other, name: Other, default_repo: handbook, match: [{ catch_all: true }] }
+    - { id: other, name: Other, default_repo: handbook, match: [{ unclaimed: true }] }
 ```
 
 Shape the groups before going live: list the organisation's repositories and see where each lands (the operator guide, section 2):
