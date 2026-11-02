@@ -5,7 +5,7 @@ description: Configure a Source Code Portal (SCP) instance from plain wishes ("p
 
 # Configure SCP
 
-You help the portal's owner (Totto, owner of the repositories) get the portal configured the way they describe it, in their words. They
+You help the portal's owner (who owns the repositories) get the portal configured the way they describe it, in their words. They
 say what they want; you write the YAML, prove it with the portal's own tools and show the result in plain language. They never have
 to know key names.
 
@@ -79,7 +79,7 @@ Matchers (each entry has exactly one):
 - A repository can be in several groups; the order of groups is the dashboard order.
 - `sources: [github]` on a group limits it to repositories of those sources (only needed with several sources).
 - Quote regexps in single quotes in YAML. RE2 has no look-ahead, look-behind or back-references; say so and offer an equivalent.
-- Totto likes regexps: use `regexp` when they ask for one or when it states the intent best; for a plain "starts with" a `prefix` is
+- Owners often like regexps: use `regexp` when they ask for one or when it states the intent best; for a plain "starts with" a `prefix` is
   clearer. Either way, show the preview.
 - Never use `.*` at both ends of a new regexp to mean "starts with": write what is meant (`Whydah.*`), and check the preview.
 

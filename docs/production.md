@@ -1,11 +1,11 @@
-# Production setup: scp.cantara.no
+# Production setup
 
-The steps from nothing to the public portal at `https://scp.cantara.no` for the Cantara organisation: one host with Docker, a reverse
+The steps from nothing to a public portal at `https://scp.example.org` for a GitHub organisation (here `example`): one host with Docker, a reverse
 proxy that holds the TLS certificate, a GitHub App, single sign-on for the people who see private repositories and the admin page, and
 the assistant. The [operator guide](operator-guide.md) explains every key; Kubernetes and several instances are in its section 3.
 
-What you need: a Linux host with Docker and ports 80 and 443 open, the DNS name `scp.cantara.no` pointing at it, owner rights on the
-`Cantara` GitHub organisation, an administrator at the organisation's OpenID Connect provider, and an API key of a language model
+What you need: a Linux host with Docker and ports 80 and 443 open, the DNS name of the portal (here `scp.example.org`) pointing at it, owner rights on the
+GitHub organisation, an administrator at the organisation's OpenID Connect provider, and an API key of a language model
 provider for the assistant.
 
 ## 1. Secrets
@@ -24,22 +24,22 @@ The later steps add `scp-app.pem` (GitHub App key), `oidc-secret` (sign-in clien
 
 ## 2. GitHub App
 
-In GitHub, *Cantara* organisation, *Settings*, *Developer settings*, *GitHub Apps*, *New GitHub App*:
+In GitHub, the organisation's *Settings*, *Developer settings*, *GitHub Apps*, *New GitHub App*:
 
-- Name: `Cantara Source Code Portal`; homepage `https://scp.cantara.no`.
-- Webhook: active, URL `https://scp.cantara.no/webhooks/github`, secret: the contents of `webhook-secret`.
+- Name: `Example Source Code Portal`; homepage `https://scp.example.org`.
+- Webhook: active, URL `https://scp.example.org/webhooks/github`, secret: the contents of `webhook-secret`.
 - Repository permissions: *Contents* read-only, *Metadata* read-only. Nothing else.
 - Subscribe to events: *Push*, *Release*, *Repository*.
 - Where can it be installed: *Only on this account*.
 
 Create it, note the *App ID*, generate a private key and store it as `/srv/scp/secrets/scp-app.pem` (group 65532, mode 0640). Then
-*Install App* on `Cantara`, *All repositories* (or the ones the portal shows).
+*Install App* on the organisation, *All repositories* (or the ones the portal shows).
 
 ## 3. Sign-in
 
 Register the portal at the organisation's OpenID Connect provider (Google Workspace, Entra ID, Keycloak, ...) as a web application:
 
-- Redirect URI: `https://scp.cantara.no/auth/callback`; sign-out redirect: `https://scp.cantara.no/`.
+- Redirect URI: `https://scp.example.org/auth/callback`; sign-out redirect: `https://scp.example.org/`.
 - Scopes `openid email profile`, and a `groups` claim when the provider has groups (the claim's name is `auth.oidc.groups_claim`).
 
 Store the client secret as `/srv/scp/secrets/oidc-secret`. Decide who sees private repositories (`access.private_groups`) and who is
@@ -52,7 +52,7 @@ who signs in.
 
 ```yaml
 server:
-  public_url: https://scp.cantara.no
+  public_url: https://scp.example.org
   trusted_proxies: [172.30.0.0/24]          # the compose network of step 5: the reverse proxy
 log:
   level: info
@@ -61,14 +61,14 @@ store:
 github:
   sources:
     - id: github
-      orgs: [Cantara]
+      orgs: [example]
       app: { id: 123456, private_key_file: /run/secrets/scp-app.pem }   # the App ID of step 2
       include_private: true                  # only for viewers in access.private_groups
 access:
-  private_groups: [cantara-developers]       # a group of the provider, or ["*"]
+  private_groups: [developers]       # a group of the provider, or ["*"]
 auth:
   session_key_file: /run/secrets/session-key
-  admin_emails: [<administrator>@cantara.no] # the administrators' verified addresses
+  admin_emails: [<administrator>@example.org] # the administrators' verified addresses
   oidc:
     issuer: https://accounts.google.com      # the provider of step 3
     client_id: <client id>
@@ -83,15 +83,15 @@ webhook:
   secret_file: /run/secrets/webhook-secret
 catalog:
   groups:
-    - { id: whydah, name: Whydah, description: Identity and access management, default_repo: Whydah-UserAdminService,
-        match: [{ prefix: whydah- }] }
-    - { id: other, name: Other, default_repo: source-code-portal, match: [{ catch_all: true }] }
+    - { id: identity, name: Identity, description: Sign-in and access management, default_repo: identity-service,
+        match: [{ prefix: identity- }] }
+    - { id: other, name: Other, default_repo: handbook, match: [{ catch_all: true }] }
 ```
 
 Shape the groups before going live: list the organisation's repositories and see where each lands (the operator guide, section 2):
 
 ```sh
-gh api --paginate "orgs/Cantara/repos?per_page=100" > /srv/scp/repos.json
+gh api --paginate "orgs/example/repos?per_page=100" > /srv/scp/repos.json
 portal() { docker run --rm -v /srv/scp:/srv/scp:ro -v /srv/scp/secrets:/run/secrets:ro ghcr.io/cantara/source-code-portal:2.0.0 "$@"; }
 portal config groups -c /srv/scp/scp.yaml --repos /srv/scp/repos.json
 portal config check -c /srv/scp/scp.yaml
@@ -101,7 +101,7 @@ portal config check -c /srv/scp/scp.yaml
 
 ## 5. Run
 
-`/srv/scp/compose.yaml`, with Caddy as the reverse proxy (it gets and renews the certificate for `scp.cantara.no` itself):
+`/srv/scp/compose.yaml`, with Caddy as the reverse proxy (it gets and renews the certificate for `scp.example.org` itself):
 
 ```yaml
 services:
@@ -136,7 +136,7 @@ volumes:
 `/srv/scp/Caddyfile`:
 
 ```
-scp.cantara.no {
+scp.example.org {
 	encode zstd gzip
 	reverse_proxy scp:9090
 }
@@ -154,11 +154,11 @@ The first start reads every repository (with the App, a few minutes for a few hu
 ## 6. Check
 
 - `curl -s localhost:9091/readyz` answers 200, and `curl -s localhost:9091/api/v1/status | jq .warnings` is empty.
-- `https://scp.cantara.no` shows the dashboard with the groups; a private repository is absent while signed out.
+- `https://scp.example.org` shows the dashboard with the groups; a private repository is absent while signed out.
 - *Sign in*, then the private repositories show, and an administrator sees *Admin* in the header with the portal's status.
 - On *Admin*, *Test the provider* answers with the time it took; *Ask* in the header answers a question with links into the portal.
 - Push to a repository: the commit shows within seconds; GitHub's App settings, *Advanced*, list the deliveries with status 202.
-- A badge, for example `https://scp.cantara.no/badges/groups/whydah/health.svg`, renders in a README.
+- A badge, for example `https://scp.example.org/badges/groups/identity/health.svg`, renders in a README.
 
 ## 7. Operate
 
