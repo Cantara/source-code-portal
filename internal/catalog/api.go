@@ -16,7 +16,7 @@ type API struct {
 	Current   func(context.Context) *snapshot.Snapshot // the viewer's view
 	Dashboard []func(*snapshot.Snapshot, *oapi.Dashboard)
 	Group     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group)
-	Repo      []func(*snapshot.RepoEntry, *oapi.Repo)
+	Repo      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo)
 	Detail    []func(*snapshot.RepoEntry, *oapi.RepoDetail)
 }
 
@@ -26,11 +26,18 @@ func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {
 
 func (a API) GetDashboard(ctx context.Context, _ oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
 	s := a.Current(ctx)
-	out := oapi.Dashboard{Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos), Latest: []oapi.Commit{}}
+	out := oapi.Dashboard{Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos), Latest: []oapi.Commit{},
+		Activity: noActivity()}
 	for _, g := range s.Groups {
 		def, _ := defaultRepo(g)
+		members := make([]oapi.DashboardMember, 0, len(g.Members))
+		for _, k := range g.Members {
+			if e := s.Repos[k]; e != nil {
+				members = append(members, oapi.DashboardMember{Address: string(k), Name: e.Repo.Name, Archived: e.Repo.Archived})
+			}
+		}
 		out.Groups = append(out.Groups, oapi.DashboardGroup{Id: g.ID, Name: g.Name, Description: g.Description, DefaultRepo: def,
-			RepoCount: len(g.Members)})
+			RepoCount: len(g.Members), Members: members, Activity: noActivity()})
 	}
 	for k := range s.Repos {
 		if len(s.GroupsOf(k)) == 0 {
@@ -157,9 +164,14 @@ func (a API) repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oa
 		Freshness: oapi.FreshnessOf(e.Fresh, now),
 	}
 	for _, fn := range a.Repo {
-		fn(e, &out)
+		fn(s, e, &out)
 	}
 	return out
+}
+
+// noActivity is the activity before the commits are added: none.
+func noActivity() oapi.Activity {
+	return oapi.Activity{Weekly: make([]int, 12), Authors: []string{}, Recent: []oapi.RecentRepo{}}
 }
 
 func nonNil(ss []string) []string {

@@ -100,7 +100,7 @@ func Graph() snapshot.Indexer {
 }
 
 // Repo adds the language of the first manifest that names one to a repository summary.
-func Repo(e *snapshot.RepoEntry, r *oapi.Repo) {
+func Repo(_ *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	ms, _ := Of(e)
 	for _, m := range ms {
 		if m.Language != "" {

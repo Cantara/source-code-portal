@@ -19,21 +19,21 @@ func failing(f snapshot.Freshness) bool {
 	return f.Attempts >= 3 || (f.CheckedAt.IsZero() && f.State == snapshot.StateError)
 }
 
-// assess is a repository's health from the facets of the catalogue, its commits and its release.
-func assess(e *snapshot.RepoEntry, now time.Time) health.Repo {
+// assess is a repository's health in the view s from the facets of the catalogue, its commits and its release.
+func assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.Repo {
 	r := e.Repo
 	d, _ := catalog.DescriptorOf(e)
 	last, commitsFresh := commits.LastCommit(e)
-	s := health.Signals{Archived: r.Archived, Deprecated: d.Lifecycle == "deprecated", Public: r.Visibility == "public",
+	sig := health.Signals{Archived: r.Archived, Deprecated: d.Lifecycle == "deprecated", Public: r.Visibility == "public",
 		LastChange: r.PushedAt, LastCommit: last, License: r.License, OpenIssues: r.OpenIssues,
 		Failing: failing(e.Fresh) || failing(commitsFresh)}
-	if at, before := commits.LastAuthored(e); !at.IsZero() {
-		s.LastChange, s.Automated, s.Before = at, before || last.After(at), before
+	if at, before := commits.LastAuthored(s, e); !at.IsZero() {
+		sig.LastChange, sig.Automated, sig.Before = at, before || last.After(at), before
 	}
 	if rel, _ := badges.ReleaseOf(e); rel != nil {
-		s.Release, s.Released = rel.Tag, rel.Published
+		sig.Release, sig.Released = rel.Tag, rel.Published
 	}
-	return health.Assess(s, now)
+	return health.Assess(sig, now)
 }
 
 // weigh is the health of the repositories keys (def is the default repository) present in the snapshot.
@@ -41,7 +41,7 @@ func weigh(s *snapshot.Snapshot, keys []snapshot.RepoKey, def snapshot.RepoKey, 
 	members := make([]health.Member, 0, len(keys))
 	for _, k := range keys {
 		if e := s.Repos[k]; e != nil {
-			members = append(members, health.Member{Address: string(k), Default: def != "" && k == def, Health: assess(e, now)})
+			members = append(members, health.Member{Address: string(k), Default: def != "" && k == def, Health: assess(s, e, now)})
 		}
 	}
 	return health.Weigh(members)
@@ -51,8 +51,8 @@ func groupHealth(s *snapshot.Snapshot, g snapshot.Group, now time.Time) health.P
 	return weigh(s, g.Members, g.DefaultRepo, now)
 }
 
-func repoHealthAPI(e *snapshot.RepoEntry, out *oapi.Repo) {
-	r := assess(e, time.Now())
+func repoHealthAPI(s *snapshot.Snapshot, e *snapshot.RepoEntry, out *oapi.Repo) {
+	r := assess(s, e, time.Now())
 	if !r.Counted {
 		return
 	}
@@ -85,6 +85,14 @@ func dashboardHealthAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
 	now := time.Now()
 	for i, g := range s.Groups {
 		out.Groups[i].Health = productAPI(groupHealth(s, g, now), dashboardFindings)
+		for j := range out.Groups[i].Members {
+			m := &out.Groups[i].Members[j]
+			if e := s.Repos[snapshot.RepoKey(m.Address)]; e != nil {
+				if r := assess(s, e, now); r.Counted {
+					m.Level = new(oapi.HealthLevel(r.Level))
+				}
+			}
+		}
 	}
 	keys := make([]snapshot.RepoKey, 0, len(s.Repos))
 	for k := range s.Repos {

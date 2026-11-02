@@ -237,9 +237,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		routes = append(routes, a.Routes()...)
 	}
 	catalogAPI := catalog.API{Current: view,
-		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI},
+		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
-		Repo:      []func(*snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, repoHealthAPI},
+		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, repoHealthAPI},
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
 	commitsAPI := commits.API{Current: view}
 	groupNames := func(ctx context.Context) []string {

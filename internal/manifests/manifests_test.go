@@ -331,7 +331,7 @@ func TestGraph(t *testing.T) {
 		t.Errorf("summary = %+v", sum)
 	}
 	var r oapi.Repo
-	if Repo(s.Repos["acme/app"], &r); r.Language != "Go" {
+	if Repo(s, s.Repos["acme/app"], &r); r.Language != "Go" {
 		t.Errorf("language = %q", r.Language)
 	}
 }

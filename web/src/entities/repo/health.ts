@@ -21,8 +21,14 @@ export function lastChange(r: Repo): string {
 
 /** activity classifies a repository relative to now. */
 export function activity(r: Repo, now: number): Activity {
-  if (r.archived) return "archived"
-  const age = now - new Date(lastChange(r)).getTime()
+  return activityAt(lastChange(r), r.archived, now)
+}
+
+/** activityAt classifies a last change by a person (null: none read) relative to now. */
+export function activityAt(at: string | null, archived: boolean, now: number): Activity {
+  if (archived) return "archived"
+  if (at === null) return "dormant"
+  const age = now - new Date(at).getTime()
   if (age <= 30 * day) return "active"
   if (age <= 182 * day) return "recent"
   if (age <= 730 * day) return "quiet"

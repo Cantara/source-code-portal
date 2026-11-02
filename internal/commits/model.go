@@ -1,6 +1,7 @@
 package commits
 
 import (
+	"cmp"
 	"container/heap"
 	"maps"
 	"slices"
@@ -155,12 +156,51 @@ func (h *newest) Pop() any {
 type Ref struct {
 	Repo   snapshot.RepoKey
 	Commit *Commit // points into the repository's facet
+	Person bool    // a person's work in the view (ByPerson); set in the feeds index only
 }
 
-// feeds are the merged commits of every repository and of every group, newest first (committedAt desc, repo asc, sha desc).
+// feeds are the merged commits of every repository and of every group, newest first (committedAt desc, repo asc, sha desc), and the
+// sweeps among them.
 type feeds struct {
 	all     []Ref
 	byGroup map[string][]Ref
+	sweeps  map[sweep]bool
+}
+
+// sweep is a commit subject on a day (UTC). One that lands in more than sweepRepos repositories is a change to the fleet, not work in
+// each repository: it is not counted as a person's activity.
+type sweep struct {
+	year, day int
+	subject   string
+}
+
+const sweepRepos = 10
+
+func sweepOf(c *Commit) sweep {
+	t := c.CommittedAt.UTC()
+	return sweep{t.Year(), t.YearDay(), c.Subject}
+}
+
+// sweepsOf finds the sweeps among the default-branch commits of the view.
+func sweepsOf(s *snapshot.Snapshot) map[sweep]bool {
+	repos := map[sweep]map[snapshot.RepoKey]bool{}
+	for k, e := range s.Repos {
+		cs, _ := Of(e)
+		for i := range cs {
+			sw := sweepOf(&cs[i])
+			if repos[sw] == nil {
+				repos[sw] = map[snapshot.RepoKey]bool{}
+			}
+			repos[sw][k] = true
+		}
+	}
+	out := map[sweep]bool{}
+	for sw, ks := range repos {
+		if len(ks) > sweepRepos {
+			out[sw] = true
+		}
+	}
+	return out
 }
 
 const (
@@ -183,9 +223,10 @@ func HistoryOf(e *snapshot.RepoEntry) (*History, snapshot.Freshness) { return fa
 // Feeds is the indexer of the merged commit feeds, for snapshot.NewPublisher.
 func Feeds() snapshot.Indexer {
 	return feedIndex.Build(func(s *snapshot.Snapshot) feeds {
-		f := feeds{all: merge(s, slices.Sorted(maps.Keys(s.Repos))), byGroup: make(map[string][]Ref, len(s.Groups))}
+		sweeps := sweepsOf(s)
+		f := feeds{all: merge(s, slices.Sorted(maps.Keys(s.Repos)), sweeps), byGroup: make(map[string][]Ref, len(s.Groups)), sweeps: sweeps}
 		for _, g := range s.Groups {
-			f.byGroup[g.ID] = merge(s, g.Members)
+			f.byGroup[g.ID] = merge(s, g.Members, sweeps)
 		}
 		return f
 	})
@@ -201,14 +242,14 @@ func feed(s *snapshot.Snapshot, id string) ([]Ref, bool) {
 	return refs, ok
 }
 
-// merge merges the commits of keys, newest first.
-func merge(s *snapshot.Snapshot, keys []snapshot.RepoKey) []Ref {
+// merge merges the commits of keys, newest first, marking a person's work.
+func merge(s *snapshot.Snapshot, keys []snapshot.RepoKey, sweeps map[sweep]bool) []Ref {
 	var out []Ref
 	for _, k := range keys {
 		if e := s.Repos[k]; e != nil {
 			cs, _ := Of(e)
 			for i := range cs {
-				out = append(out, Ref{Repo: k, Commit: &cs[i]})
+				out = append(out, Ref{Repo: k, Commit: &cs[i], Person: !Automated(&cs[i]) && !sweeps[sweepOf(&cs[i])]})
 			}
 		}
 	}
@@ -249,12 +290,18 @@ func Automated(c *Commit) bool {
 		strings.HasPrefix(c.Subject, "[maven-release-plugin]")
 }
 
-// LastAuthored returns the time of the newest commit of e made by a person. When every read commit is automated, it returns the oldest
-// read commit's time with before set: the last person's commit is older. Zero when there are no commits.
-func LastAuthored(e *snapshot.RepoEntry) (at time.Time, before bool) {
+// Sweep reports whether c is part of a sweep in the view s: its subject landed in more than 10 repositories on its day.
+func Sweep(s *snapshot.Snapshot, c *Commit) bool { return feedIndex.Get(s).sweeps[sweepOf(c)] }
+
+// ByPerson reports whether c is a person's work in the view s: not automated and not part of a sweep.
+func ByPerson(s *snapshot.Snapshot, c *Commit) bool { return !Automated(c) && !Sweep(s, c) }
+
+// LastAuthored returns the time of the newest commit of e in the view s that is a person's work (ByPerson). When no read commit is,
+// it returns the oldest read commit's time with before set: the last person's commit is older. Zero when there are no commits.
+func LastAuthored(s *snapshot.Snapshot, e *snapshot.RepoEntry) (at time.Time, before bool) {
 	cs, _ := Of(e)
 	for i := range cs {
-		if !Automated(&cs[i]) {
+		if ByPerson(s, &cs[i]) {
 			return cs[i].CommittedAt, false
 		}
 	}
@@ -264,21 +311,44 @@ func LastAuthored(e *snapshot.RepoEntry) (at time.Time, before bool) {
 	return cs[len(cs)-1].CommittedAt, true
 }
 
-// dashboardCommits is how many of the latest commits the dashboard shows.
-const dashboardCommits = 10
+const (
+	dashboardCommits = 10 // how many of the latest commits by people the dashboard shows
+	activityDays     = 30 // the window of the activity counts and authors
+	activityWeeks    = 12 // the weekly counts
+	activityAuthors  = 5  // the authors named
+	activityRecent   = 3  // the repositories people changed last
+)
 
-// Dashboard adds the commits to the dashboard: the latest commits, each group's last activity and the commits' freshness counts.
+// Dashboard adds the commits to the dashboard: the latest commits by people, the activity of the fleet and of each group (with its
+// members' last change by a person), each group's last activity and the commits' freshness counts.
 func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
+	now := time.Now()
 	all, _ := feed(s, "")
-	for _, r := range all[:min(dashboardCommits, len(all))] {
-		d.Latest = append(d.Latest, commitOf(r.Repo, r.Commit))
-	}
-	for i := range d.Groups {
-		if refs, _ := feed(s, d.Groups[i].Id); len(refs) > 0 {
-			d.Groups[i].LastActivity = oapi.TimeOrNil(refs[0].Commit.CommittedAt)
+	for _, r := range all {
+		if len(d.Latest) == dashboardCommits {
+			break
+		}
+		if r.Person {
+			d.Latest = append(d.Latest, commitOf(r.Repo, r.Commit))
 		}
 	}
-	now := time.Now()
+	d.Activity = activity(all, now)
+	for i := range d.Groups {
+		g := &d.Groups[i]
+		refs, _ := feed(s, g.Id)
+		if len(refs) > 0 {
+			g.LastActivity = oapi.TimeOrNil(refs[0].Commit.CommittedAt)
+		}
+		g.Activity = activity(refs, now)
+		for j := range g.Members {
+			m := &g.Members[j]
+			if e := s.Repos[snapshot.RepoKey(m.Address)]; e != nil {
+				if at, _ := LastAuthored(s, e); !at.IsZero() {
+					m.LastAuthoredAt = oapi.TimeOrNil(at)
+				}
+			}
+		}
+	}
 	for _, e := range s.Repos {
 		_, f := Of(e)
 		switch f.Derive(now) {
@@ -294,12 +364,67 @@ func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 	}
 }
 
+// activity sums a feed (newest first) at now: commits by people, automation and sweeps in the last 30 days, people's commits per week,
+// the authors, the last commit by a person and the repositories people changed last.
+func activity(refs []Ref, now time.Time) oapi.Activity {
+	const day, week = 24 * time.Hour, 7 * 24 * time.Hour
+	a := oapi.Activity{Weekly: make([]int, activityWeeks), Authors: []string{}, Recent: []oapi.RecentRepo{}}
+	window, weeks := now.Add(-activityDays*day), now.Add(-activityWeeks*week)
+	type author struct {
+		name    string
+		commits int
+		first   int // order of appearance: the newest commit first
+	}
+	authors := map[string]*author{}
+	for _, r := range refs {
+		c := r.Commit
+		if c.CommittedAt.Before(weeks) && a.LastAuthoredAt != nil && len(a.Recent) == activityRecent {
+			break
+		}
+		if r.Person {
+			if a.LastAuthoredAt == nil {
+				a.LastAuthoredAt = oapi.TimeOrNil(c.CommittedAt)
+			}
+			if len(a.Recent) < activityRecent && !slices.ContainsFunc(a.Recent, func(x oapi.RecentRepo) bool { return x.Repo == string(r.Repo) }) {
+				a.Recent = append(a.Recent, oapi.RecentRepo{Repo: string(r.Repo), At: c.CommittedAt.UTC()})
+			}
+			if !c.CommittedAt.Before(weeks) {
+				a.Weekly[activityWeeks-1-min(max(int(now.Sub(c.CommittedAt)/week), 0), activityWeeks-1)]++
+			}
+		}
+		if c.CommittedAt.Before(window) {
+			continue
+		}
+		switch {
+		case Automated(c):
+			a.Automation++
+		case !r.Person:
+			a.Sweeps++
+		default:
+			a.People++
+			key := strings.ToLower(cmp.Or(c.AuthorLogin, c.AuthorName))
+			if authors[key] == nil {
+				authors[key] = &author{name: cmp.Or(c.AuthorName, c.AuthorLogin), first: len(authors)}
+			}
+			authors[key].commits++
+		}
+	}
+	ranked := slices.SortedFunc(maps.Values(authors), func(x, y *author) int {
+		return cmp.Or(cmp.Compare(y.commits, x.commits), cmp.Compare(x.first, y.first))
+	})
+	a.AuthorCount = len(ranked)
+	for _, au := range ranked[:min(activityAuthors, len(ranked))] {
+		a.Authors = append(a.Authors, au.name)
+	}
+	return a
+}
+
 // Repo adds the time of the last commit to a repository summary.
-func Repo(e *snapshot.RepoEntry, r *oapi.Repo) {
+func Repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	if at, _ := LastCommit(e); !at.IsZero() {
 		r.LastCommitAt = oapi.TimeOrNil(at)
 	}
-	if at, _ := LastAuthored(e); !at.IsZero() {
+	if at, _ := LastAuthored(s, e); !at.IsZero() {
 		r.LastAuthoredAt = oapi.TimeOrNil(at)
 	}
 }

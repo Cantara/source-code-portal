@@ -518,7 +518,7 @@ components:
         error: { type: integer }
     DashboardGroup:
       type: object
-      required: [id, name, description, defaultRepo, repoCount, lastActivity, health]
+      required: [id, name, description, defaultRepo, repoCount, lastActivity, health, activity, members, summary]
       properties:
         id: { type: string }
         name: { type: string }
@@ -527,15 +527,57 @@ components:
         repoCount: { type: integer }
         lastActivity: { type: [string, "null"], format: date-time, description: Time of the group's newest commit }
         health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: Null when no repository is counted }
+        activity: { $ref: "#/components/schemas/Activity" }
+        members: { type: array, items: { $ref: "#/components/schemas/DashboardMember" }, description: "Every member, by address, for the fleet map" }
+        summary: { $ref: "#/components/schemas/GroupSummaryFacts" }
+    Activity:
+      type: object
+      description: >-
+        Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a
+        subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
+      required: [people, automation, sweeps, weekly, authors, authorCount, lastAuthoredAt, recent]
+      properties:
+        people: { type: integer, description: Commits by people in the last 30 days }
+        automation: { type: integer, description: Commits by automation in the last 30 days }
+        sweeps: { type: integer, description: Commits of sweeps in the last 30 days }
+        weekly: { type: array, items: { type: integer }, minItems: 12, maxItems: 12, description: "Commits by people per 7 days, the oldest of the last 12 first" }
+        authors: { type: array, items: { type: string }, description: "The people who committed in the last 30 days, most commits first, at most 5" }
+        authorCount: { type: integer, description: How many people committed in the last 30 days }
+        lastAuthoredAt: { type: [string, "null"], format: date-time, description: "The newest commit by a person; null when none is read" }
+        recent: { type: array, items: { $ref: "#/components/schemas/RecentRepo" }, description: "The repositories people changed last, at most 3" }
+    RecentRepo:
+      type: object
+      required: [repo, at]
+      properties:
+        repo: { type: string, description: Address }
+        at: { type: string, format: date-time }
+    DashboardMember:
+      type: object
+      required: [address, name, archived, lastAuthoredAt, level]
+      properties:
+        address: { type: string }
+        name: { type: string }
+        archived: { type: boolean }
+        lastAuthoredAt: { type: [string, "null"], format: date-time, description: "As Repo.lastAuthoredAt" }
+        level: { oneOf: [{ $ref: "#/components/schemas/HealthLevel" }, { type: "null" }], description: Null when not counted }
+    GroupSummaryFacts:
+      type: object
+      description: What most members share, said once instead of on every repository; null where fewer than 80% share it
+      required: [license, language, released]
+      properties:
+        license: { type: [string, "null"], description: "The licence at least 80% of the members have" }
+        language: { type: [string, "null"], description: "The language at least 80% of the members have" }
+        released: { type: integer, description: Members with a release }
     Dashboard:
       type: object
-      required: [groups, repoCount, ungroupedCount, latest, health, freshness]
+      required: [groups, repoCount, ungroupedCount, latest, health, freshness, activity]
       properties:
         groups: { type: array, items: { $ref: "#/components/schemas/DashboardGroup" } }
+        activity: { $ref: "#/components/schemas/Activity" }
         health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: "Every repository weighed as one product; the first 5 findings" }
         repoCount: { type: integer }
         ungroupedCount: { type: integer, description: Repositories in no group }
-        latest: { type: array, items: { $ref: "#/components/schemas/Commit" } }
+        latest: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: "The 10 newest commits by people (Activity): neither automation nor sweeps; /commits lists all of them" }
         freshness: { $ref: "#/components/schemas/FreshnessCounts" }
     DocSummary:
       type: object

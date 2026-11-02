@@ -534,14 +534,69 @@ export interface components {
       lastActivity: string | null
       /** @description Null when no repository is counted */
       health: components["schemas"]["ProductHealth"] | null
+      activity: components["schemas"]["Activity"]
+      /** @description Every member, by address, for the fleet map */
+      members: components["schemas"]["DashboardMember"][]
+      summary: components["schemas"]["GroupSummaryFacts"]
+    }
+    /** @description Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it. */
+    Activity: {
+      /** @description Commits by people in the last 30 days */
+      people: number
+      /** @description Commits by automation in the last 30 days */
+      automation: number
+      /** @description Commits of sweeps in the last 30 days */
+      sweeps: number
+      /** @description Commits by people per 7 days, the oldest of the last 12 first */
+      weekly: number[]
+      /** @description The people who committed in the last 30 days, most commits first, at most 5 */
+      authors: string[]
+      /** @description How many people committed in the last 30 days */
+      authorCount: number
+      /**
+       * Format: date-time
+       * @description The newest commit by a person; null when none is read
+       */
+      lastAuthoredAt: string | null
+      /** @description The repositories people changed last, at most 3 */
+      recent: components["schemas"]["RecentRepo"][]
+    }
+    RecentRepo: {
+      /** @description Address */
+      repo: string
+      /** Format: date-time */
+      at: string
+    }
+    DashboardMember: {
+      address: string
+      name: string
+      archived: boolean
+      /**
+       * Format: date-time
+       * @description As Repo.lastAuthoredAt
+       */
+      lastAuthoredAt: string | null
+      /** @description Null when not counted */
+      level: components["schemas"]["HealthLevel"] | null
+    }
+    /** @description What most members share, said once instead of on every repository; null where fewer than 80% share it */
+    GroupSummaryFacts: {
+      /** @description The licence at least 80% of the members have */
+      license: string | null
+      /** @description The language at least 80% of the members have */
+      language: string | null
+      /** @description Members with a release */
+      released: number
     }
     Dashboard: {
       groups: components["schemas"]["DashboardGroup"][]
+      activity: components["schemas"]["Activity"]
       /** @description Every repository weighed as one product; the first 5 findings */
       health: components["schemas"]["ProductHealth"] | null
       repoCount: number
       /** @description Repositories in no group */
       ungroupedCount: number
+      /** @description The 10 newest commits by people (Activity): neither automation nor sweeps; /commits lists all of them */
       latest: components["schemas"]["Commit"][]
       freshness: components["schemas"]["FreshnessCounts"]
     }

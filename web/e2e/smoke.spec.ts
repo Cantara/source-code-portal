@@ -143,7 +143,12 @@ for (const path of ["/repos/acme/whydah-core"]) {
 
 test("a product shows its weighed health and what costs it points", async ({ page }) => {
   await page.goto("/")
-  await expect(page.getByRole("region", { name: "Telemetry" }).getByText("Health", { exact: true })).toBeVisible()
+  await expect(page.getByRole("region", { name: "Telemetry" }).getByText("Findings", { exact: true })).toBeVisible()
+  await expect(page.getByRole("region", { name: "Fleet" })).toBeVisible()
+  await page.getByRole("button", { name: "table" }).click()
+  await expect(page.getByRole("table", { name: /Products/ }).getByRole("rowheader", { name: "Whydah" })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole("button", { name: "table" })).toHaveAttribute("aria-pressed", "true") // remembered, drawn by the server
   await page.goto("/groups/whydah")
   const health = page.getByRole("region", { name: "Health" })
   await expect(health.getByText(/repositories weighed/)).toBeVisible()
@@ -174,9 +179,9 @@ test("static files are immutable and compressed; pages are not stored", async ({
   expect(asset.headers()["content-encoding"]).toBe("gzip")
 })
 
-// Badges are a hard requirement: every repository on the dashboard and its group shows its health badges, and the repository page
-// shows its SVG badges, every one loaded.
-for (const path of ["/", "/groups/whydah"]) {
+// Badges are a hard requirement: every repository of a group shows its health badges on the group's page (the dashboard shows
+// products, not their members: P-36), and the repository page shows its SVG badges, every one loaded.
+for (const path of ["/groups/whydah"]) {
   test(`${path} shows health badges for every repository`, async ({ page }) => {
     await page.goto(path)
     const repos = page.locator('a[href^="/repos/"]:not([href*="/commits"]):not([href*="/docs/"])')

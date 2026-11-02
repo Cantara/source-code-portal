@@ -12,7 +12,8 @@ score loses is a finding the reader can see: the score summarises, the findings 
 Signals of a repository: archived, lifecycle (`scp.yaml`), visibility, the last change by a person, the newest commit, the latest
 release (tag and time), the licence, open issues and pull requests, and whether SCP keeps failing to read it.
 
-The last change is the newest default-branch commit by a person (`commits.LastAuthored`), else the last push. Automation is not a
+The last change is the newest default-branch commit by a person (`commits.LastAuthored`), else the last push. A sweep (one subject in
+more than 10 repositories of the viewer's view on one UTC day, `commits.Sweep`) is not a person's work either (P-36). Automation is not a
 person: an author ending in `[bot]` (Renovate, Dependabot, GitHub Actions) or a `[maven-release-plugin]` commit. With dependency
 updates merging themselves, a repository nobody works on would otherwise look active. When every read commit (the latest 30) is
 automated, the oldest of them stands in and the finding says "more than". The API carries it as `Repo.lastAuthoredAt`, and the web

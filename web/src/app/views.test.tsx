@@ -13,7 +13,7 @@ import type { Ctx } from "@/lib/page"
 import { panels } from "./repos/[owner]/[name]/panels"
 import { StatusBanners } from "@/features/status/banners"
 import { setLocation } from "@/test/navigation"
-import { commit, fresh, http, server, snapshot } from "@/test/server"
+import { activity, commit, fresh, http, server, snapshot } from "@/test/server"
 
 function client() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10_000 } } })
@@ -31,18 +31,34 @@ function show(view: ReactNode, path = "/", qc = client()) {
 }
 
 describe("pages", () => {
-  it("renders the dashboard with groups, health and the latest commits", async () => {
+  it("renders the dashboard with the fleet, the products' signals and the latest commits by people", async () => {
     show(<DashboardView />)
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()
     expect(await screen.findByRole("link", { name: "IAM" })).toHaveAttribute("href", "/groups/iam")
     expect(screen.getByText("Commit 1")).toBeInTheDocument()
-    // Every repository of the group shows with its health badges.
-    const card = (await screen.findByRole("link", { name: "Whydah-Core" })).closest("li")
-    expect(card).toHaveTextContent("v1.0.0")
-    expect(card).toHaveTextContent("Apache-2.0")
-    expect(card).toHaveTextContent("0 open issues")
-    expect(screen.getByRole("img", { name: "Activity: 2 active" })).toBeInTheDocument()
-    expect(screen.getByText("Repositories").nextElementSibling).toHaveTextContent("2")
+    expect(screen.getByRole("heading", { name: "Latest commits by people" })).toBeInTheDocument()
+    // The card says people's work apart from automation's, who did it, and what most members share once.
+    const card = screen.getByRole("link", { name: "IAM" }).closest("li") as HTMLElement
+    expect(card).toHaveTextContent("4 commits by people")
+    expect(card).toHaveTextContent("9 by automation")
+    expect(card).toHaveTextContent("Ada and Bo")
+    expect(card).toHaveTextContent("Apache-2.0 · Java · 1 of 2 released")
+    expect(within(card).getByRole("link", { name: "whydah-core" })).toHaveAttribute("href", "/repos/acme/whydah-core")
+    expect(within(card).getByRole("img", { name: /Commits by people per week/ })).toBeInTheDocument()
+    // The fleet map counts every member by its last change by a person.
+    expect(screen.getByRole("region", { name: "Fleet" })).toHaveTextContent("2 active")
+    expect(screen.getByText("People").nextElementSibling).toHaveTextContent("2")
+  })
+
+  it("switches the products to a sortable table and remembers the choice", async () => {
+    const user = userEvent.setup()
+    show(<DashboardView />)
+    await user.click(await screen.findByRole("button", { name: "table" }))
+    const table = screen.getByRole("table", { name: /Products/ })
+    expect(within(table).getByRole("rowheader", { name: "IAM" })).toBeInTheDocument()
+    await user.click(within(table).getByRole("button", { name: /By people, 30 days/ }))
+    expect(within(table).getByRole("columnheader", { name: /By people/ })).toHaveAttribute("aria-sort", "descending")
+    expect(document.cookie).toContain("scp-view-products=table")
   })
 
   it("filters and sorts the repositories of a group through the URL", async () => {
@@ -167,6 +183,7 @@ describe("commit log", () => {
           repoCount: ++n,
           ungroupedCount: 0,
           latest: [],
+          activity: activity(),
           freshness: { fresh: 0, stale: 0, unknown: 0, error: 0 },
         }),
       ),
@@ -209,6 +226,7 @@ describe("commit log", () => {
             repoCount: ++n,
             ungroupedCount: 0,
             latest: [],
+            activity: activity(),
             freshness: { fresh: 0, stale: 0, unknown: 0, error: 0 },
           }),
         ),

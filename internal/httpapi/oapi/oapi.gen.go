@@ -428,6 +428,33 @@ func (e ToolchainVersionsName) Valid() bool {
 	}
 }
 
+// Activity Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
+type Activity struct {
+	// AuthorCount How many people committed in the last 30 days
+	AuthorCount int `json:"authorCount"`
+
+	// Authors The people who committed in the last 30 days, most commits first, at most 5
+	Authors []string `json:"authors"`
+
+	// Automation Commits by automation in the last 30 days
+	Automation int `json:"automation"`
+
+	// LastAuthoredAt The newest commit by a person; null when none is read
+	LastAuthoredAt *time.Time `json:"lastAuthoredAt"`
+
+	// People Commits by people in the last 30 days
+	People int `json:"people"`
+
+	// Recent The repositories people changed last, at most 3
+	Recent []RecentRepo `json:"recent"`
+
+	// Sweeps Commits of sweeps in the last 30 days
+	Sweeps int `json:"sweeps"`
+
+	// Weekly Commits by people per 7 days, the oldest of the last 12 first
+	Weekly []int `json:"weekly"`
+}
+
 // AssistantStatus defines model for AssistantStatus.
 type AssistantStatus struct {
 	// Access Who may ask
@@ -479,14 +506,19 @@ type CommitPage struct {
 
 // Dashboard defines model for Dashboard.
 type Dashboard struct {
+	// Activity Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
+	Activity Activity `json:"activity"`
+
 	// Freshness Repositories by the freshness of their commits
 	Freshness FreshnessCounts  `json:"freshness"`
 	Groups    []DashboardGroup `json:"groups"`
 
 	// Health Every repository weighed as one product; the first 5 findings
-	Health    *ProductHealth `json:"health"`
-	Latest    []Commit       `json:"latest"`
-	RepoCount int            `json:"repoCount"`
+	Health *ProductHealth `json:"health"`
+
+	// Latest The 10 newest commits by people (Activity): neither automation nor sweeps; /commits lists all of them
+	Latest    []Commit `json:"latest"`
+	RepoCount int      `json:"repoCount"`
 
 	// UngroupedCount Repositories in no group
 	UngroupedCount int `json:"ungroupedCount"`
@@ -494,6 +526,9 @@ type Dashboard struct {
 
 // DashboardGroup defines model for DashboardGroup.
 type DashboardGroup struct {
+	// Activity Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
+	Activity Activity `json:"activity"`
+
 	// DefaultRepo Address of the group's main repository
 	DefaultRepo *string `json:"defaultRepo"`
 	Description string  `json:"description"`
@@ -504,8 +539,27 @@ type DashboardGroup struct {
 
 	// LastActivity Time of the group's newest commit
 	LastActivity *time.Time `json:"lastActivity"`
-	Name         string     `json:"name"`
-	RepoCount    int        `json:"repoCount"`
+
+	// Members Every member, by address, for the fleet map
+	Members   []DashboardMember `json:"members"`
+	Name      string            `json:"name"`
+	RepoCount int               `json:"repoCount"`
+
+	// Summary What most members share, said once instead of on every repository; null where fewer than 80% share it
+	Summary GroupSummaryFacts `json:"summary"`
+}
+
+// DashboardMember defines model for DashboardMember.
+type DashboardMember struct {
+	Address  string `json:"address"`
+	Archived bool   `json:"archived"`
+
+	// LastAuthoredAt As Repo.lastAuthoredAt
+	LastAuthoredAt *time.Time `json:"lastAuthoredAt"`
+
+	// Level Null when not counted
+	Level *HealthLevel `json:"level"`
+	Name  string       `json:"name"`
 }
 
 // Dependency defines model for Dependency.
@@ -707,6 +761,18 @@ type GroupSummary struct {
 // GroupSummaryDefaultRepoState defines model for GroupSummary.DefaultRepoState.
 type GroupSummaryDefaultRepoState string
 
+// GroupSummaryFacts What most members share, said once instead of on every repository; null where fewer than 80% share it
+type GroupSummaryFacts struct {
+	// Language The language at least 80% of the members have
+	Language *string `json:"language"`
+
+	// License The licence at least 80% of the members have
+	License *string `json:"license"`
+
+	// Released Members with a release
+	Released int `json:"released"`
+}
+
 // Heading defines model for Heading.
 type Heading struct {
 	Id    string `json:"id"`
@@ -905,6 +971,14 @@ type ProductHealth struct {
 
 	// Watch Repositories at watch
 	Watch int `json:"watch"`
+}
+
+// RecentRepo defines model for RecentRepo.
+type RecentRepo struct {
+	At time.Time `json:"at"`
+
+	// Repo Address
+	Repo string `json:"repo"`
 }
 
 // Release defines model for Release.

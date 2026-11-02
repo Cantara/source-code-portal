@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/github"
+	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -145,9 +146,68 @@ func TestLastAuthored(t *testing.T) {
 	} {
 		e := &snapshot.RepoEntry{}
 		facet.Set(e, newHistory(tc.cs, nil, nil, "main"), snapshot.Freshness{State: snapshot.StateOK})
-		if at, before := LastAuthored(e); !at.Equal(tc.at) || before != tc.before {
+		if at, before := LastAuthored(&snapshot.Snapshot{}, e); !at.Equal(tc.at) || before != tc.before {
 			t.Errorf("%s: %v %v, want %v %v", name, at, before, tc.at, tc.before)
 		}
+	}
+}
+
+// TestSweepsAndActivity: one subject in more than 10 repositories on a day is a sweep, counted apart from people and automation, and
+// a repository whose newest commits are the sweep and a bot's still shows the person's commit before them.
+func TestSweepsAndActivity(t *testing.T) {
+	now := time.Now().UTC()
+	ago := func(d int) time.Time { return now.Add(-time.Duration(d) * 24 * time.Hour) }
+	n := 0
+	commit := func(author, subject string, at time.Time) Commit {
+		n++
+		return Commit{SHA: sha(byte(n)), AuthorName: author, AuthorLogin: strings.ToLower(author), Subject: subject, CommittedAt: at}
+	}
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
+	var entries []*snapshot.RepoEntry
+	var members []snapshot.RepoKey
+	for i := range 11 {
+		e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: int64(i + 1)}, Owner: "acme", Name: fmt.Sprintf("r%d", i)}}
+		cs := []Commit{commit("Sweeper", "chore: repair the manifest", ago(2))}
+		if i == 0 {
+			cs = append([]Commit{{SHA: sha(200), AuthorName: "renovate[bot]", Subject: "chore(deps): update", CommittedAt: ago(1)}}, cs...)
+			cs = append(cs, commit("Ada", "Fix the parser", ago(3)), commit("Ada", "Add a test", ago(20)), commit("Bo", "Old work", ago(60)))
+		}
+		facet.Set(e, newHistory(cs, nil, nil, "main"), snapshot.Freshness{State: snapshot.StateOK})
+		entries = append(entries, e)
+		members = append(members, e.Repo.Key())
+	}
+	p.Update(func(b *snapshot.Builder) {
+		b.ReplaceSource("gh", entries, nil, snapshot.SourceStatus{ID: "gh"})
+		b.SetGroups([]snapshot.Group{{ID: "g", Name: "G", Members: members[:1]}})
+	})
+	p.Flush()
+	s := p.Current()
+	if at, before := LastAuthored(s, s.Repos["acme/r0"]); !at.Equal(ago(3)) || before {
+		t.Errorf("last authored = %v %v, want the person's commit 3 days ago", at, before)
+	}
+	if at, _ := LastAuthored(s, s.Repos["acme/r5"]); !at.Equal(ago(2)) {
+		t.Errorf("a repository holding only the sweep: %v, want the oldest read commit", at)
+	}
+	d := oapi.Dashboard{Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
+	Dashboard(s, &d)
+	g := d.Groups[0].Activity
+	if g.People != 2 || g.Automation != 1 || g.Sweeps != 1 || g.AuthorCount != 1 || !slices.Equal(g.Authors, []string{"Ada"}) {
+		t.Errorf("group activity = %+v", g)
+	}
+	if g.LastAuthoredAt == nil || !g.LastAuthoredAt.Equal(ago(3)) || len(g.Recent) != 1 || g.Recent[0].Repo != "acme/r0" {
+		t.Errorf("group last change = %v, recent %+v", g.LastAuthoredAt, g.Recent)
+	}
+	if sum := g.Weekly[11] + g.Weekly[9]; sum != 2 || g.Weekly[11] != 1 || len(g.Weekly) != 12 {
+		t.Errorf("weekly = %v", g.Weekly)
+	}
+	if d.Activity.Sweeps != 11 || d.Activity.People != 2 {
+		t.Errorf("fleet activity = %+v", d.Activity)
+	}
+	if len(d.Latest) != 3 || d.Latest[0].Subject != "Fix the parser" {
+		t.Errorf("latest = %+v, want people's commits only", d.Latest)
+	}
+	if m := d.Groups[0].Members[0]; m.LastAuthoredAt == nil || !m.LastAuthoredAt.Equal(ago(3)) {
+		t.Errorf("member = %+v", m)
 	}
 }
 

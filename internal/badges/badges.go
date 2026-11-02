@@ -45,7 +45,7 @@ const facet snapshot.Facet[*Release] = "release"
 func ReleaseOf(e *snapshot.RepoEntry) (*Release, snapshot.Freshness) { return facet.Get(e) }
 
 // Repo adds the latest release to a repository summary.
-func Repo(e *snapshot.RepoEntry, r *oapi.Repo) {
+func Repo(_ *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	if rel, _ := facet.Get(e); rel != nil {
 		r.Release = &oapi.Release{Tag: rel.Tag, Url: rel.URL, PublishedAt: rel.Published.UTC()}
 	}
@@ -101,7 +101,7 @@ type Data struct {
 	// LastCommit is a repository's newest commit time (zero when there is none) and the freshness of its commits.
 	LastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)
 	// Health is a repository's health at now.
-	Health func(*snapshot.RepoEntry, time.Time) health.Repo
+	Health func(*snapshot.Snapshot, *snapshot.RepoEntry, time.Time) health.Repo
 	// Product is a group's weighed health at now.
 	Product func(*snapshot.Snapshot, snapshot.Group, time.Time) health.Product
 }
@@ -152,7 +152,7 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 		rel, fresh := facet.Get(e)
 		b, data = release(rel, fresh.State == snapshot.StateNotFound)
 	case "health":
-		r := h.Health(e, h.now())
+		r := h.Health(s, e, h.now())
 		b, data = score(r.Counted, r.Score, r.Level)
 	case "license":
 		b.label = "license"

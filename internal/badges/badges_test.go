@@ -108,7 +108,7 @@ func lastCommit(e *snapshot.RepoEntry) (time.Time, snapshot.Freshness) {
 
 // data stands in for the other features: acme/x scores 72, acme/new is not counted, the group scores 41.
 var data = Data{LastCommit: lastCommit, //nolint:gochecknoglobals // test double
-	Health: func(e *snapshot.RepoEntry, _ time.Time) health.Repo {
+	Health: func(_ *snapshot.Snapshot, e *snapshot.RepoEntry, _ time.Time) health.Repo {
 		if e.Repo.Name == "x" {
 			return health.Repo{Counted: true, Score: 72, Level: health.Watch}
 		}

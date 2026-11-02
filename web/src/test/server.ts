@@ -90,6 +90,19 @@ export const me = (over: Partial<S["Me"]> = {}): S["Me"] => ({
   ...over,
 })
 
+/** activity is a product's or the fleet's work, none unless over says otherwise. */
+export const activity = (over: Partial<S["Activity"]> = {}): S["Activity"] => ({
+  people: 0,
+  automation: 0,
+  sweeps: 0,
+  weekly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3],
+  authors: [],
+  authorCount: 0,
+  lastAuthoredAt: null,
+  recent: [],
+  ...over,
+})
+
 /** defaults answer every page with one group, two repositories and a README. */
 export const defaults = [
   http.get("/me", ({ response }) => response(200).json(me())),
@@ -109,9 +122,23 @@ export const defaults = [
           repoCount: 2,
           lastActivity: at,
           health: product,
+          activity: activity({
+            people: 4,
+            automation: 9,
+            authors: ["Ada", "Bo"],
+            authorCount: 2,
+            lastAuthoredAt: at,
+            recent: [{ repo: "acme/whydah-core", at }],
+          }),
+          members: [
+            { address: "acme/whydah", name: "Whydah", archived: false, lastAuthoredAt: at, level: "good" },
+            { address: "acme/whydah-core", name: "Whydah-Core", archived: false, lastAuthoredAt: at, level: "watch" },
+          ],
+          summary: { license: "Apache-2.0", language: "Java", released: 1 },
         },
       ],
       health: product,
+      activity: activity({ people: 4, automation: 9, authors: ["Ada", "Bo"], authorCount: 2, lastAuthoredAt: at }),
       repoCount: 3,
       ungroupedCount: 1,
       latest: [commit(1)],

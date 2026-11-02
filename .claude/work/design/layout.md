@@ -1,5 +1,5 @@
 # Landing page and layouts
-Status: planned (L1, L2). Binding order: ../plan.md > this note.
+Status: L1 built, L2 planned. Binding order: ../plan.md > this note.
 
 ## Scope
 The landing page exists so an engineer sees which products need a look and why. Today it lists every repository with every attribute:
@@ -48,16 +48,15 @@ The landing page is a list of elements, each a component of `web/src/features/da
 | Element | Shows | Options |
 |---|---|---|
 | `fleet-map` | every counted repository as one tile, grouped by product, coloured by its activity level (people only); tooltips and a text summary | groups |
-| `product-cards` | one card per product, every card the same five rows: name and level, people's work (30-day counts and the 12-week sparkline), who, the last changed repositories, the exceptions | groups, rows, columns |
-| `product-table` | one row per product, sortable by any column (people 30 days, automation 30 days, last change by a person, findings, score) | groups, columns, sort |
-| `latest-commits` | the newest commits | automation shown, count |
+| `products` | the products as cards or as a table, the reader's switch kept in the cookie `scp-view-products` (as the page size is, P-26). A card has the same five rows on every product: name and level (the score small while good, the level chip when not), people's work (30-day counts and the 12-week sparkline) against automation's, who and the last change by a person, the 3 repositories people changed last, and the 3 costliest findings with what the members share said once. The table has a row per product, sortable by any column | groups, view |
+| `latest-commits` | the newest commits by people; "include automation" shows all of them | count |
 | `telemetry` | the fleet tiles (repositories, products, people this month, findings, freshness) | tiles |
 | `heading` | a plain-text heading and line of text, no HTML | text |
 
 `groups` selects products: all, or a list of group ids, in that order. Elements select groups, never repositories, so a layout never
-names a repository. The default landing page is a `telemetry` row, the `fleet-map` band, and `product-cards` with a "Cards | Table"
-switch to `product-table`, kept in a cookie as the page size is (P-26), then `latest-commits`. Per-repository rows leave the
-landing page for the group page.
+names a repository. The default landing page is a `telemetry` row, the `fleet-map` band, `products` as cards, then `latest-commits`.
+Per-repository rows leave the landing page for the group page. The telemetry tiles: people (who committed in 30 days), active
+repositories, automation (and sweeps), findings, products (and the repositories in no group), in sync.
 
 ## Layouts (L2)
 A layout is a page's elements and their options, as data:
@@ -66,7 +65,7 @@ A layout is a page's elements and their options, as data:
 {"page": "dashboard", "elements": [
   {"kind": "telemetry", "tiles": ["repos", "people", "findings"]},
   {"kind": "fleet-map", "groups": "all"},
-  {"kind": "product-cards", "groups": ["core", "tools"], "columns": 3}
+  {"kind": "products", "groups": ["core", "tools"], "view": "cards"}
 ]}
 ```
 
