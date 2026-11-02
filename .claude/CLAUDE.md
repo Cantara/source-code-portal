@@ -6,13 +6,13 @@ Guidance for Claude Code in this repository. The coding instructions are importe
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`, public)
 is Source Code Portal (SCP) in Go with a server-rendered Next.js web UI. The first release is `v2.0.0`, which the owner's team tags;
-**S1 (sign-in and admin)**, **A1 (assistant)**, **M13 (search engines)** and **H1 (hardened private instance)** are built; no milestone is queued. Coding instructions for the repository itself are in
+**S1 (sign-in and admin)**, **A1 (assistant)**, **M13 (search engines)** and **H1 (hardened private instance)** are built; **L1 (landing page of signals)** and **L2 (layouts and design mode)** are planned. Coding instructions for the repository itself are in
 the root `AGENTS.md` (imported above).
 
 - **`.claude/work/plan.md` is the binding plan**: what SCP is, architecture and rules, stack, the work in progress. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: one note per area, as built (GitHub, sync/snapshot/store, catalog, content, manifests, access, cluster,
-  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13) and `hardening.md` (H1). Binding below `plan.md`.
+  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13), `hardening.md` (H1) and `layout.md` (L1, L2, planned). Binding below `plan.md`.
 - `.claude/work/decisions.md`: the decisions in force.
 - `.claude/skills/configure-scp/`: the skill that turns the owner's wishes (groups, regexps, the legacy Java `config.json`) into
   `scp.yaml`, proved with `scp config check` and `scp config groups`.
@@ -87,7 +87,7 @@ Test idioms: engine tests run in `testing/synctest` bubbles with a real store in
 
 ## Next
 
-Nothing queued. New work starts with its design note and a row in `plan.md` section 4.
+L1, then L2 (`design/layout.md`). New work starts with its design note and a row in `plan.md` section 4.
 Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs
 `pnpm -C web exec playwright install chromium`; `rm -rf web/.next` after a `next dev` run before `pnpm build` (stale dev route types);
 the Hazelcast tests: `docker run -d -p 127.0.0.1:5701:5701 -e HZ_NETWORK_PUBLICADDRESS=127.0.0.1:5701 hazelcast/hazelcast:5.7` and
