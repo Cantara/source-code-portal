@@ -177,7 +177,7 @@ export function Designer({ data, groups, onClose }: { data: Schemas["Dashboard"]
     <div className="flex flex-col gap-4">
       <section
         aria-label="Design mode"
-        className="panel sticky top-16 z-10 flex flex-wrap items-center justify-between gap-3 border-primary/40 p-3"
+        className="panel sticky top-16 z-20 flex flex-wrap items-center justify-between gap-3 border-primary/40 p-3"
       >
         <div className="flex flex-col">
           <h2 className="text-sm font-semibold">Design mode</h2>

@@ -55,7 +55,7 @@ describe("pages", () => {
     const user = userEvent.setup()
     show(<DashboardView />)
     const fleet = within(await screen.findByRole("region", { name: "Fleet" }))
-    expect(fleet.getByRole("list", { name: "Activity of every repository" })).toHaveTextContent("Active≤ 30 d")
+    expect(fleet.getByRole("list", { name: "Activity of every repository" })).toHaveTextContent("Active≤30d")
     const about = fleet.getByRole("button", { name: "About the fleet map" })
     expect(about).toHaveAttribute("aria-expanded", "false")
     expect(fleet.queryByRole("note")).not.toBeInTheDocument()

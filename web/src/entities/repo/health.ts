@@ -7,10 +7,10 @@ export type Activity = "active" | "recent" | "quiet" | "dormant" | "archived"
 
 /** activities in display order, with their labels and the age of the last change by a person each covers (span, short). */
 export const activities: { level: Activity; label: string; span: string; within: string }[] = [
-  { level: "active", label: "Active", span: "≤ 30 d", within: "a commit by a person in the last 30 days" },
-  { level: "recent", label: "Recent", span: "≤ 6 mo", within: "a commit by a person in the last 6 months" },
-  { level: "quiet", label: "Quiet", span: "≤ 2 y", within: "a commit by a person in the last 2 years" },
-  { level: "dormant", label: "Dormant", span: "> 2 y", within: "no commit by a person for 2 years" },
+  { level: "active", label: "Active", span: "≤30d", within: "a commit by a person in the last 30 days" },
+  { level: "recent", label: "Recent", span: "≤6mo", within: "a commit by a person in the last 6 months" },
+  { level: "quiet", label: "Quiet", span: "≤2y", within: "a commit by a person in the last 2 years" },
+  { level: "dormant", label: "Dormant", span: ">2y", within: "no commit by a person for 2 years" },
   { level: "archived", label: "Archived", span: "", within: "archived on GitHub" },
 ]
 

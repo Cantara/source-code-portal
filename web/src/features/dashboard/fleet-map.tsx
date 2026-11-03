@@ -34,7 +34,7 @@ export function FleetMap({ groups, now }: { groups: Group[]; now: number }) {
   for (const g of groups) for (const m of g.members) all.set(m.address, m)
   const total = tally([...all.values()], now)
   return (
-    <section aria-labelledby="fleet" className="panel flex flex-col gap-3 p-4">
+    <section aria-labelledby="fleet" className="panel relative z-10 flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <h2 id="fleet" className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
@@ -49,7 +49,9 @@ export function FleetMap({ groups, now }: { groups: Group[]; now: number }) {
               {activities.map((a) => (
                 <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`}>
                   <span aria-hidden="true" className="cell" />
-                  <span className="font-medium">{a.label}</span>: {a.within}
+                  <span>
+                    <span className="font-medium">{a.label}</span>: {a.within}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -64,7 +66,7 @@ export function FleetMap({ groups, now }: { groups: Group[]; now: number }) {
             <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`} title={a.within}>
               <span aria-hidden="true" className="cell" />
               {a.label}
-              {a.span && <span className="font-mono">{a.span}</span>}
+              {a.span && <span>{a.span}</span>}
               <span className="font-mono text-foreground">{count(total[a.level])}</span>
             </li>
           ))}
