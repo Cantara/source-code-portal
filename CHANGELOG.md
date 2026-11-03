@@ -4,6 +4,26 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.0
+
+The dashboard becomes a page of signals the reader tunes, and the portal explains itself. No configuration change is needed to
+upgrade: the new keys are optional and off by default.
+
+- A landing page of signals: telemetry, a fleet map of every repository coloured by its last change, distilled product cards or a
+  sortable table, and the latest commits beside the products as a side panel that folds away and resizes.
+- The work that counts: commits are told apart as by hand, with AI (an AI co-author, a tool's footer or a coding agent) and by
+  automation (CI, dependency and release bots, and sweeps across many repositories). The reader chooses any of them in the new
+  Settings page (cookie `scp-work`); `/api/v1/dashboard?work=` and `/api/v1/commits?work=` take the same choice.
+- Every colour signal (fleet tiles, legends, activity lights, health and release chips, the AI mark) names itself in a small card at
+  once on hover, focus or a tap.
+- A Getting started page (`/guide`, *Guide* in the header) explains the signals with screenshots and how to run a portal; the header's
+  right holds the Guide, Settings and the theme as icons.
+- A design mode for administrators: the dashboard's elements, their order and their groups, kept in `layout.dir` (empty: the
+  built-in layout, no design mode).
+- `unclaimed: true`, a group matcher for the repositories no other group selects (for an "Other" group instead of `catch_all: true`).
+- A Claude Code plugin for operators: `/plugin install scp --marketplace Cantara/source-code-portal`.
+- Fixes: a repository without a commit of the work that counts no longer looks active; each commit is classified once per snapshot.
+
 ## 2.1.0
 
 The web UI moves to Next.js and the portal gains the features around it. Upgrading a binary install needs the web UI bundle and Node.js 24
