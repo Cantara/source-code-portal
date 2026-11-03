@@ -2,6 +2,7 @@ import Link from "next/link"
 import type { Schemas } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
+import { by, type Work } from "@/lib/preferences"
 import { Toggletip } from "@/shared/toggletip"
 import { activities, activityAt, type Activity } from "@/entities/repo/health"
 
@@ -15,6 +16,15 @@ function tally(members: Group["members"], now: number): Record<Activity, number>
   return t
 }
 
+/** ages say what each level means, of the last change of the work that counts. */
+const ages: Record<Activity, string> = {
+  active: "in the last 30 days",
+  recent: "in the last 6 months",
+  quiet: "in the last 2 years",
+  dormant: "more than 2 years ago, or none among the commits read",
+  archived: "archived on GitHub, whatever its age",
+}
+
 function summary(t: Record<Activity, number>): string {
   return (
     activities
@@ -25,11 +35,11 @@ function summary(t: Record<Activity, number>): string {
 }
 
 /**
- * FleetMap is every repository as one tile, grouped by product and coloured by the last change by a person, so big products look
+ * FleetMap is every repository as one tile, grouped by product and coloured by the last change of the work that counts, so big products look
  * big and quiet ones look cold. Each product's counts are its text for screen readers; the tiles are for the eye (and the mouse:
  * each opens its repository, its name and age in the title), while the products below carry the keyboard's links.
  */
-export function FleetMap({ groups, now }: { groups: Group[]; now: number }) {
+export function FleetMap({ groups, work = "all", now }: { groups: Group[]; work?: Work; now: number }) {
   const all = new Map<string, Group["members"][number]>()
   for (const g of groups) for (const m of g.members) all.set(m.address, m)
   const total = tally([...all.values()], now)
@@ -42,28 +52,32 @@ export function FleetMap({ groups, now }: { groups: Group[]; now: number }) {
           </h2>
           <Toggletip label="About the fleet map">
             <p>
-              Each tile is one repository, grouped by product and coloured by the age of its last commit by a person. Bots,
-              release-plugin commits and sweeps (the same subject in more than 10 repositories on one day) do not count.
+              Each tile is one repository, grouped by product and coloured by the age of its last change {by[work]} (Settings
+              choose the work that counts). Bots, release-plugin commits and sweeps (the same subject in more than 10 repositories
+              on one day) never count.
             </p>
             <ul className="mt-2 flex flex-col gap-0.5">
               {activities.map((a) => (
                 <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`}>
                   <span aria-hidden="true" className="cell" />
                   <span>
-                    <span className="font-medium">{a.label}</span>: {a.within}
+                    <span className="font-medium">{a.label}</span>: {ages[a.level]}
                   </span>
                 </li>
               ))}
             </ul>
             <p className="mt-2">
-              Dormant also covers a repository with no commit by a person among those read. A repository in several products is
-              counted once in the totals. Select a tile to open its repository.
+              A repository in several products is counted once in the totals. Select a tile to open its repository.
             </p>
           </Toggletip>
         </div>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Activity of every repository">
           {activities.map((a) => (
-            <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`} title={a.within}>
+            <li
+              key={a.level}
+              className={`lvl-${a.level} flex items-center gap-1.5`}
+              title={a.level === "archived" ? ages.archived : `last change ${by[work]} ${ages[a.level]}`}
+            >
               <span aria-hidden="true" className="cell" />
               {a.label}
               {a.span && <span>{a.span}</span>}
@@ -83,7 +97,9 @@ export function FleetMap({ groups, now }: { groups: Group[]; now: number }) {
             <div aria-hidden="true" className="mt-1 flex flex-wrap gap-0.5">
               {g.members.map((m) => {
                 const level = activityAt(m.lastAuthoredAt, m.archived, now)
-                const age = m.lastAuthoredAt ? `last change by a person ${ago(m.lastAuthoredAt, now)} ago` : "no change read"
+                const age = m.lastAuthoredAt
+                  ? `last change ${by[work]} ${ago(m.lastAuthoredAt, now)} ago`
+                  : `no change ${by[work]} read`
                 return (
                   <Link
                     key={m.address}

@@ -46,6 +46,9 @@ export function MainNav({ ask = false }: { ask?: boolean }) {
           Ask
         </Link>
       )}
+      <Link href="/settings" className={nav} aria-current={path === "/settings" ? "page" : undefined}>
+        Settings
+      </Link>
     </nav>
   )
 }

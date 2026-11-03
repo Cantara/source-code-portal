@@ -3,6 +3,8 @@ import { cn } from "@/lib/cn"
 import { count, plural } from "@/lib/format"
 import { levels } from "@/entities/health/health"
 import { activityAt } from "@/entities/repo/health"
+import { by, type Work } from "@/lib/preferences"
+import { assistants, counted, noun } from "./work"
 
 function Tile({ label, value, detail, level }: { label: string; value: string; detail?: string; level?: string }) {
   return (
@@ -17,9 +19,12 @@ function Tile({ label, value, detail, level }: { label: string; value: string; d
   )
 }
 
-/** withAI is "43 with AI (Claude, Copilot)": the commits by people that name an AI, and the assistants. */
-function withAI(a: Schemas["Activity"]): string {
-  return `${count(a.ai)} with AI${a.assistants.length > 0 ? ` (${a.assistants.join(", ")})` : ""}`
+/** work says the team's commits through the lens: the counted ones first, the rest after. */
+function work(a: Schemas["Activity"], w: Work): string {
+  const n = counted(a, w)
+  if (w === "hand") return `${count(n)} ${noun(n, w)} in 30 days; ${count(a.ai)} with AI`
+  if (w === "ai") return `${count(n)} ${noun(n, w)}${assistants(a)} in 30 days; ${count(a.hand)} by hand`
+  return `${count(n)} ${noun(n, w)} in 30 days: ${count(a.hand)} by hand, ${count(a.ai)} with AI${assistants(a)}`
 }
 
 function percent(part: number, whole: number): string {
@@ -51,13 +56,13 @@ export function Telemetry({ data, now }: { data: Schemas["Dashboard"]; now: numb
         <Tile
           label="People"
           value={count(a.authorCount)}
-          detail={`${plural(a.people, "commit", "commits")} by people in 30 days${a.ai > 0 ? `, ${withAI(a)}` : ""}`}
+          detail={work(a, data.work)}
           level={a.authorCount > 0 ? "lvl-active" : "lvl-dormant"}
         />
         <Tile
           label="Active"
           value={count(activeMembers(data.groups, now))}
-          detail={`of ${plural(data.repoCount, "repository", "repositories")} changed by a person in 30 days`}
+          detail={`of ${plural(data.repoCount, "repository", "repositories")} changed ${by[data.work]} in 30 days`}
         />
         <Tile
           label="Automation"

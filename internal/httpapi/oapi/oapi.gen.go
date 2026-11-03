@@ -521,6 +521,27 @@ func (e ToolchainVersionsName) Valid() bool {
 	}
 }
 
+// Defines values for Work.
+const (
+	Ai   Work = "ai"
+	All  Work = "all"
+	Hand Work = "hand"
+)
+
+// Valid indicates whether the value is a known member of the Work enum.
+func (e Work) Valid() bool {
+	switch e {
+	case Ai:
+		return true
+	case All:
+		return true
+	case Hand:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetPageParamsPage.
 const (
 	GetPageParamsPageDashboard GetPageParamsPage = "dashboard"
@@ -536,40 +557,40 @@ func (e GetPageParamsPage) Valid() bool {
 	}
 }
 
-// Activity Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound.
+// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work).
 type Activity struct {
-	// Ai Of the commits by people in the last 30 days, those with an AI: an AI co-author, or a coding agent as the author
+	// Ai People's commits with an AI in the last 30 days: an AI co-author, or a coding agent as the author
 	Ai int `json:"ai"`
 
 	// Assistants The AI assistants of the last 30 days by family ("Claude", "Copilot"), most commits first, at most 3
 	Assistants []string `json:"assistants"`
 
-	// AuthorCount How many people committed in the last 30 days
+	// AuthorCount How many made the work that counts in the last 30 days
 	AuthorCount int `json:"authorCount"`
 
-	// Authors The people who committed in the last 30 days, most commits first, at most 5
+	// Authors Who made the work that counts in the last 30 days, most commits first, at most 5
 	Authors []Person `json:"authors"`
 
 	// Automation Commits by automation in the last 30 days
 	Automation int `json:"automation"`
 
-	// LastAuthoredAt The newest commit by a person; null when none is read
+	// Hand People's commits by hand in the last 30 days
+	Hand int `json:"hand"`
+
+	// LastAuthoredAt The newest commit of the work that counts; null when none is read
 	LastAuthoredAt *time.Time `json:"lastAuthoredAt"`
 
-	// People Commits by people in the last 30 days
-	People int `json:"people"`
-
-	// Recent The repositories people changed last, at most 3
+	// Recent The repositories the work that counts changed last, at most 3
 	Recent []RecentRepo `json:"recent"`
 
 	// Sweeps Commits of sweeps in the last 30 days
 	Sweeps int `json:"sweeps"`
 
-	// Weekly Commits by people per 7 days, the oldest of the last 12 first
-	Weekly []int `json:"weekly"`
-
-	// WeeklyAi Of weekly, the commits with an AI
+	// WeeklyAi People's commits with an AI per 7 days, the oldest of the last 12 first
 	WeeklyAi []int `json:"weeklyAi"`
+
+	// WeeklyHand People's commits by hand per 7 days, the oldest of the last 12 first
+	WeeklyHand []int `json:"weeklyHand"`
 }
 
 // AssistantStatus defines model for AssistantStatus.
@@ -632,7 +653,7 @@ type CommitPage struct {
 
 // Dashboard defines model for Dashboard.
 type Dashboard struct {
-	// Activity Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound.
+	// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work).
 	Activity Activity `json:"activity"`
 
 	// Freshness Repositories by the freshness of their commits
@@ -642,17 +663,20 @@ type Dashboard struct {
 	// Health Every repository weighed as one product; the first 5 findings
 	Health *ProductHealth `json:"health"`
 
-	// Latest The 10 newest commits by people (Activity): neither automation nor sweeps; /commits lists all of them
+	// Latest The 10 newest commits of the work that counts (Activity): neither automation nor sweeps; /commits lists all of them
 	Latest    []Commit `json:"latest"`
 	RepoCount int      `json:"repoCount"`
 
 	// UngroupedCount Repositories in no group
 	UngroupedCount int `json:"ungroupedCount"`
+
+	// Work The work that counts: all of people's work, by hand only, or with an AI only
+	Work Work `json:"work"`
 }
 
 // DashboardGroup defines model for DashboardGroup.
 type DashboardGroup struct {
-	// Activity Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound.
+	// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work).
 	Activity Activity `json:"activity"`
 
 	// DefaultRepo Address of the group's main repository
@@ -680,7 +704,7 @@ type DashboardMember struct {
 	Address  string `json:"address"`
 	Archived bool   `json:"archived"`
 
-	// LastAuthoredAt As Repo.lastAuthoredAt
+	// LastAuthoredAt As Repo.lastAuthoredAt, of the work that counts (Dashboard.work)
 	LastAuthoredAt *time.Time `json:"lastAuthoredAt"`
 
 	// Level Null when not counted
@@ -1185,7 +1209,7 @@ type Repo struct {
 	// Language Language of the first package manifest; empty when there is none
 	Language string `json:"language"`
 
-	// LastAuthoredAt The newest default-branch commit by a person, not automation (bots, release plugins); when every read commit is automated, the oldest read one (the person's is older); null until read
+	// LastAuthoredAt The newest default-branch commit of people's work (by hand or with AI), not automation (bots, release plugins) or a sweep; when no read commit is, the oldest read one (people's is older); null until read
 	LastAuthoredAt *time.Time `json:"lastAuthoredAt"`
 
 	// LastCommitAt The newest default-branch commit; null until read
@@ -1300,6 +1324,9 @@ type ToolchainVersions struct {
 // ToolchainVersionsName defines model for ToolchainVersions.Name.
 type ToolchainVersionsName string
 
+// Work The work that counts: all of people's work, by hand only, or with an AI only
+type Work string
+
 // PageNumber defines model for PageNumber.
 type PageNumber = int
 
@@ -1319,9 +1346,18 @@ type ListCommitsParams struct {
 	// Automation false leaves out commits made by automation
 	Automation *bool `form:"automation,omitempty" json:"automation,omitempty"`
 
+	// Work The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out
+	Work *Work `form:"work,omitempty" json:"work,omitempty"`
+
 	// Page The page, from 1
 	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
 	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetDashboardParams defines parameters for GetDashboard.
+type GetDashboardParams struct {
+	// Work The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out
+	Work *Work `form:"work,omitempty" json:"work,omitempty"`
 }
 
 // GetPageParamsPage defines parameters for GetPage.
@@ -1364,7 +1400,7 @@ type ServerInterface interface {
 	ListCommits(w http.ResponseWriter, r *http.Request, params ListCommitsParams)
 	// GetDashboard Groups with counts and latest activity, the latest commits and data health
 	// (GET /dashboard)
-	GetDashboard(w http.ResponseWriter, r *http.Request)
+	GetDashboard(w http.ResponseWriter, r *http.Request, params GetDashboardParams)
 	// ListGroups All groups in configuration order, with member counts
 	// (GET /groups)
 	ListGroups(w http.ResponseWriter, r *http.Request)
@@ -1471,6 +1507,19 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// ------------- Optional query parameter "work" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "work", r.URL.Query(), &params.Work, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "work"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "work", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "page" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
@@ -1511,8 +1560,27 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 // GetDashboard operation middleware
 func (siw *ServerInterfaceWrapper) GetDashboard(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDashboardParams
+
+	// ------------- Optional query parameter "work" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "work", r.URL.Query(), &params.Work, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "work"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "work", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDashboard(w, r)
+		siw.Handler.GetDashboard(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2172,6 +2240,7 @@ func (response ListCommits404ApplicationProblemPlusJSONResponse) VisitListCommit
 }
 
 type GetDashboardRequestObject struct {
+	Params GetDashboardParams
 }
 
 type GetDashboardResponseObject interface {
@@ -2945,8 +3014,10 @@ func (sh *strictHandler) ListCommits(w http.ResponseWriter, r *http.Request, par
 }
 
 // GetDashboard operation middleware
-func (sh *strictHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) GetDashboard(w http.ResponseWriter, r *http.Request, params GetDashboardParams) {
 	var request GetDashboardRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetDashboard(ctx, request.(GetDashboardRequestObject))

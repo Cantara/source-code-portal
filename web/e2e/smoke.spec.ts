@@ -14,6 +14,7 @@ const pages = [
   ["/commits?group=whydah", "Commits"],
   ["/repos/acme/whydah-core/docs/docs/setup", "Setup"],
   ["/signin", "Sign in"],
+  ["/settings", "Settings"],
   ["/admin", "Admin"],
 ] as const
 

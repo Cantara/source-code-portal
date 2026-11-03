@@ -71,12 +71,12 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		scope = []snapshot.RepoKey{key}
 	}
 
-	people := p.Automation != nil && !*p.Automation
+	keep := filterOf(p.Automation, p.Work)
 	total := len(refs)
-	if people {
+	if keep != nil {
 		total = 0
 		for _, r := range refs {
-			if !Automated(r.Commit) {
+			if keep(r) {
 				total++
 			}
 		}
@@ -88,7 +88,7 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		if i >= end {
 			break
 		}
-		if people && Automated(r.Commit) {
+		if keep != nil && !keep(r) {
 			continue
 		}
 		if i >= start {
@@ -162,4 +162,21 @@ func paging(total, number, size int) (start, end int, p oapi.Page) {
 	start = min((number-1)*size, total)
 	end = min(start+size, total)
 	return start, end, oapi.Page{Number: number, Size: size, Total: total, Pages: max(1, (total+size-1)/size)}
+}
+
+// filterOf is the commits a listing keeps (nil: every one): automation=false leaves out automation; work=hand or ai keeps only
+// people's commits by hand or with an AI.
+func filterOf(automation *bool, work *oapi.Work) func(Ref) bool {
+	w := WorkAll
+	if work != nil {
+		w = WorkOf(*work)
+	}
+	noBots := automation != nil && !*automation
+	if w == WorkAll && !noBots {
+		return nil
+	}
+	return func(r Ref) bool {
+		o := r.Origin
+		return (!noBots || o != OriginAutomation) && (w == WorkAll || w.Counts(o))
+	}
 }

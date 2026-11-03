@@ -280,6 +280,11 @@ name the assistants, the sparklines draw them at the foot of each week, and the 
 (inline completion) is not counted, so the share is a lower bound. Each card says once what most of its repositories share (the licence, the language) and shows only
 the exceptions; the members are on the product's page. A reader's choice of cards or table is kept in a cookie.
 
+People and agents work together, so the cards rank neither: each leads with the team's commits and says how many were by hand and how
+many with AI. **Settings** (in the header) lets every reader choose the work that counts: both (the default), by hand only, or with an
+AI only. The choice changes the numbers, the sparklines, who made the work, the last change, the fleet map and the latest commits; it
+is kept in the reader's browser, never on the server. Settings also hold the products view, the page sizes and the theme.
+
 An administrator can arrange the page: *Design this page* on the dashboard opens the design mode, with the page's elements in a list
 to add, move (the arrows, or drag them), set up and remove, beside a live preview. The elements are the telemetry, the fleet map and the
 products (each for every product or for chosen ones, in your order), the latest commits (how many) and a heading with a line of text.

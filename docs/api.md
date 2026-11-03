@@ -18,7 +18,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 
 | Request | Returns |
 |---|---|
-| `GET /api/v1/dashboard` | every group with its activity (commits by people and of them with AI, by automation and in sweeps over 30 days, 12 weekly counts and those with AI, the AI assistants, who, the repositories people changed last), its members' last change by a person, what most members share, its health; the fleet's activity; the latest commits by people; repositories by freshness |
+| `GET /api/v1/dashboard[?work=all\|hand\|ai]` | every group with its activity (the team's commits by hand and with AI, by automation and in sweeps over 30 days, 12 weekly counts of each, the AI assistants, and of the work that counts: who, the last change, the repositories it changed last), its members' last change of that work, what most members share, its health; the fleet's activity; the latest commits of that work; repositories by freshness. `work` is the lens: all of the team's work (the default), by hand only, or with an AI only |
 | `GET /api/v1/pages/dashboard` | the landing page's layout: its elements in order, as an administrator designed it or built in |
 | `GET /api/v1/groups` | groups in configuration order |
 | `GET /api/v1/groups/{group}` | one group with its repositories |
@@ -27,7 +27,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/repos/{owner}/{name}/docs` | the repository's documents, README first |
 | `GET /api/v1/repos/{owner}/{name}/docs/{docId}` | one rendered document; `docId` is its path, percent-encoded into one segment (`docs%2Fsetup.md`); the path without its extension also matches |
 | `GET /api/v1/repos/{owner}/{name}/manifests` | the repository's `go.mod`, `package.json` and `pom.xml` files with their dependencies, the technology they state, and the catalogued repositories it uses and is used by |
-| `GET /api/v1/commits[?group=][&repo=owner/name][&automation=false][&page=][&limit=]` | commits newest first, in numbered pages; `automation=false` leaves out bots and release-plugin commits; each commit says its `kind` (`person`, `assisted`, `agent`, `automation`) and the `assistant` it names |
+| `GET /api/v1/commits[?group=][&repo=owner/name][&automation=false][&page=][&limit=]` | commits newest first, in numbered pages; `automation=false` leaves out bots and release-plugin commits; `work=hand` or `work=ai` keeps only the team's commits by hand or with an AI; each commit says its `kind` (`person`, `assisted`, `agent`, `automation`) and the `assistant` it names |
 | `GET /api/v1/repos/{owner}/{name}/history[?ref=][&author=][&q=][&automation=false][&page=][&limit=][&at=]` | the stored history (500 default-branch commits, the newest 10 other branches, the newest 100 tags) in graph order with branch and tag labels; `ref` keeps what a branch or tag reaches, `author`, `q` (subject, body, SHA prefix) and `automation` filter and set `filtered`; each commit carries its row of the git graph (`graph`, `null` on a filtered page) and `lanes` is the page's width |
 | `GET /api/v1/me` | the viewer: signed in or not, name, how identified (`proxy`, `oidc`, `token`), whether it sees private repositories and is an administrator, and the ways to sign in |
 | `GET /api/v1/assistant` | whether the assistant is set up, whether this viewer may ask, who may (`signed-in`, `admin`, `everyone`), the provider and model |

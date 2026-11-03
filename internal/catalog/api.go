@@ -24,10 +24,14 @@ func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {
 	return oapi.NotFoundApplicationProblemPlusJSONResponse(oapi.NewProblem(http.StatusNotFound, "not-found", "Not Found", detail))
 }
 
-func (a API) GetDashboard(ctx context.Context, _ oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
+func (a API) GetDashboard(ctx context.Context, req oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
 	s := a.Current(ctx)
-	out := oapi.Dashboard{Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos), Latest: []oapi.Commit{},
-		Activity: noActivity()}
+	work := oapi.All
+	if w := req.Params.Work; w != nil && w.Valid() {
+		work = *w
+	}
+	out := oapi.Dashboard{Work: work, Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos),
+		Latest: []oapi.Commit{}, Activity: noActivity()}
 	for _, g := range s.Groups {
 		def, _ := defaultRepo(g)
 		members := make([]oapi.DashboardMember, 0, len(g.Members))
@@ -171,7 +175,7 @@ func (a API) repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oa
 
 // noActivity is the activity before the commits are added: none.
 func noActivity() oapi.Activity {
-	return oapi.Activity{Weekly: make([]int, 12), WeeklyAi: make([]int, 12), Authors: []oapi.Person{}, Assistants: []string{},
+	return oapi.Activity{WeeklyHand: make([]int, 12), WeeklyAi: make([]int, 12), Authors: []oapi.Person{}, Assistants: []string{},
 		Recent: []oapi.RecentRepo{}}
 }
 

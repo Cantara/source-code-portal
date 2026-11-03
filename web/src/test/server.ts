@@ -94,11 +94,11 @@ export const me = (over: Partial<S["Me"]> = {}): S["Me"] => ({
 
 /** activity is a product's or the fleet's work, none unless over says otherwise. */
 export const activity = (over: Partial<S["Activity"]> = {}): S["Activity"] => ({
-  people: 0,
+  hand: 0,
   ai: 0,
   automation: 0,
   sweeps: 0,
-  weekly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3],
+  weeklyHand: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3],
   weeklyAi: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   assistants: [],
   authors: [],
@@ -128,8 +128,9 @@ export const defaults = [
     }),
   ),
   http.get("/repos", ({ response }) => response(200).json({ repos: [repo("Whydah"), repo("Whydah-Core")] })),
-  http.get("/dashboard", ({ response }) =>
+  http.get("/dashboard", ({ query, response }) =>
     response(200).json({
+      work: query.get("work") === "hand" ? "hand" : query.get("work") === "ai" ? "ai" : "all",
       groups: [
         {
           id: "iam",
@@ -140,7 +141,7 @@ export const defaults = [
           lastActivity: at,
           health: product,
           activity: activity({
-            people: 4,
+            hand: 1,
             ai: 3,
             weeklyAi: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2],
             assistants: ["Claude"],
@@ -159,7 +160,7 @@ export const defaults = [
       ],
       health: product,
       activity: activity({
-        people: 4,
+        hand: 1,
         ai: 3,
         assistants: ["Claude", "Copilot"],
         automation: 9,

@@ -4,24 +4,7 @@ import type { Schemas } from "@/lib/api/client"
 export type Element = Schemas["LayoutElement"]
 export type Kind = Element["kind"]
 
-/** ProductsView is how the products element draws the groups: distilled cards or one sortable table. */
-export type ProductsView = NonNullable<Element["view"]>
-
-export const productsViews: ProductsView[] = ["cards", "table"]
-
-/** viewCookie remembers the reader's choice of products view, read on the server as the page sizes are. */
-export const viewCookie = "scp-view-products"
-
-/** productsView is v when it names a view, else fallback. */
-export function productsView(v: unknown, fallback: ProductsView): ProductsView {
-  return productsViews.includes(v as ProductsView) ? (v as ProductsView) : fallback
-}
-
-/** rememberView keeps the reader's products view for a year. */
-export function rememberView(view: ProductsView) {
-  const secure = location.protocol === "https:" ? "; Secure" : ""
-  document.cookie = `${viewCookie}=${view}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`
-}
+export type { ProductsView } from "@/lib/preferences"
 
 /**
  * kinds are the elements the design mode offers, each with what it shows. Every element carries signals, not attributes:

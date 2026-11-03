@@ -356,7 +356,7 @@ export interface components {
       lastCommitAt: string | null
       /**
        * Format: date-time
-       * @description The newest default-branch commit by a person, not automation (bots, release plugins); when every read commit is automated, the oldest read one (the person's is older); null until read
+       * @description The newest default-branch commit of people's work (by hand or with AI), not automation (bots, release plugins) or a sweep; when no read commit is, the oldest read one (people's is older); null until read
        */
       lastAuthoredAt: string | null
       /** @description The latest release; null when there is none or it is not read yet */
@@ -568,32 +568,32 @@ export interface components {
       members: components["schemas"]["DashboardMember"][]
       summary: components["schemas"]["GroupSummaryFacts"]
     }
-    /** @description Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound. */
+    /** @description Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work). */
     Activity: {
-      /** @description Commits by people in the last 30 days */
-      people: number
-      /** @description Of the commits by people in the last 30 days, those with an AI: an AI co-author, or a coding agent as the author */
+      /** @description People's commits by hand in the last 30 days */
+      hand: number
+      /** @description People's commits with an AI in the last 30 days: an AI co-author, or a coding agent as the author */
       ai: number
       /** @description Commits by automation in the last 30 days */
       automation: number
       /** @description Commits of sweeps in the last 30 days */
       sweeps: number
-      /** @description Commits by people per 7 days, the oldest of the last 12 first */
-      weekly: number[]
-      /** @description Of weekly, the commits with an AI */
+      /** @description People's commits by hand per 7 days, the oldest of the last 12 first */
+      weeklyHand: number[]
+      /** @description People's commits with an AI per 7 days, the oldest of the last 12 first */
       weeklyAi: number[]
       /** @description The AI assistants of the last 30 days by family ("Claude", "Copilot"), most commits first, at most 3 */
       assistants: string[]
-      /** @description The people who committed in the last 30 days, most commits first, at most 5 */
+      /** @description Who made the work that counts in the last 30 days, most commits first, at most 5 */
       authors: components["schemas"]["Person"][]
-      /** @description How many people committed in the last 30 days */
+      /** @description How many made the work that counts in the last 30 days */
       authorCount: number
       /**
        * Format: date-time
-       * @description The newest commit by a person; null when none is read
+       * @description The newest commit of the work that counts; null when none is read
        */
       lastAuthoredAt: string | null
-      /** @description The repositories people changed last, at most 3 */
+      /** @description The repositories the work that counts changed last, at most 3 */
       recent: components["schemas"]["RecentRepo"][]
     }
     Person: {
@@ -614,7 +614,7 @@ export interface components {
       archived: boolean
       /**
        * Format: date-time
-       * @description As Repo.lastAuthoredAt
+       * @description As Repo.lastAuthoredAt, of the work that counts (Dashboard.work)
        */
       lastAuthoredAt: string | null
       /** @description Null when not counted */
@@ -651,7 +651,14 @@ export interface components {
       /** @description An admin's layout; false: the built-in one */
       stored: boolean
     }
+    /**
+     * @description The work that counts: all of people's work, by hand only, or with an AI only
+     * @default all
+     * @enum {string}
+     */
+    Work: "all" | "hand" | "ai"
     Dashboard: {
+      work: components["schemas"]["Work"]
       groups: components["schemas"]["DashboardGroup"][]
       activity: components["schemas"]["Activity"]
       /** @description Every repository weighed as one product; the first 5 findings */
@@ -659,7 +666,7 @@ export interface components {
       repoCount: number
       /** @description Repositories in no group */
       ungroupedCount: number
-      /** @description The 10 newest commits by people (Activity): neither automation nor sweeps; /commits lists all of them */
+      /** @description The 10 newest commits of the work that counts (Activity): neither automation nor sweeps; /commits lists all of them */
       latest: components["schemas"]["Commit"][]
       freshness: components["schemas"]["FreshnessCounts"]
     }
@@ -905,6 +912,8 @@ export interface components {
     }
   }
   parameters: {
+    /** @description The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out */
+    Work: components["schemas"]["Work"]
     /** @description The page, from 1 */
     PageNumber: number
   }
@@ -919,7 +928,10 @@ export type $defs = Record<string, never>
 export interface operations {
   getDashboard: {
     parameters: {
-      query?: never
+      query?: {
+        /** @description The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out */
+        work?: components["parameters"]["Work"]
+      }
       header?: never
       path?: never
       cookie?: never
@@ -947,6 +959,8 @@ export interface operations {
         repo?: string
         /** @description false leaves out commits made by automation */
         automation?: boolean
+        /** @description The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out */
+        work?: components["parameters"]["Work"]
         /** @description The page, from 1 */
         page?: components["parameters"]["PageNumber"]
         limit?: number

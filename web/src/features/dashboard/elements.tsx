@@ -19,7 +19,7 @@ export function Elements({ layout, data, view }: { layout: Element[]; data: Sche
           case "telemetry":
             return <Telemetry key={i} data={data} now={now} />
           case "fleet-map":
-            return <FleetMap key={i} groups={pick(data.groups, el.groups)} now={now} />
+            return <FleetMap key={i} groups={pick(data.groups, el.groups)} work={data.work} now={now} />
           case "products":
             return (
               <Products
@@ -27,13 +27,14 @@ export function Elements({ layout, data, view }: { layout: Element[]; data: Sche
                 groups={pick(data.groups, el.groups)}
                 repoCount={data.repoCount}
                 view={view ?? el.view ?? "cards"}
+                work={data.work}
                 now={now}
               />
             )
           case "latest-commits":
             return (
               <PanelBoundary key={i}>
-                <LatestCommits people={data.latest} count={el.count ?? 10} />
+                <LatestCommits counted={data.latest} work={data.work} count={el.count ?? 10} />
               </PanelBoundary>
             )
           case "heading":

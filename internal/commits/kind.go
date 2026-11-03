@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"regexp"
 	"strings"
+
+	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 )
 
 // Origin is who made a commit (design/layout.md, P-40): a person, a person with an AI, a coding agent, or automation.
@@ -126,4 +128,35 @@ func coAuthors(body string) (ai string, bot bool) {
 func Assistant(name string) string {
 	first, _, _ := strings.Cut(strings.TrimSpace(name), " ")
 	return first
+}
+
+// Work is the reader's lens on people's work (P-42): all of it, by hand only, or with an AI only. Automation is never people's work.
+type Work uint8
+
+const (
+	WorkAll  Work = iota // by hand and with an AI
+	WorkHand             // a person, no trace of an AI
+	WorkAI               // assisted or by an agent
+)
+
+// WorkOf is the lens a request names; all when it names none.
+func WorkOf(w oapi.Work) Work {
+	switch w {
+	case oapi.Hand:
+		return WorkHand
+	case oapi.Ai:
+		return WorkAI
+	}
+	return WorkAll
+}
+
+// Counts reports whether a commit of origin o is work of the lens: never automation.
+func (w Work) Counts(o Origin) bool {
+	switch w {
+	case WorkHand:
+		return o == OriginPerson
+	case WorkAI:
+		return o.AI()
+	}
+	return o != OriginAutomation
 }

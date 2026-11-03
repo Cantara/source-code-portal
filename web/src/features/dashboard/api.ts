@@ -1,10 +1,15 @@
 import { queryOptions } from "@tanstack/react-query"
 import { get, unwrap, type Api } from "@/lib/api/client"
 import { keys } from "@/lib/api/queries"
+import type { Work } from "@/lib/preferences"
 import type { Element } from "./layout"
 
-export const dashboardQuery = (api: Api) =>
-  queryOptions({ queryKey: keys.dashboard(), queryFn: ({ signal }) => unwrap(api.GET("/dashboard", { signal })) })
+/** dashboardQuery is the dashboard through the reader's lens on people's work. */
+export const dashboardQuery = (api: Api, work: Work) =>
+  queryOptions({
+    queryKey: keys.dashboard(work),
+    queryFn: ({ signal }) => unwrap(api.GET("/dashboard", { params: { query: { work } }, signal })),
+  })
 
 /** pageQuery is the landing page's layout, resolved for the viewer. */
 export const pageQuery = (api: Api) =>
@@ -13,7 +18,7 @@ export const pageQuery = (api: Api) =>
     queryFn: ({ signal }) => unwrap(api.GET("/pages/{page}", { params: { path: { page: "dashboard" } }, signal })),
   })
 
-/** latestAllQuery is the newest commits of every kind, for the dashboard's "include automation". */
+/** latestAllQuery is the newest commits of every kind, automation and sweeps included, for the dashboard's "include automation". */
 export const latestAllQuery = (api: Api, limit: number) =>
   queryOptions({
     queryKey: keys.commitLog("", "", true, limit, 1),

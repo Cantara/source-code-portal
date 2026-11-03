@@ -1,5 +1,5 @@
 # Landing page and layouts
-Status: as built (L1, L2, L3). Binding order: ../plan.md > this note.
+Status: as built (L1 to L4). Binding order: ../plan.md > this note.
 
 ## Scope
 The landing page exists so an engineer sees which products need a look and why. Today it lists every repository with every attribute:
@@ -100,6 +100,22 @@ flat object per element whose kind reads only its own fields):
   changes). A refused save offers to load the newer layout. The reader's products view (the cookie) wins over a layout's `view`.
 - **Pages**: `dashboard`. The page is in the address, so further pages (a product's page, named dashboards) come without a format
   change.
+
+## The work that counts and Settings (L4)
+
+People and agents work together, so neither is ranked: a card leads with the team's commits (by hand and with AI) and says both counts
+under it. The reader's lens (P-42), **Both** (the default), **By hand** or **With AI**, is a preference in the cookie `scp-work`; the
+dashboard route reads it and asks `GET /dashboard?work=`, and Go computes the lens: the counted number, who made the work, the last
+change, the recent repositories, the members' last change (so the fleet map and the Active tile) and the latest commits. The counts by
+hand and with AI are always both in `Activity` (`hand`, `ai`, `weeklyHand`, `weeklyAi`), so a card names the rest; the sparkline is
+both stacked (with AI at the foot) under Both, else the one series. `/commits?work=hand|ai` keeps only that work. Automation never
+counts and sweeps stay out of the team's work under every lens. Health, the group page and the repository page count all of the team's
+work (`commits.WorkAll`): they score and list repositories, they are not the reader's lens.
+
+`/settings` (in the header, for every viewer, not indexed) holds the reader's preferences: the work that counts, the products view,
+the page sizes of the commit timelines and the histories (Default forgets the cookie), and the theme (its own storage, as before).
+Each is kept at once, the page announces it, and the server's pages follow it on their next render; `lib/preferences.ts` holds the
+cookies and their parsing, so the features share them without importing each other. Nothing is stored per person (P-38).
 
 ## Not now
 Layouts per person or per sign-in group, repository-level selection in elements, other stores (a Git repository, S3), and sharing layouts

@@ -24,6 +24,9 @@ func feedSnapshot(t *testing.T) *snapshot.Snapshot {
 			if id == 0 && i == 1 {
 				cs[i].AuthorName = "renovate[bot]"
 			}
+			if id == 0 && i == 2 {
+				cs[i].Body = "Co-authored-by: Claude <noreply@anthropic.com>"
+			}
 		}
 		facet.Set(e, newHistory(cs, nil, nil, "main"), f)
 		return e
@@ -114,5 +117,21 @@ func TestListCommitsAutomation(t *testing.T) {
 	}
 	if strings.Join(shas, "") != "afkgc" { // b, by automation, is left out
 		t.Errorf("commits without automation = %v", shas)
+	}
+}
+
+// TestListCommitsWork: work=ai keeps people's commits with an AI, work=hand those by hand; neither keeps automation.
+func TestListCommitsWork(t *testing.T) {
+	s := feedSnapshot(t)
+	a := API{Current: func(context.Context) *snapshot.Snapshot { return s }}
+	for work, want := range map[oapi.Work]string{oapi.Ai: "c", oapi.Hand: "afkg", oapi.All: "afkbgc"} {
+		res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: oapi.ListCommitsParams{Work: new(work)}})
+		var shas []string
+		for _, c := range res.(oapi.ListCommits200JSONResponse).Body.Commits {
+			shas = append(shas, c.Sha[:1])
+		}
+		if got := strings.Join(shas, ""); got != want {
+			t.Errorf("work=%s: %s, want %s", work, got, want)
+		}
 	}
 }

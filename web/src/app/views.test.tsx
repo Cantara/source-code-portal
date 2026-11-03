@@ -31,27 +31,30 @@ function show(view: ReactNode, path = "/", qc = client()) {
 }
 
 describe("pages", () => {
-  it("renders the dashboard with the fleet, the products' signals and the latest commits by people", async () => {
+  it("renders the dashboard with the fleet, the products' signals and the team's latest commits", async () => {
     show(<DashboardView />)
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()
     expect(await screen.findByRole("link", { name: "IAM" })).toHaveAttribute("href", "/groups/iam")
     expect(screen.getByText("Commit 1")).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Latest commits by people" })).toBeInTheDocument()
-    // The card says people's work apart from automation's, who did it, and what most members share once.
+    expect(screen.getByRole("heading", { name: "Latest commits by the team" })).toBeInTheDocument()
+    // The card says the team's work, by hand and with AI, apart from automation's, who did it, and what most members share once.
     const card = screen.getByRole("link", { name: "IAM" }).closest("li") as HTMLElement
-    expect(card).toHaveTextContent("4 commits by people")
+    expect(card).toHaveTextContent("4 commits")
+    expect(card).toHaveTextContent("1 by hand · 3 with AI (Claude)")
     expect(card).toHaveTextContent("9 by automation")
-    expect(card).toHaveTextContent("3 with AI (Claude)")
-    expect(within(card).getByRole("img", { name: /with AI: 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2/ })).toBeInTheDocument()
+    expect(
+      within(card).getByRole("img", {
+        name: /by hand 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3; with AI 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2/,
+      }),
+    ).toBeInTheDocument()
     expect(card).toHaveTextContent("ada and Bo")
     expect(within(card).getByText("ada")).toHaveAttribute("title", "Ada Lovelace")
     expect(card).toHaveTextContent("Apache-2.0 · Java · 1 of 2 released")
     expect(within(card).getByRole("link", { name: "whydah-core" })).toHaveAttribute("href", "/repos/acme/whydah-core")
-    expect(within(card).getByRole("img", { name: /Commits by people per week/ })).toBeInTheDocument()
     // The fleet map counts every member by its last change by a person.
     expect(screen.getByRole("region", { name: "Fleet" })).toHaveTextContent("2 active")
     expect(screen.getByText("People").nextElementSibling).toHaveTextContent("2")
-    expect(screen.getByText(/by people in 30 days, 3 with AI \(Claude, Copilot\)/)).toBeInTheDocument()
+    expect(screen.getByText(/4 commits in 30 days: 1 by hand, 3 with AI \(Claude, Copilot\)/)).toBeInTheDocument()
     // The latest commits mark the one made with an AI, naming it.
     expect(screen.getByText("with Claude Opus 5")).toBeInTheDocument()
   })
@@ -74,6 +77,16 @@ describe("pages", () => {
     expect(about).toHaveAttribute("aria-expanded", "false")
   })
 
+  it("counts the work the reader's lens names: with AI only", async () => {
+    show(<DashboardView work="ai" />)
+    const card = (await screen.findByRole("link", { name: "IAM" })).closest("li") as HTMLElement
+    expect(card).toHaveTextContent("3 commits with AI (Claude)")
+    expect(card).toHaveTextContent("1 by hand · 9 by automation · 30 days")
+    expect(within(card).getByRole("img", { name: /^Commits with AI per week/ })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Latest commits with AI" })).toBeInTheDocument()
+    expect(screen.getByText(/3 commits with AI \(Claude, Copilot\) in 30 days; 1 by hand/)).toBeInTheDocument()
+  })
+
   it("switches the products to a sortable table and remembers the choice", async () => {
     const user = userEvent.setup()
     show(<DashboardView />)
@@ -81,8 +94,8 @@ describe("pages", () => {
     const table = screen.getByRole("table", { name: /Products/ })
     expect(within(table).getByRole("rowheader", { name: "IAM" })).toBeInTheDocument()
     expect(within(table).getByRole("cell", { name: "75%" })).toBeInTheDocument()
-    await user.click(within(table).getByRole("button", { name: /By people, 30 days/ }))
-    expect(within(table).getByRole("columnheader", { name: /By people/ })).toHaveAttribute("aria-sort", "descending")
+    await user.click(within(table).getByRole("button", { name: /Commits, 30 days/ }))
+    expect(within(table).getByRole("columnheader", { name: /Commits, 30 days/ })).toHaveAttribute("aria-sort", "descending")
     expect(document.cookie).toContain("scp-view-products=table")
   })
 
@@ -203,6 +216,7 @@ describe("commit log", () => {
     server.use(
       http.get("/dashboard", ({ response }) =>
         response(200).json({
+          work: "all",
           groups: [],
           health: null,
           repoCount: ++n,
@@ -246,6 +260,7 @@ describe("commit log", () => {
       server.use(
         http.get("/dashboard", ({ response }) =>
           response(200).json({
+            work: "all",
             groups: [],
             health: null,
             repoCount: ++n,

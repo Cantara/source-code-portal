@@ -146,7 +146,7 @@ func TestLastAuthored(t *testing.T) {
 	} {
 		e := &snapshot.RepoEntry{}
 		facet.Set(e, newHistory(tc.cs, nil, nil, "main"), snapshot.Freshness{State: snapshot.StateOK})
-		if at, before := LastAuthored(&snapshot.Snapshot{}, e); !at.Equal(tc.at) || before != tc.before {
+		if at, before := LastAuthored(&snapshot.Snapshot{}, e, WorkAll); !at.Equal(tc.at) || before != tc.before {
 			t.Errorf("%s: %v %v, want %v %v", name, at, before, tc.at, tc.before)
 		}
 	}
@@ -184,28 +184,28 @@ func TestSweepsAndActivity(t *testing.T) {
 	})
 	p.Flush()
 	s := p.Current()
-	if at, before := LastAuthored(s, s.Repos["acme/r0"]); !at.Equal(ago(3)) || before {
+	if at, before := LastAuthored(s, s.Repos["acme/r0"], WorkAll); !at.Equal(ago(3)) || before {
 		t.Errorf("last authored = %v %v, want the person's commit 3 days ago", at, before)
 	}
-	if at, _ := LastAuthored(s, s.Repos["acme/r5"]); !at.Equal(ago(2)) {
+	if at, _ := LastAuthored(s, s.Repos["acme/r5"], WorkAll); !at.Equal(ago(2)) {
 		t.Errorf("a repository holding only the sweep: %v, want the oldest read commit", at)
 	}
 	d := oapi.Dashboard{Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
 	Dashboard(s, &d)
 	g := d.Groups[0].Activity
-	if g.People != 2 || g.Automation != 1 || g.Sweeps != 1 || g.AuthorCount != 1 || len(g.Authors) != 1 || g.Authors[0].Name != "Ada" {
+	if g.Hand != 1 || g.Ai != 1 || g.Automation != 1 || g.Sweeps != 1 || g.AuthorCount != 1 || len(g.Authors) != 1 || g.Authors[0].Name != "Ada" {
 		t.Errorf("group activity = %+v", g)
 	}
 	if g.LastAuthoredAt == nil || !g.LastAuthoredAt.Equal(ago(3)) || len(g.Recent) != 1 || g.Recent[0].Repo != "acme/r0" {
 		t.Errorf("group last change = %v, recent %+v", g.LastAuthoredAt, g.Recent)
 	}
-	if sum := g.Weekly[11] + g.Weekly[9]; sum != 2 || g.Weekly[11] != 1 || len(g.Weekly) != 12 {
-		t.Errorf("weekly = %v", g.Weekly)
+	if g.WeeklyHand[11] != 1 || g.WeeklyHand[9] != 0 || len(g.WeeklyHand) != 12 {
+		t.Errorf("weekly by hand = %v", g.WeeklyHand)
 	}
 	if g.Ai != 1 || !slices.Equal(g.Assistants, []string{"Claude"}) || g.WeeklyAi[9] != 1 || g.WeeklyAi[11] != 0 {
 		t.Errorf("the commits with an AI: %d %v %v", g.Ai, g.Assistants, g.WeeklyAi)
 	}
-	if d.Activity.Sweeps != 11 || d.Activity.People != 2 {
+	if d.Activity.Sweeps != 11 || d.Activity.Hand+d.Activity.Ai != 2 {
 		t.Errorf("fleet activity = %+v", d.Activity)
 	}
 	if len(d.Latest) != 3 || d.Latest[0].Subject != "Fix the parser" {
@@ -213,6 +213,23 @@ func TestSweepsAndActivity(t *testing.T) {
 	}
 	if m := d.Groups[0].Members[0]; m.LastAuthoredAt == nil || !m.LastAuthoredAt.Equal(ago(3)) {
 		t.Errorf("member = %+v", m)
+	}
+	// The lens: with AI, the work that counts is the assisted commit 20 days ago; by hand, the fix 3 days ago. The counts give both.
+	for _, tc := range []struct {
+		work   oapi.Work
+		last   time.Time
+		latest int
+	}{{oapi.Ai, ago(20), 1}, {oapi.Hand, ago(3), 2}} {
+		d := oapi.Dashboard{Work: tc.work, Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
+		Dashboard(s, &d)
+		g := d.Groups[0].Activity
+		if g.LastAuthoredAt == nil || !g.LastAuthoredAt.Equal(tc.last) || g.AuthorCount != 1 || g.Hand != 1 || g.Ai != 1 ||
+			len(d.Latest) != tc.latest {
+			t.Errorf("%s: last %v, %d authors, %d by hand, %d with AI, %d latest", tc.work, g.LastAuthoredAt, g.AuthorCount, g.Hand, g.Ai, len(d.Latest))
+		}
+		if m := d.Groups[0].Members[0]; m.LastAuthoredAt == nil || !m.LastAuthoredAt.Equal(tc.last) {
+			t.Errorf("%s: member %+v", tc.work, m)
+		}
 	}
 }
 

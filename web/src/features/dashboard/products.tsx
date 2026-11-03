@@ -11,7 +11,9 @@ import { FindingList, HealthScore, levels } from "@/entities/health/health"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
 import { Sparkline } from "@/shared/sparkline"
-import { rememberView, type ProductsView } from "./layout"
+import { by, remember, viewCookie, type Work } from "@/lib/preferences"
+import { assistants, counted, noun, series, share, weekly } from "./work"
+import type { ProductsView } from "./layout"
 
 type Group = Schemas["DashboardGroup"]
 
@@ -31,16 +33,14 @@ function names(a: Schemas["Activity"]): ReactNode {
   ))
 }
 
-/** weekly is the sparkline's label: what the bars count and the last week. */
-function weekly(a: Schemas["Activity"]): string {
-  const ai = a.weeklyAi.some((n) => n > 0) ? `; with AI: ${a.weeklyAi.join(", ")}` : ""
-  return `Commits by people per week, the last 12 weeks: ${a.weekly.join(", ")}${ai}`
+/** Trend is an activity's sparkline through the lens. */
+function Trend({ a, w, className }: { a: Schemas["Activity"]; w: Work; className?: string }) {
+  const s = series(a, w)
+  return <Sparkline values={s.values} part={s.part} label={weekly(a, w)} className={cn(s.ai && "text-[var(--ai)]", className)} />
 }
 
-/** share is the part of the people's commits with an AI, as a percentage (-1 without commits). */
-function share(a: Schemas["Activity"]): number {
-  return a.people === 0 ? -1 : Math.round((a.ai / a.people) * 100)
-}
+/** AiDot marks the commits with AI in text, in the colour the sparklines draw them. */
+const AiDot = () => <span aria-hidden="true" className="mr-1 inline-block size-2 rounded-xs bg-[var(--ai)]" />
 
 /** Shared is what most members have in common, said once: the licence, the language and how many are released. */
 function Shared({ group }: { group: Group }) {
@@ -54,7 +54,7 @@ function Shared({ group }: { group: Group }) {
  * level, people's work against automation's, who did it, what they changed last, and the exceptions. The members are on the
  * product's page.
  */
-function ProductCard({ group, now }: { group: Group; now: number }) {
+function ProductCard({ group, work: w, now }: { group: Group; work: Work; now: number }) {
   const a = group.activity
   const h = group.health
   const findings = h?.findings.slice(0, cardFindings) ?? []
@@ -80,19 +80,26 @@ function ProductCard({ group, now }: { group: Group; now: number }) {
       </div>
       <div className="flex items-end justify-between gap-3">
         <p className="text-sm">
-          <span className="font-mono text-lg font-semibold tabular-nums">{count(a.people)}</span>{" "}
-          {a.people === 1 ? "commit" : "commits"} by people
-          {a.ai > 0 && (
+          <span className="font-mono text-lg font-semibold tabular-nums">{count(counted(a, w))}</span> {noun(counted(a, w), w)}
+          {w === "ai" && assistants(a)}
+          {w === "all" && (
             <span className="block text-xs text-muted-foreground">
-              <span aria-hidden="true" className="mr-1 inline-block size-2 rounded-xs bg-[var(--ai)]" />
-              {count(a.ai)} with AI{a.assistants.length > 0 && ` (${a.assistants.join(", ")})`}
+              {count(a.hand)} by hand · {a.ai > 0 && <AiDot />}
+              {count(a.ai)} with AI{assistants(a)}
             </span>
           )}
           <span className="block text-xs text-muted-foreground">
+            {w === "hand" && (
+              <>
+                {a.ai > 0 && <AiDot />}
+                {count(a.ai)} with AI ·{" "}
+              </>
+            )}
+            {w === "ai" && <>{count(a.hand)} by hand · </>}
             {count(a.automation)} by automation{a.sweeps > 0 && `, ${count(a.sweeps)} in sweeps`} · 30 days
           </span>
         </p>
-        <Sparkline values={a.weekly} part={a.weeklyAi} label={weekly(a)} />
+        <Trend a={a} w={w} />
       </div>
       <p className="text-sm">
         {a.authorCount > 0 ? (
@@ -101,20 +108,20 @@ function ProductCard({ group, now }: { group: Group; now: number }) {
             <span className="text-foreground">{names(a)}</span>
           </span>
         ) : (
-          <span className="text-muted-foreground">No person committed in 30 days</span>
+          <span className="text-muted-foreground">No commit {by[w]} in 30 days</span>
         )}
         <span className="block text-xs text-muted-foreground">
           {a.lastAuthoredAt ? (
             <>
-              Last change by a person <RelativeTime at={a.lastAuthoredAt} />
+              Last change {by[w]} <RelativeTime at={a.lastAuthoredAt} />
             </>
           ) : (
-            "No change by a person read"
+            `No change ${by[w]} read`
           )}
         </span>
       </p>
       {a.recent.length > 0 && (
-        <ul aria-label="Changed last by people" className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <ul aria-label={`Changed last ${by[w]}`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
           {a.recent.map((r) => (
             <li key={r.repo} className="flex min-w-0 items-baseline gap-1">
               <Link href={addressPath(r.repo)} className="truncate font-medium hover:underline">
@@ -154,7 +161,7 @@ type Column = {
   cell: (g: Group) => ReactNode
 }
 
-const columns: Column[] = [
+const columns = (w: Work): Column[] => [
   {
     key: "name",
     label: "Product",
@@ -167,20 +174,20 @@ const columns: Column[] = [
   },
   { key: "repos", label: "Repositories", numeric: true, value: (g) => g.repoCount, cell: (g) => count(g.repoCount) },
   {
-    key: "people",
-    label: "By people, 30 days",
+    key: "commits",
+    label: w === "all" ? "Commits, 30 days" : `${w === "hand" ? "By hand" : "With AI"}, 30 days`,
     numeric: true,
-    value: (g) => g.activity.people,
+    value: (g) => counted(g.activity, w),
     cell: (g) => (
       <span className="inline-flex items-center justify-end gap-2">
-        {count(g.activity.people)}
-        <Sparkline values={g.activity.weekly} part={g.activity.weeklyAi} label={weekly(g.activity)} className="h-4 w-12" />
+        {count(counted(g.activity, w))}
+        <Trend a={g.activity} w={w} className="h-4 w-12" />
       </span>
     ),
   },
   {
     key: "ai",
-    label: "With AI",
+    label: "Share with AI",
     numeric: true,
     value: (g) => share(g.activity),
     cell: (g) => (share(g.activity) < 0 ? "–" : `${share(g.activity)}%`),
@@ -201,7 +208,7 @@ const columns: Column[] = [
   },
   {
     key: "last",
-    label: "Last change by a person",
+    label: `Last change ${by[w]}`,
     value: (g) => g.activity.lastAuthoredAt ?? "",
     cell: (g) => <RelativeTime at={g.activity.lastAuthoredAt} />,
   },
@@ -222,9 +229,10 @@ const columns: Column[] = [
 ]
 
 /** ProductTable is every product in one row, sortable by any column, so many products compare at once. */
-function ProductTable({ groups }: { groups: Group[] }) {
+function ProductTable({ groups, work }: { groups: Group[]; work: Work }) {
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "", dir: 1 })
-  const col = columns.find((c) => c.key === sort.key)
+  const cols = columns(work)
+  const col = cols.find((c) => c.key === sort.key)
   const rows = col
     ? [...groups].sort((a, b) => {
         const x = col.value(a)
@@ -238,7 +246,7 @@ function ProductTable({ groups }: { groups: Group[] }) {
         <caption className="sr-only">Products, sortable by every column</caption>
         <thead>
           <tr className="border-b border-border text-xs text-muted-foreground">
-            {columns.map((c) => (
+            {cols.map((c) => (
               <th
                 key={c.key}
                 scope="col"
@@ -264,7 +272,7 @@ function ProductTable({ groups }: { groups: Group[] }) {
         <tbody>
           {rows.map((g) => (
             <tr key={g.id} className="border-b border-border/60 last:border-b-0">
-              {columns.map((c, i) =>
+              {cols.map((c, i) =>
                 i === 0 ? (
                   <th key={c.key} scope="row" className="px-3 py-2 text-left font-normal">
                     {c.cell(g)}
@@ -288,17 +296,19 @@ export function Products({
   groups,
   repoCount,
   view: initial,
+  work,
   now,
 }: {
   groups: Group[]
   repoCount: number
   view: ProductsView
+  work: Work
   now: number
 }) {
   const [view, setView] = useState(initial)
   const choose = (v: ProductsView) => {
     setView(v)
-    rememberView(v)
+    remember(viewCookie, v)
   }
   return (
     <section aria-labelledby="products" className="min-w-0">
@@ -326,11 +336,11 @@ export function Products({
       {groups.length === 0 ? (
         <EmptyState title="No groups configured">{plural(repoCount, "repository", "repositories")} in the catalogue.</EmptyState>
       ) : view === "table" ? (
-        <ProductTable groups={groups} />
+        <ProductTable groups={groups} work={work} />
       ) : (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-4">
           {groups.map((g) => (
-            <ProductCard key={g.id} group={g} now={now} />
+            <ProductCard key={g.id} group={g} work={work} now={now} />
           ))}
         </ul>
       )}
