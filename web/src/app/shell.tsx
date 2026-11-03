@@ -4,26 +4,61 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { buttonClass } from "@/components/ui/button"
+import { BookIcon, MonitorIcon, MoonIcon, SlidersIcon, SunIcon } from "@/components/ui/icons"
 import type { Schemas } from "@/lib/api/client"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 
-/** ThemeSelect picks system, light or dark (lib/theme.ts, public/theme-init.js). */
+const themes = [
+  { value: "system", label: "System", Icon: MonitorIcon },
+  { value: "dark", label: "Dark", Icon: MoonIcon },
+  { value: "light", label: "Light", Icon: SunIcon },
+] as const
+
+/** ThemeSelect picks system, dark or light (lib/theme.ts, public/theme-init.js): radio buttons drawn as one segmented control of icons. */
 export function ThemeSelect() {
   const theme = useTheme()
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="sr-only sm:not-sr-only">Theme</span>
-      <select
-        value={theme}
-        onChange={(e) => apply(e.target.value as Choice)}
-        className="min-h-8 rounded-md border border-border bg-card px-2 text-sm"
-        aria-label="Theme"
-      >
-        <option value="system">System</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </label>
+    <fieldset className="flex items-center rounded-md border border-border bg-card/60 p-0.5">
+      <legend className="sr-only">Theme</legend>
+      {themes.map(({ value, label, Icon }) => (
+        <label
+          key={value}
+          title={label}
+          className="relative grid size-7 cursor-pointer place-items-center rounded-[0.3rem] text-muted-foreground transition-colors hover:text-foreground has-checked:bg-accent has-checked:text-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring"
+        >
+          <input
+            type="radio"
+            name="scp-theme"
+            value={value}
+            checked={theme === value}
+            onChange={() => apply(value as Choice)}
+            className="absolute inset-0 cursor-pointer appearance-none rounded-[0.3rem] outline-none"
+          />
+          <Icon className="pointer-events-none size-4" />
+          <span className="sr-only">{label}</span>
+        </label>
+      ))}
+    </fieldset>
+  )
+}
+
+const tool =
+  "grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground"
+
+/** PortalNav is the reader's own corner of the header: Settings and the Guide, as icons named for assistive technology. */
+export function PortalNav() {
+  const path = usePathname()
+  return (
+    <nav aria-label="Portal" className="flex items-center gap-0.5">
+      <Link href="/settings" className={tool} title="Settings" aria-current={path === "/settings" ? "page" : undefined}>
+        <SlidersIcon className="size-[1.125rem]" />
+        <span className="sr-only">Settings</span>
+      </Link>
+      <Link href="/guide" className={tool} title="Guide" aria-current={path === "/guide" ? "page" : undefined}>
+        <BookIcon className="size-[1.125rem]" />
+        <span className="sr-only">Guide</span>
+      </Link>
+    </nav>
   )
 }
 
@@ -46,12 +81,6 @@ export function MainNav({ ask = false }: { ask?: boolean }) {
           Ask
         </Link>
       )}
-      <Link href="/settings" className={nav} aria-current={path === "/settings" ? "page" : undefined}>
-        Settings
-      </Link>
-      <Link href="/guide" className={nav} aria-current={path === "/guide" ? "page" : undefined}>
-        Guide
-      </Link>
     </nav>
   )
 }

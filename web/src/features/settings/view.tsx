@@ -163,14 +163,14 @@ export function SettingsView({ initial }: { initial: Settings }) {
           {size("commits", "Commit timelines")}
           {size("history", "Repository histories")}
         </Section>
-        <Section title="Theme" about="Light, dark, or as the system is set.">
+        <Section title="Theme" about="As the system is set, dark or light.">
           <Choices
             legend="Theme"
             value={theme}
             options={[
               { value: "system" as Choice, label: "System" },
-              { value: "light" as Choice, label: "Light" },
               { value: "dark" as Choice, label: "Dark" },
+              { value: "light" as Choice, label: "Light" },
             ]}
             onChange={(t) => {
               apply(t)

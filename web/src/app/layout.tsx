@@ -5,7 +5,7 @@ import { LiveIndicator, StatusBanners } from "@/features/status/banners"
 import { unwrap } from "@/lib/api/client"
 import { origin, privateViewer, renderedAt, serverApi } from "@/lib/api/server"
 import { Providers } from "./providers"
-import { FocusOnNavigation, MainNav, Mark, ThemeSelect, ViewerMenu } from "./shell"
+import { FocusOnNavigation, MainNav, Mark, PortalNav, ThemeSelect, ViewerMenu } from "./shell"
 import "@/styles/index.css"
 import "@/styles/docs.css"
 
@@ -63,10 +63,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 </span>
               </Link>
               <MainNav ask={!!assistant?.enabled && assistant.allowed} />
-              <div className="ml-auto flex items-center gap-4">
+              <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
                 <LiveIndicator />
-                <ViewerMenu me={me} />
                 <ThemeSelect />
+                <PortalNav />
+                <ViewerMenu me={me} />
               </div>
             </div>
           </header>
