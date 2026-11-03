@@ -18,7 +18,8 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 
 | Request | Returns |
 |---|---|
-| `GET /api/v1/dashboard` | groups with counts and latest activity, the latest commits, repositories by freshness |
+| `GET /api/v1/dashboard` | every group with its activity (commits by people, by automation and in sweeps over 30 days, 12 weekly counts, who, the repositories people changed last), its members' last change by a person, what most members share, its health; the fleet's activity; the latest commits by people; repositories by freshness |
+| `GET /api/v1/pages/dashboard` | the landing page's layout: its elements in order, as an administrator designed it or built in |
 | `GET /api/v1/groups` | groups in configuration order |
 | `GET /api/v1/groups/{group}` | one group with its repositories |
 | `GET /api/v1/repos[?group=]` | every repository sorted by address, optionally of one group |

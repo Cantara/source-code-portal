@@ -60,6 +60,23 @@ export function getter(base: string, headers: Record<string, string> = {}): Get 
 /** get is the browser's Get. */
 export const get: Get = (path, signal) => getter(`${globalThis.location?.origin ?? "http://localhost"}/api/v1`)(path, signal)
 
+/** send writes to a path of /api/v1 outside the contract (the admin's layouts) with a JSON body, failing as unwrap does. */
+export function send<T>(method: "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
+  const base = `${globalThis.location?.origin ?? "http://localhost"}/api/v1`
+  return unwrap<T>(
+    globalThis
+      .fetch(`${base}${path}`, {
+        method,
+        headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+      .then(async (response) => {
+        const data: unknown = await response.json().catch(() => undefined)
+        return response.ok ? { data: data as T, response } : { error: data, response }
+      }),
+  )
+}
+
 interface Result<T> {
   data?: T
   error?: unknown

@@ -5,6 +5,7 @@
 node_modules/
 # Local configuration and data
 /scp.yaml
+/layouts/
 *.db
 *.db-shm
 *.db-wal

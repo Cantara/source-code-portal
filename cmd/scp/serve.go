@@ -30,6 +30,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/layout"
 	"github.com/cantara/source-code-portal/internal/llms"
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/safehtml"
@@ -77,11 +78,13 @@ type (
 	commitsAPI   = commits.API
 	docsAPI      = docs.API
 	manifestsAPI = manifests.API
+	layoutAPI    = layout.API
 	api          struct {
 		catalogAPI
 		commitsAPI
 		docsAPI
 		manifestsAPI
+		layoutAPI
 		httpapi.SnapshotAPI
 		httpapi.MeAPI
 		*assistant.Assistant
@@ -97,6 +100,7 @@ type server struct {
 	engine            *sync.Engine
 	member            *cluster.Member // nil when the instance is alone
 	web               *webui.Server   // nil without web.dir
+	layouts           *layout.Store
 	stopping          atomic.Bool
 	public, admin     *http.Server
 	publicLn, adminLn net.Listener
@@ -186,8 +190,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	ready := func() bool {
 		return !s.stopping.Load() && s.pub.Current().Catalogued && (s.web == nil || s.web.Ready())
 	}
+	s.layouts = layout.Open(cfg.Layout.Dir, log)
 	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
-		webhook: cfg.Webhook.Secret.IsSet(), deliveries: map[string]int{}}
+		webhook: cfg.Webhook.Secret.IsSet(), layouts: s.layouts.Problems, deliveries: map[string]int{}}
 	if s.member != nil {
 		st.cluster = s.member
 	}
@@ -255,7 +260,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return nil, err
 	}
 	routes = append(routes, ask.Routes()...)
-	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view},
+	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
+	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view}, layout.API{Current: view, Store: s.layouts},
 		httpapi.SnapshotAPI{Current: view}, me, ask}
 	if s.web != nil {
 		opts.Build = s.web.Build
@@ -398,6 +404,10 @@ func (s *server) run(ctx context.Context) error {
 	engineCtx, stopEngine := context.WithCancel(context.WithoutCancel(ctx))
 	engineDone := make(chan error, 1)
 	go func() { engineDone <- s.engine.Run(engineCtx) }()
+	layoutsCtx, stopLayouts := context.WithCancel(ctx)
+	layoutsDone := make(chan struct{})
+	go func() { s.layouts.Run(layoutsCtx); close(layoutsDone) }()
+	defer func() { stopLayouts(); <-layoutsDone }()
 	memberCtx, stopMember := context.WithCancel(context.WithoutCancel(ctx))
 	memberDone := make(chan error, 1)
 	if s.member != nil {

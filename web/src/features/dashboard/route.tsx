@@ -1,13 +1,13 @@
-import { load } from "@/lib/load"
+import { load, prefetch } from "@/lib/load"
 import type { Route } from "@/lib/page"
-import { dashboardQuery } from "./api"
+import { dashboardQuery, pageQuery } from "./api"
 import { productsView, viewCookie } from "./layout"
 import { DashboardView } from "./view"
 import { ld } from "@/lib/seo"
 
-/** dashboardRoute is `/`: the dashboard, with the reader's remembered products view. */
+/** dashboardRoute is `/`: the dashboard and its layout, with the reader's remembered products view. */
 export const dashboardRoute: Route<object> = {
-  load: ({ api, qc }) => load(qc, dashboardQuery(api)),
+  load: ({ api, qc }) => Promise.all([load(qc, dashboardQuery(api)), prefetch(qc, pageQuery(api))]),
   metadata: () => ({ title: { absolute: "Dashboard · Source Code Portal" }, alternates: { canonical: "/" } }),
   structured: (_, base) => [ld.page(base, "/", "Dashboard", "CollectionPage", false)],
   render: (ctx) => {

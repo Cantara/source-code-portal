@@ -21,6 +21,7 @@ type status struct {
 	depth        func() (waiting, running int)
 	rate         func() map[string]float64
 	webhook      bool
+	layouts      func() []string // why stored layouts are not served
 	cluster      interface {
 		Leader() bool
 		Connected() bool
@@ -117,6 +118,9 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	}
 	if !st.webhook {
 		b.Warnings = append(b.Warnings, "webhook: not configured; pushes show after the next scheduled listing")
+	}
+	if st.layouts != nil {
+		b.Warnings = append(b.Warnings, st.layouts()...)
 	}
 	slices.Sort(b.Warnings)
 	st.mu.Lock()

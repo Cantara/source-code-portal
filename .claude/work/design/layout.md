@@ -1,5 +1,5 @@
 # Landing page and layouts
-Status: L1 built, L2 planned. Binding order: ../plan.md > this note.
+Status: as built (L1, L2). Binding order: ../plan.md > this note.
 
 ## Scope
 The landing page exists so an engineer sees which products need a look and why. Today it lists every repository with every attribute:
@@ -59,34 +59,42 @@ Per-repository rows leave the landing page for the group page. The telemetry til
 repositories, automation (and sweeps), findings, products (and the repositories in no group), in sync.
 
 ## Layouts (L2)
-A layout is a page's elements and their options, as data:
+A layout is a page's elements and their options, as data; the file is the API's element list (`LayoutElement` in the contract, one
+flat object per element whose kind reads only its own fields):
 
 ```json
-{"page": "dashboard", "elements": [
-  {"kind": "telemetry", "tiles": ["repos", "people", "findings"]},
-  {"kind": "fleet-map", "groups": "all"},
-  {"kind": "products", "groups": ["core", "tools"], "view": "cards"}
+{"elements": [
+  {"kind": "telemetry"},
+  {"kind": "heading", "text": "Products with work this month"},
+  {"kind": "products", "groups": ["core", "tools"], "view": "table"},
+  {"kind": "latest-commits", "count": 10}
 ]}
 ```
 
-- **Validated on both sides**: Go checks a layout against the element catalogue (`internal/layout`, unknown kinds and fields refused,
-  bounded size and element count) before it is saved or served; the web UI renders only known kinds. No HTML, no scripts, no URLs.
-- **Store**: `layout.Store` (`Load(page)`, `Save(page, layout, revision)`, `List()`). The file system is the one store: `layout.dir`,
-  one `<page>.json` per page, written to a temporary file and renamed. The revision is the content's SHA-256; a save with a stale
-  revision is refused (412), so two admins never overwrite each other. Without `layout.dir`, or without a page's file, the built-in
-  default renders and design mode is off; deleting the file resets the page.
+- **Validated in Go** (`internal/layout`, a feature): one JSON value of at most 64 KiB, unknown fields refused, 1..50 elements, a known
+  kind with only its own options (`groups` 1..100 unique group ids for `fleet-map` and `products`, `view` for `products`, `count` 1..50
+  for `latest-commits`, `text` (required) and `note` for `heading`, cleaned to one plain line with `untrusted.Text`). No HTML, no
+  scripts, no URLs. The web UI renders only known kinds. Absent `groups` means every group.
+- **Store**: `layout.Store` over `layout.dir`, one `<page>.json` per page, written to a temporary file, synced and renamed. The revision
+  is the file's content digest (SHA-256, 128 bits), empty when there is no file; a save or reset on another revision is refused (412),
+  so two admins never overwrite each other. A broken file keeps the last good layout serving and reports why; its revision is the broken
+  content's, so an admin can save over it. Without `layout.dir` the built-in layout renders and saves answer 409.
 - **Not a cache, not a user store**: layouts are the site's, edited by admins; they never go into SQLite (rule 5) and nothing is kept
   per person (P-27).
-- **Reload**: each instance stats the files every 5 s and reloads a changed one, so a shared volume serves several instances and an
-  operator can also write the files by hand or from configuration management. A file that fails validation is logged, shown on the
-  status page and in design mode, and the last good layout (else the default) keeps serving.
-- **API**: `GET /api/v1/pages/{page}` (contract) answers the page's elements resolved against the viewer's view: groups the viewer
-  cannot see are dropped, so the leak test covers it. `GET` and `PUT /api/v1/admin/layouts/{page}` (admin, same origin) read and write
-  the stored layout with its revision.
-- **Design mode**: an admin's toggle on the page (the viewer menu). Elements can be added from the catalogue, moved, removed and set up
-  in a side panel with a live preview; Save writes the layout, Discard reloads it. Keyboard moves as well as dragging (axe gate).
-- **Pages**: `dashboard` first. The format names its page, so further pages (a product's page, named dashboards) come without a
-  format change.
+- **Reload**: each instance stats the files every 5 s and reads a changed one, so a shared volume serves several instances and a file
+  written by hand or by configuration management is picked up. A file that fails validation is logged and shown on the status page
+  (`/api/v1/status` warnings) and in the design mode.
+- **API**: `GET /api/v1/pages/{page}` (contract) answers the elements resolved against the viewer's view: a group with no repository the
+  viewer sees is dropped, and an element whose chosen groups all are, so the leak test (which walks every contract GET) covers it.
+  `GET`, `PUT` and `DELETE /api/v1/admin/layouts/{page}` (outside the contract, as the admin status is; admin role; writes from the
+  portal's own pages) read the stored layout with its revision, whether it can be saved and its problem, save `{elements, revision}`
+  (422 with the reason when invalid) and reset (`?revision=`).
+- **Design mode** (`web/src/features/dashboard/design.tsx`): *Design this page* in the dashboard's header for admins. The elements in a
+  list (move with the arrow buttons or by dragging, remove, the options of each), a new element from the catalogue with what it shows,
+  and the draft drawn live beside it. *Save*, *Discard changes*, *Back to the built-in layout*, *Done* (asks before dropping unsaved
+  changes). A refused save offers to load the newer layout. The reader's products view (the cookie) wins over a layout's `view`.
+- **Pages**: `dashboard`. The page is in the address, so further pages (a product's page, named dashboards) come without a format
+  change.
 
 ## Not now
 Layouts per person or per sign-in group, repository-level selection in elements, other stores (a Git repository, S3), and sharing layouts

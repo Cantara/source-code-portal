@@ -132,7 +132,7 @@ func publicPaths(t *testing.T) []string {
 	var paths []string
 	for _, m := range regexp.MustCompile(`(?m)^  (/\S+):\n    get:`).FindAllStringSubmatch(string(contract.OpenAPI), -1) {
 		paths = append(paths, "/api/v1"+param.ReplaceAllStringFunc(m[1], func(p string) string {
-			return map[string]string{"{owner}": "acme", "{name}": "zq-hidden", "{group}": "all", "{docId}": "docs%2Fguide.md"}[p]
+			return map[string]string{"{owner}": "acme", "{name}": "zq-hidden", "{group}": "all", "{docId}": "docs%2Fguide.md", "{page}": "dashboard"}[p]
 		}))
 	}
 	if len(paths) < 12 {
@@ -144,7 +144,7 @@ func publicPaths(t *testing.T) []string {
 		"/badges/repos/acme/zq-hidden/issues.svg", "/badges/repos/acme/zq-hidden/health.svg", "/badges/groups/all/repos.svg",
 		"/badges/groups/all/health.svg", "/badges/groups/all/last-commit.svg", "/badges/groups/all/release.svg",
 		"/images/acme/zq-hidden/00000000000000000000000000000000", "/badge/license/zq-hidden/main", "/commits/zq-hidden",
-		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events")
+		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events", "/api/v1/admin/layouts/dashboard")
 }
 
 // TestNoLeak fetches every public path as the public, in HTML and Markdown: no answer carries a trace of the private repository,

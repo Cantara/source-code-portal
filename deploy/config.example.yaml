@@ -94,5 +94,9 @@ cluster:
 web:
   dir: "" # web/bundle
   node: node
+# The pages' layouts an administrator designs on the dashboard (Design this page); one JSON file per page. Empty: the built-in
+# layout, nothing saved.
+layout:
+  dir: ""
 ops:
   pprof: false # /debug/pprof/ on the admin listener

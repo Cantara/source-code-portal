@@ -311,6 +311,51 @@ func (e LabelKind) Valid() bool {
 	}
 }
 
+// Defines values for LayoutElementKind.
+const (
+	LayoutElementKindFleetMap      LayoutElementKind = "fleet-map"
+	LayoutElementKindHeading       LayoutElementKind = "heading"
+	LayoutElementKindLatestCommits LayoutElementKind = "latest-commits"
+	LayoutElementKindProducts      LayoutElementKind = "products"
+	LayoutElementKindTelemetry     LayoutElementKind = "telemetry"
+)
+
+// Valid indicates whether the value is a known member of the LayoutElementKind enum.
+func (e LayoutElementKind) Valid() bool {
+	switch e {
+	case LayoutElementKindFleetMap:
+		return true
+	case LayoutElementKindHeading:
+		return true
+	case LayoutElementKindLatestCommits:
+		return true
+	case LayoutElementKindProducts:
+		return true
+	case LayoutElementKindTelemetry:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LayoutElementView.
+const (
+	Cards LayoutElementView = "cards"
+	Table LayoutElementView = "table"
+)
+
+// Valid indicates whether the value is a known member of the LayoutElementView enum.
+func (e LayoutElementView) Valid() bool {
+	switch e {
+	case Cards:
+		return true
+	case Table:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ManifestEcosystem.
 const (
 	ManifestEcosystemGo    ManifestEcosystem = "go"
@@ -422,6 +467,21 @@ func (e ToolchainVersionsName) Valid() bool {
 	case ToolchainVersionsNameJava:
 		return true
 	case ToolchainVersionsNameNode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPageParamsPage.
+const (
+	GetPageParamsPageDashboard GetPageParamsPage = "dashboard"
+)
+
+// Valid indicates whether the value is a known member of the GetPageParamsPage enum.
+func (e GetPageParamsPage) Valid() bool {
+	switch e {
+	case GetPageParamsPageDashboard:
 		return true
 	default:
 		return false
@@ -861,6 +921,27 @@ type Label struct {
 // LabelKind defines model for Label.Kind.
 type LabelKind string
 
+// LayoutElement One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, latest-commits takes count, heading takes text and note (plain text).
+type LayoutElement struct {
+	// Count How many commits
+	Count *int `json:"count,omitempty"`
+
+	// Groups Group ids in display order
+	Groups *[]string         `json:"groups,omitempty"`
+	Kind   LayoutElementKind `json:"kind"`
+	Note   *string           `json:"note,omitempty"`
+	Text   *string           `json:"text,omitempty"`
+
+	// View How products are drawn until the reader switches
+	View *LayoutElementView `json:"view,omitempty"`
+}
+
+// LayoutElementKind defines model for LayoutElement.Kind.
+type LayoutElementKind string
+
+// LayoutElementView How products are drawn until the reader switches
+type LayoutElementView string
+
 // Link defines model for Link.
 type Link struct {
 	Title string `json:"title"`
@@ -939,6 +1020,15 @@ type Page struct {
 
 	// Total Items matching the filter
 	Total int `json:"total"`
+}
+
+// PageLayout defines model for PageLayout.
+type PageLayout struct {
+	Elements []LayoutElement `json:"elements"`
+	Page     string          `json:"page"`
+
+	// Stored An admin's layout; false: the built-in one
+	Stored bool `json:"stored"`
 }
 
 // Problem defines model for Problem.
@@ -1150,6 +1240,9 @@ type ListCommitsParams struct {
 	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// GetPageParamsPage defines parameters for GetPage.
+type GetPageParamsPage string
+
 // ListReposParams defines parameters for ListRepos.
 type ListReposParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
@@ -1197,6 +1290,9 @@ type ServerInterface interface {
 	// GetMe The viewer, its roles and how one signs in
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// GetPage A page's layout, its elements resolved against the viewer's view
+	// (GET /pages/{page})
+	GetPage(w http.ResponseWriter, r *http.Request, page GetPageParamsPage)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(w http.ResponseWriter, r *http.Request, params ListReposParams)
@@ -1387,6 +1483,32 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPage operation middleware
+func (siw *ServerInterfaceWrapper) GetPage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "page" -------------
+	var page GetPageParamsPage
+
+	err = runtime.BindStyledParameterWithOptions("simple", "page", r.PathValue("page"), &page, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPage(w, r, page)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1851,6 +1973,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/docs/{docId}", wrapper.GetDoc)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/manifests", wrapper.GetManifests)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/history", wrapper.GetHistory)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pages/{page}", wrapper.GetPage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assistant", wrapper.GetAssistant)
@@ -2112,6 +2235,61 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPageRequestObject struct {
+	Page GetPageParamsPage `json:"page"`
+}
+
+type GetPageResponseObject interface {
+	VisitGetPageResponse(w http.ResponseWriter) error
+}
+
+type GetPage200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetPage200JSONResponse struct {
+	Body    PageLayout
+	Headers GetPage200ResponseHeaders
+}
+
+func (response GetPage200JSONResponse) VisitGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPage304Response = NotModifiedResponse
+
+func (response GetPage304Response) VisitGetPageResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetPage404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetPage404ApplicationProblemPlusJSONResponse) VisitGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2567,6 +2745,9 @@ type StrictServerInterface interface {
 	// GetMe The viewer, its roles and how one signs in
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// GetPage A page's layout, its elements resolved against the viewer's view
+	// (GET /pages/{page})
+	GetPage(ctx context.Context, request GetPageRequestObject) (GetPageResponseObject, error)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(ctx context.Context, request ListReposRequestObject) (ListReposResponseObject, error)
@@ -2770,6 +2951,32 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPage operation middleware
+func (sh *strictHandler) GetPage(w http.ResponseWriter, r *http.Request, page GetPageParamsPage) {
+	var request GetPageRequestObject
+
+	request.Page = page
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPage(ctx, request.(GetPageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPageResponseObject); ok {
+		if err := validResponse.VisitGetPageResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

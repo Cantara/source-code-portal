@@ -108,10 +108,14 @@ func TestServeForPlaywright(t *testing.T) {
 	dir := t.TempDir()
 	token, key, e2eToken := filepath.Join(dir, "token"), filepath.Join(dir, "session-key"), filepath.Join(dir, "e2e-token")
 	llmKey, model := filepath.Join(dir, "llm-key"), fakeAnthropic(t)
-	path := filepath.Join(dir, "scp.yaml")
+	path, layouts := filepath.Join(dir, "scp.yaml"), filepath.Join(dir, "layouts")
+	if err := os.Mkdir(layouts, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	body := `store: {path: ` + filepath.Join(dir, "scp.db") + `}
 server: {public_addr: "` + addr + `", admin_addr: "127.0.0.1:0", public_url: "http://` + addr + `"}
 web: {dir: ` + bundle + `}
+layout: {dir: ` + layouts + `}
 access: {private_groups: [staff]}
 auth:
   session_key_file: ` + key + `

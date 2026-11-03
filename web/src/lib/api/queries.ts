@@ -21,6 +21,7 @@ export const keys = {
   history: (owner: string, name: string, filter: Record<string, string | number | boolean | undefined>) =>
     ["commits", "history", lc(owner), lc(name), filter] as const,
   latestCommits: (group: string) => ["commits", "latest", group] as const,
+  page: (page: string) => ["page", page] as const,
   me: () => ["me"] as const,
   assistant: () => ["assistant"] as const,
 }

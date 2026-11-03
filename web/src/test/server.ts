@@ -110,6 +110,18 @@ export const defaults = [
     response(200).json({ enabled: false, allowed: false, access: "signed-in", provider: "", model: "" }),
   ),
   http.get("/snapshot", ({ response }) => response(200).json(snapshot(1))),
+  http.get("/pages/{page}", ({ response }) =>
+    response(200).json({
+      page: "dashboard",
+      stored: false,
+      elements: [
+        { kind: "telemetry" },
+        { kind: "fleet-map" },
+        { kind: "products", view: "cards" },
+        { kind: "latest-commits", count: 10 },
+      ],
+    }),
+  ),
   http.get("/repos", ({ response }) => response(200).json({ repos: [repo("Whydah"), repo("Whydah-Core")] })),
   http.get("/dashboard", ({ response }) =>
     response(200).json({

@@ -127,6 +127,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js 24 executable that runs the bundle |
+| `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4); empty: the built-in layout, no saving |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
@@ -266,6 +267,35 @@ The header shows *Ask* to the viewers `assistant.access` admits. `signed-in` and
 a proxy, section 2.1). Each answer is bounded by the `assistant.*` budgets; `assistant.concurrency` limits the answers in progress on
 one instance. Everything a tool returns is marked to the model as repository content written by others, never instructions. Watch the
 cost with `scp_assistant_tokens_total` (section 5).
+
+### 2.4 The landing page and the design mode
+
+The dashboard shows signals, not every attribute of every repository: a telemetry row (who committed in the last 30 days, the
+repositories a person changed, what automation did, the findings, whether the catalogue is current), a fleet map with every repository
+as one tile coloured by its last change by a person, the products as cards or a sortable table, and the latest commits by people. A
+commit by a bot or a release plugin is automation; a commit whose subject landed in more than 10 repositories on one day is a sweep.
+Neither counts as a person's work. Each card says once what most of its repositories share (the licence, the language) and shows only
+the exceptions; the members are on the product's page. A reader's choice of cards or table is kept in a cookie.
+
+An administrator can arrange the page: *Design this page* on the dashboard opens the design mode, with the page's elements in a list
+to add, move (the arrows, or drag them), set up and remove, beside a live preview. The elements are the telemetry, the fleet map and the
+products (each for every product or for chosen ones, in your order), the latest commits (how many) and a heading with a line of text.
+*Save* keeps the layout for every viewer; *Back to the built-in layout* removes it.
+
+```yaml
+layout:
+  dir: /var/lib/scp/layouts   # writable by the portal; one JSON file per page (dashboard.json)
+```
+
+- Without `layout.dir` the built-in layout renders and the design mode can only try layouts, not save them.
+- The files are the portal's own: keep them with your configuration's backup. They are not in the cache (`store.path`), so deleting the
+  cache never loses a design; deleting `dashboard.json` brings back the built-in layout.
+- A save is written to a temporary file and renamed, so a reader never sees half a layout. Two administrators never overwrite each
+  other: a save based on a layout someone else changed since is refused with an offer to load theirs.
+- Each instance reads the files again within 5 seconds of a change, so several instances share a layout through a shared volume, and a
+  file written by hand or by configuration management is picked up too. A file that does not validate is not served: the last good
+  layout stays, and `/api/v1/status` and the design mode say why.
+- A layout names groups, never repositories; a viewer sees only the groups with repositories they may see.
 
 ## 3. Run
 

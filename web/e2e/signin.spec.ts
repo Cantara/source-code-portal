@@ -70,3 +70,32 @@ test("a signed-in viewer asks the assistant; its answer streams with what it rea
   await expect(page.getByRole("heading", { name: "acme/vault" })).toBeVisible()
   await expect(page.getByRole("button", { name: "New conversation" })).toBeVisible()
 })
+
+// One layout file serves both projects: the design mode is a desktop task, and a second admin's save is refused as a conflict.
+test("an admin designs the dashboard in the design mode and every viewer gets it", async ({ page, browser }, info) => {
+  test.skip(info.project.name !== "desktop", "one layout file serves both projects")
+  await page.goto("/signin")
+  await page.getByRole("link", { name: "Sign in with single sign-on" }).click()
+  await expect(page.getByText("Ada Lovelace", { exact: true })).toBeVisible()
+  await page.goto("/")
+  await page.getByRole("button", { name: "Design this page" }).click()
+  const list = page.getByRole("region", { name: "Elements" })
+  await list.getByRole("combobox", { name: "New element" }).selectOption("heading")
+  await list.getByRole("button", { name: "Add" }).click()
+  await list.getByRole("textbox", { name: "Heading" }).fill("Designed in the e2e")
+  await list.getByRole("button", { name: "Move Heading up" }).click()
+  await expect(page.getByRole("region", { name: "Preview" }).getByRole("heading", { name: "Designed in the e2e" })).toBeVisible()
+  await page.getByRole("button", { name: "Save" }).click()
+  await expect(page.getByText("Saved: every viewer sees this layout")).toBeVisible()
+
+  const anonymous = await browser.newPage()
+  await anonymous.goto(page.url())
+  await expect(anonymous.getByRole("heading", { name: "Designed in the e2e" })).toBeVisible()
+  await expect(anonymous.getByRole("button", { name: "Design this page" })).toHaveCount(0)
+  await anonymous.close()
+
+  await page.getByRole("button", { name: "Back to the built-in layout" }).click()
+  await expect(page.getByText("The built-in layout")).toBeVisible()
+  await page.getByRole("button", { name: "Done" }).click()
+  await expect(page.getByRole("heading", { name: "Designed in the e2e" })).toHaveCount(0)
+})

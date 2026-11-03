@@ -188,6 +188,28 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/pages/{page}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A page's layout, its elements resolved against the viewer's view
+     * @description The elements an admin arranged in the design mode (design/layout.md), or the built-in layout when none is stored. Groups the
+     *     viewer cannot see, or that have no repository the viewer can see, are left out; an element whose groups are all left out is
+     *     left out.
+     */
+    get: operations["getPage"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/snapshot": {
     parameters: {
       query?: never
@@ -587,6 +609,28 @@ export interface components {
       language: string | null
       /** @description Members with a release */
       released: number
+    }
+    /** @description One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, latest-commits takes count, heading takes text and note (plain text). */
+    LayoutElement: {
+      /** @enum {string} */
+      kind: "telemetry" | "fleet-map" | "products" | "latest-commits" | "heading"
+      /** @description Group ids in display order */
+      groups?: string[]
+      /**
+       * @description How products are drawn until the reader switches
+       * @enum {string}
+       */
+      view?: "cards" | "table"
+      /** @description How many commits */
+      count?: number
+      text?: string
+      note?: string
+    }
+    PageLayout: {
+      page: string
+      elements: components["schemas"]["LayoutElement"][]
+      /** @description An admin's layout; false: the built-in one */
+      stored: boolean
     }
     Dashboard: {
       groups: components["schemas"]["DashboardGroup"][]
@@ -1130,6 +1174,31 @@ export interface operations {
       304: components["responses"]["NotModified"]
       308: components["responses"]["Moved"]
       400: components["responses"]["BadRequest"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  getPage: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        page: "dashboard"
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The page's layout */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["PageLayout"]
+        }
+      }
+      304: components["responses"]["NotModified"]
       404: components["responses"]["NotFound"]
     }
   }

@@ -1,74 +1,54 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api/client"
-import { useNow } from "@/lib/clock"
+import { meQuery } from "@/lib/api/queries"
 import { plural } from "@/lib/format"
 import { PageHeader } from "@/shared/page-header"
-import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
-import { dashboardQuery } from "./api"
-import { FleetMap } from "./fleet-map"
-import { LatestCommits } from "./latest"
-import { Products } from "./products"
-import { Telemetry } from "./telemetry"
-import { defaultLayout, pick, type Element, type ProductsView } from "./layout"
+import { dashboardQuery, pageQuery } from "./api"
+import { Designer } from "./design"
+import { Elements } from "./elements"
+import { defaultLayout, type ProductsView } from "./layout"
 
 /**
- * DashboardView is the landing page: its elements in layout order (design/layout.md), each answering which product needs a look
- * and why. view is the reader's remembered products view, when there is one.
+ * DashboardView is the landing page: its layout's elements in order (design/layout.md), each answering which product needs a look
+ * and why. view is the reader's remembered products view, when there is one. An admin can switch to the design mode.
  */
-export function DashboardView({ layout = defaultLayout, view }: { layout?: Element[]; view?: ProductsView }) {
+export function DashboardView({ view }: { view?: ProductsView }) {
   const { data, error } = useQuery(dashboardQuery(api))
-  const now = useNow()
+  const { data: page } = useQuery(pageQuery(api))
+  const { data: me } = useQuery(meQuery(api))
+  const [designing, setDesigning] = useState(false)
+  const layout = page?.elements ?? defaultLayout
   return (
     <>
       <PageHeader
         title="Dashboard"
         meta={
-          data && (
-            <span className="font-mono text-xs text-muted-foreground">
-              {plural(data.groups.length, "product", "products")} · {plural(data.repoCount, "repository", "repositories")}
-            </span>
-          )
+          <>
+            {data && (
+              <span className="font-mono text-xs text-muted-foreground">
+                {plural(data.groups.length, "product", "products")} · {plural(data.repoCount, "repository", "repositories")}
+              </span>
+            )}
+            {me?.admin && !designing && (
+              <Button variant="outline" className="ml-auto min-h-8 px-2 text-xs" onClick={() => setDesigning(true)}>
+                Design this page
+              </Button>
+            )}
+          </>
         }
       />
       {error && !data && <ProblemAlert error={error} />}
-      {data && (
-        <div className="flex flex-col gap-6">
-          {layout.map((el, i) => {
-            switch (el.kind) {
-              case "telemetry":
-                return <Telemetry key={i} data={data} now={now} />
-              case "fleet-map":
-                return <FleetMap key={i} groups={pick(data.groups, el.groups)} now={now} />
-              case "products":
-                return (
-                  <Products
-                    key={i}
-                    groups={pick(data.groups, el.groups)}
-                    repoCount={data.repoCount}
-                    view={view ?? el.view}
-                    now={now}
-                  />
-                )
-              case "latest-commits":
-                return (
-                  <PanelBoundary key={i}>
-                    <LatestCommits people={data.latest} count={el.count} />
-                  </PanelBoundary>
-                )
-              case "heading":
-                return (
-                  <div key={i}>
-                    <h2 className="text-lg font-semibold">{el.text}</h2>
-                    {el.note && <p className="text-sm text-muted-foreground">{el.note}</p>}
-                  </div>
-                )
-            }
-          })}
-        </div>
-      )}
+      {data &&
+        (designing ? (
+          <Designer data={data} groups={data.groups} onClose={() => setDesigning(false)} />
+        ) : (
+          <Elements layout={layout} data={data} view={view} />
+        ))}
     </>
   )
 }

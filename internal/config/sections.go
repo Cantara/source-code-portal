@@ -109,6 +109,22 @@ func (w Web) validate() []string {
 	return p
 }
 
+// Layout configures the layout store (design/layout.md): the directory where an admin's design of the pages is kept, one file per
+// page. Empty: the built-in layouts, and no design mode.
+type Layout struct {
+	Dir string `mapstructure:"dir"`
+}
+
+func (l Layout) validate() []string {
+	if l.Dir == "" {
+		return nil
+	}
+	if info, err := os.Stat(l.Dir); err != nil || !info.IsDir() {
+		return []string{fmt.Sprintf("layout.dir: %q is not a directory", l.Dir)}
+	}
+	return nil
+}
+
 var namespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 
 func (c Cluster) validate() []string {

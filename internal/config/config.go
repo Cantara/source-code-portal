@@ -32,6 +32,7 @@ type Config struct {
 	Assistant Assistant `mapstructure:"assistant"`
 	Cluster   Cluster   `mapstructure:"cluster"`
 	Web       Web       `mapstructure:"web"`
+	Layout    Layout    `mapstructure:"layout"`
 	Ops       Ops       `mapstructure:"ops"`
 }
 
@@ -104,6 +105,7 @@ func defaults() map[string]any {
 		"cluster.namespace":            "scp",
 		"web.dir":                      "",
 		"web.node":                     "node",
+		"layout.dir":                   "",
 	}
 }
 
@@ -238,6 +240,7 @@ func (c Config) validate() []string {
 	p = append(p, c.Auth.validate(c.Server.PublicURL)...)
 	p = append(p, c.Cluster.validate()...)
 	p = append(p, c.Web.validate()...)
+	p = append(p, c.Layout.validate()...)
 	slices.Sort(p)
 	return p
 }
