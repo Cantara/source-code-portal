@@ -10,6 +10,7 @@ import { repoQuery } from "@/lib/api/queries"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { count, exactUTC } from "@/lib/format"
 import { firstPageOf, rememberSize } from "@/lib/paging"
+import { Author } from "@/entities/commit/author"
 import { GraphCell, maxLanes } from "@/entities/commit/graph-cell"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { crumbs } from "@/lib/crumbs"
@@ -387,7 +388,9 @@ function Row({
         <span className={`min-w-24 flex-1 truncate ${c.automated ? "text-muted-foreground" : ""}`}>{c.subject}</span>
         {said && <span className="sr-only">{said}</span>}
       </span>
-      <span className="hidden w-36 shrink-0 truncate text-muted-foreground sm:block">{c.authorName || c.authorLogin}</span>
+      <span className="hidden w-28 shrink-0 truncate text-muted-foreground sm:block">
+        <Author name={c.authorName} login={c.authorLogin} />
+      </span>
       <span className="hidden w-28 shrink-0 text-muted-foreground md:block">
         <RelativeTime at={c.committedAt} />
       </span>

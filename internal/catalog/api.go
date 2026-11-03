@@ -171,7 +171,7 @@ func (a API) repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oa
 
 // noActivity is the activity before the commits are added: none.
 func noActivity() oapi.Activity {
-	return oapi.Activity{Weekly: make([]int, 12), Authors: []string{}, Recent: []oapi.RecentRepo{}}
+	return oapi.Activity{Weekly: make([]int, 12), Authors: []oapi.Person{}, Recent: []oapi.RecentRepo{}}
 }
 
 func nonNil(ss []string) []string {

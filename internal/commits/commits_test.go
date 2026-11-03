@@ -191,7 +191,7 @@ func TestSweepsAndActivity(t *testing.T) {
 	d := oapi.Dashboard{Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
 	Dashboard(s, &d)
 	g := d.Groups[0].Activity
-	if g.People != 2 || g.Automation != 1 || g.Sweeps != 1 || g.AuthorCount != 1 || !slices.Equal(g.Authors, []string{"Ada"}) {
+	if g.People != 2 || g.Automation != 1 || g.Sweeps != 1 || g.AuthorCount != 1 || len(g.Authors) != 1 || g.Authors[0].Name != "Ada" {
 		t.Errorf("group activity = %+v", g)
 	}
 	if g.LastAuthoredAt == nil || !g.LastAuthoredAt.Equal(ago(3)) || len(g.Recent) != 1 || g.Recent[0].Repo != "acme/r0" {

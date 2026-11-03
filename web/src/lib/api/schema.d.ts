@@ -572,7 +572,7 @@ export interface components {
       /** @description Commits by people per 7 days, the oldest of the last 12 first */
       weekly: number[]
       /** @description The people who committed in the last 30 days, most commits first, at most 5 */
-      authors: string[]
+      authors: components["schemas"]["Person"][]
       /** @description How many people committed in the last 30 days */
       authorCount: number
       /**
@@ -582,6 +582,12 @@ export interface components {
       lastAuthoredAt: string | null
       /** @description The repositories people changed last, at most 3 */
       recent: components["schemas"]["RecentRepo"][]
+    }
+    Person: {
+      /** @description The name in the commits (the login when they carry none) */
+      name: string
+      /** @description The GitHub login, when GitHub links the commits to an account; the short form to show */
+      login?: string
     }
     RecentRepo: {
       /** @description Address */

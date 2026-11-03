@@ -494,7 +494,7 @@ type Activity struct {
 	AuthorCount int `json:"authorCount"`
 
 	// Authors The people who committed in the last 30 days, most commits first, at most 5
-	Authors []string `json:"authors"`
+	Authors []Person `json:"authors"`
 
 	// Automation Commits by automation in the last 30 days
 	Automation int `json:"automation"`
@@ -1029,6 +1029,15 @@ type PageLayout struct {
 
 	// Stored An admin's layout; false: the built-in one
 	Stored bool `json:"stored"`
+}
+
+// Person defines model for Person.
+type Person struct {
+	// Login The GitHub login, when GitHub links the commits to an account; the short form to show
+	Login *string `json:"login,omitempty"`
+
+	// Name The name in the commits (the login when they carry none)
+	Name string `json:"name"`
 }
 
 // Problem defines model for Problem.

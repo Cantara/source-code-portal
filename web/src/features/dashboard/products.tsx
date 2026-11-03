@@ -6,6 +6,7 @@ import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { ago, count, plural } from "@/lib/format"
 import { addressPath, groupPath } from "@/lib/paths"
+import { Author } from "@/entities/commit/author"
 import { FindingList, HealthScore, levels } from "@/entities/health/health"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
@@ -17,11 +18,17 @@ type Group = Schemas["DashboardGroup"]
 /** cardFindings is how many findings a card shows, the most costly first; the product's page has the rest. */
 const cardFindings = 3
 
-/** names is "Ada, Bo and 3 others" for the people of an activity. */
-function names(a: Schemas["Activity"]): string {
+/** names is "ada, bo and 3 others" for the people of an activity, each by login (the full name on hover). */
+function names(a: Schemas["Activity"]): ReactNode {
   const more = a.authorCount - a.authors.length
-  if (more <= 0) return a.authors.length > 1 ? `${a.authors.slice(0, -1).join(", ")} and ${a.authors.at(-1)}` : a.authors.join("")
-  return `${a.authors.join(", ")} and ${plural(more, "other", "others")}`
+  const people = a.authors.map((p, i) => <Author key={i} name={p.name} login={p.login} />)
+  const parts: ReactNode[] = more > 0 ? [...people, plural(more, "other", "others")] : people
+  return parts.map((p, i) => (
+    <span key={i}>
+      {i > 0 && (i === parts.length - 1 ? " and " : ", ")}
+      {p}
+    </span>
+  ))
 }
 
 /** weekly is the sparkline's label: what the bars count and the last week. */

@@ -368,12 +368,12 @@ func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 // the authors, the last commit by a person and the repositories people changed last.
 func activity(refs []Ref, now time.Time) oapi.Activity {
 	const day, week = 24 * time.Hour, 7 * 24 * time.Hour
-	a := oapi.Activity{Weekly: make([]int, activityWeeks), Authors: []string{}, Recent: []oapi.RecentRepo{}}
+	a := oapi.Activity{Weekly: make([]int, activityWeeks), Authors: []oapi.Person{}, Recent: []oapi.RecentRepo{}}
 	window, weeks := now.Add(-activityDays*day), now.Add(-activityWeeks*week)
 	type author struct {
-		name    string
-		commits int
-		first   int // order of appearance: the newest commit first
+		name, login string
+		commits     int
+		first       int // order of appearance: the newest commit first
 	}
 	authors := map[string]*author{}
 	for _, r := range refs {
@@ -404,7 +404,7 @@ func activity(refs []Ref, now time.Time) oapi.Activity {
 			a.People++
 			key := strings.ToLower(cmp.Or(c.AuthorLogin, c.AuthorName))
 			if authors[key] == nil {
-				authors[key] = &author{name: cmp.Or(c.AuthorName, c.AuthorLogin), first: len(authors)}
+				authors[key] = &author{name: cmp.Or(c.AuthorName, c.AuthorLogin), login: c.AuthorLogin, first: len(authors)}
 			}
 			authors[key].commits++
 		}
@@ -414,7 +414,7 @@ func activity(refs []Ref, now time.Time) oapi.Activity {
 	})
 	a.AuthorCount = len(ranked)
 	for _, au := range ranked[:min(activityAuthors, len(ranked))] {
-		a.Authors = append(a.Authors, au.name)
+		a.Authors = append(a.Authors, oapi.Person{Name: au.name, Login: loginOf(au.login)})
 	}
 	return a
 }
@@ -440,4 +440,12 @@ func Detail(e *snapshot.RepoEntry, d *oapi.RepoDetail) {
 	for i := range cs[:min(len(cs), detailCommits)] {
 		d.Commits = append(d.Commits, commitOf(key, &cs[i]))
 	}
+}
+
+// loginOf is the login, absent when the commits carry none.
+func loginOf(login string) *string {
+	if login == "" {
+		return nil
+	}
+	return &login
 }

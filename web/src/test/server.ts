@@ -137,7 +137,7 @@ export const defaults = [
           activity: activity({
             people: 4,
             automation: 9,
-            authors: ["Ada", "Bo"],
+            authors: [{ name: "Ada Lovelace", login: "ada" }, { name: "Bo" }],
             authorCount: 2,
             lastAuthoredAt: at,
             recent: [{ repo: "acme/whydah-core", at }],
@@ -150,7 +150,13 @@ export const defaults = [
         },
       ],
       health: product,
-      activity: activity({ people: 4, automation: 9, authors: ["Ada", "Bo"], authorCount: 2, lastAuthoredAt: at }),
+      activity: activity({
+        people: 4,
+        automation: 9,
+        authors: [{ name: "Ada Lovelace", login: "ada" }, { name: "Bo" }],
+        authorCount: 2,
+        lastAuthoredAt: at,
+      }),
       repoCount: 3,
       ungroupedCount: 1,
       latest: [commit(1)],

@@ -41,7 +41,8 @@ describe("pages", () => {
     const card = screen.getByRole("link", { name: "IAM" }).closest("li") as HTMLElement
     expect(card).toHaveTextContent("4 commits by people")
     expect(card).toHaveTextContent("9 by automation")
-    expect(card).toHaveTextContent("Ada and Bo")
+    expect(card).toHaveTextContent("ada and Bo")
+    expect(within(card).getByText("ada")).toHaveAttribute("title", "Ada Lovelace")
     expect(card).toHaveTextContent("Apache-2.0 · Java · 1 of 2 released")
     expect(within(card).getByRole("link", { name: "whydah-core" })).toHaveAttribute("href", "/repos/acme/whydah-core")
     expect(within(card).getByRole("img", { name: /Commits by people per week/ })).toBeInTheDocument()

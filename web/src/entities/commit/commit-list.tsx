@@ -5,6 +5,7 @@ import { addressPath } from "@/lib/paths"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { RelativeTime } from "@/shared/relative-time"
 import { EmptyState } from "@/shared/empty-state"
+import { Author } from "./author"
 import { GraphCell } from "./graph-cell"
 
 /**
@@ -64,7 +65,7 @@ export function CommitList({
                     ·{" "}
                   </>
                 )}
-                {c.authorName || c.authorLogin} · <RelativeTime at={c.committedAt} /> ·{" "}
+                <Author name={c.authorName} login={c.authorLogin} /> · <RelativeTime at={c.committedAt} /> ·{" "}
                 <span className="font-mono">{c.sha.slice(0, 7)}</span>
               </p>
             </div>

@@ -29,8 +29,8 @@ The rule every element keeps, and the test for any new one:
 ## Data (L1)
 Added to `DashboardGroup`, computed per request from the viewer's view in the commits hook (`commits.Dashboard`):
 
-- `activity`: commits by people and by automation in the last 30 days, 12 weekly counts of commits by people, the people (author
-  names, at most 5, then a count), and the 3 repositories people changed last.
+- `activity`: commits by people and by automation in the last 30 days, 12 weekly counts of commits by people, the people (name and
+  GitHub login, at most 5, then a count; the web shows the login, the name on hover, as the commit lists do), and the 3 repositories people changed last.
 - `exceptions`: the members whose chips are exceptions (rule 1), with the exception codes.
 - `summary`: the defaults said once: the common licence, language and release state when at least 80% of the members share them.
 
