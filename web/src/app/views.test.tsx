@@ -50,6 +50,24 @@ describe("pages", () => {
     expect(screen.getByText("People").nextElementSibling).toHaveTextContent("2")
   })
 
+  it("explains the fleet map's legend: the ranges always, the rest on request", async () => {
+    const user = userEvent.setup()
+    show(<DashboardView />)
+    const fleet = within(await screen.findByRole("region", { name: "Fleet" }))
+    expect(fleet.getByRole("list", { name: "Activity of every repository" })).toHaveTextContent("Active≤ 30 d")
+    const about = fleet.getByRole("button", { name: "About the fleet map" })
+    expect(about).toHaveAttribute("aria-expanded", "false")
+    expect(fleet.queryByRole("note")).not.toBeInTheDocument()
+    await user.click(about)
+    expect(fleet.getByRole("note", { name: "About the fleet map" })).toHaveTextContent("sweeps")
+    await user.keyboard("{Escape}")
+    expect(fleet.queryByRole("note")).not.toBeInTheDocument()
+    expect(about).toHaveFocus()
+    await user.click(about)
+    await user.click(document.body)
+    expect(about).toHaveAttribute("aria-expanded", "false")
+  })
+
   it("switches the products to a sortable table and remembers the choice", async () => {
     const user = userEvent.setup()
     show(<DashboardView />)

@@ -2,6 +2,7 @@ import Link from "next/link"
 import type { Schemas } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
+import { Toggletip } from "@/shared/toggletip"
 import { activities, activityAt, type Activity } from "@/entities/repo/health"
 
 type Group = Schemas["DashboardGroup"]
@@ -35,14 +36,35 @@ export function FleetMap({ groups, now }: { groups: Group[]; now: number }) {
   return (
     <section aria-labelledby="fleet" className="panel flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="fleet" className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-          Fleet
-        </h2>
+        <div className="flex items-center gap-1.5">
+          <h2 id="fleet" className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+            Fleet
+          </h2>
+          <Toggletip label="About the fleet map">
+            <p>
+              Each tile is one repository, grouped by product and coloured by the age of its last commit by a person. Bots,
+              release-plugin commits and sweeps (the same subject in more than 10 repositories on one day) do not count.
+            </p>
+            <ul className="mt-2 flex flex-col gap-0.5">
+              {activities.map((a) => (
+                <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`}>
+                  <span aria-hidden="true" className="cell" />
+                  <span className="font-medium">{a.label}</span>: {a.within}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2">
+              Dormant also covers a repository with no commit by a person among those read. A repository in several products is
+              counted once in the totals. Select a tile to open its repository.
+            </p>
+          </Toggletip>
+        </div>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Activity of every repository">
           {activities.map((a) => (
             <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`} title={a.within}>
               <span aria-hidden="true" className="cell" />
               {a.label}
+              {a.span && <span className="font-mono">{a.span}</span>}
               <span className="font-mono text-foreground">{count(total[a.level])}</span>
             </li>
           ))}
