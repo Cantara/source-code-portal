@@ -128,6 +128,25 @@ test("a stored dark theme paints dark from the first frame", async ({ page }) =>
   ])
 })
 
+test("a fleet tile and a legend level explain themselves at once, on hover or a tap", async ({ page, isMobile }) => {
+  await page.goto("/")
+  const fleet = page.locator("section[aria-labelledby=fleet]")
+  const tile = fleet.locator("a.cell").first()
+  const tip = page.getByRole("tooltip")
+  if (isMobile) {
+    await tile.tap()
+    await expect(page).toHaveURL("/") // the first tap explains, it does not navigate
+  } else {
+    await tile.hover()
+  }
+  await expect(tip).toBeVisible()
+  await expect(tip).toContainText(" means a last change ")
+  await page.keyboard.press("Escape")
+  await expect(tip).toHaveCount(0)
+  await fleet.getByRole("list", { name: "Activity of every repository" }).getByRole("listitem").first().focus()
+  await expect(tip).toContainText("Active means a last change")
+})
+
 test("the theme menu switches light and dark, and system follows the system preference as it changes", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" })
   await page.goto("/")

@@ -194,6 +194,15 @@
     @apply size-2.5 rounded-[2px];
     background: var(--lvl);
   }
+  /* A Hint's card (shared/hint.tsx) and the colour it explains. */
+  .hint-swatch {
+    @apply inline-block size-3 shrink-0 rounded-[3px];
+    background: var(--lvl, var(--ai));
+    box-shadow: 0 0 0.5rem color-mix(in oklch, var(--lvl, var(--ai)) 55%, transparent);
+  }
+  .ai-swatch {
+    --lvl: var(--ai);
+  }
   /* Commit graph lanes paint with currentColor. */
   .lane-0 {
     color: var(--lane-0);
@@ -216,6 +225,24 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .hint {
+    animation: hint-in 120ms ease-out;
+  }
+  .hint[data-side="bottom"] {
+    animation-name: hint-in-below;
+  }
+  @keyframes hint-in {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+    }
+  }
+  @keyframes hint-in-below {
+    from {
+      opacity: 0;
+      translate: 0 -4px;
+    }
+  }
   .lvl-active.led-live {
     animation: pulse-led 2.4s ease-in-out infinite;
   }

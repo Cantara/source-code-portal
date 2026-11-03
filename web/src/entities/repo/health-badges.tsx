@@ -1,10 +1,18 @@
+"use client"
+
 import type { Repo } from "@/lib/api/client"
 import { ago, count, exactUTC } from "@/lib/format"
 import { activities, activity, lastChange, type Activity, type Pulse } from "./health"
 import { cn } from "@/lib/cn"
 import { levels } from "@/entities/health/health"
+import { Hint } from "@/shared/hint"
 
 const label = Object.fromEntries(activities.map((a) => [a.level, a])) as Record<Activity, (typeof activities)[number]>
+
+/** within says what an activity level means, as a sentence's start: "Recent means a commit by a person in the last 6 months". */
+function within(level: Activity): string {
+  return `${label[level].label} means ${label[level].within}`
+}
 
 // The components take the view's instant (useNow, read once per view): one clock subscription per page, not one per repository.
 
@@ -25,13 +33,18 @@ export function ActivityLight({
 }) {
   const level = activity(repo, now)
   return (
-    <span
-      className={cn(`lvl-${level} led led-live`, className)}
-      title={`${label[level].label}: ${label[level].within}`}
-      aria-hidden={decorative || undefined}
+    <Hint
+      heading={label[level].label}
+      swatch={`lvl-${level}`}
+      meta={label[level].span}
+      render={(t) => (
+        <span {...t} className={cn(`lvl-${level} led led-live cursor-help`, className)} aria-hidden={decorative || undefined}>
+          {!decorative && <span className="sr-only">{label[level].label}</span>}
+        </span>
+      )}
     >
-      {!decorative && <span className="sr-only">{label[level].label}</span>}
-    </span>
+      Last change {ago(lastChange(repo), now)} ago. {within(level)}.
+    </Hint>
   )
 }
 
@@ -42,47 +55,99 @@ export function ActivityLight({
 export function HealthBadges({ repo, now, className }: { repo: Repo; now: number; className?: string }) {
   const level = activity(repo, now)
   const licensed = repo.license !== "" && repo.license !== "NOASSERTION"
+  const health = repo.health
   return (
     <span className={cn("flex flex-wrap items-center gap-1", className)}>
-      {repo.health && repo.health.level !== "good" && (
-        <span
-          className={cn(levels[repo.health.level].className, "chip")}
-          title={repo.health.findings.map((f) => `−${f.penalty} ${f.message}`).join("\n")}
+      {health && health.level !== "good" && (
+        <Hint
+          heading={`Health ${health.score} of 100`}
+          swatch={levels[health.level].className}
+          meta={levels[health.level].label}
+          render={(t) => (
+            <span {...t} className={cn(levels[health.level].className, "chip cursor-help")}>
+              <span className="sr-only">Health </span>
+              {health.score} {levels[health.level].label.toLowerCase()}
+              <span className="sr-only">: {health.findings.map((f) => f.message).join("; ")}</span>
+            </span>
+          )}
         >
-          <span className="sr-only">Health </span>
-          {repo.health.score} {levels[repo.health.level].label.toLowerCase()}
-          <span className="sr-only">: {repo.health.findings.map((f) => f.message).join("; ")}</span>
-        </span>
+          <ul className="flex flex-col gap-0.5">
+            {health.findings.map((f) => (
+              <li key={f.message} className="flex gap-2">
+                <span className="w-7 shrink-0 text-right font-mono text-foreground">−{f.penalty}</span>
+                <span>{f.message}</span>
+              </li>
+            ))}
+          </ul>
+        </Hint>
       )}
-      <span className={`lvl-${level} chip`} title={`${label[level].label}: last change ${exactUTC(lastChange(repo))}`}>
-        <span aria-hidden="true" className="led size-1.5" />
-        <span className="sr-only">{label[level].label}, last change</span>
-        <time dateTime={lastChange(repo)} suppressHydrationWarning>
-          {ago(lastChange(repo), now)}
-        </time>
-      </span>
+      <Hint
+        heading={label[level].label}
+        swatch={`lvl-${level}`}
+        meta={label[level].span}
+        render={(t) => (
+          <span {...t} className={`lvl-${level} chip cursor-help`}>
+            <span aria-hidden="true" className="led size-1.5" />
+            <span className="sr-only">{label[level].label}, last change</span>
+            <time dateTime={lastChange(repo)} suppressHydrationWarning>
+              {ago(lastChange(repo), now)}
+            </time>
+          </span>
+        )}
+      >
+        {within(level)}.<span className="block font-mono text-[0.6875rem]">Last change {exactUTC(lastChange(repo))}</span>
+      </Hint>
       {repo.release ? (
-        <a
-          href={repo.release.url}
-          rel="noreferrer nofollow"
-          className="lvl-recent chip max-w-40 hover:underline"
-          title={`Latest release ${repo.release.tag}, ${exactUTC(repo.release.publishedAt)}`}
+        <Hint
+          heading={`Latest release ${repo.release.tag}`}
+          swatch="lvl-recent"
+          render={(t) => (
+            <a {...t} href={repo.release?.url} rel="noreferrer nofollow" className="lvl-recent chip max-w-40 hover:underline">
+              <span className="sr-only">Release</span>
+              <span className="truncate">{repo.release?.tag}</span>
+            </a>
+          )}
         >
-          <span className="sr-only">Release</span>
-          <span className="truncate">{repo.release.tag}</span>
-        </a>
+          Published {exactUTC(repo.release.publishedAt)}. Select to open it on GitHub.
+        </Hint>
       ) : (
-        <span className="lvl-dormant chip" title="No release published">
-          no release
-        </span>
+        <Hint
+          heading="No release"
+          swatch="lvl-dormant"
+          render={(t) => (
+            <span {...t} className="lvl-dormant chip cursor-help">
+              no release
+            </span>
+          )}
+        >
+          No GitHub release is published for this repository.
+        </Hint>
       )}
-      <span className={cn("chip", licensed ? "lvl-dormant" : "lvl-danger")} title={licensed ? "Licence" : "No licence detected"}>
-        {licensed ? repo.license : "no licence"}
-      </span>
-      <span className={cn("chip", repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant")} title="Open issues and pull requests">
-        {count(repo.openIssues)}
-        <span className="sr-only"> open</span> issues
-      </span>
+      <Hint
+        heading={licensed ? `Licence ${repo.license}` : "No licence"}
+        swatch={licensed ? "lvl-dormant" : "lvl-danger"}
+        render={(t) => (
+          <span {...t} className={cn("chip cursor-help", licensed ? "lvl-dormant" : "lvl-danger")}>
+            {licensed ? repo.license : "no licence"}
+          </span>
+        )}
+      >
+        {licensed
+          ? "The licence GitHub detects in the repository."
+          : "GitHub detects no licence: others may not use the code. It costs a public repository health points."}
+      </Hint>
+      <Hint
+        heading={`${count(repo.openIssues)} open`}
+        swatch={repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant"}
+        render={(t) => (
+          <span {...t} className={cn("chip cursor-help", repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant")}>
+            {count(repo.openIssues)}
+            <span className="sr-only"> open</span> issues
+          </span>
+        )}
+      >
+        Open issues and pull requests on GitHub. More than 20 is marked, and costs health points.
+      </Hint>
       {repo.language && <span className="chip">{repo.language}</span>}
     </span>
   )
@@ -96,9 +161,20 @@ export function HealthStrip({ repos, pulse, now, className }: { repos: Repo[]; p
     .join(", ")
   return (
     <span role="img" aria-label={`Activity: ${summary || "no repositories"}`} className={cn("flex flex-wrap gap-0.5", className)}>
-      {repos.map((r) => (
-        <span key={r.address} className={`lvl-${activity(r, now)} cell`} title={r.name} />
-      ))}
+      {repos.map((r) => {
+        const level = activity(r, now)
+        return (
+          <Hint
+            key={r.address}
+            heading={r.name}
+            swatch={`lvl-${level}`}
+            meta={label[level].span ? `${label[level].label} · ${label[level].span}` : label[level].label}
+            render={(t) => <span {...t} className={`lvl-${level} cell cursor-help`} />}
+          >
+            Last change {ago(lastChange(r), now)} ago. {within(level)}.
+          </Hint>
+        )
+      })}
     </span>
   )
 }
@@ -108,11 +184,25 @@ export function ActivityLegend({ pulse }: { pulse?: Pulse }) {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Activity legend">
       {activities.map((a) => (
-        <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`} title={a.within}>
-          <span aria-hidden="true" className="cell" />
-          {a.label}
-          {pulse && <span className="font-mono text-foreground">{count(pulse.levels[a.level])}</span>}
-        </li>
+        <Hint
+          key={a.level}
+          heading={a.label}
+          swatch={`lvl-${a.level}`}
+          meta={a.span}
+          render={(t) => (
+            <li
+              {...t}
+              tabIndex={0}
+              className={`lvl-${a.level} flex cursor-help items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+            >
+              <span aria-hidden="true" className="cell" />
+              {a.label}
+              {pulse && <span className="font-mono text-foreground">{count(pulse.levels[a.level])}</span>}
+            </li>
+          )}
+        >
+          {within(a.level)}.
+        </Hint>
       ))}
     </ul>
   )

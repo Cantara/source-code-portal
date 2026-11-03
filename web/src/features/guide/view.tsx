@@ -327,7 +327,7 @@ export function GuideView({ version }: { version: string }) {
           title="The fleet map"
           lede="Every repository is one tile, grouped by product and coloured by the age of its last change. Big products look big; cold ones look cold."
         >
-          <Figure caption="Point at a tile for its repository and age; a click opens it.">
+          <Figure caption="Point at a tile, or tap it, for its repository, its age and what its colour means; a click opens it. The legend explains each colour the same way.">
             <Shot name="fleet" alt="The fleet map: a row of coloured tiles per product." />
           </Figure>
           <ul aria-label="The colours of the fleet map" className="flex flex-wrap gap-x-6 gap-y-3 text-sm">

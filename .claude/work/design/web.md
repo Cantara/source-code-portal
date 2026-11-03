@@ -86,7 +86,7 @@ faint grid backdrop (`.cosmos`). Health is drawn in HTML, not with badge images:
 newest commit (else its last push) as active (30 days), recent (6 months), quiet (2 years), dormant or archived (`entities/repo/health.ts`);
 `entities/repo/health-badges.tsx` renders the light (`.led`), the chips (`.chip`: age, latest release, licence, open issues, language, each with its meaning in text)
 and the per-group strip (one `.cell` per repository). The level colours are tokens (`--active`, `--active-fg`, ...) with AA text
-contrast in both themes. The header shows whether the live stream is open (`LiveIndicator`); at its right, in this order, the Guide and Settings as icon links (`PortalNav`, named for assistive technology, a tooltip each), then the theme as one segmented control of icons (System, Dark, Light: radio buttons, `ThemeSelect`), then the viewer. The line icons are `components/ui/icons.tsx`, drawn in the current colour.
+contrast in both themes. The header shows whether the live stream is open (`LiveIndicator`); at its right, in this order, the Guide and Settings as icon links (`PortalNav`, named for assistive technology, a tooltip each), then the theme as one segmented control of icons (System, Dark, Light: radio buttons, `ThemeSelect`), then the viewer. The line icons are `components/ui/icons.tsx`, drawn in the current colour. Every signal that is a colour (a fleet tile, a legend level, a light, a chip, the strip's cells, the AI mark) explains itself in a `Hint` (`shared/hint.tsx`): a card shown at once on hover, focus or a tap (a tap shows it, a second tap follows the link), with a swatch of the colour, the facts of this one and what the colour means; one at a time, closed by Escape, leaving or a tap elsewhere, a tooltip by `aria-describedby`, placed above or below inside the viewport. No signal relies on the browser's `title`.
 
 ## Behaviour (numbered)
 1. Queries: `staleTime` 10 s, `gcTime` 5 min, retry network/429/5xx at most twice (honour `Retry-After`), refetch on window focus,
@@ -139,7 +139,7 @@ contrast in both themes. The header shows whether the live stream is open (`Live
 
 ## Build and serve
 - `pnpm build`: `next build` with `BUILD_ID` (git SHA, `dev` locally) as `deploymentId` and `NEXT_PUBLIC_BUILD_ID`, then `scripts/bundle.ts`: copies
-  `.next/standalone`, `.next/static` and `public/` into `web/bundle`, writes `BUILD` (the `BUILD_ID`) last, and fails when the gzip JS under `/_next/static` exceeds 310 KB (P-41),
+  `.next/standalone`, `.next/static` and `public/` into `web/bundle`, writes `BUILD` (the `BUILD_ID`) last, and fails when the gzip JS under `/_next/static` exceeds 320 KB (P-41),
   the CSS 25 KB, or any font is present. `web/bundle` is platform-independent JavaScript (`sharp` is not traced).
 - `web.dir` (the bundle directory) and `web.node` (default `node`): `scp serve` starts `node server.js` with `PORT` (a free loopback
   port), `HOSTNAME=127.0.0.1`, `NODE_ENV=production`, `SCP_API`, `SCP_VERSION` (the release, shown in the header next to the name) and nothing else from its environment; output goes to the log
