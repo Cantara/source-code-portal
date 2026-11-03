@@ -179,6 +179,16 @@ Tests never touch the network: GitHub is a fake in `internal/github/githubtest`.
 - [Security model](docs/security-model.md): the guarantees for private repositories and the operator's part.
 - [API guide](docs/api.md): the JSON API, badges and Markdown for agents.
 - [Changelog](CHANGELOG.md) and [security policy](SECURITY.md).
+- The portal's own *Guide* page (`/guide`): how to read the signals, and the short path to a portal of your own.
+
+**Claude Code plugin.** The `scp` plugin's `run-scp` skill configures, deploys, upgrades and troubleshoots a released portal with you,
+reading the documents of the release you run and proving the configuration with `scp config check`:
+
+```text
+/plugin install scp --marketplace Cantara/source-code-portal
+```
+
+On Claude Code before 2.1.275: `/plugin marketplace add Cantara/source-code-portal`, then `/plugin install scp@source-code-portal`.
 
 ## Contributing
 

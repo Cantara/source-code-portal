@@ -15,6 +15,7 @@ const pages = [
   ["/repos/acme/whydah-core/docs/docs/setup", "Setup"],
   ["/signin", "Sign in"],
   ["/settings", "Settings"],
+  ["/guide", "Read the portal in five minutes, run your own in thirty"],
   ["/admin", "Admin"],
 ] as const
 
@@ -36,6 +37,25 @@ for (const [path, h1] of pages) {
     }
   })
 }
+
+test("the guide's pictures load in the theme shown, and every section is in its contents", async ({ page }) => {
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await page.goto("/guide")
+    const shown = page.locator("main img:visible")
+    await shown.last().scrollIntoViewIfNeeded()
+    for (const img of await shown.all()) {
+      await img.scrollIntoViewIfNeeded()
+      await expect(img).toHaveAttribute("src", new RegExp(`-${scheme}\\.webp$`))
+      expect(await img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
+    }
+  }
+  const contents = page.getByRole("navigation", { name: "Guide" }).getByRole("link")
+  for (const link of await contents.all()) {
+    const id = ((await link.getAttribute("href")) ?? "").slice(1)
+    await expect(page.locator(`section#${id}`)).toHaveCount(1)
+  }
+})
 
 test("an unknown address answers 404 with the not-found page", async ({ page }) => {
   const res = await page.goto("/no/such/page")

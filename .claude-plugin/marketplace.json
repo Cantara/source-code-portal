@@ -1,0 +1,17 @@
+{
+  "name": "source-code-portal",
+  "owner": { "name": "Cantara", "url": "https://github.com/Cantara" },
+  "metadata": {
+    "description": "Claude Code plugins for Source Code Portal (SCP): configure, deploy and operate a released portal."
+  },
+  "plugins": [
+    {
+      "name": "scp",
+      "source": "./plugins/scp",
+      "description": "Configure, deploy, upgrade and troubleshoot a Source Code Portal from its released binary or container image.",
+      "category": "devops",
+      "homepage": "https://github.com/Cantara/source-code-portal",
+      "license": "Apache-2.0"
+    }
+  ]
+}

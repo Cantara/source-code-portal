@@ -1,0 +1,19 @@
+{
+  "name": "scp",
+  "version": "1.0.0",
+  "description": "Configure, deploy, upgrade and troubleshoot a Source Code Portal (SCP) from its released binary or container image.",
+  "author": {
+    "name": "Cantara",
+    "url": "https://github.com/Cantara"
+  },
+  "homepage": "https://github.com/Cantara/source-code-portal",
+  "repository": "https://github.com/Cantara/source-code-portal",
+  "license": "Apache-2.0",
+  "keywords": [
+    "source-code-portal",
+    "github",
+    "developer-portal",
+    "deployment",
+    "configuration"
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "callouts": {
+    "name": {
+      "x": 4.3,
+      "y": 8.1
+    },
+    "score": {
+      "x": 92.1,
+      "y": 7.5
+    },
+    "work": {
+      "x": 4.3,
+      "y": 23.7
+    },
+    "trend": {
+      "x": 80.8,
+      "y": 29.7
+    },
+    "people": {
+      "x": 4.3,
+      "y": 41.9
+    },
+    "recent": {
+      "x": 4.3,
+      "y": 53.5
+    },
+    "findings": {
+      "x": 4.3,
+      "y": 79.6
+    },
+    "shared": {
+      "x": 4.3,
+      "y": 92.5
+    }
+  },
+  "sizes": {
+    "card": {
+      "width": 400,
+      "height": 333
+    },
+    "card-watch": {
+      "width": 400,
+      "height": 333
+    },
+    "fleet": {
+      "width": 1232,
+      "height": 97
+    },
+    "latest": {
+      "width": 1232,
+      "height": 376
+    },
+    "settings": {
+      "width": 504,
+      "height": 314
+    },
+    "table": {
+      "width": 1230,
+      "height": 145
+    },
+    "telemetry": {
+      "width": 1232,
+      "height": 135
+    }
+  }
+}

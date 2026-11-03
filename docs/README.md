@@ -5,3 +5,6 @@
 - [Repository guide](repository-guide.md): what a repository shows in the portal and the optional `scp.yaml` descriptor.
 - [Security model](security-model.md): what the portal guarantees about private repositories, what the operator provides, and its limits.
 - [API guide](api.md): the JSON API under `/api/v1`, badges, and the Markdown surface for scripts and LLM agents.
+
+In the portal, *Guide* in the header explains the dashboard's signals. For Claude Code, the `scp` plugin sets a portal up with you:
+`/plugin install scp --marketplace Cantara/source-code-portal`.
