@@ -79,3 +79,21 @@ export const viewCookie = "scp-view-products"
 export function productsView(v: unknown, fallback: ProductsView): ProductsView {
   return productsViews.includes(v as ProductsView) ? (v as ProductsView) : fallback
 }
+
+/** Side is the dashboard's side panel of the latest commits beside the products: open or folded to a rail, and its width (rem). */
+export type Side = { open: boolean; width: number }
+
+export const sideCookie = "scp-side-commits"
+export const sideWidths = { min: 18, max: 40, initial: 26 } as const
+
+/** sideOf reads the panel's cookie ("open:26", "closed:30"); anything else is open at the initial width. */
+export function sideOf(v: unknown): Side {
+  const m = typeof v === "string" ? /^(open|closed):(\d{1,2})$/.exec(v) : null
+  const width = m ? Math.min(Math.max(Number(m[2]), sideWidths.min), sideWidths.max) : sideWidths.initial
+  return { open: m?.[1] !== "closed", width }
+}
+
+/** sideValue is the panel's cookie value. */
+export function sideValue(s: Side): string {
+  return `${s.open ? "open" : "closed"}:${s.width}`
+}

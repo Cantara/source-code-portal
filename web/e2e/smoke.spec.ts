@@ -147,6 +147,31 @@ test("a fleet tile and a legend level name their signals at once, on hover or a 
   await expect(tip).toContainText(/^Active.*Last change .* within 30 days$/)
 })
 
+test("the latest commits sit beside the products, fold away and widen, and the page remembers both", async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto("/")
+  const panel = page.getByRole("complementary", { name: "Latest commits" })
+  await expect(panel.getByRole("heading", { name: /^Latest commits/ })).toBeVisible()
+  if (!isMobile) {
+    const products = await page.getByRole("heading", { name: "Products" }).boundingBox()
+    const side = await panel.boundingBox()
+    expect(side?.x ?? 0).toBeGreaterThan((products?.x ?? 0) + 200) // to the right, not below
+    const edge = page.getByRole("separator", { name: "Resize latest commits" })
+    await edge.focus()
+    await page.keyboard.press("ArrowLeft")
+    await expect(edge).toHaveAttribute("aria-valuenow", "27")
+  }
+  await panel.getByRole("button", { name: "Hide latest commits" }).click()
+  await expect(panel.getByRole("heading")).toHaveCount(0)
+  await page.reload()
+  await panel.getByRole("button", { name: "Show latest commits" }).click()
+  await expect(panel.getByRole("heading", { name: /^Latest commits/ })).toBeVisible()
+  if (!isMobile)
+    await expect(page.getByRole("separator", { name: "Resize latest commits" })).toHaveAttribute("aria-valuenow", "27")
+})
+
 test("the theme menu switches light and dark, and system follows the system preference as it changes", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" })
   await page.goto("/")

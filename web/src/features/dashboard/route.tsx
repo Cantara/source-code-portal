@@ -1,7 +1,7 @@
 import { load, prefetch } from "@/lib/load"
 import type { Route } from "@/lib/page"
 import { dashboardQuery, pageQuery } from "./api"
-import { productsView, viewCookie, workCookie, workOf } from "@/lib/preferences"
+import { productsView, sideCookie, sideOf, viewCookie, workCookie, workOf } from "@/lib/preferences"
 import { DashboardView } from "./view"
 import { ld } from "@/lib/seo"
 
@@ -13,6 +13,12 @@ export const dashboardRoute: Route<object> = {
   structured: (_, base) => [ld.page(base, "/", "Dashboard", "CollectionPage", false)],
   render: (ctx) => {
     const view = ctx.cookies[viewCookie]
-    return <DashboardView work={workOf(ctx.cookies[workCookie])} view={view ? productsView(view, "cards") : undefined} />
+    return (
+      <DashboardView
+        work={workOf(ctx.cookies[workCookie])}
+        view={view ? productsView(view, "cards") : undefined}
+        side={sideOf(ctx.cookies[sideCookie])}
+      />
+    )
   },
 }

@@ -69,3 +69,14 @@ export function BookIcon({ className }: { className?: string }) {
     </Icon>
   )
 }
+
+/** PanelRightIcon stands for a side panel at the right: folded (the chevron points to open it) or open (it points to fold it). */
+export function PanelRightIcon({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M15 4v16" />
+      <path d={open ? "M8 10l2 2-2 2" : "M10 10l-2 2 2 2"} />
+    </Icon>
+  )
+}

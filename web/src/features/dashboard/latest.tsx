@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Commit } from "@/lib/api/client"
 import { CommitList } from "@/entities/commit/commit-list"
@@ -11,9 +11,20 @@ import { latestAllQuery } from "./api"
 
 /**
  * LatestCommits are the newest commits of the work that counts (the dashboard's, through the reader's lens), and, when the lens leaves
- * automation out, on request the newest of every kind.
+ * automation out, on request the newest of every kind. As the dashboard's side panel it carries the button that folds it.
  */
-export function LatestCommits({ counted, work, count }: { counted: Commit[]; work: Work; count: number }) {
+export function LatestCommits({
+  counted,
+  work,
+  count,
+  fold,
+}: {
+  counted: Commit[]
+  work: Work
+  count: number
+  /** The side panel's button that folds it away, at the header's end. */
+  fold?: ReactNode
+}) {
   const [all, setAll] = useState(false)
   const { data } = useQuery({ ...latestAllQuery(api, count), enabled: all })
   const commits = all ? (data?.commits ?? []) : counted.slice(0, count)
@@ -31,6 +42,7 @@ export function LatestCommits({ counted, work, count }: { counted: Commit[]; wor
           <Link href="/commits" className="hover:text-primary hover:underline">
             All commits
           </Link>
+          {fold}
         </div>
       </div>
       {all && !data ? <p className="text-sm text-muted-foreground">Loading…</p> : <CommitList commits={commits} />}
