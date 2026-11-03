@@ -16,7 +16,7 @@ export function AiMark({ commit }: { commit: Pick<Commit, "kind" | "assistant"> 
       : `with ${commit.assistant || "an AI"}`
   return (
     <Hint
-      heading={commit.kind === "agent" ? "A coding agent's commit" : "Made with AI"}
+      heading={commit.kind === "agent" ? "By a coding agent" : "With AI"}
       swatch="ai-swatch"
       meta={commit.assistant || undefined}
       render={(t) => (
@@ -28,10 +28,6 @@ export function AiMark({ commit }: { commit: Pick<Commit, "kind" | "assistant"> 
           <span className="sr-only">{about}</span>
         </span>
       )}
-    >
-      {commit.kind === "agent"
-        ? "An AI agent authored this commit on someone's behalf. It counts as the team's work, with AI."
-        : `A person made this commit ${about}: an AI co-author or tool footer in the message. It counts as the team's work, with AI.`}
-    </Hint>
+    />
   )
 }

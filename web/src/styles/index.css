@@ -200,6 +200,10 @@
     background: var(--lvl, var(--ai));
     box-shadow: 0 0 0.5rem color-mix(in oklch, var(--lvl, var(--ai)) 55%, transparent);
   }
+  .hint-dot {
+    @apply inline-block size-2 shrink-0 rounded-full;
+    background: var(--lvl, var(--muted-foreground));
+  }
   .ai-swatch {
     --lvl: var(--ai);
   }

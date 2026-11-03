@@ -27,6 +27,9 @@ export type HintTrigger = {
   "aria-describedby"?: string
 }
 
+/** HintRow is one signal of a Hint. */
+export type HintRow = { swatch?: string; label: string; value?: string }
+
 const opened = "scp-hint-open" // the event that closes every other hint: one shows at a time
 const gap = 8 // px between the trigger and the card, and the card's least distance to the viewport's edges
 
@@ -36,8 +39,8 @@ function tapped(el: EventTarget): boolean {
 }
 
 /**
- * Hint explains a signal (a coloured tile, a light, a chip) the moment the reader points at it, focuses it or taps it: a small card
- * with a swatch of the colour, what the colour means and the facts of this one. A tap on a phone shows it first, a second tap
+ * Hint names a signal (a coloured tile, a light, a chip) the moment the reader points at it, focuses it or taps it: a small card
+ * with what it is and at most three signals, each a dot of its colour, a word and a value. Short: the page explains, the card names. A tap on a phone shows it first, a second tap
  * follows a link; Escape, a tap elsewhere or leaving the trigger closes it. The card is a tooltip (`aria-describedby`), never in the
  * way: it does not take the pointer, and it stays within the viewport.
  */
@@ -45,6 +48,7 @@ export function Hint({
   heading,
   swatch,
   meta,
+  rows,
   children,
   render,
 }: {
@@ -53,6 +57,9 @@ export function Hint({
   swatch?: string
   /** A short fact at the card's top right: a span (≤6mo), a count. */
   meta?: ReactNode
+  /** The signals, at most three: a dot of the colour, the signal in a word or two, its value. */
+  rows?: HintRow[]
+  /** One short line, for a hint that is not a list of signals. */
   children?: ReactNode
   render: (trigger: HintTrigger) => ReactNode
 }) {
@@ -146,13 +153,24 @@ export function Hint({
             ref={card}
             id={id}
             role="tooltip"
-            className="hint pointer-events-none fixed top-0 left-0 z-50 w-max max-w-[min(20rem,calc(100vw-1rem))] rounded-lg border border-border bg-popover/95 px-3 py-2.5 text-xs leading-relaxed text-popover-foreground shadow-xl backdrop-blur-md"
+            className="hint pointer-events-none fixed top-0 left-0 z-50 w-max max-w-[min(17rem,calc(100vw-1rem))] rounded-lg border border-border bg-popover/95 px-2.5 py-2 text-xs leading-relaxed text-popover-foreground shadow-xl backdrop-blur-md"
           >
             <div className="flex items-center gap-2">
               {swatch && <span aria-hidden="true" className={cn(swatch, "hint-swatch")} />}
               <span className="min-w-0 font-medium text-foreground">{heading}</span>
               {meta && <span className="ml-auto pl-3 font-mono whitespace-nowrap text-muted-foreground">{meta}</span>}
             </div>
+            {rows && rows.length > 0 && (
+              <ul className="mt-1.5 flex flex-col gap-1">
+                {rows.slice(0, 3).map((r) => (
+                  <li key={r.label} className="flex items-center gap-2">
+                    <span aria-hidden="true" className={cn(r.swatch, "hint-dot")} />
+                    <span>{r.label}</span>
+                    {r.value && <span className="ml-auto pl-3 font-mono whitespace-nowrap text-muted-foreground">{r.value}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
             {children && <div className="mt-1 text-muted-foreground">{children}</div>}
           </div>,
           document.body,

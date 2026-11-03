@@ -1,18 +1,13 @@
 "use client"
 
 import type { Repo } from "@/lib/api/client"
-import { ago, count, exactUTC } from "@/lib/format"
+import { ago, count } from "@/lib/format"
 import { activities, activity, lastChange, type Activity, type Pulse } from "./health"
 import { cn } from "@/lib/cn"
 import { levels } from "@/entities/health/health"
 import { Hint } from "@/shared/hint"
 
 const label = Object.fromEntries(activities.map((a) => [a.level, a])) as Record<Activity, (typeof activities)[number]>
-
-/** within says what an activity level means, as a sentence's start: "Recent means a commit by a person in the last 6 months". */
-function within(level: Activity): string {
-  return `${label[level].label} means ${label[level].within}`
-}
 
 // The components take the view's instant (useNow, read once per view): one clock subscription per page, not one per repository.
 
@@ -36,15 +31,13 @@ export function ActivityLight({
     <Hint
       heading={label[level].label}
       swatch={`lvl-${level}`}
-      meta={label[level].span}
+      meta={`${ago(lastChange(repo), now)} ago`}
       render={(t) => (
         <span {...t} className={cn(`lvl-${level} led led-live cursor-help`, className)} aria-hidden={decorative || undefined}>
           {!decorative && <span className="sr-only">{label[level].label}</span>}
         </span>
       )}
-    >
-      Last change {ago(lastChange(repo), now)} ago. {within(level)}.
-    </Hint>
+    />
   )
 }
 
@@ -60,7 +53,12 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
     <span className={cn("flex flex-wrap items-center gap-1", className)}>
       {health && health.level !== "good" && (
         <Hint
-          heading={`Health ${health.score} of 100`}
+          heading={`Health ${health.score}`}
+          rows={health.findings.map((f) => ({
+            swatch: levels[health.level].className,
+            label: f.message,
+            value: `−${f.penalty}`,
+          }))}
           swatch={levels[health.level].className}
           meta={levels[health.level].label}
           render={(t) => (
@@ -70,16 +68,7 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
               <span className="sr-only">: {health.findings.map((f) => f.message).join("; ")}</span>
             </span>
           )}
-        >
-          <ul className="flex flex-col gap-0.5">
-            {health.findings.map((f) => (
-              <li key={f.message} className="flex gap-2">
-                <span className="w-7 shrink-0 text-right font-mono text-foreground">−{f.penalty}</span>
-                <span>{f.message}</span>
-              </li>
-            ))}
-          </ul>
-        </Hint>
+        />
       )}
       <Hint
         heading={label[level].label}
@@ -94,12 +83,11 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
             </time>
           </span>
         )}
-      >
-        {within(level)}.<span className="block font-mono text-[0.6875rem]">Last change {exactUTC(lastChange(repo))}</span>
-      </Hint>
+      />
       {repo.release ? (
         <Hint
-          heading={`Latest release ${repo.release.tag}`}
+          heading={`Release ${repo.release.tag}`}
+          meta={`${ago(repo.release.publishedAt, now)} ago`}
           swatch="lvl-recent"
           render={(t) => (
             <a {...t} href={repo.release?.url} rel="noreferrer nofollow" className="lvl-recent chip max-w-40 hover:underline">
@@ -107,9 +95,7 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
               <span className="truncate">{repo.release?.tag}</span>
             </a>
           )}
-        >
-          Published {exactUTC(repo.release.publishedAt)}. Select to open it on GitHub.
-        </Hint>
+        />
       ) : (
         <Hint
           heading="No release"
@@ -119,9 +105,7 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
               no release
             </span>
           )}
-        >
-          No GitHub release is published for this repository.
-        </Hint>
+        />
       )}
       <Hint
         heading={licensed ? `Licence ${repo.license}` : "No licence"}
@@ -131,13 +115,9 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
             {licensed ? repo.license : "no licence"}
           </span>
         )}
-      >
-        {licensed
-          ? "The licence GitHub detects in the repository."
-          : "GitHub detects no licence: others may not use the code. It costs a public repository health points."}
-      </Hint>
+      />
       <Hint
-        heading={`${count(repo.openIssues)} open`}
+        heading={`${count(repo.openIssues)} open issues and pull requests`}
         swatch={repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant"}
         render={(t) => (
           <span {...t} className={cn("chip cursor-help", repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant")}>
@@ -145,9 +125,7 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
             <span className="sr-only"> open</span> issues
           </span>
         )}
-      >
-        Open issues and pull requests on GitHub. More than 20 is marked, and costs health points.
-      </Hint>
+      />
       {repo.language && <span className="chip">{repo.language}</span>}
     </span>
   )
@@ -168,11 +146,9 @@ export function HealthStrip({ repos, pulse, now, className }: { repos: Repo[]; p
             key={r.address}
             heading={r.name}
             swatch={`lvl-${level}`}
-            meta={label[level].span ? `${label[level].label} · ${label[level].span}` : label[level].label}
+            meta={`${label[level].label} · ${ago(lastChange(r), now)} ago`}
             render={(t) => <span {...t} className={`lvl-${level} cell cursor-help`} />}
-          >
-            Last change {ago(lastChange(r), now)} ago. {within(level)}.
-          </Hint>
+          />
         )
       })}
     </span>
@@ -200,9 +176,7 @@ export function ActivityLegend({ pulse }: { pulse?: Pulse }) {
               {pulse && <span className="font-mono text-foreground">{count(pulse.levels[a.level])}</span>}
             </li>
           )}
-        >
-          {within(a.level)}.
-        </Hint>
+        />
       ))}
     </ul>
   )

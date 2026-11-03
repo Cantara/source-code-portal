@@ -2,17 +2,17 @@
 
 import Link from "next/link"
 import type { Schemas } from "@/lib/api/client"
-import { ago, count, exactUTC } from "@/lib/format"
+import { ago, count } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
 import { by, team, type Work } from "@/lib/preferences"
 import { Hint } from "@/shared/hint"
 import { Toggletip } from "@/shared/toggletip"
+import { levels } from "@/entities/health/health"
 import { activities, activityAt, type Activity } from "@/entities/repo/health"
 
 type Group = Schemas["DashboardGroup"]
 
 const label = Object.fromEntries(activities.map((a) => [a.level, a.label])) as Record<Activity, string>
-const span = Object.fromEntries(activities.map((a) => [a.level, a.span])) as Record<Activity, string>
 
 function tally(members: Group["members"], now: number): Record<Activity, number> {
   const t: Record<Activity, number> = { active: 0, recent: 0, quiet: 0, dormant: 0, archived: 0 }
@@ -29,10 +29,13 @@ const ages: Record<Activity, string> = {
   archived: "archived on GitHub, whatever its age",
 }
 
-/** meaning says what a level's colour means under the lens work. */
-function meaning(level: Activity, work: Work): string {
-  if (level === "archived") return "Archived means archived on GitHub, whatever its age."
-  return `${label[level]} means a last change ${by(work)} ${ages[level]}.`
+/** short is each level's range in a few words, for its hint. */
+const short: Record<Activity, string> = {
+  active: "within 30 days",
+  recent: "within 6 months",
+  quiet: "within 2 years",
+  dormant: "over 2 years ago, or none read",
+  archived: "",
 }
 
 /** plural is a count of repositories in words. */
@@ -52,7 +55,7 @@ function summary(t: Record<Activity, number>): string {
 /**
  * FleetMap is every repository as one tile, grouped by product and coloured by the last change of the work that counts, so big products look
  * big and quiet ones look cold. Each product's counts are its text for screen readers; the tiles are for the eye and the pointer
- * (a Hint names each one, its age and what its colour means, the moment it is pointed at or tapped; a click opens it), while the
+ * (a Hint names each one with its activity and health the moment it is pointed at or tapped; a click opens it), while the
  * products below carry the keyboard's links. The legend's levels explain themselves the same way, from the keyboard too.
  */
 export function FleetMap({ groups, work = team, now }: { groups: Group[]; work?: Work; now: number }) {
@@ -107,7 +110,7 @@ export function FleetMap({ groups, work = team, now }: { groups: Group[]; work?:
                 </li>
               )}
             >
-              {meaning(a.level, work)}
+              {a.level === "archived" ? "Archived on GitHub" : `Last change ${by(work)} ${short[a.level]}`}
             </Hint>
           ))}
         </ul>
@@ -123,15 +126,18 @@ export function FleetMap({ groups, work = team, now }: { groups: Group[]; work?:
             <div aria-hidden="true" className="mt-1 flex flex-wrap gap-0.5">
               {g.members.map((m) => {
                 const level = activityAt(m.lastAuthoredAt, m.archived, now)
-                const age = m.lastAuthoredAt
-                  ? `last change ${by(work)} ${ago(m.lastAuthoredAt, now)} ago`
-                  : `no change ${by(work)} read`
                 return (
                   <Hint
                     key={m.address}
                     heading={m.name}
-                    swatch={`lvl-${level}`}
-                    meta={span[level] ? `${label[level]} · ${span[level]}` : label[level]}
+                    rows={[
+                      {
+                        swatch: `lvl-${level}`,
+                        label: label[level],
+                        value: m.lastAuthoredAt ? `${ago(m.lastAuthoredAt, now)} ago` : "none read",
+                      },
+                      ...(m.level ? [{ swatch: levels[m.level].className, label: "Health", value: levels[m.level].label }] : []),
+                    ]}
                     render={(t) => (
                       <Link
                         {...t}
@@ -140,15 +146,7 @@ export function FleetMap({ groups, work = team, now }: { groups: Group[]; work?:
                         className={`lvl-${level} cell transition-transform hover:scale-150 motion-reduce:transition-none`}
                       />
                     )}
-                  >
-                    <p>
-                      {age[0]?.toUpperCase()}
-                      {age.slice(1)}
-                      {m.lastAuthoredAt && <span className="block font-mono text-[0.6875rem]">{exactUTC(m.lastAuthoredAt)}</span>}
-                    </p>
-                    <p className="mt-1">{meaning(level, work)}</p>
-                    <p className="mt-1 text-[0.6875rem]">A click, or a second tap, opens the repository.</p>
-                  </Hint>
+                  />
                 )
               })}
             </div>
