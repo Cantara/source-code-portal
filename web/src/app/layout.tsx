@@ -65,8 +65,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <MainNav ask={!!assistant?.enabled && assistant.allowed} />
               <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
                 <LiveIndicator />
-                <ThemeSelect />
                 <PortalNav />
+                <ThemeSelect />
                 <ViewerMenu me={me} />
               </div>
             </div>

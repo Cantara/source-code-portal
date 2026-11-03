@@ -86,7 +86,7 @@ faint grid backdrop (`.cosmos`). Health is drawn in HTML, not with badge images:
 newest commit (else its last push) as active (30 days), recent (6 months), quiet (2 years), dormant or archived (`entities/repo/health.ts`);
 `entities/repo/health-badges.tsx` renders the light (`.led`), the chips (`.chip`: age, latest release, licence, open issues, language, each with its meaning in text)
 and the per-group strip (one `.cell` per repository). The level colours are tokens (`--active`, `--active-fg`, ...) with AA text
-contrast in both themes. The header shows whether the live stream is open (`LiveIndicator`); at its right, in this order, the theme as one segmented control of icons (System, Dark, Light: radio buttons, `ThemeSelect`), Settings and the Guide as icon links (`PortalNav`, named for assistive technology, a tooltip each), then the viewer. The line icons are `components/ui/icons.tsx`, drawn in the current colour.
+contrast in both themes. The header shows whether the live stream is open (`LiveIndicator`); at its right, in this order, the Guide and Settings as icon links (`PortalNav`, named for assistive technology, a tooltip each), then the theme as one segmented control of icons (System, Dark, Light: radio buttons, `ThemeSelect`), then the viewer. The line icons are `components/ui/icons.tsx`, drawn in the current colour.
 
 ## Behaviour (numbered)
 1. Queries: `staleTime` 10 s, `gcTime` 5 min, retry network/429/5xx at most twice (honour `Retry-After`), refetch on window focus,

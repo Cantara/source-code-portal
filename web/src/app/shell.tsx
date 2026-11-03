@@ -45,18 +45,18 @@ export function ThemeSelect() {
 const tool =
   "grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground"
 
-/** PortalNav is the reader's own corner of the header: Settings and the Guide, as icons named for assistive technology. */
+/** PortalNav is the reader's own corner of the header: the Guide and Settings, as icons named for assistive technology. */
 export function PortalNav() {
   const path = usePathname()
   return (
     <nav aria-label="Portal" className="flex items-center gap-0.5">
-      <Link href="/settings" className={tool} title="Settings" aria-current={path === "/settings" ? "page" : undefined}>
-        <SlidersIcon className="size-[1.125rem]" />
-        <span className="sr-only">Settings</span>
-      </Link>
       <Link href="/guide" className={tool} title="Guide" aria-current={path === "/guide" ? "page" : undefined}>
         <BookIcon className="size-[1.125rem]" />
         <span className="sr-only">Guide</span>
+      </Link>
+      <Link href="/settings" className={tool} title="Settings" aria-current={path === "/settings" ? "page" : undefined}>
+        <SlidersIcon className="size-[1.125rem]" />
+        <span className="sr-only">Settings</span>
       </Link>
     </nav>
   )
