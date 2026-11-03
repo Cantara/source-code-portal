@@ -54,7 +54,7 @@ describe("pages", () => {
     // The fleet map counts every member by its last change by a person.
     expect(screen.getByRole("region", { name: "Fleet" })).toHaveTextContent("2 active")
     expect(screen.getByText("People").nextElementSibling).toHaveTextContent("2")
-    expect(screen.getByText(/4 commits in 30 days: 1 by hand, 3 with AI \(Claude, Copilot\)/)).toBeInTheDocument()
+    expect(screen.getByText("1 by hand, 3 with AI (Claude, Copilot) in 30 days")).toBeInTheDocument()
     // The latest commits mark the one made with an AI, naming it.
     expect(screen.getByText("with Claude Opus 5")).toBeInTheDocument()
   })
@@ -78,13 +78,27 @@ describe("pages", () => {
   })
 
   it("counts the work the reader's lens names: with AI only", async () => {
-    show(<DashboardView work="ai" />)
+    show(<DashboardView work={["ai"]} />)
     const card = (await screen.findByRole("link", { name: "IAM" })).closest("li") as HTMLElement
-    expect(card).toHaveTextContent("3 commits with AI (Claude)")
-    expect(card).toHaveTextContent("1 by hand · 9 by automation · 30 days")
+    expect(card).toHaveTextContent("3 commits with AI")
+    expect(card).toHaveTextContent("1 by hand · 3 with AI (Claude)")
+    expect(card).toHaveTextContent("9 by automation · 30 days")
     expect(within(card).getByRole("img", { name: /^Commits with AI per week/ })).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Latest commits with AI" })).toBeInTheDocument()
-    expect(screen.getByText(/3 commits with AI \(Claude, Copilot\) in 30 days; 1 by hand/)).toBeInTheDocument()
+  })
+
+  it("counts automation too when the reader's lens names it, and drops the latest commits' own switch", async () => {
+    show(<DashboardView work={["hand", "ai", "automation"]} />)
+    const card = (await screen.findByRole("link", { name: "IAM" })).closest("li") as HTMLElement
+    expect(card).toHaveTextContent("13 commits")
+    expect(
+      within(card).getByRole("img", {
+        name: /^Commits by the team or automation per week.*; by automation 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 5$/,
+      }),
+    ).toBeInTheDocument()
+    expect(card).toHaveTextContent("Last change by the team or automation")
+    expect(screen.getByRole("heading", { name: "Latest commits by the team or automation" })).toBeInTheDocument()
+    expect(screen.queryByRole("checkbox", { name: "Include automation" })).not.toBeInTheDocument()
   })
 
   it("switches the products to a sortable table and remembers the choice", async () => {
@@ -216,7 +230,7 @@ describe("commit log", () => {
     server.use(
       http.get("/dashboard", ({ response }) =>
         response(200).json({
-          work: "all",
+          work: ["hand", "ai"],
           groups: [],
           health: null,
           repoCount: ++n,
@@ -260,7 +274,7 @@ describe("commit log", () => {
       server.use(
         http.get("/dashboard", ({ response }) =>
           response(200).json({
-            work: "all",
+            work: ["hand", "ai"],
             groups: [],
             health: null,
             repoCount: ++n,

@@ -296,9 +296,12 @@ components:
       name: work
       in: query
       required: false
+      style: form
+      explode: false
       description: >-
-        The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an
-        AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out
+        The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI
+        co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai
+        without it, /commits lists every commit
       schema: { $ref: "#/components/schemas/Work" }
     PageNumber:
       name: page
@@ -573,9 +576,10 @@ components:
         Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not
         part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's
         work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the
-        author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people,
-        the last change and the recent repositories follow the work that counts (Dashboard.work).
-      required: [hand, ai, automation, sweeps, weeklyHand, weeklyAi, authors, authorCount, assistants, lastAuthoredAt, recent]
+        author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. Automation and sweeps are
+        maintenance. The counts give every kind; the people (of people's work that counts), the last change and the recent
+        repositories follow the work that counts (Dashboard.work).
+      required: [hand, ai, automation, sweeps, weeklyHand, weeklyAi, weeklyAutomation, authors, authorCount, assistants, lastAuthoredAt, recent]
       properties:
         hand: { type: integer, description: "People's commits by hand in the last 30 days" }
         ai: { type: integer, description: "People's commits with an AI in the last 30 days: an AI co-author, or a coding agent as the author" }
@@ -583,9 +587,10 @@ components:
         sweeps: { type: integer, description: Commits of sweeps in the last 30 days }
         weeklyHand: { type: array, items: { type: integer }, minItems: 12, maxItems: 12, description: "People's commits by hand per 7 days, the oldest of the last 12 first" }
         weeklyAi: { type: array, items: { type: integer }, minItems: 12, maxItems: 12, description: "People's commits with an AI per 7 days, the oldest of the last 12 first" }
+        weeklyAutomation: { type: array, items: { type: integer }, minItems: 12, maxItems: 12, description: "Commits by automation and of sweeps per 7 days, the oldest of the last 12 first" }
         assistants: { type: array, items: { type: string }, description: "The AI assistants of the last 30 days by family (\"Claude\", \"Copilot\"), most commits first, at most 3" }
-        authors: { type: array, items: { $ref: "#/components/schemas/Person" }, description: "Who made the work that counts in the last 30 days, most commits first, at most 5" }
-        authorCount: { type: integer, description: How many made the work that counts in the last 30 days }
+        authors: { type: array, items: { $ref: "#/components/schemas/Person" }, description: "The people who made the work that counts in the last 30 days (automation names none), most commits first, at most 5" }
+        authorCount: { type: integer, description: How many people made the work that counts in the last 30 days }
         lastAuthoredAt: { type: [string, "null"], format: date-time, description: "The newest commit of the work that counts; null when none is read" }
         recent: { type: array, items: { $ref: "#/components/schemas/RecentRepo" }, description: "The repositories the work that counts changed last, at most 3" }
     Person:
@@ -638,10 +643,16 @@ components:
         elements: { type: array, items: { $ref: "#/components/schemas/LayoutElement" } }
         stored: { type: boolean, description: "An admin's layout; false: the built-in one" }
     Work:
+      type: array
+      items: { $ref: "#/components/schemas/WorkKind" }
+      minItems: 1
+      maxItems: 3
+      uniqueItems: true
+      description: "The work that counts: one or more kinds"
+    WorkKind:
       type: string
-      enum: [all, hand, ai]
-      default: all
-      description: "The work that counts: all of people's work, by hand only, or with an AI only"
+      enum: [hand, ai, automation]
+      description: "A kind of work: people's by hand, people's with an AI, or maintenance by automation (bots and sweeps)"
     Dashboard:
       type: object
       required: [work, groups, repoCount, ungroupedCount, latest, health, freshness, activity]
@@ -652,7 +663,7 @@ components:
         health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: "Every repository weighed as one product; the first 5 findings" }
         repoCount: { type: integer }
         ungroupedCount: { type: integer, description: Repositories in no group }
-        latest: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: "The 10 newest commits of the work that counts (Activity): neither automation nor sweeps; /commits lists all of them" }
+        latest: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: "The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them" }
         freshness: { $ref: "#/components/schemas/FreshnessCounts" }
     DocSummary:
       type: object

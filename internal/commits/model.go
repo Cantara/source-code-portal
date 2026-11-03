@@ -301,13 +301,13 @@ func Sweep(s *snapshot.Snapshot, c *Commit) bool { return feedIndex.Get(s).sweep
 // person's work: someone set the agent to it (P-40).
 func ByPerson(s *snapshot.Snapshot, c *Commit) bool { return !Automated(c) && !Sweep(s, c) }
 
-// LastAuthored returns the time of the newest commit of e in the view s that is people's work of the lens w (ByPerson, then w). When no
+// LastAuthored returns the time of the newest commit of e in the view s that is work of the lens w (Counts). When no
 // read commit is, it returns the oldest read commit's time with before set: the last such commit is older. Zero when there are no
 // commits.
 func LastAuthored(s *snapshot.Snapshot, e *snapshot.RepoEntry, w Work) (at time.Time, before bool) {
 	cs, _ := Of(e)
 	for i := range cs {
-		if o, _ := Classify(&cs[i]); w.Counts(o) && !Sweep(s, &cs[i]) {
+		if o, _ := Classify(&cs[i]); w.Counts(o, o != OriginAutomation && !Sweep(s, &cs[i])) {
 			return cs[i].CommittedAt, false
 		}
 	}
@@ -331,13 +331,13 @@ const (
 // counts.
 func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 	now := time.Now()
-	w := WorkOf(d.Work)
+	w := WorkOf(d.Work, WorkTeam)
 	all, _ := feed(s, "")
 	for _, r := range all {
 		if len(d.Latest) == dashboardCommits {
 			break
 		}
-		if r.Person && w.Counts(r.Origin) {
+		if w.Counts(r.Origin, r.Person) {
 			d.Latest = append(d.Latest, commitOf(r.Repo, r.Commit))
 		}
 	}
@@ -374,11 +374,12 @@ func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 }
 
 // activity sums a feed (newest first) at now through the lens w: people's commits by hand and with an AI, automation and sweeps in the
-// last 30 days, both per week, the assistants, and of the work that counts the authors, the last commit and the repositories it
+// last 30 days, each kind per week, the assistants, and of the work that counts the people, the last commit and the repositories it
 // changed last.
 func activity(refs []Ref, now time.Time, w Work) oapi.Activity {
 	const day, week = 24 * time.Hour, 7 * 24 * time.Hour
-	a := oapi.Activity{WeeklyHand: make([]int, activityWeeks), WeeklyAi: make([]int, activityWeeks), Authors: []oapi.Person{},
+	a := oapi.Activity{WeeklyHand: make([]int, activityWeeks), WeeklyAi: make([]int, activityWeeks),
+		WeeklyAutomation: make([]int, activityWeeks), Authors: []oapi.Person{},
 		Assistants: []string{}, Recent: []oapi.RecentRepo{}}
 	window, weeks := now.Add(-activityDays*day), now.Add(-activityWeeks*week)
 	type author struct {
@@ -392,7 +393,7 @@ func activity(refs []Ref, now time.Time, w Work) oapi.Activity {
 		if c.CommittedAt.Before(weeks) && a.LastAuthoredAt != nil && len(a.Recent) == activityRecent {
 			break
 		}
-		counts := r.Person && w.Counts(r.Origin)
+		counts := w.Counts(r.Origin, r.Person)
 		if counts {
 			if a.LastAuthoredAt == nil {
 				a.LastAuthoredAt = oapi.TimeOrNil(c.CommittedAt)
@@ -401,12 +402,15 @@ func activity(refs []Ref, now time.Time, w Work) oapi.Activity {
 				a.Recent = append(a.Recent, oapi.RecentRepo{Repo: string(r.Repo), At: c.CommittedAt.UTC()})
 			}
 		}
-		if r.Person && !c.CommittedAt.Before(weeks) {
+		if !c.CommittedAt.Before(weeks) {
 			wk := activityWeeks - 1 - min(max(int(now.Sub(c.CommittedAt)/week), 0), activityWeeks-1)
-			if r.Origin.AI() {
+			switch kindOf(r.Origin, r.Person) {
+			case WorkAI:
 				a.WeeklyAi[wk]++
-			} else {
+			case WorkHand:
 				a.WeeklyHand[wk]++
+			default:
+				a.WeeklyAutomation[wk]++
 			}
 		}
 		if c.CommittedAt.Before(window) {
@@ -456,7 +460,7 @@ func Repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	if at, _ := LastCommit(e); !at.IsZero() {
 		r.LastCommitAt = oapi.TimeOrNil(at)
 	}
-	if at, _ := LastAuthored(s, e, WorkAll); !at.IsZero() {
+	if at, _ := LastAuthored(s, e, WorkTeam); !at.IsZero() {
 		r.LastAuthoredAt = oapi.TimeOrNil(at)
 	}
 }

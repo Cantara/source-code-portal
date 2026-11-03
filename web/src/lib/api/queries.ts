@@ -8,7 +8,7 @@ const lc = (s: string) => s.toLowerCase()
  * cache and the browser's always agree on a key.
  */
 export const keys = {
-  dashboard: (work: string) => ["dashboard", work] as const,
+  dashboard: (work: readonly string[]) => ["dashboard", work.join(",")] as const,
   repos: () => ["repos"] as const,
   repo: (owner: string, name: string) => ["repo", lc(owner), lc(name)] as const,
   docs: (owner: string, name: string) => ["docs", lc(owner), lc(name)] as const,

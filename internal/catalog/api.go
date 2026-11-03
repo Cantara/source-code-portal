@@ -26,10 +26,7 @@ func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {
 
 func (a API) GetDashboard(ctx context.Context, req oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
 	s := a.Current(ctx)
-	work := oapi.All
-	if w := req.Params.Work; w != nil && w.Valid() {
-		work = *w
-	}
+	work := oapi.WorkOrDefault(req.Params.Work, oapi.Work{oapi.WorkKindHand, oapi.WorkKindAi})
 	out := oapi.Dashboard{Work: work, Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos),
 		Latest: []oapi.Commit{}, Activity: noActivity()}
 	for _, g := range s.Groups {
@@ -175,7 +172,7 @@ func (a API) repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oa
 
 // noActivity is the activity before the commits are added: none.
 func noActivity() oapi.Activity {
-	return oapi.Activity{WeeklyHand: make([]int, 12), WeeklyAi: make([]int, 12), Authors: []oapi.Person{}, Assistants: []string{},
+	return oapi.Activity{WeeklyHand: make([]int, 12), WeeklyAi: make([]int, 12), WeeklyAutomation: make([]int, 12), Authors: []oapi.Person{}, Assistants: []string{},
 		Recent: []oapi.RecentRepo{}}
 }
 

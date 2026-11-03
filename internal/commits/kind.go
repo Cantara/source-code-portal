@@ -130,33 +130,62 @@ func Assistant(name string) string {
 	return first
 }
 
-// Work is the reader's lens on people's work (P-42): all of it, by hand only, or with an AI only. Automation is never people's work.
+// Work is the reader's lens, the work that counts (P-42, P-43): a set of kinds. People's work is by hand or with an AI; automation
+// (CI, dependency and release bots) and sweeps are maintenance.
 type Work uint8
 
 const (
-	WorkAll  Work = iota // by hand and with an AI
-	WorkHand             // a person, no trace of an AI
-	WorkAI               // assisted or by an agent
+	WorkHand       Work = 1 << iota // a person, no trace of an AI
+	WorkAI                          // assisted or by an agent
+	WorkAutomation                  // automation and sweeps
+
+	WorkTeam  = WorkHand | WorkAI // people's work: the dashboard's default
+	WorkEvery = WorkTeam | WorkAutomation
 )
 
-// WorkOf is the lens a request names; all when it names none.
-func WorkOf(w oapi.Work) Work {
-	switch w {
-	case oapi.Hand:
-		return WorkHand
-	case oapi.Ai:
-		return WorkAI
+// WorkOf is the lens of the kinds a request names; none when it names no known kind.
+func WorkOf(ks []oapi.WorkKind, none Work) Work {
+	var w Work
+	for _, k := range ks {
+		switch k {
+		case oapi.WorkKindHand:
+			w |= WorkHand
+		case oapi.WorkKindAi:
+			w |= WorkAI
+		case oapi.WorkKindAutomation:
+			w |= WorkAutomation
+		}
 	}
-	return WorkAll
+	if w == 0 {
+		return none
+	}
+	return w
 }
 
-// Counts reports whether a commit of origin o is work of the lens: never automation.
-func (w Work) Counts(o Origin) bool {
-	switch w {
-	case WorkHand:
-		return o == OriginPerson
-	case WorkAI:
-		return o.AI()
+// Kinds is the lens in the contract's form.
+func (w Work) Kinds() oapi.Work {
+	out := oapi.Work{}
+	for _, k := range []struct {
+		w Work
+		k oapi.WorkKind
+	}{{WorkHand, oapi.WorkKindHand}, {WorkAI, oapi.WorkKindAi}, {WorkAutomation, oapi.WorkKindAutomation}} {
+		if w&k.w != 0 {
+			out = append(out, k.k)
+		}
 	}
-	return o != OriginAutomation
+	return out
 }
+
+// kindOf is the kind of work of a commit of origin o; person is false for automation and sweeps.
+func kindOf(o Origin, person bool) Work {
+	switch {
+	case !person || o == OriginAutomation:
+		return WorkAutomation
+	case o.AI():
+		return WorkAI
+	}
+	return WorkHand
+}
+
+// Counts reports whether a commit of origin o is work of the lens; person is false for a sweep's (and automation's).
+func (w Work) Counts(o Origin, person bool) bool { return w&kindOf(o, person) != 0 }

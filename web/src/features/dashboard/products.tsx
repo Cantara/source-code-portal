@@ -11,8 +11,8 @@ import { FindingList, HealthScore, levels } from "@/entities/health/health"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
 import { Sparkline } from "@/shared/sparkline"
-import { by, remember, viewCookie, type Work } from "@/lib/preferences"
-import { assistants, counted, noun, series, share, weekly } from "./work"
+import { by, isTeam, remember, viewCookie, type Work } from "@/lib/preferences"
+import { assistants, counted, maintenance, noun, series, share, weekly } from "./work"
 import type { ProductsView } from "./layout"
 
 type Group = Schemas["DashboardGroup"]
@@ -35,12 +35,16 @@ function names(a: Schemas["Activity"]): ReactNode {
 
 /** Trend is an activity's sparkline through the lens. */
 function Trend({ a, w, className }: { a: Schemas["Activity"]; w: Work; className?: string }) {
-  const s = series(a, w)
-  return <Sparkline values={s.values} part={s.part} label={weekly(a, w)} className={cn(s.ai && "text-[var(--ai)]", className)} />
+  return <Sparkline parts={series(a, w)} label={weekly(a, w)} className={className} />
 }
 
-/** AiDot marks the commits with AI in text, in the colour the sparklines draw them. */
-const AiDot = () => <span aria-hidden="true" className="mr-1 inline-block size-2 rounded-xs bg-[var(--ai)]" />
+/** dots are the kinds' colours in text, as the sparklines draw them (no inline style: the CSP forbids it). */
+const dots = { hand: "bg-primary", ai: "bg-[var(--ai)]", automation: "bg-muted-foreground" } as const
+
+/** Dot marks a kind of work in text, in the colour the sparklines draw it; only where the lens counts it and there is some. */
+function Dot({ kind, on }: { kind: keyof typeof dots; on: boolean }) {
+  return on ? <span aria-hidden="true" className={cn("mr-1 inline-block size-2 rounded-xs", dots[kind])} /> : null
+}
 
 /** Shared is what most members have in common, said once: the licence, the language and how many are released. */
 function Shared({ group }: { group: Group }) {
@@ -81,21 +85,13 @@ function ProductCard({ group, work: w, now }: { group: Group; work: Work; now: n
       <div className="flex items-end justify-between gap-3">
         <p className="text-sm">
           <span className="font-mono text-lg font-semibold tabular-nums">{count(counted(a, w))}</span> {noun(counted(a, w), w)}
-          {w === "ai" && assistants(a)}
-          {w === "all" && (
-            <span className="block text-xs text-muted-foreground">
-              {count(a.hand)} by hand · {a.ai > 0 && <AiDot />}
-              {count(a.ai)} with AI{assistants(a)}
-            </span>
-          )}
           <span className="block text-xs text-muted-foreground">
-            {w === "hand" && (
-              <>
-                {a.ai > 0 && <AiDot />}
-                {count(a.ai)} with AI ·{" "}
-              </>
-            )}
-            {w === "ai" && <>{count(a.hand)} by hand · </>}
+            <Dot kind="hand" on={w.includes("hand") && a.hand > 0} />
+            {count(a.hand)} by hand · <Dot kind="ai" on={w.includes("ai") && a.ai > 0} />
+            {count(a.ai)} with AI{assistants(a)}
+          </span>
+          <span className="block text-xs text-muted-foreground">
+            <Dot kind="automation" on={w.includes("automation") && maintenance(a) > 0} />
             {count(a.automation)} by automation{a.sweeps > 0 && `, ${count(a.sweeps)} in sweeps`} · 30 days
           </span>
         </p>
@@ -108,20 +104,20 @@ function ProductCard({ group, work: w, now }: { group: Group; work: Work; now: n
             <span className="text-foreground">{names(a)}</span>
           </span>
         ) : (
-          <span className="text-muted-foreground">No commit {by[w]} in 30 days</span>
+          <span className="text-muted-foreground">No commit {by(w)} in 30 days</span>
         )}
         <span className="block text-xs text-muted-foreground">
           {a.lastAuthoredAt ? (
             <>
-              Last change {by[w]} <RelativeTime at={a.lastAuthoredAt} />
+              Last change {by(w)} <RelativeTime at={a.lastAuthoredAt} />
             </>
           ) : (
-            `No change ${by[w]} read`
+            `No change ${by(w)} read`
           )}
         </span>
       </p>
       {a.recent.length > 0 && (
-        <ul aria-label={`Changed last ${by[w]}`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <ul aria-label={`Changed last ${by(w)}`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
           {a.recent.map((r) => (
             <li key={r.repo} className="flex min-w-0 items-baseline gap-1">
               <Link href={addressPath(r.repo)} className="truncate font-medium hover:underline">
@@ -175,7 +171,7 @@ const columns = (w: Work): Column[] => [
   { key: "repos", label: "Repositories", numeric: true, value: (g) => g.repoCount, cell: (g) => count(g.repoCount) },
   {
     key: "commits",
-    label: w === "all" ? "Commits, 30 days" : `${w === "hand" ? "By hand" : "With AI"}, 30 days`,
+    label: isTeam(w) ? "Commits, 30 days" : `${by(w).replace(/^./, (c) => c.toUpperCase())}, 30 days`,
     numeric: true,
     value: (g) => counted(g.activity, w),
     cell: (g) => (
@@ -208,7 +204,7 @@ const columns = (w: Work): Column[] => [
   },
   {
     key: "last",
-    label: `Last change ${by[w]}`,
+    label: `Last change ${by(w)}`,
     value: (g) => g.activity.lastAuthoredAt ?? "",
     cell: (g) => <RelativeTime at={g.activity.lastAuthoredAt} />,
   },

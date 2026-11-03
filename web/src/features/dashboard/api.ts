@@ -4,7 +4,7 @@ import { keys } from "@/lib/api/queries"
 import type { Work } from "@/lib/preferences"
 import type { Element } from "./layout"
 
-/** dashboardQuery is the dashboard through the reader's lens on people's work. */
+/** dashboardQuery is the dashboard through the reader's lens, the work that counts. */
 export const dashboardQuery = (api: Api, work: Work) =>
   queryOptions({
     queryKey: keys.dashboard(work),

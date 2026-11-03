@@ -31,6 +31,9 @@ export class ProblemError extends Error {
 /** Api is a typed client of /api/v1: the browser's (api) or one per server request (lib/api/server.ts). */
 export type Api = Client<paths>
 
+/** querySerializer writes array parameters as the contract has them: comma-separated in one value (work=hand,ai). */
+export const querySerializer = { array: { style: "form", explode: false } } as const
+
 /**
  * api is the browser's client. The base is absolute (the tests resolve against jsdom's location) and fetch is looked up per request
  * (the tests intercept it). On the server it is never called: the pages hand their data to the browser's cache. The providers add
@@ -39,6 +42,7 @@ export type Api = Client<paths>
 export const api: Api = createClient<paths>({
   baseUrl: `${globalThis.location?.origin ?? "http://localhost"}/api/v1`,
   fetch: (r) => globalThis.fetch(r),
+  querySerializer,
 })
 
 /** Get reads a path of /api/v1 outside the contract (the operator's status) as JSON, failing as unwrap does. */

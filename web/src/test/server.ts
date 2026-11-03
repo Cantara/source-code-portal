@@ -1,6 +1,7 @@
 import { setupServer } from "msw/node"
 import { createOpenApiHttp } from "openapi-msw"
 import type { components, paths } from "@/lib/api/schema"
+import { workOf } from "@/lib/preferences"
 
 type S = components["schemas"]
 
@@ -100,6 +101,7 @@ export const activity = (over: Partial<S["Activity"]> = {}): S["Activity"] => ({
   sweeps: 0,
   weeklyHand: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3],
   weeklyAi: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  weeklyAutomation: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   assistants: [],
   authors: [],
   authorCount: 0,
@@ -130,7 +132,7 @@ export const defaults = [
   http.get("/repos", ({ response }) => response(200).json({ repos: [repo("Whydah"), repo("Whydah-Core")] })),
   http.get("/dashboard", ({ query, response }) =>
     response(200).json({
-      work: query.get("work") === "hand" ? "hand" : query.get("work") === "ai" ? "ai" : "all",
+      work: workOf(query.get("work")),
       groups: [
         {
           id: "iam",
@@ -146,6 +148,7 @@ export const defaults = [
             weeklyAi: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2],
             assistants: ["Claude"],
             automation: 9,
+            weeklyAutomation: [0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 5],
             authors: [{ name: "Ada Lovelace", login: "ada" }, { name: "Bo" }],
             authorCount: 2,
             lastAuthoredAt: at,

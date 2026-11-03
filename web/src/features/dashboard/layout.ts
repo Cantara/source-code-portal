@@ -22,7 +22,11 @@ export const kinds: { kind: Kind; label: string; about: string }[] = [
     about: "Every repository as a tile by product, coloured by its last change by a person.",
   },
   { kind: "products", label: "Products", about: "The products as distilled cards or one sortable table." },
-  { kind: "latest-commits", label: "Latest commits", about: "The newest commits by people; automation on request." },
+  {
+    kind: "latest-commits",
+    label: "Latest commits",
+    about: "The newest commits of the work that counts; automation on request.",
+  },
   { kind: "heading", label: "Heading", about: "A heading and a line of text that divide the page." },
 ]
 

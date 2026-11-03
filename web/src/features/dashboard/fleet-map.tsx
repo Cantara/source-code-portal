@@ -2,7 +2,7 @@ import Link from "next/link"
 import type { Schemas } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
-import { by, type Work } from "@/lib/preferences"
+import { by, team, type Work } from "@/lib/preferences"
 import { Toggletip } from "@/shared/toggletip"
 import { activities, activityAt, type Activity } from "@/entities/repo/health"
 
@@ -39,7 +39,7 @@ function summary(t: Record<Activity, number>): string {
  * big and quiet ones look cold. Each product's counts are its text for screen readers; the tiles are for the eye (and the mouse:
  * each opens its repository, its name and age in the title), while the products below carry the keyboard's links.
  */
-export function FleetMap({ groups, work = "all", now }: { groups: Group[]; work?: Work; now: number }) {
+export function FleetMap({ groups, work = team, now }: { groups: Group[]; work?: Work; now: number }) {
   const all = new Map<string, Group["members"][number]>()
   for (const g of groups) for (const m of g.members) all.set(m.address, m)
   const total = tally([...all.values()], now)
@@ -52,7 +52,7 @@ export function FleetMap({ groups, work = "all", now }: { groups: Group[]; work?
           </h2>
           <Toggletip label="About the fleet map">
             <p>
-              Each tile is one repository, grouped by product and coloured by the age of its last change {by[work]} (Settings
+              Each tile is one repository, grouped by product and coloured by the age of its last change {by(work)} (Settings
               choose the work that counts). Bots, release-plugin commits and sweeps (the same subject in more than 10 repositories
               on one day) never count.
             </p>
@@ -76,7 +76,7 @@ export function FleetMap({ groups, work = "all", now }: { groups: Group[]; work?
             <li
               key={a.level}
               className={`lvl-${a.level} flex items-center gap-1.5`}
-              title={a.level === "archived" ? ages.archived : `last change ${by[work]} ${ages[a.level]}`}
+              title={a.level === "archived" ? ages.archived : `last change ${by(work)} ${ages[a.level]}`}
             >
               <span aria-hidden="true" className="cell" />
               {a.label}
@@ -98,8 +98,8 @@ export function FleetMap({ groups, work = "all", now }: { groups: Group[]; work?
               {g.members.map((m) => {
                 const level = activityAt(m.lastAuthoredAt, m.archived, now)
                 const age = m.lastAuthoredAt
-                  ? `last change ${by[work]} ${ago(m.lastAuthoredAt, now)} ago`
-                  : `no change ${by[work]} read`
+                  ? `last change ${by(work)} ${ago(m.lastAuthoredAt, now)} ago`
+                  : `no change ${by(work)} read`
                 return (
                   <Link
                     key={m.address}

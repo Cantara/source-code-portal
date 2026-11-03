@@ -568,7 +568,7 @@ export interface components {
       members: components["schemas"]["DashboardMember"][]
       summary: components["schemas"]["GroupSummaryFacts"]
     }
-    /** @description Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work). */
+    /** @description Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. Automation and sweeps are maintenance. The counts give every kind; the people (of people's work that counts), the last change and the recent repositories follow the work that counts (Dashboard.work). */
     Activity: {
       /** @description People's commits by hand in the last 30 days */
       hand: number
@@ -582,11 +582,13 @@ export interface components {
       weeklyHand: number[]
       /** @description People's commits with an AI per 7 days, the oldest of the last 12 first */
       weeklyAi: number[]
+      /** @description Commits by automation and of sweeps per 7 days, the oldest of the last 12 first */
+      weeklyAutomation: number[]
       /** @description The AI assistants of the last 30 days by family ("Claude", "Copilot"), most commits first, at most 3 */
       assistants: string[]
-      /** @description Who made the work that counts in the last 30 days, most commits first, at most 5 */
+      /** @description The people who made the work that counts in the last 30 days (automation names none), most commits first, at most 5 */
       authors: components["schemas"]["Person"][]
-      /** @description How many made the work that counts in the last 30 days */
+      /** @description How many people made the work that counts in the last 30 days */
       authorCount: number
       /**
        * Format: date-time
@@ -651,12 +653,13 @@ export interface components {
       /** @description An admin's layout; false: the built-in one */
       stored: boolean
     }
+    /** @description The work that counts: one or more kinds */
+    Work: components["schemas"]["WorkKind"][]
     /**
-     * @description The work that counts: all of people's work, by hand only, or with an AI only
-     * @default all
+     * @description A kind of work: people's by hand, people's with an AI, or maintenance by automation (bots and sweeps)
      * @enum {string}
      */
-    Work: "all" | "hand" | "ai"
+    WorkKind: "hand" | "ai" | "automation"
     Dashboard: {
       work: components["schemas"]["Work"]
       groups: components["schemas"]["DashboardGroup"][]
@@ -666,7 +669,7 @@ export interface components {
       repoCount: number
       /** @description Repositories in no group */
       ungroupedCount: number
-      /** @description The 10 newest commits of the work that counts (Activity): neither automation nor sweeps; /commits lists all of them */
+      /** @description The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them */
       latest: components["schemas"]["Commit"][]
       freshness: components["schemas"]["FreshnessCounts"]
     }
@@ -912,7 +915,7 @@ export interface components {
     }
   }
   parameters: {
-    /** @description The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out */
+    /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit */
     Work: components["schemas"]["Work"]
     /** @description The page, from 1 */
     PageNumber: number
@@ -929,7 +932,7 @@ export interface operations {
   getDashboard: {
     parameters: {
       query?: {
-        /** @description The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out */
+        /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit */
         work?: components["parameters"]["Work"]
       }
       header?: never
@@ -959,7 +962,7 @@ export interface operations {
         repo?: string
         /** @description false leaves out commits made by automation */
         automation?: boolean
-        /** @description The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out */
+        /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit */
         work?: components["parameters"]["Work"]
         /** @description The page, from 1 */
         page?: components["parameters"]["PageNumber"]

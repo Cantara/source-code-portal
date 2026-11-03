@@ -1,21 +1,21 @@
 import { cn } from "@/lib/cn"
 
 /**
- * Sparkline draws counts (oldest first) as bars, scaled to the largest; part, when given, is the share of each bar drawn at its foot
- * in a second colour (the commits with an AI). Its label says what they count, so the picture is never the only way to read it.
+ * Sparkline draws weekly counts (oldest first) as bars scaled to the largest, each bar stacking its parts from the foot (the kinds of
+ * work, each in its fill). Its label says what they count, so the picture is never the only way to read it.
  */
 export function Sparkline({
-  values,
-  part,
+  parts,
   label,
   className,
 }: {
-  values: number[]
-  part?: number[]
+  parts: { values: number[]; fill: string }[]
   label: string
   className?: string
 }) {
-  const top = Math.max(1, ...values)
+  const weeks = Math.max(0, ...parts.map((p) => p.values.length))
+  const totals = Array.from({ length: weeks }, (_, i) => parts.reduce((n, p) => n + (p.values[i] ?? 0), 0))
+  const top = Math.max(1, ...totals)
   const w = 4
   const gap = 1
   const h = 20
@@ -23,19 +23,25 @@ export function Sparkline({
     <svg
       role="img"
       aria-label={label}
-      viewBox={`0 0 ${values.length * (w + gap) - gap} ${h}`}
+      viewBox={`0 0 ${weeks * (w + gap) - gap} ${h}`}
       className={cn("h-5 w-[3.75rem] shrink-0 text-primary", className)}
       preserveAspectRatio="none"
     >
       <title>{label}</title>
-      {values.map((v, i) => {
-        const bar = v === 0 ? 1 : Math.max(2, Math.round((v / top) * h))
-        const p = Math.min(part?.[i] ?? 0, v)
-        const foot = p === 0 ? 0 : Math.max(1, Math.round((p / v) * bar))
+      {totals.map((v, i) => {
+        const x = i * (w + gap)
+        if (v === 0) return <rect key={i} x={x} y={h - 1} width={w} height={1} rx={1} fill="currentColor" opacity={0.25} />
+        const bar = Math.max(2, Math.round((v / top) * h))
+        let below = 0 // the parts' count under this one
         return (
           <g key={i}>
-            <rect x={i * (w + gap)} y={h - bar} width={w} height={bar} rx={1} fill="currentColor" opacity={v === 0 ? 0.25 : 1} />
-            {foot > 0 && <rect x={i * (w + gap)} y={h - foot} width={w} height={foot} rx={1} fill="var(--ai)" />}
+            {parts.map((p, j) => {
+              const n = p.values[i] ?? 0
+              const from = Math.round((below / v) * bar)
+              below += n
+              const to = Math.round((below / v) * bar)
+              return to > from && <rect key={j} x={x} y={h - to} width={w} height={to - from} rx={1} fill={p.fill} />
+            })}
           </g>
         )
       })}

@@ -11,14 +11,14 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { dashboardQuery, pageQuery } from "./api"
 import { Designer } from "./design"
 import { Elements } from "./elements"
-import type { Work } from "@/lib/preferences"
+import { team, type Work } from "@/lib/preferences"
 import { defaultLayout, type ProductsView } from "./layout"
 
 /**
  * DashboardView is the landing page: its layout's elements in order (design/layout.md), each answering which product needs a look
- * and why, through the reader's lens on people's work (work). view is the reader's remembered products view, when there is one. An admin can switch to the design mode.
+ * and why, through the reader's lens (work). view is the reader's remembered products view, when there is one. An admin can switch to the design mode.
  */
-export function DashboardView({ work = "all", view }: { work?: Work; view?: ProductsView }) {
+export function DashboardView({ work = team, view }: { work?: Work; view?: ProductsView }) {
   const { data, error } = useQuery(dashboardQuery(api, work))
   const { data: page } = useQuery(pageQuery(api))
   const { data: me } = useQuery(meQuery(api))

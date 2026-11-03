@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import { useId, useState, type ReactNode } from "react"
 import { Card, CardTitle } from "@/components/ui/card"
 import { pageSizes, sizeCookie, type PagedList } from "@/lib/paging"
-import { forget, productsViews, remember, viewCookie, workCookie, works, type ProductsView, type Work } from "@/lib/preferences"
+import { forget, kinds, productsViews, remember, viewCookie, workCookie, type ProductsView, type Work } from "@/lib/preferences"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import { PageHeader } from "@/shared/page-header"
 
@@ -42,6 +42,34 @@ function Choices<T extends string>({
           </span>
         </label>
       ))}
+    </fieldset>
+  )
+}
+
+/** Kinds is the work that counts as checkboxes, one per kind; the last one ticked stays, so something always counts. */
+function Kinds({ value, onChange }: { value: Work; onChange: (w: Work) => void }) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-sm font-medium">Count, at least one</legend>
+      {kinds.map((k) => {
+        const on = value.includes(k.value)
+        return (
+          <label key={k.value} className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              value={k.value}
+              checked={on}
+              disabled={on && value.length === 1}
+              onChange={() => onChange(kinds.map((x) => x.value).filter((x) => (x === k.value ? !on : value.includes(x))))}
+              className="mt-1 accent-primary"
+            />
+            <span>
+              {k.label}
+              <span className="block text-xs text-muted-foreground">{k.about}</span>
+            </span>
+          </label>
+        )
+      })}
     </fieldset>
   )
 }
@@ -104,15 +132,19 @@ export function SettingsView({ initial }: { initial: Settings }) {
       <div className="grid max-w-5xl gap-4 md:grid-cols-2">
         <Section
           title="Work that counts"
-          about="People and agents work together. Choose what the dashboard counts as the team's work: its numbers, sparklines, people, last change and fleet map."
+          about="People and agents work together, and automation maintains. Choose what the dashboard counts: its numbers, sparklines, people, last change and fleet map. The other kinds stay in sight beside it."
         >
-          <Choices
-            legend="Count"
+          <Kinds
             value={s.work}
-            options={works}
             onChange={(work) => {
-              remember(workCookie, work)
-              keep({ work }, `Work that counts: ${works.find((w) => w.value === work)?.label}`)
+              remember(workCookie, work.join(","))
+              keep(
+                { work },
+                `Work that counts: ${kinds
+                  .filter((k) => work.includes(k.value))
+                  .map((k) => k.label.toLowerCase())
+                  .join(", ")}`,
+              )
             }}
           />
         </Section>

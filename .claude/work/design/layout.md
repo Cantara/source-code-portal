@@ -103,16 +103,22 @@ flat object per element whose kind reads only its own fields):
 
 ## The work that counts and Settings (L4)
 
-People and agents work together, so neither is ranked: a card leads with the team's commits (by hand and with AI) and says both counts
-under it. The reader's lens (P-42), **Both** (the default), **By hand** or **With AI**, is a preference in the cookie `scp-work`; the
-dashboard route reads it and asks `GET /dashboard?work=`, and Go computes the lens: the counted number, who made the work, the last
-change, the recent repositories, the members' last change (so the fleet map and the Active tile) and the latest commits. The counts by
-hand and with AI are always both in `Activity` (`hand`, `ai`, `weeklyHand`, `weeklyAi`), so a card names the rest; the sparkline is
-both stacked (with AI at the foot) under Both, else the one series. `/commits?work=hand|ai` keeps only that work. Automation never
-counts and sweeps stay out of the team's work under every lens. Health, the group page and the repository page count all of the team's
-work (`commits.WorkAll`): they score and list repositories, they are not the reader's lens.
+People and agents work together, and automation maintains, so none is ranked: a card leads with the commits of the work that counts and
+names every kind under it. The reader's lens (P-42, P-43) is a set of kinds, any one or more of **By hand**, **With AI** and **By
+automation** (CI, dependency and release bots, and sweeps): a preference in the cookie `scp-work` (`hand,ai`), people's work (by hand
+and with AI) until the reader chooses. The dashboard route reads it and asks `GET /dashboard?work=hand,ai` (comma-separated, the
+clients' `querySerializer`), and Go computes the lens (`commits.Work`, a bit set; `oapi.WorkOrDefault` orders the echo): the counted
+number, the last change, the recent repositories, the members' last change (so the fleet map and the Active tile) and the latest
+commits; who made the work is people only (automation names none). Every kind's counts are always in `Activity` (`hand`, `ai`,
+`automation`, `sweeps`, `weeklyHand`, `weeklyAi`, `weeklyAutomation`), so a card names the rest, with a coloured dot for each kind
+that counts; the sparkline stacks the counted kinds, with AI at the foot (`--ai`), by hand, then automation (`--muted-foreground`).
+Sentences name the lens with `by(work)`: "by the team", "by hand", "with AI", "by automation", "by hand or automation", "by the team
+or automation". The latest commits' own *Include automation* shows only while the lens leaves automation out. `/commits?work=` keeps
+the kinds it names (every kind without it). Health, the group page and the repository page count people's work
+(`commits.WorkTeam`): they score and list repositories, they are not the reader's lens.
 
-`/settings` (in the header, for every viewer, not indexed) holds the reader's preferences: the work that counts, the products view,
+`/settings` (in the header, for every viewer, not indexed) holds the reader's preferences: the work that counts (a checkbox per kind,
+the last one ticked stays), the products view,
 the page sizes of the commit timelines and the histories (Default forgets the cookie), and the theme (its own storage, as before).
 Each is kept at once, the page announces it, and the server's pages follow it on their next render; `lib/preferences.ts` holds the
 cookies and their parsing, so the features share them without importing each other. Nothing is stored per person (P-38).

@@ -1,6 +1,7 @@
 package oapi
 
 import (
+	"slices"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -23,4 +24,18 @@ func TimeOrNil(t time.Time) *time.Time {
 // NewProblem returns an RFC 9457 problem with the portal's type URN for code.
 func NewProblem(status int, code, title, detail string) Problem {
 	return Problem{Type: "urn:scp:problem:" + code, Title: title, Status: status, Code: code, Detail: &detail}
+}
+
+// WorkOrDefault is the known kinds w names, once each and in the contract's order (hand, ai, automation); def when it names none.
+func WorkOrDefault(w *Work, def Work) Work {
+	out := Work{}
+	for _, k := range []WorkKind{WorkKindHand, WorkKindAi, WorkKindAutomation} {
+		if w != nil && slices.Contains(*w, k) {
+			out = append(out, k)
+		}
+	}
+	if len(out) == 0 {
+		return def
+	}
+	return out
 }

@@ -1,32 +1,46 @@
 import type { Schemas } from "@/lib/api/client"
-import type { Work } from "@/lib/preferences"
+import { by, has, isTeam, type Work } from "@/lib/preferences"
 
 type Activity = Schemas["Activity"]
 
+/** maintenance is the commits by automation and of sweeps in the last 30 days. */
+export const maintenance = (a: Activity) => a.automation + a.sweeps
+
 /** counted is the work that counts of an activity, in the last 30 days. */
 export function counted(a: Activity, w: Work): number {
-  return w === "hand" ? a.hand : w === "ai" ? a.ai : a.hand + a.ai
+  return (has(w, "hand") ? a.hand : 0) + (has(w, "ai") ? a.ai : 0) + (has(w, "automation") ? maintenance(a) : 0)
 }
 
-/** noun names the counted commits: "commits", "commits by hand", "commits with AI". */
+/** noun names the counted commits: "commits" for people's work (with automation or not), else "commits by hand", "with AI", .... */
 export function noun(n: number, w: Work): string {
   const c = n === 1 ? "commit" : "commits"
-  return w === "hand" ? `${c} by hand` : w === "ai" ? `${c} with AI` : c
+  return has(w, "hand") && has(w, "ai") ? c : `${c} ${by(w)}`
 }
 
-/** series is what a sparkline draws for the lens: both stacked (with AI at the foot), or the one the lens counts. */
-export function series(a: Activity, w: Work): { values: number[]; part?: number[]; ai?: boolean } {
-  if (w === "hand") return { values: a.weeklyHand }
-  if (w === "ai") return { values: a.weeklyAi, ai: true }
-  return { values: a.weeklyHand.map((n, i) => n + (a.weeklyAi[i] ?? 0)), part: a.weeklyAi }
+/** Part is one kind's weekly counts in a stacked sparkline, with its fill. */
+export type Part = { values: number[]; fill: string }
+
+/** fills are the colours the kinds are drawn in, here and in the text's dots. */
+export const fills = { hand: "currentColor", ai: "var(--ai)", automation: "var(--muted-foreground)" } as const
+
+/** series is what a sparkline stacks for the lens, the foot first: with AI, by hand, by automation, each when it counts. */
+export function series(a: Activity, w: Work): Part[] {
+  const parts: Part[] = []
+  if (has(w, "ai")) parts.push({ values: a.weeklyAi, fill: fills.ai })
+  if (has(w, "hand")) parts.push({ values: a.weeklyHand, fill: fills.hand })
+  if (has(w, "automation")) parts.push({ values: a.weeklyAutomation, fill: fills.automation })
+  return parts
 }
 
 /** weekly is a sparkline's label: what the bars count, by week. */
 export function weekly(a: Activity, w: Work): string {
-  const head = "the last 12 weeks, the oldest first"
-  if (w === "hand") return `Commits by hand per week, ${head}: ${a.weeklyHand.join(", ")}`
-  if (w === "ai") return `Commits with AI per week, ${head}: ${a.weeklyAi.join(", ")}`
-  return `Commits per week, ${head}: by hand ${a.weeklyHand.join(", ")}; with AI ${a.weeklyAi.join(", ")}`
+  const head = `Commits ${isTeam(w) ? "" : `${by(w)} `}per week, the last 12 weeks, the oldest first:`
+  const parts = [
+    has(w, "hand") && `by hand ${a.weeklyHand.join(", ")}`,
+    has(w, "ai") && `with AI ${a.weeklyAi.join(", ")}`,
+    has(w, "automation") && `by automation ${a.weeklyAutomation.join(", ")}`,
+  ].filter(Boolean)
+  return `${head} ${parts.join("; ")}`
 }
 
 /** share is the part of the team's commits made with an AI, as a percentage (-1 without commits). */

@@ -521,21 +521,21 @@ func (e ToolchainVersionsName) Valid() bool {
 	}
 }
 
-// Defines values for Work.
+// Defines values for WorkKind.
 const (
-	Ai   Work = "ai"
-	All  Work = "all"
-	Hand Work = "hand"
+	WorkKindAi         WorkKind = "ai"
+	WorkKindAutomation WorkKind = "automation"
+	WorkKindHand       WorkKind = "hand"
 )
 
-// Valid indicates whether the value is a known member of the Work enum.
-func (e Work) Valid() bool {
+// Valid indicates whether the value is a known member of the WorkKind enum.
+func (e WorkKind) Valid() bool {
 	switch e {
-	case Ai:
+	case WorkKindAi:
 		return true
-	case All:
+	case WorkKindAutomation:
 		return true
-	case Hand:
+	case WorkKindHand:
 		return true
 	default:
 		return false
@@ -557,7 +557,7 @@ func (e GetPageParamsPage) Valid() bool {
 	}
 }
 
-// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work).
+// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. Automation and sweeps are maintenance. The counts give every kind; the people (of people's work that counts), the last change and the recent repositories follow the work that counts (Dashboard.work).
 type Activity struct {
 	// Ai People's commits with an AI in the last 30 days: an AI co-author, or a coding agent as the author
 	Ai int `json:"ai"`
@@ -565,10 +565,10 @@ type Activity struct {
 	// Assistants The AI assistants of the last 30 days by family ("Claude", "Copilot"), most commits first, at most 3
 	Assistants []string `json:"assistants"`
 
-	// AuthorCount How many made the work that counts in the last 30 days
+	// AuthorCount How many people made the work that counts in the last 30 days
 	AuthorCount int `json:"authorCount"`
 
-	// Authors Who made the work that counts in the last 30 days, most commits first, at most 5
+	// Authors The people who made the work that counts in the last 30 days (automation names none), most commits first, at most 5
 	Authors []Person `json:"authors"`
 
 	// Automation Commits by automation in the last 30 days
@@ -588,6 +588,9 @@ type Activity struct {
 
 	// WeeklyAi People's commits with an AI per 7 days, the oldest of the last 12 first
 	WeeklyAi []int `json:"weeklyAi"`
+
+	// WeeklyAutomation Commits by automation and of sweeps per 7 days, the oldest of the last 12 first
+	WeeklyAutomation []int `json:"weeklyAutomation"`
 
 	// WeeklyHand People's commits by hand per 7 days, the oldest of the last 12 first
 	WeeklyHand []int `json:"weeklyHand"`
@@ -653,7 +656,7 @@ type CommitPage struct {
 
 // Dashboard defines model for Dashboard.
 type Dashboard struct {
-	// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work).
+	// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. Automation and sweeps are maintenance. The counts give every kind; the people (of people's work that counts), the last change and the recent repositories follow the work that counts (Dashboard.work).
 	Activity Activity `json:"activity"`
 
 	// Freshness Repositories by the freshness of their commits
@@ -663,20 +666,20 @@ type Dashboard struct {
 	// Health Every repository weighed as one product; the first 5 findings
 	Health *ProductHealth `json:"health"`
 
-	// Latest The 10 newest commits of the work that counts (Activity): neither automation nor sweeps; /commits lists all of them
+	// Latest The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them
 	Latest    []Commit `json:"latest"`
 	RepoCount int      `json:"repoCount"`
 
 	// UngroupedCount Repositories in no group
 	UngroupedCount int `json:"ungroupedCount"`
 
-	// Work The work that counts: all of people's work, by hand only, or with an AI only
+	// Work The work that counts: one or more kinds
 	Work Work `json:"work"`
 }
 
 // DashboardGroup defines model for DashboardGroup.
 type DashboardGroup struct {
-	// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. The counts give both; the people, the last change and the recent repositories follow the work that counts (Dashboard.work).
+	// Activity Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. Automation and sweeps are maintenance. The counts give every kind; the people (of people's work that counts), the last change and the recent repositories follow the work that counts (Dashboard.work).
 	Activity Activity `json:"activity"`
 
 	// DefaultRepo Address of the group's main repository
@@ -1324,8 +1327,11 @@ type ToolchainVersions struct {
 // ToolchainVersionsName defines model for ToolchainVersions.Name.
 type ToolchainVersionsName string
 
-// Work The work that counts: all of people's work, by hand only, or with an AI only
-type Work string
+// Work The work that counts: one or more kinds
+type Work = []WorkKind
+
+// WorkKind A kind of work: people's by hand, people's with an AI, or maintenance by automation (bots and sweeps)
+type WorkKind string
 
 // PageNumber defines model for PageNumber.
 type PageNumber = int
@@ -1346,7 +1352,7 @@ type ListCommitsParams struct {
 	// Automation false leaves out commits made by automation
 	Automation *bool `form:"automation,omitempty" json:"automation,omitempty"`
 
-	// Work The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out
+	// Work The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit
 	Work *Work `form:"work,omitempty" json:"work,omitempty"`
 
 	// Page The page, from 1
@@ -1356,7 +1362,7 @@ type ListCommitsParams struct {
 
 // GetDashboardParams defines parameters for GetDashboard.
 type GetDashboardParams struct {
-	// Work The work that counts (the reader's lens): all of people's work (by hand and with AI), by hand only, or with an AI only (an AI co-author or a coding agent). Automation is never people's work; on /commits, hand and ai leave it out
+	// Work The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit
 	Work *Work `form:"work,omitempty" json:"work,omitempty"`
 }
 
@@ -1509,7 +1515,7 @@ func (siw *ServerInterfaceWrapper) ListCommits(w http.ResponseWriter, r *http.Re
 
 	// ------------- Optional query parameter "work" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "work", r.URL.Query(), &params.Work, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "work", r.URL.Query(), &params.Work, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -1568,7 +1574,7 @@ func (siw *ServerInterfaceWrapper) GetDashboard(w http.ResponseWriter, r *http.R
 
 	// ------------- Optional query parameter "work" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "work", r.URL.Query(), &params.Work, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "work", r.URL.Query(), &params.Work, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {

@@ -16,28 +16,56 @@ export function forget(name: string) {
   document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`
 }
 
-/** Work is the work that counts, the reader's lens on people's work: all of it, by hand only, or with an AI only. */
+/**
+ * Work is the work that counts, the reader's lens: one or more kinds. People's work is by hand or with AI; automation (CI,
+ * dependency and release bots, and sweeps) is maintenance. The dashboard counts people's work until the reader chooses (P-43).
+ */
 export type Work = Schemas["Work"]
+export type WorkKind = Schemas["WorkKind"]
 
 export const workCookie = "scp-work"
 
-export const works: { value: Work; label: string; about: string }[] = [
-  { value: "all", label: "Both", about: "Every commit by the team, by hand and with AI. Automation is counted apart." },
-  { value: "hand", label: "By hand", about: "Only commits with no trace of an AI." },
+/** team is people's work, by hand and with AI: the default. */
+export const team: Work = ["hand", "ai"]
+
+export const kinds: { value: WorkKind; label: string; about: string }[] = [
+  { value: "hand", label: "By hand", about: "People's commits with no trace of an AI." },
   {
     value: "ai",
     label: "With AI",
-    about: "Only commits with an AI co-author, or by a coding agent. Some tools leave no trace, so this is a lower bound.",
+    about: "People's commits with an AI co-author, and a coding agent's. Some tools leave no trace, so this is a lower bound.",
+  },
+  {
+    value: "automation",
+    label: "By automation",
+    about: "Maintenance: CI, dependency and release bots, and sweeps (one change landing in more than 10 repositories on a day).",
   },
 ]
 
-/** workOf is v when it names a lens, else all. */
+/** workOf is the kinds v names (a cookie's "hand,ai"), once each and in order; people's work when it names none. */
 export function workOf(v: unknown): Work {
-  return v === "hand" || v === "ai" ? v : "all"
+  const named = typeof v === "string" ? v.split(",") : Array.isArray(v) ? v : []
+  const w = kinds.map((k) => k.value).filter((k) => named.includes(k))
+  return w.length > 0 ? w : team
 }
 
-/** by is how a sentence names the work that counts: "Last change by the team", "by hand", "with AI". */
-export const by: Record<Work, string> = { all: "by the team", hand: "by hand", ai: "with AI" }
+/** has reports whether the lens counts kind k. */
+export const has = (w: Work, k: WorkKind) => w.includes(k)
+
+/** isTeam reports whether the lens is people's work exactly, by hand and with AI. */
+export const isTeam = (w: Work) => w.length === 2 && has(w, "hand") && has(w, "ai")
+
+const named: Record<WorkKind, string> = { hand: "by hand", ai: "with AI", automation: "by automation" }
+
+/**
+ * by is how a sentence names the work that counts: "Last change by the team", "by hand", "with AI", "by automation", "by hand or
+ * automation", "by the team or automation".
+ */
+export function by(w: Work): string {
+  const people = has(w, "hand") && has(w, "ai") ? ["by the team"] : w.filter((k) => k !== "automation").map((k) => named[k])
+  if (!has(w, "automation")) return people.join(" or ")
+  return people.length === 0 ? named.automation : `${people.join(" or ")} or automation`
+}
 
 /** ProductsView is how the products element draws the groups: distilled cards or one sortable table. */
 export type ProductsView = "cards" | "table"

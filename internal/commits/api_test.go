@@ -120,18 +120,34 @@ func TestListCommitsAutomation(t *testing.T) {
 	}
 }
 
-// TestListCommitsWork: work=ai keeps people's commits with an AI, work=hand those by hand; neither keeps automation.
+// TestListCommitsWork: work keeps the kinds it names, over the fleet and in one repository.
 func TestListCommitsWork(t *testing.T) {
 	s := feedSnapshot(t)
 	a := API{Current: func(context.Context) *snapshot.Snapshot { return s }}
-	for work, want := range map[oapi.Work]string{oapi.Ai: "c", oapi.Hand: "afkg", oapi.All: "afkbgc"} {
-		res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: oapi.ListCommitsParams{Work: new(work)}})
+	for _, tc := range []struct {
+		repo string
+		work oapi.Work
+		want string
+	}{
+		{"", oapi.Work{oapi.WorkKindAi}, "c"},
+		{"", oapi.Work{oapi.WorkKindHand}, "afkg"},
+		{"", oapi.Work{oapi.WorkKindHand, oapi.WorkKindAi}, "afkgc"},
+		{"", oapi.Work{oapi.WorkKindAutomation}, "b"},
+		{"", oapi.Work{oapi.WorkKindAutomation, oapi.WorkKindHand, oapi.WorkKindAi}, "afkbgc"},
+		{"acme/x", oapi.Work{oapi.WorkKindAi}, "c"},
+		{"acme/x", oapi.Work{oapi.WorkKindHand, oapi.WorkKindAutomation}, "ab"},
+	} {
+		p := oapi.ListCommitsParams{Work: new(tc.work)}
+		if tc.repo != "" {
+			p.Repo = new(tc.repo)
+		}
+		res, _ := a.ListCommits(t.Context(), oapi.ListCommitsRequestObject{Params: p})
 		var shas []string
 		for _, c := range res.(oapi.ListCommits200JSONResponse).Body.Commits {
 			shas = append(shas, c.Sha[:1])
 		}
-		if got := strings.Join(shas, ""); got != want {
-			t.Errorf("work=%s: %s, want %s", work, got, want)
+		if got := strings.Join(shas, ""); got != tc.want {
+			t.Errorf("repo=%s work=%v: %s, want %s", tc.repo, tc.work, got, tc.want)
 		}
 	}
 }

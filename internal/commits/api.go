@@ -62,11 +62,7 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		key := e.Repo.Key()
 		refs = nil
 		if slices.Contains(scope, key) {
-			cs, _ := Of(e)
-			for i := range cs {
-				refs = append(refs, Ref{Repo: key, Commit: &cs[i]})
-			}
-			slices.SortFunc(refs, compareRefs)
+			refs = merge(s, []snapshot.RepoKey{key}, feedIndex.Get(s).sweeps)
 		}
 		scope = []snapshot.RepoKey{key}
 	}
@@ -164,19 +160,15 @@ func paging(total, number, size int) (start, end int, p oapi.Page) {
 	return start, end, oapi.Page{Number: number, Size: size, Total: total, Pages: max(1, (total+size-1)/size)}
 }
 
-// filterOf is the commits a listing keeps (nil: every one): automation=false leaves out automation; work=hand or ai keeps only
-// people's commits by hand or with an AI.
+// filterOf is the commits a listing keeps (nil: every one): automation=false leaves out automation; work keeps the kinds it names.
 func filterOf(automation *bool, work *oapi.Work) func(Ref) bool {
-	w := WorkAll
+	w := WorkEvery
 	if work != nil {
-		w = WorkOf(*work)
+		w = WorkOf(*work, WorkEvery)
 	}
 	noBots := automation != nil && !*automation
-	if w == WorkAll && !noBots {
+	if w == WorkEvery && !noBots {
 		return nil
 	}
-	return func(r Ref) bool {
-		o := r.Origin
-		return (!noBots || o != OriginAutomation) && (w == WorkAll || w.Counts(o))
-	}
+	return func(r Ref) bool { return (!noBots || r.Origin != OriginAutomation) && w.Counts(r.Origin, r.Person) }
 }

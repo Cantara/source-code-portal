@@ -2,7 +2,7 @@ import "server-only"
 import createClient from "openapi-fetch"
 import { headers } from "next/headers"
 import { cache } from "react"
-import { getter, type Api, type Get } from "./client"
+import { getter, querySerializer, type Api, type Get } from "./client"
 import type { paths } from "./schema"
 
 // The headers the Go server puts on a proxied page request that the API calls of the page carry back: the viewer (its kind, name
@@ -22,7 +22,9 @@ const pass = cache(async (): Promise<Record<string, string>> => {
 })
 
 /** serverApi is the API client of the current request: it reaches the Go server at SCP_API as the page's viewer. */
-export const serverApi = cache(async (): Promise<Api> => createClient<paths>({ baseUrl: base(), headers: await pass() }))
+export const serverApi = cache(async (): Promise<Api> =>
+  createClient<paths>({ baseUrl: base(), headers: await pass(), querySerializer }),
+)
 
 /** serverGet is the current request's Get, as the page's viewer. */
 export const serverGet = cache(async (): Promise<Get> => getter(base(), await pass()))
