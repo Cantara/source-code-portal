@@ -41,6 +41,8 @@ describe("pages", () => {
     const card = screen.getByRole("link", { name: "IAM" }).closest("li") as HTMLElement
     expect(card).toHaveTextContent("4 commits by people")
     expect(card).toHaveTextContent("9 by automation")
+    expect(card).toHaveTextContent("3 with AI (Claude)")
+    expect(within(card).getByRole("img", { name: /with AI: 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2/ })).toBeInTheDocument()
     expect(card).toHaveTextContent("ada and Bo")
     expect(within(card).getByText("ada")).toHaveAttribute("title", "Ada Lovelace")
     expect(card).toHaveTextContent("Apache-2.0 · Java · 1 of 2 released")
@@ -49,6 +51,9 @@ describe("pages", () => {
     // The fleet map counts every member by its last change by a person.
     expect(screen.getByRole("region", { name: "Fleet" })).toHaveTextContent("2 active")
     expect(screen.getByText("People").nextElementSibling).toHaveTextContent("2")
+    expect(screen.getByText(/by people in 30 days, 3 with AI \(Claude, Copilot\)/)).toBeInTheDocument()
+    // The latest commits mark the one made with an AI, naming it.
+    expect(screen.getByText("with Claude Opus 5")).toBeInTheDocument()
   })
 
   it("explains the fleet map's legend: the ranges always, the rest on request", async () => {
@@ -75,6 +80,7 @@ describe("pages", () => {
     await user.click(await screen.findByRole("button", { name: "table" }))
     const table = screen.getByRole("table", { name: /Products/ })
     expect(within(table).getByRole("rowheader", { name: "IAM" })).toBeInTheDocument()
+    expect(within(table).getByRole("cell", { name: "75%" })).toBeInTheDocument()
     await user.click(within(table).getByRole("button", { name: /By people, 30 days/ }))
     expect(within(table).getByRole("columnheader", { name: /By people/ })).toHaveAttribute("aria-sort", "descending")
     expect(document.cookie).toContain("scp-view-products=table")

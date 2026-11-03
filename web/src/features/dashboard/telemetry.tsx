@@ -17,6 +17,11 @@ function Tile({ label, value, detail, level }: { label: string; value: string; d
   )
 }
 
+/** withAI is "43 with AI (Claude, Copilot)": the commits by people that name an AI, and the assistants. */
+function withAI(a: Schemas["Activity"]): string {
+  return `${count(a.ai)} with AI${a.assistants.length > 0 ? ` (${a.assistants.join(", ")})` : ""}`
+}
+
 function percent(part: number, whole: number): string {
   return whole === 0 ? "–" : `${Math.round((part / whole) * 100)}%`
 }
@@ -46,7 +51,7 @@ export function Telemetry({ data, now }: { data: Schemas["Dashboard"]; now: numb
         <Tile
           label="People"
           value={count(a.authorCount)}
-          detail={`${plural(a.people, "commit", "commits")} by people in 30 days`}
+          detail={`${plural(a.people, "commit", "commits")} by people in 30 days${a.ai > 0 ? `, ${withAI(a)}` : ""}`}
           level={a.authorCount > 0 ? "lvl-active" : "lvl-dormant"}
         />
         <Tile
@@ -59,8 +64,8 @@ export function Telemetry({ data, now }: { data: Schemas["Dashboard"]; now: numb
           value={count(a.automation)}
           detail={
             a.sweeps > 0
-              ? `bot and release commits in 30 days; ${plural(a.sweeps, "commit", "commits")} in sweeps`
-              : "bot and release commits in 30 days"
+              ? `CI, dependency and release bots in 30 days; ${plural(a.sweeps, "commit", "commits")} in sweeps`
+              : "CI, dependency and release bots in 30 days"
           }
         />
         <Tile

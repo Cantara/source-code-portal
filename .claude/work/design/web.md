@@ -139,7 +139,7 @@ contrast in both themes. The header shows whether the live stream is open (`Live
 
 ## Build and serve
 - `pnpm build`: `next build` with `BUILD_ID` (git SHA, `dev` locally) as `deploymentId` and `NEXT_PUBLIC_BUILD_ID`, then `scripts/bundle.ts`: copies
-  `.next/standalone`, `.next/static` and `public/` into `web/bundle`, writes `BUILD` (the `BUILD_ID`) last, and fails when the gzip JS under `/_next/static` exceeds 300 KB,
+  `.next/standalone`, `.next/static` and `public/` into `web/bundle`, writes `BUILD` (the `BUILD_ID`) last, and fails when the gzip JS under `/_next/static` exceeds 310 KB (P-41),
   the CSS 25 KB, or any font is present. `web/bundle` is platform-independent JavaScript (`sharp` is not traced).
 - `web.dir` (the bundle directory) and `web.node` (default `node`): `scp serve` starts `node server.js` with `PORT` (a free loopback
   port), `HOSTNAME=127.0.0.1`, `NODE_ENV=production`, `SCP_API`, `SCP_VERSION` (the release, shown in the header next to the name) and nothing else from its environment; output goes to the log

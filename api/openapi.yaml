@@ -447,7 +447,7 @@ components:
         message: { type: string }
     Commit:
       type: object
-      required: [repo, sha, subject, authorName, authorLogin, url, committedAt, parents]
+      required: [repo, sha, subject, authorName, authorLogin, url, committedAt, parents, kind, assistant]
       properties:
         repo: { type: string, description: Repository address }
         sha: { type: string }
@@ -461,6 +461,13 @@ components:
           items: { type: string }
           maxItems: 8
           description: SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge
+        kind:
+          type: string
+          enum: [person, assisted, agent, automation]
+          description: >-
+            Who made it: a person with no trace of an AI; a person with an AI co-author (a Co-authored-by trailer or an AI tool's
+            footer); a coding agent as the author; automation (CI, dependency and release bots, or a bot's pull request merged)
+        assistant: { type: string, description: "The AI named by the commit, as named (\"Claude Opus 5\", \"Copilot\"); empty for none" }
     Label:
       type: object
       required: [name, kind, sha, default]
@@ -477,7 +484,7 @@ components:
           properties:
             body: { type: string, description: The message after its subject line; empty when there is none }
             committerName: { type: string }
-            automated: { type: boolean, description: "Made by automation: a [bot] author or a release plugin" }
+            automated: { type: boolean, description: "Made by automation: kind automation" }
             labels: { type: array, items: { $ref: "#/components/schemas/Label" }, description: "The branches and tags at this commit, the default branch first" }
             beyond: { type: array, items: { type: string }, description: The parents older than the stored history }
             graph: { oneOf: [{ $ref: "#/components/schemas/GraphRow" }, { type: "null" }], description: "The commit's row of the git graph; null on a filtered page" }
@@ -552,14 +559,19 @@ components:
     Activity:
       type: object
       description: >-
-        Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a
-        subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
-      required: [people, automation, sweeps, weekly, authors, authorCount, lastAuthoredAt, recent]
+        Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part
+        of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone
+        set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent)
+        within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound.
+      required: [people, ai, automation, sweeps, weekly, weeklyAi, authors, authorCount, assistants, lastAuthoredAt, recent]
       properties:
         people: { type: integer, description: Commits by people in the last 30 days }
+        ai: { type: integer, description: "Of the commits by people in the last 30 days, those with an AI: an AI co-author, or a coding agent as the author" }
         automation: { type: integer, description: Commits by automation in the last 30 days }
         sweeps: { type: integer, description: Commits of sweeps in the last 30 days }
         weekly: { type: array, items: { type: integer }, minItems: 12, maxItems: 12, description: "Commits by people per 7 days, the oldest of the last 12 first" }
+        weeklyAi: { type: array, items: { type: integer }, minItems: 12, maxItems: 12, description: "Of weekly, the commits with an AI" }
+        assistants: { type: array, items: { type: string }, description: "The AI assistants of the last 30 days by family (\"Claude\", \"Copilot\"), most commits first, at most 3" }
         authors: { type: array, items: { $ref: "#/components/schemas/Person" }, description: "The people who committed in the last 30 days, most commits first, at most 5" }
         authorCount: { type: integer, description: How many people committed in the last 30 days }
         lastAuthoredAt: { type: [string, "null"], format: date-time, description: "The newest commit by a person; null when none is read" }

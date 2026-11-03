@@ -274,7 +274,10 @@ The dashboard shows signals, not every attribute of every repository: a telemetr
 repositories a person changed, what automation did, the findings, whether the catalogue is current), a fleet map with every repository
 as one tile coloured by its last change by a person, the products as cards or a sortable table, and the latest commits by people. A
 commit by a bot or a release plugin is automation; a commit whose subject landed in more than 10 repositories on one day is a sweep.
-Neither counts as a person's work. Each card says once what most of its repositories share (the licence, the language) and shows only
+Neither counts as a person's work. A person's commit with an AI `Co-authored-by` trailer (as Claude Code, Copilot and Cursor write
+them) or an AI tool's footer, and a coding agent's own commit, are people's work "with AI": the cards and the telemetry count them and
+name the assistants, the sparklines draw them at the foot of each week, and the commit lists mark them. A tool that leaves no trace
+(inline completion) is not counted, so the share is a lower bound. Each card says once what most of its repositories share (the licence, the language) and shows only
 the exceptions; the members are on the product's page. A reader's choice of cards or table is kept in a cookie.
 
 An administrator can arrange the page: *Design this page* on the dashboard opens the design mode, with the page's elements in a list

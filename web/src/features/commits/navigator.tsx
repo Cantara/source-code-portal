@@ -10,6 +10,7 @@ import { repoQuery } from "@/lib/api/queries"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { count, exactUTC } from "@/lib/format"
 import { firstPageOf, rememberSize } from "@/lib/paging"
+import { AiMark } from "@/entities/commit/ai-mark"
 import { Author } from "@/entities/commit/author"
 import { GraphCell, maxLanes } from "@/entities/commit/graph-cell"
 import { FreshnessBadge } from "@/shared/freshness-badge"
@@ -386,6 +387,7 @@ function Row({
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
         <Labels labels={c.labels} row />
         <span className={`min-w-24 flex-1 truncate ${c.automated ? "text-muted-foreground" : ""}`}>{c.subject}</span>
+        <AiMark commit={c} />
         {said && <span className="sr-only">{said}</span>}
       </span>
       <span className="hidden w-28 shrink-0 truncate text-muted-foreground sm:block">
@@ -508,7 +510,14 @@ function Details({
           {c.authorName || c.authorLogin}
           {c.authorLogin && c.authorName ? ` (${c.authorLogin})` : ""}
           {c.automated ? ", automation" : ""}
+          {c.kind === "agent" ? ", a coding agent" : ""}
         </dd>
+        {c.assistant && (
+          <>
+            <dt className="text-muted-foreground">With AI</dt>
+            <dd className="break-words">{c.assistant}</dd>
+          </>
+        )}
         {c.committerName && c.committerName !== c.authorName && (
           <>
             <dt className="text-muted-foreground">Committer</dt>

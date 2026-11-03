@@ -170,7 +170,9 @@ func TestSweepsAndActivity(t *testing.T) {
 		cs := []Commit{commit("Sweeper", "chore: repair the manifest", ago(2))}
 		if i == 0 {
 			cs = append([]Commit{{SHA: sha(200), AuthorName: "renovate[bot]", Subject: "chore(deps): update", CommittedAt: ago(1)}}, cs...)
-			cs = append(cs, commit("Ada", "Fix the parser", ago(3)), commit("Ada", "Add a test", ago(20)), commit("Bo", "Old work", ago(60)))
+			assisted := commit("Ada", "Add a test", ago(20))
+			assisted.Body = "Covers the empty case.\n\nCo-authored-by: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+			cs = append(cs, commit("Ada", "Fix the parser", ago(3)), assisted, commit("Bo", "Old work", ago(60)))
 		}
 		facet.Set(e, newHistory(cs, nil, nil, "main"), snapshot.Freshness{State: snapshot.StateOK})
 		entries = append(entries, e)
@@ -199,6 +201,9 @@ func TestSweepsAndActivity(t *testing.T) {
 	}
 	if sum := g.Weekly[11] + g.Weekly[9]; sum != 2 || g.Weekly[11] != 1 || len(g.Weekly) != 12 {
 		t.Errorf("weekly = %v", g.Weekly)
+	}
+	if g.Ai != 1 || !slices.Equal(g.Assistants, []string{"Claude"}) || g.WeeklyAi[9] != 1 || g.WeeklyAi[11] != 0 {
+		t.Errorf("the commits with an AI: %d %v %v", g.Ai, g.Assistants, g.WeeklyAi)
 	}
 	if d.Activity.Sweeps != 11 || d.Activity.People != 2 {
 		t.Errorf("fleet activity = %+v", d.Activity)

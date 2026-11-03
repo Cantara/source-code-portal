@@ -151,6 +151,8 @@ func (h *History) commitOf(key snapshot.RepoKey, c *Commit) oapi.HistoryCommit {
 	out := oapi.HistoryCommit{Repo: string(key), Sha: c.SHA, Subject: c.Subject, Body: c.Body, AuthorName: c.AuthorName,
 		AuthorLogin: c.AuthorLogin, CommitterName: c.CommitterName, Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents,
 		Automated: Automated(c), Labels: []oapi.Label{}, Beyond: []string{}}
+	kind, ai := Classify(c)
+	out.Kind, out.Assistant = oapi.HistoryCommitKind(kind.String()), ai
 	for _, p := range c.Parents {
 		if !h.held(p) {
 			out.Beyond = append(out.Beyond, p)

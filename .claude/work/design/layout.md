@@ -1,5 +1,5 @@
 # Landing page and layouts
-Status: as built (L1, L2). Binding order: ../plan.md > this note.
+Status: as built (L1, L2, L3). Binding order: ../plan.md > this note.
 
 ## Scope
 The landing page exists so an engineer sees which products need a look and why. Today it lists every repository with every attribute:
@@ -16,7 +16,11 @@ The rule every element keeps, and the test for any new one:
 1. **Show the exception, not the default.** A value most repositories share is said once in the product's summary; a chip appears only
    where it differs: no licence, a release with unreleased changes, more than 20 open issues, failing to read.
 2. **People, not automation.** Activity counts commits by people. Automation (`commits.Automated`) is counted beside it, in grey, never
-   added to it; a product kept alive only by dependency updates reads as quiet.
+   added to it; a product kept alive only by dependency updates reads as quiet. Agents are co-workers (P-40): `commits.Classify` tells
+   each commit's origin, a person, a person with an AI (`assisted`: an AI `Co-authored-by` trailer, or an AI tool's footer), a coding
+   agent as the author (`agent`), or automation (CI, dependency and release bots, by `[bot]` or a bot-like name, and a bot's pull
+   request merged by a person). Assisted and agent commits are people's work and counted within it as "with AI", the assistant's
+   family named (Claude, Copilot); inline completion leaves no trace, so the count is a lower bound. A cut body keeps its trailers.
 3. **A sweep is not activity.** A commit whose subject lands in more than 10 repositories on the same day (UTC) is one change to the
    fleet, not activity in each repository: it counts neither as people nor for the activity levels.
 4. **Rank by what changes.** While every product scores good, the score does not tell products apart: the card leads with people's
@@ -29,7 +33,8 @@ The rule every element keeps, and the test for any new one:
 ## Data (L1)
 Added to `DashboardGroup`, computed per request from the viewer's view in the commits hook (`commits.Dashboard`):
 
-- `activity`: commits by people and by automation in the last 30 days, 12 weekly counts of commits by people, the people (name and
+- `activity`: commits by people (and of them, with AI) and by automation in the last 30 days, 12 weekly counts of commits by people
+  (and with AI, drawn at the foot of each bar in the `--ai` colour), the assistants (at most 3 families), the people (name and
   GitHub login, at most 5, then a count; the web shows the login, the name on hover, as the commit lists do), and the 3 repositories people changed last.
 - `exceptions`: the members whose chips are exceptions (rule 1), with the exception codes.
 - `summary`: the defaults said once: the common licence, language and release state when at least 80% of the members share them.

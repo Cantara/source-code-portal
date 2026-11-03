@@ -156,7 +156,9 @@ func (h *newest) Pop() any {
 type Ref struct {
 	Repo   snapshot.RepoKey
 	Commit *Commit // points into the repository's facet
-	Person bool    // a person's work in the view (ByPerson); set in the feeds index only
+	Person bool    // a person's work in the view (ByPerson), an agent's included; set in the feeds index only
+	Origin Origin  // set in the feeds index only
+	AI     string  // the assistant's family (Assistant) when Origin.AI
 }
 
 // feeds are the merged commits of every repository and of every group, newest first (committedAt desc, repo asc, sha desc), and the
@@ -249,7 +251,9 @@ func merge(s *snapshot.Snapshot, keys []snapshot.RepoKey, sweeps map[sweep]bool)
 		if e := s.Repos[k]; e != nil {
 			cs, _ := Of(e)
 			for i := range cs {
-				out = append(out, Ref{Repo: k, Commit: &cs[i], Person: !Automated(&cs[i]) && !sweeps[sweepOf(&cs[i])]})
+				kind, ai := Classify(&cs[i])
+				out = append(out, Ref{Repo: k, Commit: &cs[i], Origin: kind, AI: Assistant(ai),
+					Person: kind != OriginAutomation && !sweeps[sweepOf(&cs[i])]})
 			}
 		}
 	}
@@ -270,8 +274,9 @@ func compareRefs(a, b Ref) int {
 
 // commitOf converts a commit of the repository at repo to its API form.
 func commitOf(repo snapshot.RepoKey, c *Commit) oapi.Commit {
+	kind, ai := Classify(c)
 	return oapi.Commit{Repo: string(repo), Sha: c.SHA, Subject: c.Subject, AuthorName: c.AuthorName, AuthorLogin: c.AuthorLogin,
-		Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents}
+		Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents, Kind: oapi.CommitKind(kind.String()), Assistant: ai}
 }
 
 // LastCommit returns the time of the newest commit of e (zero when there is none) and the commits' freshness.
@@ -283,17 +288,17 @@ func LastCommit(e *snapshot.RepoEntry) (time.Time, snapshot.Freshness) {
 	return cs[0].CommittedAt, fresh
 }
 
-// Automated reports whether a commit was made by automation: an author named like a GitHub App (`renovate[bot]`) or a Maven release
-// commit.
+// Automated reports whether a commit was made by automation (Classify): CI, dependency and release bots, not coding agents.
 func Automated(c *Commit) bool {
-	return strings.HasSuffix(c.AuthorLogin, "[bot]") || strings.HasSuffix(c.AuthorName, "[bot]") ||
-		strings.HasPrefix(c.Subject, "[maven-release-plugin]")
+	k, _ := Classify(c)
+	return k == OriginAutomation
 }
 
 // Sweep reports whether c is part of a sweep in the view s: its subject landed in more than 10 repositories on its day.
 func Sweep(s *snapshot.Snapshot, c *Commit) bool { return feedIndex.Get(s).sweeps[sweepOf(c)] }
 
-// ByPerson reports whether c is a person's work in the view s: not automated and not part of a sweep.
+// ByPerson reports whether c is a person's work in the view s: not automated and not part of a sweep. A coding agent's commit is a
+// person's work: someone set the agent to it (P-40).
 func ByPerson(s *snapshot.Snapshot, c *Commit) bool { return !Automated(c) && !Sweep(s, c) }
 
 // LastAuthored returns the time of the newest commit of e in the view s that is a person's work (ByPerson). When no read commit is,
@@ -312,11 +317,12 @@ func LastAuthored(s *snapshot.Snapshot, e *snapshot.RepoEntry) (at time.Time, be
 }
 
 const (
-	dashboardCommits = 10 // how many of the latest commits by people the dashboard shows
-	activityDays     = 30 // the window of the activity counts and authors
-	activityWeeks    = 12 // the weekly counts
-	activityAuthors  = 5  // the authors named
-	activityRecent   = 3  // the repositories people changed last
+	dashboardCommits   = 10 // how many of the latest commits by people the dashboard shows
+	activityDays       = 30 // the window of the activity counts and authors
+	activityWeeks      = 12 // the weekly counts
+	activityAuthors    = 5  // the authors named
+	activityRecent     = 3  // the repositories people changed last
+	activityAssistants = 3  // the AI assistants named
 )
 
 // Dashboard adds the commits to the dashboard: the latest commits by people, the activity of the fleet and of each group (with its
@@ -368,14 +374,15 @@ func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 // the authors, the last commit by a person and the repositories people changed last.
 func activity(refs []Ref, now time.Time) oapi.Activity {
 	const day, week = 24 * time.Hour, 7 * 24 * time.Hour
-	a := oapi.Activity{Weekly: make([]int, activityWeeks), Authors: []oapi.Person{}, Recent: []oapi.RecentRepo{}}
+	a := oapi.Activity{Weekly: make([]int, activityWeeks), WeeklyAi: make([]int, activityWeeks), Authors: []oapi.Person{},
+		Assistants: []string{}, Recent: []oapi.RecentRepo{}}
 	window, weeks := now.Add(-activityDays*day), now.Add(-activityWeeks*week)
 	type author struct {
 		name, login string
 		commits     int
 		first       int // order of appearance: the newest commit first
 	}
-	authors := map[string]*author{}
+	authors, assistants := map[string]*author{}, map[string]*author{}
 	for _, r := range refs {
 		c := r.Commit
 		if c.CommittedAt.Before(weeks) && a.LastAuthoredAt != nil && len(a.Recent) == activityRecent {
@@ -389,7 +396,11 @@ func activity(refs []Ref, now time.Time) oapi.Activity {
 				a.Recent = append(a.Recent, oapi.RecentRepo{Repo: string(r.Repo), At: c.CommittedAt.UTC()})
 			}
 			if !c.CommittedAt.Before(weeks) {
-				a.Weekly[activityWeeks-1-min(max(int(now.Sub(c.CommittedAt)/week), 0), activityWeeks-1)]++
+				w := activityWeeks - 1 - min(max(int(now.Sub(c.CommittedAt)/week), 0), activityWeeks-1)
+				a.Weekly[w]++
+				if r.Origin.AI() {
+					a.WeeklyAi[w]++
+				}
 			}
 		}
 		if c.CommittedAt.Before(window) {
@@ -407,14 +418,26 @@ func activity(refs []Ref, now time.Time) oapi.Activity {
 				authors[key] = &author{name: cmp.Or(c.AuthorName, c.AuthorLogin), login: c.AuthorLogin, first: len(authors)}
 			}
 			authors[key].commits++
+			if r.Origin.AI() {
+				a.Ai++
+				if assistants[r.AI] == nil {
+					assistants[r.AI] = &author{name: r.AI, first: len(assistants)}
+				}
+				assistants[r.AI].commits++
+			}
 		}
 	}
-	ranked := slices.SortedFunc(maps.Values(authors), func(x, y *author) int {
+	byCommits := func(x, y *author) int {
 		return cmp.Or(cmp.Compare(y.commits, x.commits), cmp.Compare(x.first, y.first))
-	})
+	}
+	ranked := slices.SortedFunc(maps.Values(authors), byCommits)
 	a.AuthorCount = len(ranked)
 	for _, au := range ranked[:min(activityAuthors, len(ranked))] {
 		a.Authors = append(a.Authors, oapi.Person{Name: au.name, Login: loginOf(au.login)})
+	}
+	tools := slices.SortedFunc(maps.Values(assistants), byCommits)
+	for _, t := range tools[:min(activityAssistants, len(tools))] {
+		a.Assistants = append(a.Assistants, t.name)
 	}
 	return a
 }

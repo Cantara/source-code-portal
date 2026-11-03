@@ -20,6 +20,8 @@ export function commit(i: number, repo = "acme/core"): S["Commit"] {
     url: `https://github.com/${repo}/commit/${i}`,
     committedAt: at,
     parents: i > 0 ? [(i - 1).toString(16).padStart(40, "0")] : [],
+    kind: "person",
+    assistant: "",
   }
 }
 
@@ -93,9 +95,12 @@ export const me = (over: Partial<S["Me"]> = {}): S["Me"] => ({
 /** activity is a product's or the fleet's work, none unless over says otherwise. */
 export const activity = (over: Partial<S["Activity"]> = {}): S["Activity"] => ({
   people: 0,
+  ai: 0,
   automation: 0,
   sweeps: 0,
   weekly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3],
+  weeklyAi: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  assistants: [],
   authors: [],
   authorCount: 0,
   lastAuthoredAt: null,
@@ -136,6 +141,9 @@ export const defaults = [
           health: product,
           activity: activity({
             people: 4,
+            ai: 3,
+            weeklyAi: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2],
+            assistants: ["Claude"],
             automation: 9,
             authors: [{ name: "Ada Lovelace", login: "ada" }, { name: "Bo" }],
             authorCount: 2,
@@ -152,6 +160,8 @@ export const defaults = [
       health: product,
       activity: activity({
         people: 4,
+        ai: 3,
+        assistants: ["Claude", "Copilot"],
         automation: 9,
         authors: [{ name: "Ada Lovelace", login: "ada" }, { name: "Bo" }],
         authorCount: 2,
@@ -159,7 +169,7 @@ export const defaults = [
       }),
       repoCount: 3,
       ungroupedCount: 1,
-      latest: [commit(1)],
+      latest: [{ ...commit(1), kind: "assisted", assistant: "Claude Opus 5" }],
       freshness: { fresh: 2, stale: 1, unknown: 0, error: 0 },
     }),
   ),

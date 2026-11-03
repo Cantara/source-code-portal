@@ -33,7 +33,13 @@ function names(a: Schemas["Activity"]): ReactNode {
 
 /** weekly is the sparkline's label: what the bars count and the last week. */
 function weekly(a: Schemas["Activity"]): string {
-  return `Commits by people per week, the last 12 weeks: ${a.weekly.join(", ")}`
+  const ai = a.weeklyAi.some((n) => n > 0) ? `; with AI: ${a.weeklyAi.join(", ")}` : ""
+  return `Commits by people per week, the last 12 weeks: ${a.weekly.join(", ")}${ai}`
+}
+
+/** share is the part of the people's commits with an AI, as a percentage (-1 without commits). */
+function share(a: Schemas["Activity"]): number {
+  return a.people === 0 ? -1 : Math.round((a.ai / a.people) * 100)
 }
 
 /** Shared is what most members have in common, said once: the licence, the language and how many are released. */
@@ -76,11 +82,17 @@ function ProductCard({ group, now }: { group: Group; now: number }) {
         <p className="text-sm">
           <span className="font-mono text-lg font-semibold tabular-nums">{count(a.people)}</span>{" "}
           {a.people === 1 ? "commit" : "commits"} by people
+          {a.ai > 0 && (
+            <span className="block text-xs text-muted-foreground">
+              <span aria-hidden="true" className="mr-1 inline-block size-2 rounded-xs bg-[var(--ai)]" />
+              {count(a.ai)} with AI{a.assistants.length > 0 && ` (${a.assistants.join(", ")})`}
+            </span>
+          )}
           <span className="block text-xs text-muted-foreground">
             {count(a.automation)} by automation{a.sweeps > 0 && `, ${count(a.sweeps)} in sweeps`} · 30 days
           </span>
         </p>
-        <Sparkline values={a.weekly} label={weekly(a)} />
+        <Sparkline values={a.weekly} part={a.weeklyAi} label={weekly(a)} />
       </div>
       <p className="text-sm">
         {a.authorCount > 0 ? (
@@ -162,9 +174,16 @@ const columns: Column[] = [
     cell: (g) => (
       <span className="inline-flex items-center justify-end gap-2">
         {count(g.activity.people)}
-        <Sparkline values={g.activity.weekly} label={weekly(g.activity)} className="h-4 w-12" />
+        <Sparkline values={g.activity.weekly} part={g.activity.weeklyAi} label={weekly(g.activity)} className="h-4 w-12" />
       </span>
     ),
+  },
+  {
+    key: "ai",
+    label: "With AI",
+    numeric: true,
+    value: (g) => share(g.activity),
+    cell: (g) => (share(g.activity) < 0 ? "–" : `${share(g.activity)}%`),
   },
   {
     key: "automation",

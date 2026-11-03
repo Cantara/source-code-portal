@@ -56,8 +56,10 @@ points for each finding, and the portal shows the findings beside the score:
 | no licence | 20 | a public repository where GitHub detects no licence |
 | open issues and pull requests | 10 or 20 | more than 20, or more than 50 |
 
-Commits by automation do not count as change: authors ending in `[bot]` (Renovate, Dependabot, GitHub Actions) and
-`[maven-release-plugin]` commits. They do count as unreleased changes. 80 and above is good, 50 and above is to watch, below 50 needs
+Commits by automation do not count as change: authors ending in `[bot]` or named like a bot (Renovate, Dependabot, GitHub Actions,
+`snyk-bot`), a bot's pull request merged by a person (a bot `Co-authored-by` trailer) and `[maven-release-plugin]` commits. Commits by
+coding agents (Claude, Copilot's coding agent, Devin, Jules, Codex) and commits with an AI co-author do count: someone set the agent to
+work. They do count as unreleased changes. 80 and above is good, 50 and above is to watch, below 50 needs
 attention. Archived repositories and those with `lifecycle: deprecated`
 in their descriptor have no score.
 

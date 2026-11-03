@@ -38,6 +38,30 @@ func (e AssistantStatusAccess) Valid() bool {
 	}
 }
 
+// Defines values for CommitKind.
+const (
+	CommitKindAgent      CommitKind = "agent"
+	CommitKindAssisted   CommitKind = "assisted"
+	CommitKindAutomation CommitKind = "automation"
+	CommitKindPerson     CommitKind = "person"
+)
+
+// Valid indicates whether the value is a known member of the CommitKind enum.
+func (e CommitKind) Valid() bool {
+	switch e {
+	case CommitKindAgent:
+		return true
+	case CommitKindAssisted:
+		return true
+	case CommitKindAutomation:
+		return true
+	case CommitKindPerson:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DependencyScope.
 const (
 	Dev      DependencyScope = "dev"
@@ -293,6 +317,30 @@ func (e HealthLevel) Valid() bool {
 	}
 }
 
+// Defines values for HistoryCommitKind.
+const (
+	HistoryCommitKindAgent      HistoryCommitKind = "agent"
+	HistoryCommitKindAssisted   HistoryCommitKind = "assisted"
+	HistoryCommitKindAutomation HistoryCommitKind = "automation"
+	HistoryCommitKindPerson     HistoryCommitKind = "person"
+)
+
+// Valid indicates whether the value is a known member of the HistoryCommitKind enum.
+func (e HistoryCommitKind) Valid() bool {
+	switch e {
+	case HistoryCommitKindAgent:
+		return true
+	case HistoryCommitKindAssisted:
+		return true
+	case HistoryCommitKindAutomation:
+		return true
+	case HistoryCommitKindPerson:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LabelKind.
 const (
 	Branch LabelKind = "branch"
@@ -488,8 +536,14 @@ func (e GetPageParamsPage) Valid() bool {
 	}
 }
 
-// Activity Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
+// Activity Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound.
 type Activity struct {
+	// Ai Of the commits by people in the last 30 days, those with an AI: an AI co-author, or a coding agent as the author
+	Ai int `json:"ai"`
+
+	// Assistants The AI assistants of the last 30 days by family ("Claude", "Copilot"), most commits first, at most 3
+	Assistants []string `json:"assistants"`
+
 	// AuthorCount How many people committed in the last 30 days
 	AuthorCount int `json:"authorCount"`
 
@@ -513,6 +567,9 @@ type Activity struct {
 
 	// Weekly Commits by people per 7 days, the oldest of the last 12 first
 	Weekly []int `json:"weekly"`
+
+	// WeeklyAi Of weekly, the commits with an AI
+	WeeklyAi []int `json:"weeklyAi"`
 }
 
 // AssistantStatus defines model for AssistantStatus.
@@ -538,10 +595,16 @@ type AssistantStatusAccess string
 
 // Commit defines model for Commit.
 type Commit struct {
+	// Assistant The AI named by the commit, as named ("Claude Opus 5", "Copilot"); empty for none
+	Assistant string `json:"assistant"`
+
 	// AuthorLogin GitHub login; empty when unknown
 	AuthorLogin string    `json:"authorLogin"`
 	AuthorName  string    `json:"authorName"`
 	CommittedAt time.Time `json:"committedAt"`
+
+	// Kind Who made it: a person with no trace of an AI; a person with an AI co-author (a Co-authored-by trailer or an AI tool's footer); a coding agent as the author; automation (CI, dependency and release bots, or a bot's pull request merged)
+	Kind CommitKind `json:"kind"`
 
 	// Parents SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge
 	Parents []string `json:"parents"`
@@ -557,6 +620,9 @@ type Commit struct {
 	Url string `json:"url"`
 }
 
+// CommitKind Who made it: a person with no trace of an AI; a person with an AI co-author (a Co-authored-by trailer or an AI tool's footer); a coding agent as the author; automation (CI, dependency and release bots, or a bot's pull request merged)
+type CommitKind string
+
 // CommitPage defines model for CommitPage.
 type CommitPage struct {
 	Commits   []Commit  `json:"commits"`
@@ -566,7 +632,7 @@ type CommitPage struct {
 
 // Dashboard defines model for Dashboard.
 type Dashboard struct {
-	// Activity Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
+	// Activity Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound.
 	Activity Activity `json:"activity"`
 
 	// Freshness Repositories by the freshness of their commits
@@ -586,7 +652,7 @@ type Dashboard struct {
 
 // DashboardGroup defines model for DashboardGroup.
 type DashboardGroup struct {
-	// Activity Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it.
+	// Activity Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound.
 	Activity Activity `json:"activity"`
 
 	// DefaultRepo Address of the group's main repository
@@ -854,11 +920,14 @@ type HealthLevel string
 
 // HistoryCommit defines model for HistoryCommit.
 type HistoryCommit struct {
+	// Assistant The AI named by the commit, as named ("Claude Opus 5", "Copilot"); empty for none
+	Assistant string `json:"assistant"`
+
 	// AuthorLogin GitHub login; empty when unknown
 	AuthorLogin string `json:"authorLogin"`
 	AuthorName  string `json:"authorName"`
 
-	// Automated Made by automation: a [bot] author or a release plugin
+	// Automated Made by automation: kind automation
 	Automated bool `json:"automated"`
 
 	// Beyond The parents older than the stored history
@@ -871,6 +940,9 @@ type HistoryCommit struct {
 
 	// Graph The commit's row of the git graph; null on a filtered page
 	Graph *GraphRow `json:"graph"`
+
+	// Kind Who made it: a person with no trace of an AI; a person with an AI co-author (a Co-authored-by trailer or an AI tool's footer); a coding agent as the author; automation (CI, dependency and release bots, or a bot's pull request merged)
+	Kind HistoryCommitKind `json:"kind"`
 
 	// Labels The branches and tags at this commit, the default branch first
 	Labels []Label `json:"labels"`
@@ -888,6 +960,9 @@ type HistoryCommit struct {
 	// Url Commit page; empty when unknown
 	Url string `json:"url"`
 }
+
+// HistoryCommitKind Who made it: a person with no trace of an AI; a person with an AI co-author (a Co-authored-by trailer or an AI tool's footer); a coding agent as the author; automation (CI, dependency and release bots, or a bot's pull request merged)
+type HistoryCommitKind string
 
 // HistoryPage defines model for HistoryPage.
 type HistoryPage struct {

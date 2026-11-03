@@ -466,6 +466,13 @@ export interface components {
       committedAt: string
       /** @description SHAs of the parent commits, first parent first; empty for a root commit, two or more for a merge */
       parents: string[]
+      /**
+       * @description Who made it: a person with no trace of an AI; a person with an AI co-author (a Co-authored-by trailer or an AI tool's footer); a coding agent as the author; automation (CI, dependency and release bots, or a bot's pull request merged)
+       * @enum {string}
+       */
+      kind: "person" | "assisted" | "agent" | "automation"
+      /** @description The AI named by the commit, as named ("Claude Opus 5", "Copilot"); empty for none */
+      assistant: string
     }
     Label: {
       name: string
@@ -480,7 +487,7 @@ export interface components {
       /** @description The message after its subject line; empty when there is none */
       body: string
       committerName: string
-      /** @description Made by automation: a [bot] author or a release plugin */
+      /** @description Made by automation: kind automation */
       automated: boolean
       /** @description The branches and tags at this commit, the default branch first */
       labels: components["schemas"]["Label"][]
@@ -561,16 +568,22 @@ export interface components {
       members: components["schemas"]["DashboardMember"][]
       summary: components["schemas"]["GroupSummaryFacts"]
     }
-    /** @description Work on the default branches. A person's commit is one not made by automation (bots, release plugins) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). Automation and sweeps are counted beside it, never in it. */
+    /** @description Work on the default branches. A person's commit is one not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is a person's: someone set the agent to it. Automation and sweeps are counted beside it, never in it; the commits with an AI (assisted or by an agent) within it. AI use leaves no trace in some tools (inline completion), so ai is a lower bound. */
     Activity: {
       /** @description Commits by people in the last 30 days */
       people: number
+      /** @description Of the commits by people in the last 30 days, those with an AI: an AI co-author, or a coding agent as the author */
+      ai: number
       /** @description Commits by automation in the last 30 days */
       automation: number
       /** @description Commits of sweeps in the last 30 days */
       sweeps: number
       /** @description Commits by people per 7 days, the oldest of the last 12 first */
       weekly: number[]
+      /** @description Of weekly, the commits with an AI */
+      weeklyAi: number[]
+      /** @description The AI assistants of the last 30 days by family ("Claude", "Copilot"), most commits first, at most 3 */
+      assistants: string[]
       /** @description The people who committed in the last 30 days, most commits first, at most 5 */
       authors: components["schemas"]["Person"][]
       /** @description How many people committed in the last 30 days */

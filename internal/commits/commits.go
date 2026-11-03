@@ -329,10 +329,41 @@ func body(msg string) string {
 	msg = strings.TrimLeft(msg, "\r\n\t ")
 	_, rest, _ := strings.Cut(msg, "\n")
 	rest = strings.TrimSpace(untrusted.Strip(rest))
-	if r := []rune(rest); len(r) > maxBody {
-		rest = string(r[:maxBody-1]) + "…"
+	r := []rune(rest)
+	if len(r) <= maxBody {
+		return rest
 	}
-	return rest
+	// The trailers (Co-authored-by and the like) close the message and say who made it: a long body keeps them.
+	tail := trailers(rest)
+	if tail == "" {
+		return string(r[:maxBody-1]) + "…"
+	}
+	return string(r[:maxBody-len([]rune(tail))-3]) + "…\n\n" + tail
+}
+
+// maxTrailers bounds the closing paragraph a cut body keeps.
+const maxTrailers = 1024 // runes
+
+// trailers is the last paragraph of a message when it is made of trailers ("Key: value" lines, an AI tool's footer among them), at
+// most maxTrailers runes; else "".
+func trailers(msg string) string {
+	i := strings.LastIndex(msg, "\n\n")
+	if i < 0 {
+		return ""
+	}
+	last := strings.TrimSpace(msg[i:])
+	if last == "" || len([]rune(last)) > maxTrailers {
+		return ""
+	}
+	for line := range strings.Lines(last) {
+		if strings.Contains(strings.ToLower(line), "generated with") {
+			continue
+		}
+		if key, _, ok := strings.Cut(strings.TrimSpace(line), ": "); !ok || key == "" || strings.ContainsAny(key, " \t") {
+			return ""
+		}
+	}
+	return last
 }
 
 // parents keeps the valid parent SHAs, lower-case, in order, without duplicates, at most maxParents; never nil.
