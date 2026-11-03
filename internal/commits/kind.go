@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 )
@@ -40,7 +41,8 @@ var agents = map[string]string{ //nolint:gochecknoglobals // a fixed table
 	"openhands-agent":              "OpenHands",
 }
 
-// aiDomains are the e-mail domains of AI co-authors; aiLocals the local parts (after a GitHub noreply's "<id>+").
+// aiDomains are the e-mail domains of AI co-authors, counted only at their no-reply address (a person at openai.com is a person);
+// aiLocals the local parts at any domain (after a GitHub noreply's "<id>+"): an own agent at claude@ is an AI.
 var (
 	aiDomains = map[string]bool{"anthropic.com": true, "claude.com": true, "cursor.com": true, "aider.chat": true, //nolint:gochecknoglobals // a fixed table
 		"openai.com": true, "cognition.ai": true}
@@ -54,6 +56,21 @@ var (
 var footers = []struct{ mark, assistant string }{ //nolint:gochecknoglobals // a fixed table
 	{"generated with [claude code]", "Claude Code"},
 	{"generated with claude code", "Claude Code"},
+}
+
+// footer is the assistant an AI tool's footer line names, "" for none: the line begins with the mark, after spaces and an emoji. A
+// mention of the words inside a sentence is not a footer.
+func footer(body string) string {
+	lower := strings.ToLower(body)
+	for line := range strings.Lines(lower) {
+		line = strings.TrimLeftFunc(line, func(r rune) bool { return unicode.IsSpace(r) || r > unicode.MaxASCII })
+		for _, f := range footers {
+			if strings.HasPrefix(line, f.mark) {
+				return f.assistant
+			}
+		}
+	}
+	return ""
 }
 
 // botLike reports whether a name or login is automation's: a GitHub App (`renovate[bot]`) or named like a bot (`Renovate Bot`,
@@ -78,21 +95,19 @@ func Classify(c *Commit) (Origin, string) {
 	if who == "" {
 		who = strings.ToLower(c.AuthorName)
 	}
-	ai, bot := coAuthors(c.Body)
 	if a, ok := agents[who]; ok {
+		ai, _ := coAuthors(c.Body)
 		return OriginAgent, cmp.Or(ai, a)
 	}
 	if botLike(c.AuthorLogin) || botLike(c.AuthorName) {
 		return OriginAutomation, ""
 	}
+	ai, bot := coAuthors(c.Body)
 	if ai != "" {
 		return OriginAssisted, ai
 	}
-	lower := strings.ToLower(c.Body)
-	for _, f := range footers {
-		if strings.Contains(lower, f.mark) {
-			return OriginAssisted, f.assistant
-		}
+	if f := footer(c.Body); f != "" {
+		return OriginAssisted, f
 	}
 	if bot {
 		return OriginAutomation, ""
@@ -113,7 +128,7 @@ func coAuthors(body string) (ai string, bot bool) {
 			local = after
 		}
 		switch {
-		case aiDomains[domain] || aiLocals[local]:
+		case aiLocals[local] || aiDomains[domain] && (local == "noreply" || local == "no-reply"):
 			if ai == "" {
 				ai = cmp.Or(strings.TrimSpace(note.ReplaceAllString(name, "")), local)
 			}
@@ -160,20 +175,6 @@ func WorkOf(ks []oapi.WorkKind, none Work) Work {
 		return none
 	}
 	return w
-}
-
-// Kinds is the lens in the contract's form.
-func (w Work) Kinds() oapi.Work {
-	out := oapi.Work{}
-	for _, k := range []struct {
-		w Work
-		k oapi.WorkKind
-	}{{WorkHand, oapi.WorkKindHand}, {WorkAI, oapi.WorkKindAi}, {WorkAutomation, oapi.WorkKindAutomation}} {
-		if w&k.w != 0 {
-			out = append(out, k.k)
-		}
-	}
-	return out
 }
 
 // kindOf is the kind of work of a commit of origin o; person is false for automation and sweeps.

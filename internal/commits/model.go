@@ -156,16 +156,17 @@ func (h *newest) Pop() any {
 type Ref struct {
 	Repo   snapshot.RepoKey
 	Commit *Commit // points into the repository's facet
-	Person bool    // a person's work in the view (ByPerson), an agent's included; set in the feeds index only
+	Person bool    // a person's work in the view (not automation, not a sweep), an agent's included; set in the feeds index only
 	Origin Origin  // set in the feeds index only
 	AI     string  // the assistant's family (Assistant) when Origin.AI
 }
 
-// feeds are the merged commits of every repository and of every group, newest first (committedAt desc, repo asc, sha desc), and the
-// sweeps among them.
+// feeds are the merged commits of every repository, of every group and of each repository, newest first (committedAt desc, repo asc,
+// sha desc), each commit classified once per snapshot, and the sweeps among them.
 type feeds struct {
 	all     []Ref
 	byGroup map[string][]Ref
+	byRepo  map[snapshot.RepoKey][]Ref
 	sweeps  map[sweep]bool
 }
 
@@ -226,9 +227,13 @@ func HistoryOf(e *snapshot.RepoEntry) (*History, snapshot.Freshness) { return fa
 func Feeds() snapshot.Indexer {
 	return feedIndex.Build(func(s *snapshot.Snapshot) feeds {
 		sweeps := sweepsOf(s)
-		f := feeds{all: merge(s, slices.Sorted(maps.Keys(s.Repos)), sweeps), byGroup: make(map[string][]Ref, len(s.Groups)), sweeps: sweeps}
+		f := feeds{byGroup: make(map[string][]Ref, len(s.Groups)), byRepo: make(map[snapshot.RepoKey][]Ref, len(s.Repos)), sweeps: sweeps}
+		for k, e := range s.Repos {
+			f.byRepo[k] = refsOf(k, e, sweeps)
+		}
+		f.all = merge(f.byRepo, slices.Collect(maps.Keys(s.Repos)))
 		for _, g := range s.Groups {
-			f.byGroup[g.ID] = merge(s, g.Members, sweeps)
+			f.byGroup[g.ID] = merge(f.byRepo, g.Members)
 		}
 		return f
 	})
@@ -244,18 +249,24 @@ func feed(s *snapshot.Snapshot, id string) ([]Ref, bool) {
 	return refs, ok
 }
 
-// merge merges the commits of keys, newest first, marking a person's work.
-func merge(s *snapshot.Snapshot, keys []snapshot.RepoKey, sweeps map[sweep]bool) []Ref {
+// refsOf classifies the default-branch commits of the repository k, newest first, marking a person's work.
+func refsOf(k snapshot.RepoKey, e *snapshot.RepoEntry, sweeps map[sweep]bool) []Ref {
+	cs, _ := Of(e)
+	out := make([]Ref, 0, len(cs))
+	for i := range cs {
+		kind, ai := Classify(&cs[i])
+		out = append(out, Ref{Repo: k, Commit: &cs[i], Origin: kind, AI: Assistant(ai),
+			Person: kind != OriginAutomation && !sweeps[sweepOf(&cs[i])]})
+	}
+	slices.SortFunc(out, compareRefs)
+	return out
+}
+
+// merge merges the classified commits of keys, newest first.
+func merge(byRepo map[snapshot.RepoKey][]Ref, keys []snapshot.RepoKey) []Ref {
 	var out []Ref
 	for _, k := range keys {
-		if e := s.Repos[k]; e != nil {
-			cs, _ := Of(e)
-			for i := range cs {
-				kind, ai := Classify(&cs[i])
-				out = append(out, Ref{Repo: k, Commit: &cs[i], Origin: kind, AI: Assistant(ai),
-					Person: kind != OriginAutomation && !sweeps[sweepOf(&cs[i])]})
-			}
-		}
+		out = append(out, byRepo[k]...)
 	}
 	slices.SortFunc(out, compareRefs)
 	return out
@@ -272,9 +283,18 @@ func compareRefs(a, b Ref) int {
 	return strings.Compare(b.Commit.SHA, a.Commit.SHA)
 }
 
-// commitOf converts a commit of the repository at repo to its API form.
-func commitOf(repo snapshot.RepoKey, c *Commit) oapi.Commit {
-	kind, ai := Classify(c)
+// commitOf converts a classified commit to its API form; only a commit with an AI is classified again, for the assistant's full name
+// (the Ref holds its family).
+func commitOf(r Ref) oapi.Commit {
+	kind, ai := r.Origin, ""
+	if kind.AI() {
+		_, ai = Classify(r.Commit)
+	}
+	return apiCommit(r.Repo, r.Commit, kind, ai)
+}
+
+// apiCommit is the API form of the commit c of the repository at repo, of origin kind, naming the assistant ai.
+func apiCommit(repo snapshot.RepoKey, c *Commit, kind Origin, ai string) oapi.Commit {
 	return oapi.Commit{Repo: string(repo), Sha: c.SHA, Subject: c.Subject, AuthorName: c.AuthorName, AuthorLogin: c.AuthorLogin,
 		Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents, Kind: oapi.CommitKind(kind.String()), Assistant: ai}
 }
@@ -297,24 +317,20 @@ func Automated(c *Commit) bool {
 // Sweep reports whether c is part of a sweep in the view s: its subject landed in more than 10 repositories on its day.
 func Sweep(s *snapshot.Snapshot, c *Commit) bool { return feedIndex.Get(s).sweeps[sweepOf(c)] }
 
-// ByPerson reports whether c is a person's work in the view s: not automated and not part of a sweep. A coding agent's commit is a
-// person's work: someone set the agent to it (P-40).
-func ByPerson(s *snapshot.Snapshot, c *Commit) bool { return !Automated(c) && !Sweep(s, c) }
-
-// LastAuthored returns the time of the newest commit of e in the view s that is work of the lens w (Counts). When no
+// LastAuthored returns the time of the newest commit of the repository k in the view s that is work of the lens w (Counts). When no
 // read commit is, it returns the oldest read commit's time with before set: the last such commit is older. Zero when there are no
 // commits.
-func LastAuthored(s *snapshot.Snapshot, e *snapshot.RepoEntry, w Work) (at time.Time, before bool) {
-	cs, _ := Of(e)
-	for i := range cs {
-		if o, _ := Classify(&cs[i]); w.Counts(o, o != OriginAutomation && !Sweep(s, &cs[i])) {
-			return cs[i].CommittedAt, false
+func LastAuthored(s *snapshot.Snapshot, k snapshot.RepoKey, w Work) (at time.Time, before bool) {
+	refs := feedIndex.Get(s).byRepo[k]
+	for _, r := range refs {
+		if w.Counts(r.Origin, r.Person) {
+			return r.Commit.CommittedAt, false
 		}
 	}
-	if len(cs) == 0 {
+	if len(refs) == 0 {
 		return time.Time{}, false
 	}
-	return cs[len(cs)-1].CommittedAt, true
+	return refs[len(refs)-1].Commit.CommittedAt, true
 }
 
 const (
@@ -338,7 +354,7 @@ func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 			break
 		}
 		if w.Counts(r.Origin, r.Person) {
-			d.Latest = append(d.Latest, commitOf(r.Repo, r.Commit))
+			d.Latest = append(d.Latest, commitOf(r))
 		}
 	}
 	d.Activity = activity(all, now, w)
@@ -351,10 +367,9 @@ func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 		g.Activity = activity(refs, now, w)
 		for j := range g.Members {
 			m := &g.Members[j]
-			if e := s.Repos[snapshot.RepoKey(m.Address)]; e != nil {
-				if at, _ := LastAuthored(s, e, w); !at.IsZero() {
-					m.LastAuthoredAt = oapi.TimeOrNil(at)
-				}
+			// Before: none of the commits read is of the work that counts, so the member has no last change of it.
+			if at, before := LastAuthored(s, snapshot.RepoKey(m.Address), w); !at.IsZero() && !before {
+				m.LastAuthoredAt = oapi.TimeOrNil(at)
 			}
 		}
 	}
@@ -431,7 +446,7 @@ func activity(refs []Ref, now time.Time, w Work) oapi.Activity {
 			} else {
 				a.Hand++
 			}
-			if counts {
+			if counts || w&WorkTeam == 0 { // a lens of automation alone still names the people beside it
 				key := strings.ToLower(cmp.Or(c.AuthorLogin, c.AuthorName))
 				if authors[key] == nil {
 					authors[key] = &author{name: cmp.Or(c.AuthorName, c.AuthorLogin), login: c.AuthorLogin, first: len(authors)}
@@ -460,7 +475,7 @@ func Repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	if at, _ := LastCommit(e); !at.IsZero() {
 		r.LastCommitAt = oapi.TimeOrNil(at)
 	}
-	if at, _ := LastAuthored(s, e, WorkTeam); !at.IsZero() {
+	if at, _ := LastAuthored(s, e.Repo.Key(), WorkTeam); !at.IsZero() {
 		r.LastAuthoredAt = oapi.TimeOrNil(at)
 	}
 }
@@ -474,7 +489,8 @@ func Detail(e *snapshot.RepoEntry, d *oapi.RepoDetail) {
 	d.CommitsFreshness = oapi.FreshnessOf(fresh, time.Now())
 	key := e.Repo.Key()
 	for i := range cs[:min(len(cs), detailCommits)] {
-		d.Commits = append(d.Commits, commitOf(key, &cs[i]))
+		kind, ai := Classify(&cs[i])
+		d.Commits = append(d.Commits, apiCommit(key, &cs[i], kind, ai))
 	}
 }
 

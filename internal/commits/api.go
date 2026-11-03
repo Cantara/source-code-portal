@@ -62,7 +62,7 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 		key := e.Repo.Key()
 		refs = nil
 		if slices.Contains(scope, key) {
-			refs = merge(s, []snapshot.RepoKey{key}, feedIndex.Get(s).sweeps)
+			refs = feedIndex.Get(s).byRepo[key]
 		}
 		scope = []snapshot.RepoKey{key}
 	}
@@ -88,7 +88,7 @@ func (a API) ListCommits(ctx context.Context, req oapi.ListCommitsRequestObject)
 			continue
 		}
 		if i >= start {
-			page.Commits = append(page.Commits, commitOf(r.Repo, r.Commit))
+			page.Commits = append(page.Commits, commitOf(r))
 		}
 		i++
 	}

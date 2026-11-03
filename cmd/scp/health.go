@@ -27,7 +27,7 @@ func assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.R
 	sig := health.Signals{Archived: r.Archived, Deprecated: d.Lifecycle == "deprecated", Public: r.Visibility == "public",
 		LastChange: r.PushedAt, LastCommit: last, License: r.License, OpenIssues: r.OpenIssues,
 		Failing: failing(e.Fresh) || failing(commitsFresh)}
-	if at, before := commits.LastAuthored(s, e, commits.WorkTeam); !at.IsZero() {
+	if at, before := commits.LastAuthored(s, r.Key(), commits.WorkTeam); !at.IsZero() {
 		sig.LastChange, sig.Automated, sig.Before = at, before || last.After(at), before
 	}
 	if rel, _ := badges.ReleaseOf(e); rel != nil {

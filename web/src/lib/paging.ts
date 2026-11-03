@@ -1,3 +1,5 @@
+import { remember } from "./preferences"
+
 /** pageSizes are the page sizes a reader can choose. */
 export const pageSizes = [25, 50, 100, 200] as const
 
@@ -20,8 +22,7 @@ export function pageNumber(v: unknown): number {
 
 /** rememberSize keeps the reader's page size for a list for a year. */
 export function rememberSize(list: PagedList, size: number) {
-  const secure = location.protocol === "https:" ? "; Secure" : ""
-  document.cookie = `${sizeCookie(list)}=${size}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`
+  remember(sizeCookie(list), String(size))
 }
 
 /** firstPageOf is the page of the new size that holds the first item of page `page` of the old size, so the reader stays put. */

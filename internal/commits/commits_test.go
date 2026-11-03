@@ -144,9 +144,14 @@ func TestLastAuthored(t *testing.T) {
 		"only automation":           {[]Commit{bot, release, app}, day(6), true},
 		"none":                      {nil, time.Time{}, false},
 	} {
-		e := &snapshot.RepoEntry{}
+		e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x"}}
 		facet.Set(e, newHistory(tc.cs, nil, nil, "main"), snapshot.Freshness{State: snapshot.StateOK})
-		if at, before := LastAuthored(&snapshot.Snapshot{}, e, WorkTeam); !at.Equal(tc.at) || before != tc.before {
+		p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
+		p.Update(func(b *snapshot.Builder) {
+			b.ReplaceSource("gh", []*snapshot.RepoEntry{e}, nil, snapshot.SourceStatus{ID: "gh"})
+		})
+		p.Flush()
+		if at, before := LastAuthored(p.Current(), "acme/x", WorkTeam); !at.Equal(tc.at) || before != tc.before {
 			t.Errorf("%s: %v %v, want %v %v", name, at, before, tc.at, tc.before)
 		}
 	}
@@ -184,10 +189,10 @@ func TestSweepsAndActivity(t *testing.T) {
 	})
 	p.Flush()
 	s := p.Current()
-	if at, before := LastAuthored(s, s.Repos["acme/r0"], WorkTeam); !at.Equal(ago(3)) || before {
+	if at, before := LastAuthored(s, "acme/r0", WorkTeam); !at.Equal(ago(3)) || before {
 		t.Errorf("last authored = %v %v, want the person's commit 3 days ago", at, before)
 	}
-	if at, _ := LastAuthored(s, s.Repos["acme/r5"], WorkTeam); !at.Equal(ago(2)) {
+	if at, _ := LastAuthored(s, "acme/r5", WorkTeam); !at.Equal(ago(2)) {
 		t.Errorf("a repository holding only the sweep: %v, want the oldest read commit", at)
 	}
 	d := oapi.Dashboard{Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
@@ -218,7 +223,8 @@ func TestSweepsAndActivity(t *testing.T) {
 		t.Errorf("member = %+v", m)
 	}
 	// The lens: with AI, the work that counts is the assisted commit 20 days ago; by hand, the fix 3 days ago; automation, the bot's
-	// update a day ago and the sweep, with no people; every kind, the bot's update. The counts give every kind.
+	// update a day ago and the sweep, still naming the people beside it; every kind, the bot's update. The counts give every kind.
+	// acme/r5 holds only the sweep: by hand it has no last change at all, not its oldest commit.
 	for _, tc := range []struct {
 		work    oapi.Work
 		last    time.Time
@@ -227,10 +233,10 @@ func TestSweepsAndActivity(t *testing.T) {
 	}{
 		{oapi.Work{oapi.WorkKindAi}, ago(20), 1, 1},
 		{oapi.Work{oapi.WorkKindHand}, ago(3), 1, 2},
-		{oapi.Work{oapi.WorkKindAutomation}, ago(1), 0, 10},
+		{oapi.Work{oapi.WorkKindAutomation}, ago(1), 1, 10},
 		{oapi.Work{oapi.WorkKindHand, oapi.WorkKindAi, oapi.WorkKindAutomation}, ago(1), 1, 10},
 	} {
-		d := oapi.Dashboard{Work: tc.work, Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
+		d := oapi.Dashboard{Work: tc.work, Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}, {Address: "acme/r5"}}}}}
 		Dashboard(s, &d)
 		g := d.Groups[0].Activity
 		if g.LastAuthoredAt == nil || !g.LastAuthoredAt.Equal(tc.last) || g.AuthorCount != tc.authors || g.Hand != 1 || g.Ai != 1 ||
@@ -239,6 +245,9 @@ func TestSweepsAndActivity(t *testing.T) {
 		}
 		if m := d.Groups[0].Members[0]; m.LastAuthoredAt == nil || !m.LastAuthoredAt.Equal(tc.last) {
 			t.Errorf("%v: member %+v", tc.work, m)
+		}
+		if m := d.Groups[0].Members[1]; len(tc.work) == 1 && tc.work[0] == oapi.WorkKindHand && m.LastAuthoredAt != nil {
+			t.Errorf("%v: a member without such work has its last change at %v", tc.work, m.LastAuthoredAt)
 		}
 	}
 }
