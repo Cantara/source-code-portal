@@ -141,7 +141,7 @@ export function Designer({ data, groups, onClose }: { data: Schemas["Dashboard"]
   const [busy, setBusy] = useState(false)
   const addId = useId()
   const [error, setError] = useState<ProblemError | null>(null)
-  const [saved, setSaved] = useState(false)
+  const [saved, setSaved] = useState(false) // the last write was a save, not a return to the built-in layout
   if (loadError) return <Alert variant="error">The layout could not be read: {loadError.message}</Alert>
   if (!stored) return <p className="text-sm text-muted-foreground">Opening the design mode…</p>
   const draft = edited ?? stored.elements
@@ -155,7 +155,7 @@ export function Designer({ data, groups, onClose }: { data: Schemas["Dashboard"]
       const next = await w()
       qc.setQueryData(storedLayoutQuery().queryKey, next)
       setDraft(next.elements)
-      setSaved(true)
+      setSaved(next.stored)
       await qc.invalidateQueries({ queryKey: keys.page("dashboard") })
     } catch (e) {
       setError(e instanceof ProblemError ? e : new ProblemError(0, "network", String(e)))
@@ -188,7 +188,7 @@ export function Designer({ data, groups, onClose }: { data: Schemas["Dashboard"]
                 ? "Saved: every viewer sees this layout"
                 : stored.stored
                   ? "The stored layout"
-                  : "The built-in layout"}
+                  : "The built-in layout, for every viewer"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

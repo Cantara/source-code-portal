@@ -95,7 +95,7 @@ test("an admin designs the dashboard in the design mode and every viewer gets it
   await anonymous.close()
 
   await page.getByRole("button", { name: "Back to the built-in layout" }).click()
-  await expect(page.getByText("The built-in layout")).toBeVisible()
+  await expect(page.getByText("The built-in layout, for every viewer")).toBeVisible()
   await page.getByRole("button", { name: "Done" }).click()
   await expect(page.getByRole("heading", { name: "Designed in the e2e" })).toHaveCount(0)
 })
