@@ -234,6 +234,28 @@ func TestETagCacheEvicts(t *testing.T) {
 	}
 }
 
+// A response past the cache's cap is read whole, not cut at the cap: a page of commits with long messages is larger than 1 MiB.
+func TestLargeResponseIsReadWhole(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("big")})
+	long := strings.Repeat("a long commit message line\n", 1600) // about 43 KB, as in a real repository
+	var cs []githubtest.Commit
+	for i := range 40 {
+		cs = append(cs, githubtest.Commit{SHA: fmt.Sprintf("%040x", i+1), Message: long, AuthorName: "Bo", Date: time.Now()})
+	}
+	srv.SetCommits(id, cs...)
+	c, err := tokenSource(t, srv, "acme").REST(t.Context(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 { // the second read is not served from a cut cache entry either
+		got, _, err := c.Repositories.ListCommits(t.Context(), "acme", "big", &gh.CommitsListOptions{ListOptions: gh.ListOptions{PerPage: 100}})
+		if err != nil || len(got) != 40 || got[39].GetCommit().GetMessage() != long {
+			t.Fatalf("commits = %d, %v", len(got), err)
+		}
+	}
+}
+
 func TestTreesAndBlobs(t *testing.T) {
 	srv := githubtest.New(t)
 	id := srv.AddRepo("acme", gh.Repository{Name: new("one")})

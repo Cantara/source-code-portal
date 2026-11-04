@@ -69,13 +69,20 @@ func (t *scpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			ContentLength: int64(len(cached.body)), Request: req}, nil
 	case resp.StatusCode == http.StatusOK && key != "" && resp.Header.Get("ETag") != "":
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxCachedBody+1))
-		_ = resp.Body.Close()
 		if err != nil {
+			_ = resp.Body.Close()
 			return nil, err
 		}
-		if len(body) <= maxCachedBody {
-			t.cache.put(key, &cacheEntry{etag: resp.Header.Get("ETag"), body: body, header: resp.Header.Clone()})
+		if len(body) > maxCachedBody {
+			// Too large to keep: not cached, and read whole, the part already read and then the rest.
+			resp.Body = struct {
+				io.Reader
+				io.Closer
+			}{io.MultiReader(bytes.NewReader(body), resp.Body), resp.Body}
+			return resp, nil
 		}
+		_ = resp.Body.Close()
+		t.cache.put(key, &cacheEntry{etag: resp.Header.Get("ETag"), body: body, header: resp.Header.Clone()})
 		resp.Body = io.NopCloser(bytes.NewReader(body))
 	}
 	return resp, nil
