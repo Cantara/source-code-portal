@@ -4,6 +4,25 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.1
+
+A release is also what a repository publishes to a package registry. No configuration change is needed to upgrade: the new
+`packages.*` keys are optional, and the public registries are asked for public repositories by default (`packages.public`).
+
+- Published packages: the portal reads what a repository publishes from its build files and asks the registry for the newest stable
+  version: Maven (`pom.xml` with its parent chain's `distributionManagement`, Gradle with `maven-publish`), npm, PyPI, Cargo, Go,
+  Swift, CocoaPods, NuGet, RubyGems and Packagist. The version shows on the release chip where there is no GitHub release, in the
+  repository page's Packages panel and in the API's `packages` field, and it counts as a release for health.
+- Private registries (`packages.registries`): Nexus, Artifactory, GitHub Packages, Verdaccio, a Cargo registry, a Go proxy and more,
+  signed in with Basic, a bearer token or a header of their own; credentials go only to the registry's own URL, never on a redirect
+  away from it. `network: private` reaches a registry on your network. A private repository's packages are never named to a public
+  registry.
+- Manifests read `Cargo.toml` and `pyproject.toml` too.
+- A licence shows its short name (APL2, MIT, ...) and links its text; the open issues link to the issue tracker.
+- The Guide: connecting GitHub first, access tokens before single sign-on, and a section on packages and private registries.
+- More robust reads: trees and the commit list stream in bounded memory, a read that fails part-way keeps what it read, a new
+  release runs failed jobs again at its first start, and a GitHub answer larger than 1 MiB is no longer cut short.
+
 ## 2.2.0
 
 The dashboard becomes a page of signals the reader tunes, and the portal explains itself. No configuration change is needed to
