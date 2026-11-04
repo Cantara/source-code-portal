@@ -15,6 +15,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	gosync "sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -46,10 +47,11 @@ const (
 var skipped = map[string]bool{"node_modules": true, "vendor": true, "testdata": true, "test": true, "tests": true, //nolint:gochecknoglobals // fixed table
 	"example": true, "examples": true, "fixtures": true, "samples": true, "docs": true}
 
-// GitHub reads a source's files; *github.Source implements it.
+// GitHub reads a source's files and tags; *github.Source implements it.
 type GitHub interface {
 	Files(ctx context.Context, owner, name string, keep func(dir string) bool) ([]github.TreeEntry, error)
 	Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
+	Tags(ctx context.Context, owner, name string) ([]string, error)
 }
 
 // Package is one package a repository publishes, with its newest release when a registry holds one.
@@ -76,18 +78,23 @@ func decode(b []byte) payload {
 
 // Packages is the packages feature.
 type Packages struct {
-	sources    map[string]GitHub
-	providers  []Provider
-	client     *Client
-	registries []Registry
-	public     bool
+	sources map[string]GitHub
+	o       Options
 }
 
-// New returns the feature for one GitHub per source id, the providers in their order, the shared client, the configured registries
-// and whether the public registries are asked.
-func New(sources map[string]GitHub, providers []Provider, client *Client, registries []Registry, public bool) *Packages {
-	return &Packages{sources: sources, providers: providers, client: client, registries: registries, public: public}
+// Options are the feature's providers and registries.
+type Options struct {
+	Providers  []Provider // in the order a repository's packages are read
+	Client     *Client    // shared by every job
+	Registries []Registry // configured, in order
+	Public     bool       // ask the public registries
+	// Repo is a repository as catalogued. A private or internal one, or one it does not know, never has its packages' names sent to
+	// a public registry: only to the configured ones and those its build files name.
+	Repo func(snapshot.RepoKey) (snapshot.Repo, bool)
 }
+
+// New returns the feature for one GitHub per source id.
+func New(sources map[string]GitHub, o Options) *Packages { return &Packages{sources: sources, o: o} }
 
 // Spec is the per-repository lookup job.
 func (p *Packages) Spec() sync.Spec {
@@ -130,7 +137,13 @@ func (p *Packages) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if prev.Kept == nil {
 		prev.Kept = map[string]string{}
 	}
-	l := &Lookup{client: p.client, registries: p.registries, public: p.public, kept: maps.Clone(prev.Kept), used: map[string]bool{}}
+	r, catalogued := snapshot.Repo{}, false
+	if p.o.Repo != nil {
+		r, catalogued = p.o.Repo(j.Repo)
+	}
+	l := &Lookup{client: p.o.Client, registries: p.o.Registries, public: p.o.Public && catalogued && r.Public(), web: r.HTMLURL,
+		kept: maps.Clone(prev.Kept), used: map[string]bool{},
+		tags: gosync.OnceValues(func() ([]string, error) { return gh.Tags(ctx, owner, name) })}
 	known := map[string]*Version{}
 	for _, pk := range prev.Packages {
 		known[pk.Ecosystem+" "+pk.Name] = pk.Latest
@@ -165,7 +178,7 @@ func (p *Packages) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 }
 
 func (p *Packages) provider(ecosystem string) Provider {
-	for _, pr := range p.providers {
+	for _, pr := range p.o.Providers {
 		if pr.Ecosystem() == ecosystem {
 			return pr
 		}
@@ -192,7 +205,7 @@ func searched(dir string) bool {
 func (p *Packages) buildFiles(tree []github.TreeEntry) []github.TreeEntry {
 	var out []github.TreeEntry
 	for _, e := range tree {
-		if e.Type == "blob" && e.Size <= maxFileBytes && slices.ContainsFunc(p.providers, func(pr Provider) bool { return pr.Wants(e.Path) }) {
+		if e.Type == "blob" && e.Size <= maxFileBytes && slices.ContainsFunc(p.o.Providers, func(pr Provider) bool { return pr.Wants(e.Path) }) {
 			out = append(out, e)
 		}
 	}
@@ -232,7 +245,7 @@ func read(ctx context.Context, gh GitHub, owner, name string, build []github.Tre
 func (p *Packages) coordinates(files []File) []Coordinate {
 	var out []Coordinate
 	seen := map[string]bool{}
-	for _, pr := range p.providers {
+	for _, pr := range p.o.Providers {
 		var mine []File
 		for _, f := range files {
 			if pr.Wants(f.Path) {

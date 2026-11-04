@@ -167,7 +167,12 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	documents := docs.New(trees, safehtml.New())
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
 	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
-		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d).Spec()} {
+		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, func(k snapshot.RepoKey) (snapshot.Repo, bool) {
+			if e := s.pub.Current().Repos[k]; e != nil {
+				return e.Repo, true
+			}
+			return snapshot.Repo{}, false
+		}).Spec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
@@ -489,7 +494,7 @@ func robots(closed bool, open http.Handler) http.Handler {
 }
 
 // newPackages is the packages feature with its providers, in the order a repository's packages are read.
-func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps) *packages.Packages {
+func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, repo func(snapshot.RepoKey) (snapshot.Repo, bool)) *packages.Packages {
 	transport := d.registries
 	if transport == nil {
 		transport = egress.Guarded(10 * time.Second)
@@ -503,5 +508,6 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps) 
 		}
 		registries = append(registries, packages.Registry{ID: r.ID, Ecosystem: r.Ecosystem, URL: u})
 	}
-	return packages.New(trees, providers, packages.NewClient(transport), registries, cfg.Public)
+	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(transport), Registries: registries,
+		Public: cfg.Public, Repo: repo})
 }

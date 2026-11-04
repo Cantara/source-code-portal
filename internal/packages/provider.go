@@ -62,6 +62,8 @@ type Lookup struct {
 	client     *Client
 	registries []Registry
 	public     bool
+	web        string                   // the repository on GitHub
+	tags       func() ([]string, error) // the repository's tags, read once per job when a provider asks
 
 	mu   gosync.Mutex
 	kept map[string]string
@@ -84,8 +86,14 @@ func (l *Lookup) Configured(ecosystem string) []Registry {
 	return out
 }
 
-// Public reports whether the ecosystems' public registries are asked.
+// Public reports whether the ecosystems' public registries are asked: they are configured to be and the repository is public.
 func (l *Lookup) Public() bool { return l.public }
+
+// Tags are the repository's tags (the first 100 GitHub lists), read once per job.
+func (l *Lookup) Tags() ([]string, error) { return l.tags() }
+
+// Web is the repository's address on GitHub.
+func (l *Lookup) Web() string { return l.web }
 
 // Name is the name of the registry at u in the pages: the configured registry's id, else u's host.
 func (l *Lookup) Name(u string) string {

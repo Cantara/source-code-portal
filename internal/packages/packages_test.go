@@ -86,6 +86,13 @@ func (r repo) Files(_ context.Context, _, _ string, keep func(string) bool) ([]g
 	return out, nil
 }
 
+func (r repo) Tags(context.Context, string, string) ([]string, error) { return nil, nil }
+
+// public is every repository catalogued and public.
+func public(snapshot.RepoKey) (snapshot.Repo, bool) {
+	return snapshot.Repo{Visibility: "public", HTMLURL: "https://github.com/acme/x"}, true
+}
+
 func (r repo) Blob(_ context.Context, _, _, sha string) ([]byte, error) {
 	_, rest, _ := strings.Cut(sha, ":")
 	_, c, _ := strings.Cut(rest, ":")
@@ -138,7 +145,7 @@ func TestMavenInheritsItsDistributionFromTheParent(t *testing.T) {
 	reg.set("/releases/no/example/parent/8/parent-8.pom", strings.ReplaceAll(parentPOM, "%REPO%", reg.URL))
 	reg.set("/releases/net/example/sso/TypeLib/maven-metadata.xml", typelibMetadata)
 	files := repo{"pom.xml": strings.ReplaceAll(childPOM, "%REPO%", reg.URL)}
-	p := New(map[string]GitHub{"gh": files}, []Provider{Maven{Central: central.URL + "/maven2/"}}, NewClient(reg.Client().Transport), nil, true)
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
 
 	res, got := run(t, p, store.Item{})
 	if len(got.Packages) != 1 || got.Packages[0].Latest == nil {
@@ -166,13 +173,13 @@ func TestMavenFallsBackToCentral(t *testing.T) {
 		`<metadata><versioning><latest>2.0.0-SNAPSHOT</latest><versions><version>1.9</version><version>2.0.0-SNAPSHOT</version></versions></versioning></metadata>`)
 	files := repo{"pom.xml": `<project><groupId>org.example</groupId><artifactId>lib</artifactId></project>`,
 		"web/pom.xml": `<project><groupId>${g}</groupId><artifactId>skipped</artifactId></project>`}
-	p := New(map[string]GitHub{"gh": files}, []Provider{Maven{Central: central.URL + "/maven2/"}}, NewClient(central.Client().Transport), nil, true)
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(central.Client().Transport), Public: true, Repo: public})
 	_, got := run(t, p, store.Item{})
 	if len(got.Packages) != 1 || got.Packages[0].Latest == nil || got.Packages[0].Latest.Version != "1.9" {
 		t.Errorf("packages = %+v", got.Packages)
 	}
 	// Without the public registries nothing is asked.
-	p = New(map[string]GitHub{"gh": files}, []Provider{Maven{Central: central.URL + "/maven2/"}}, NewClient(central.Client().Transport), nil, false)
+	p = New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(central.Client().Transport), Public: false, Repo: public})
 	asked := len(central.ledger())
 	if _, got = run(t, p, store.Item{}); got.Packages[0].Latest != nil || len(central.ledger()) != asked {
 		t.Errorf("public off: %+v, asked %v", got.Packages, central.ledger()[asked:])
@@ -186,7 +193,7 @@ func TestNPM(t *testing.T) {
 		"time":{"created":"2020-01-01T00:00:00.000Z","2.4.0":"2025-01-01T00:00:00.000Z","2.4.1":"2025-05-05T10:00:00.000Z"}}`)
 	files := repo{"package.json": `{"name":"@acme/ui","version":"2.4.1"}`, "site/package.json": `{"name":"site","private":true}`,
 		"tests/package.json": `{"name":"fixture"}`}
-	p := New(map[string]GitHub{"gh": files}, []Provider{NPM{Registry: reg.URL + "/"}}, NewClient(reg.Client().Transport), nil, true)
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{NPM{Registry: reg.URL + "/"}}, Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
 	_, got := run(t, p, store.Item{})
 	if len(got.Packages) != 1 {
 		t.Fatalf("packages = %+v", got.Packages)
@@ -201,7 +208,7 @@ func TestAFailedLookupKeepsTheLastRelease(t *testing.T) {
 	reg := newRegistry(t)
 	reg.set("/maven2/org/example/lib/maven-metadata.xml", `<metadata><versioning><release>1.0</release></versioning></metadata>`)
 	files := repo{"pom.xml": `<project><groupId>org.example</groupId><artifactId>lib</artifactId></project>`}
-	p := New(map[string]GitHub{"gh": files}, []Provider{Maven{Central: reg.URL + "/maven2/"}}, NewClient(reg.Client().Transport), nil, true)
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
 	first, _ := run(t, p, store.Item{})
 	reg.mu.Lock()
 	reg.status["/maven2/org/example/lib/maven-metadata.xml"] = http.StatusBadGateway
@@ -293,5 +300,32 @@ func TestClientAsksConditionally(t *testing.T) {
 	}
 	if err := c.Get(t.Context(), "http://"+strings.TrimPrefix(reg.URL, "https://")+"/doc", "*/*", nil); err == nil {
 		t.Error("an http address was read")
+	}
+}
+
+func TestAPrivateRepositoryNeverNamesItsPackagesToAPublicRegistry(t *testing.T) {
+	reg := newRegistry(t) // the public registries are its /maven2/ and /npm/
+	reg.set("/releases/org/example/secret/maven-metadata.xml", `<metadata><versioning><release>2.0</release></versioning></metadata>`)
+	files := repo{"pom.xml": `<project><groupId>org.example</groupId><artifactId>secret</artifactId>
+		<distributionManagement><repository><url>` + reg.URL + `/releases/</url></repository></distributionManagement></project>`,
+		"web/package.json": `{"name":"secret-ui"}`}
+	for name, lookup := range map[string]func(snapshot.RepoKey) (snapshot.Repo, bool){
+		"private":   func(snapshot.RepoKey) (snapshot.Repo, bool) { return snapshot.Repo{Visibility: "private"}, true },
+		"internal":  func(snapshot.RepoKey) (snapshot.Repo, bool) { return snapshot.Repo{Visibility: "internal"}, true },
+		"not known": func(snapshot.RepoKey) (snapshot.Repo, bool) { return snapshot.Repo{}, false },
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}, NPM{Registry: reg.URL + "/npm/"}},
+				Client: NewClient(reg.Client().Transport), Public: true, Repo: lookup})
+			_, got := run(t, p, store.Item{})
+			if len(got.Packages) != 2 || got.Packages[0].Latest == nil || got.Packages[0].Latest.Version != "2.0" || got.Packages[1].Latest != nil {
+				t.Errorf("packages = %+v", got.Packages)
+			}
+			for _, asked := range reg.ledger() {
+				if strings.HasPrefix(asked, "/maven2/") || strings.HasPrefix(asked, "/npm/") {
+					t.Errorf("a public registry was asked: %s", asked)
+				}
+			}
+		})
 	}
 }

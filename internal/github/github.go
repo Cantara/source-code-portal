@@ -383,6 +383,23 @@ func (s *Source) WebURL() string {
 	return "https://github.com/"
 }
 
+// Tags are the names of a repository's tags, the first 100 GitHub lists (the newest first, by its own order).
+func (s *Source) Tags(ctx context.Context, owner, name string) ([]string, error) {
+	c, err := s.client(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	tags, resp, err := c.Repositories.ListTags(ctx, owner, name, &gh.ListOptions{PerPage: 100})
+	if err != nil {
+		return nil, classify(resp, err)
+	}
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		out = append(out, t.GetName())
+	}
+	return out, nil
+}
+
 // Blob returns the content of a blob.
 func (s *Source) Blob(ctx context.Context, owner, name, sha string) ([]byte, error) {
 	c, err := s.client(ctx, owner)
