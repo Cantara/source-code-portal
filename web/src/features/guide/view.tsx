@@ -146,8 +146,8 @@ const parts = [
   {
     title: "Run a portal",
     sections: [
-      { id: "run", title: "Run your own portal" },
       { id: "github", title: "Connect GitHub" },
+      { id: "run", title: "Run your own portal" },
       { id: "access", title: "Sign-in and private repositories" },
       { id: "more", title: "Options and documents" },
     ],
@@ -330,7 +330,7 @@ export function GuideView({ version }: { version: string }) {
         <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-2">
           {[
             ["#signals", "Part 1", "Read the portal", "The dashboard, a product card, health and the work that counts."],
-            ["#run", "Part 2", "Run a portal", "Your products, the container, a GitHub App, sign-in and private repositories."],
+            ["#github", "Part 2", "Run a portal", "A GitHub App, your products, the container, sign-in and private repositories."],
           ].map(([href, n, t, d]) => (
             <a key={href} href={href} className="panel flex flex-col gap-0.5 p-4 transition-colors hover:border-primary/50">
               <span className="font-mono text-[0.6875rem] tracking-widest text-primary uppercase">{n}</span>
@@ -655,18 +655,82 @@ export function GuideView({ version }: { version: string }) {
           lede="For the people who put a portal on their own repositories: from nothing to a running portal, then the options."
         />
         <Section
-          id="run"
+          id="github"
           n={9}
+          title="Connect GitHub"
+          lede="The portal reads your repositories through a GitHub App of your organisation: read-only, with its own rate limit, and told by GitHub the moment something changes."
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              ["Read-only", "Contents and Metadata, read. The portal never writes to GitHub."],
+              ["Your organisation's", "Not a person's account: nothing breaks when someone leaves."],
+              ["Updates within seconds", "GitHub sends a webhook on every push, release and repository change."],
+            ].map(([t, d]) => (
+              <div key={t} className="panel p-4">
+                <p className="text-sm font-semibold">{t}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{d}</p>
+              </div>
+            ))}
+          </div>
+          <ol className="flex flex-col gap-6">
+            <Step n={1} title="Make the webhook secret">
+              <p>
+                Keep the portal&apos;s secrets together in one folder, <code className="font-mono text-xs">secrets/</code>, beside
+                its configuration. The webhook secret proves to the portal that a delivery comes from GitHub.
+              </p>
+              <Code label="Make the webhook secret">{`mkdir -p secrets
+head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
+            </Step>
+            <Step n={2} title="Create the App">
+              <p>
+                In your organisation&apos;s <em>Settings</em>, <em>Developer settings</em>, <em>GitHub Apps</em>,{" "}
+                <em>New GitHub App</em>. Repository permissions: <em>Contents</em> and <em>Metadata</em>, read-only, nothing else.
+                Webhook URL <code className="font-mono text-xs">https://your-portal/webhooks/github</code> with the text of{" "}
+                <code className="font-mono text-xs">secrets/webhook-secret</code> as its secret; events <em>Push</em>,{" "}
+                <em>Release</em> and <em>Repository</em>. Install it only on this account.
+              </p>
+            </Step>
+            <Step n={3} title="Keep its key and install it">
+              <p>
+                Note the <em>App ID</em>, generate a private key and save the downloaded file as{" "}
+                <code className="font-mono text-xs">secrets/scp-app.pem</code>. Then <em>Install App</em> on the organisation, for
+                all repositories or the ones the portal shows. The App ID and these two files are all the portal needs from GitHub
+                (section 10).
+              </p>
+            </Step>
+          </ol>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Only trying a portal out? A GitHub personal access token (a fine-grained one with read access to public repositories)
+            saved in <code className="font-mono text-xs">secrets/github-token</code> does instead of an App:{" "}
+            <code className="font-mono text-xs">token_file: /run/secrets/github-token</code> in place of{" "}
+            <code className="font-mono text-xs">app</code>, without the webhook.
+          </p>
+        </Section>
+
+        <Section
+          id="run"
+          n={10}
           title="Run your own portal"
-          lede="One binary or one container, one YAML file and read access to GitHub. Nothing to back up but the configuration and its secrets."
+          lede="One binary or one container and one YAML file, scp.yaml. Nothing to back up but the configuration and its secrets."
         >
           <ol className="flex flex-col gap-6">
-            <Step n={1} title="Give it read access to GitHub">
+            <Step n={1} title="Point it at GitHub">
               <p>
-                A GitHub App, read-only, is the way to run a portal (section 10); to try one, a GitHub personal access token is
-                enough: a fine-grained one with read access to public repositories, or a classic one without scopes, its text
-                alone in a file. It is the portal&apos;s key to GitHub, not a way for people to sign in (section 11). Secrets are
-                always files, never values in the configuration.
+                The App of section 9: its ID and the two secret files. Secrets are always files, never values in the
+                configuration; the container finds <code className="font-mono text-xs">secrets/</code> at{" "}
+                <code className="font-mono text-xs">/run/secrets</code>.
+              </p>
+              <Code label="GitHub in scp.yaml">{`github:
+  sources:
+    - id: github
+      orgs: [your-org]
+      app: { id: 123456, private_key_file: /run/secrets/scp-app.pem }
+      include_private: true        # private repositories too, for the people of section 11
+webhook:
+  secret_file: /run/secrets/webhook-secret`}</Code>
+              <p>
+                Without <code className="font-mono text-xs">include_private</code> the portal lists public repositories only,
+                whatever the App may read.
               </p>
             </Step>
             <Step n={2} title="Describe your products">
@@ -674,12 +738,7 @@ export function GuideView({ version }: { version: string }) {
                 Groups gather repositories into products by name prefix, glob, regular expression, exact name or GitHub topic;{" "}
                 <code className="font-mono text-xs">unclaimed</code> catches the rest.
               </p>
-              <Code label="scp.yaml">{`github:
-  sources:
-    - id: github
-      orgs: [your-org]
-      token_file: /run/secrets/github-token   # the GitHub token of step 1; or app: (section 10)
-catalog:
+              <Code label="Groups in scp.yaml">{`catalog:
   groups:
     - id: payments
       name: Payments
@@ -702,57 +761,6 @@ scp config groups -c scp.yaml --repos repos.json   # where each repository lands
                 Port 9090 is the portal, behind your reverse proxy; 9091 holds <code className="font-mono text-xs">/readyz</code>,{" "}
                 <code className="font-mono text-xs">/metrics</code> and the status, inside your network. The first start reads
                 every repository and the pages say so meanwhile.
-              </p>
-            </Step>
-          </ol>
-        </Section>
-
-        <Section
-          id="github"
-          n={10}
-          title="Connect GitHub"
-          lede="The portal reads your repositories through a GitHub App of your organisation: read-only, with its own rate limit, and told by GitHub the moment something changes."
-        >
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              ["Read-only", "Contents and Metadata, read. The portal never writes to GitHub."],
-              ["Your organisation's", "Not a person's account: nothing breaks when someone leaves."],
-              ["Updates within seconds", "GitHub sends a webhook on every push, release and repository change."],
-            ].map(([t, d]) => (
-              <div key={t} className="panel p-4">
-                <p className="text-sm font-semibold">{t}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{d}</p>
-              </div>
-            ))}
-          </div>
-          <ol className="flex flex-col gap-6">
-            <Step n={1} title="Create the App">
-              <p>
-                In your organisation&apos;s <em>Settings</em>, <em>Developer settings</em>, <em>GitHub Apps</em>,{" "}
-                <em>New GitHub App</em>. Repository permissions: <em>Contents</em> and <em>Metadata</em>, read-only, nothing else.
-                Webhook URL <code className="font-mono text-xs">https://your-portal/webhooks/github</code> with a secret of your
-                own; events <em>Push</em>, <em>Release</em> and <em>Repository</em>. Install it only on this account.
-              </p>
-            </Step>
-            <Step n={2} title="Keep its key and install it">
-              <p>
-                Note the <em>App ID</em> and generate a private key: the <code className="font-mono text-xs">.pem</code> file is a
-                secret, kept beside the webhook secret. Then <em>Install App</em> on the organisation, for all repositories or the
-                ones the portal shows.
-              </p>
-            </Step>
-            <Step n={3} title="Tell the portal">
-              <Code label="The GitHub App in scp.yaml">{`github:
-  sources:
-    - id: github
-      orgs: [your-org]
-      app: { id: 123456, private_key_file: /run/secrets/scp-app.pem }
-      include_private: true        # private repositories too, for the people of section 11
-webhook:
-  secret_file: /run/secrets/webhook-secret`}</Code>
-              <p>
-                Without <code className="font-mono text-xs">include_private</code> the portal lists public repositories only,
-                whatever the App may read.
               </p>
             </Step>
           </ol>

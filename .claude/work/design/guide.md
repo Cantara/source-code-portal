@@ -10,8 +10,9 @@ first and the operators' after, in twelve numbered sections. **Part 1, Read the 
 map, a product card (its picture numbered row by row beside the explanations), health and findings (the score rings of the three
 levels, the legend of the findings: each kind's icon on its severity's tile, what it means, when it is found and what it costs; the
 severities), the work that counts (the three kinds, Settings), tables and commits (the side panel, Commits, the repository page),
-and make it yours (every preference). **Part 2, Run a portal**: run your own (access, groups, check, run), connect GitHub (the read-only GitHub App:
-why, its permissions and webhook, its key and installation, the configuration), sign-in and private repositories (what an anonymous,
+and make it yours (every preference). **Part 2, Run a portal**, in the order of the work: connect GitHub (the read-only GitHub App: why, the webhook secret, the App's
+permissions and webhook, its key and installation; a personal access token only to try one), run your own (the App in `scp.yaml`,
+the groups, check, run), sign-in and private repositories (what an anonymous,
 a signed-in and an administrator viewer see, that the server filters every answer, access tokens first, in three steps (the
 secrets, the configuration, handing them out and signing in), then single sign-on: any OpenID Connect provider, GitHub accounts through Dex), and options and documents (the
 options, the documents and the plugin).
