@@ -330,7 +330,12 @@ export function GuideView({ version }: { version: string }) {
         <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-2">
           {[
             ["#signals", "Part 1", "Read the portal", "The dashboard, a product card, health and the work that counts."],
-            ["#github", "Part 2", "Run a portal", "A GitHub App, your products, the container, sign-in and private repositories."],
+            [
+              "#github",
+              "Part 2",
+              "Run a portal",
+              "A GitHub App, your products, the container, sign-in and private repositories.",
+            ],
           ].map(([href, n, t, d]) => (
             <a key={href} href={href} className="panel flex flex-col gap-0.5 p-4 transition-colors hover:border-primary/50">
               <span className="font-mono text-[0.6875rem] tracking-widest text-primary uppercase">{n}</span>
