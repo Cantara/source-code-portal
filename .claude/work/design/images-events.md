@@ -56,7 +56,7 @@ func (b *Builder) Mark(key string, repo RepoKey, digest uint64) // the item's di
 
 // internal/docs
 func (d *Docs) Images(current func(context.Context) *snapshot.Snapshot, external http.RoundTripper) http.Handler
-func Guarded() http.RoundTripper // the external transport
+// the external transport is egress.Guarded (internal/egress, shared with the package registries)
 
 // internal/httpapi
 type Events struct{ ... }

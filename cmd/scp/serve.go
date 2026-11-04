@@ -27,6 +27,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/docs"
+	"github.com/cantara/source-code-portal/internal/egress"
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -109,7 +110,7 @@ type server struct {
 // deps are the outside services; the zero value is the real ones.
 type deps struct {
 	github  http.RoundTripper                              // transport to GitHub
-	images  http.RoundTripper                              // transport to external images (docs.Guarded when nil)
+	images  http.RoundTripper                              // transport to external images (egress.Guarded when nil)
 	cluster func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
 }
 
@@ -208,7 +209,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin))
 	external := d.images
 	if external == nil {
-		external = docs.Guarded()
+		external = egress.Guarded(10 * time.Second)
 	}
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view,
 		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth})},
