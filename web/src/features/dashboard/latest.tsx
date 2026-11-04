@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Commit } from "@/lib/api/client"
 import { CommitList } from "@/entities/commit/commit-list"
-import { by, has, isEvery, type Work } from "@/lib/preferences"
+import { has, type Work } from "@/lib/preferences"
 import { latestAllQuery } from "./api"
 
 /**
@@ -30,11 +30,16 @@ export function LatestCommits({
   const commits = all ? (data?.commits ?? []) : counted.slice(0, count)
   return (
     <Card aria-labelledby="latest" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <CardTitle id="latest">{all || isEvery(work) ? "Latest commits" : `Latest commits ${by(work)}`}</CardTitle>
-        <div className="flex items-center gap-4 text-sm">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <CardTitle id="latest" className="min-w-0 flex-1">
+            Latest commits
+          </CardTitle>
+          {fold}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           {!has(work, "automation") && (
-            <label className="flex items-center gap-2 text-muted-foreground">
+            <label className="flex items-center gap-2">
               <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} className="accent-primary" />
               Include automation
             </label>
@@ -42,7 +47,6 @@ export function LatestCommits({
           <Link href="/commits" className="hover:text-primary hover:underline">
             All commits
           </Link>
-          {fold}
         </div>
       </div>
       {all && !data ? <p className="text-sm text-muted-foreground">Loading…</p> : <CommitList commits={commits} />}

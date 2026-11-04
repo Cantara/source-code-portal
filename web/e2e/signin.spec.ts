@@ -11,15 +11,17 @@ test("signing in through the provider returns to the page and shows the private 
   await expect(page).toHaveURL(/\/signin\?return_to=%2Fgroups%2Fother$/)
   await page.getByRole("link", { name: "Sign in with single sign-on" }).click()
   await expect(page).toHaveURL(/\/groups\/other$/)
-  await expect(page.getByText("Ada Lovelace", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Ada Lovelace" })).toBeVisible()
   await expect(page.getByRole("link", { name: "acme/vault" })).toBeVisible()
 
-  await page.getByRole("link", { name: "Admin", exact: true }).click()
+  await page.getByRole("button", { name: "Ada Lovelace" }).click()
+  await page.getByRole("menu", { name: "Account" }).getByRole("menuitem", { name: "Admin" }).click()
   await expect(page.getByRole("heading", { level: 1, name: "Admin", exact: true })).toBeVisible()
   await expect(page.getByText("Signed in as Ada Lovelace through single sign-on, an administrator.")).toBeVisible()
   await expect(page.getByRole("heading", { name: "Snapshot" })).toBeVisible()
 
-  await page.getByRole("button", { name: "Sign out" }).click() // through the provider's end session back to the dashboard
+  await page.getByRole("button", { name: "Ada Lovelace" }).click()
+  await page.getByRole("menuitem", { name: "Sign out" }).click() // through the provider's end session back to the dashboard
   await expect(page.getByRole("heading", { level: 1, name: "Dashboard", exact: true })).toBeVisible()
   await page.goto("/groups/other")
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible()
@@ -35,9 +37,11 @@ test("a token signs in a person without the provider; a wrong one is explained",
   await page.getByLabel("Token").fill(token)
   await page.getByRole("button", { name: "Sign in with the token" }).click()
   await expect(page).toHaveURL(/\/groups\/other$/)
-  await expect(page.getByText("e2e", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "e2e" })).toBeVisible()
   await expect(page.getByRole("link", { name: "acme/vault" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "Admin", exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "e2e" }).click()
+  await expect(page.getByText("Signed in as e2e through a token.")).toBeVisible()
+  await expect(page.getByRole("menuitem", { name: "Admin" })).toHaveCount(0)
 })
 
 test("the admin page asks an anonymous viewer to sign in", async ({ page }) => {
@@ -76,7 +80,7 @@ test("an admin designs the dashboard in the design mode and every viewer gets it
   test.skip(info.project.name !== "desktop", "one layout file serves both projects")
   await page.goto("/signin")
   await page.getByRole("link", { name: "Sign in with single sign-on" }).click()
-  await expect(page.getByText("Ada Lovelace", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Ada Lovelace" })).toBeVisible()
   await page.goto("/")
   await page.getByRole("button", { name: "Design this page" }).click()
   const list = page.getByRole("region", { name: "Elements" })

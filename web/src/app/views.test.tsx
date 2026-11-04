@@ -36,7 +36,7 @@ describe("pages", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()
     expect(await screen.findByRole("link", { name: "IAM" })).toHaveAttribute("href", "/groups/iam")
     expect(screen.getByText("Commit 1")).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Latest commits by the team" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Latest commits" })).toBeInTheDocument()
     // The card says the team's work, by hand and with AI, apart from automation's, who did it, and what most members share once.
     const card = screen.getByRole("link", { name: "IAM" }).closest("li") as HTMLElement
     expect(card).toHaveTextContent("4 commits")
@@ -84,7 +84,7 @@ describe("pages", () => {
     expect(card).toHaveTextContent("1 by hand · 3 with AI (Claude)")
     expect(card).toHaveTextContent("9 by automation · 30 days")
     expect(within(card).getByRole("img", { name: /^Commits with AI per week/ })).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Latest commits with AI" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Latest commits" })).toBeInTheDocument()
   })
 
   it("counts every kind by default, automation too, and drops the latest commits' own switch", async () => {

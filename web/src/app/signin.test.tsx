@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { http as raw, HttpResponse } from "msw"
 import type { ReactNode } from "react"
 import { describe, expect, it } from "vitest"
@@ -74,16 +74,30 @@ describe("viewer menu", () => {
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/signin?return_to=%2Fgroups%2Fiam")
   })
 
-  it("shows the name, the admin page and sign-out", () => {
+  it("opens a menu from the initial and the name: who it is, the admin page and sign-out", () => {
     show(<ViewerMenu me={me({ signedIn: true, name: "Ada", via: "oidc", admin: true, private: true })} />)
-    expect(screen.getByText("Ada")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/admin")
-    expect(screen.getByRole("button", { name: "Sign out" }).closest("form")).toHaveAttribute("action", "/auth/logout")
+    const account = screen.getByRole("button", { name: "Ada" })
+    expect(screen.queryByRole("menu")).toBeNull()
+    fireEvent.click(account)
+    const menu = screen.getByRole("menu", { name: "Account" })
+    expect(screen.getByText(/through single sign-on, an administrator/)).toBeInTheDocument()
+    const admin = within(menu).getByRole("menuitem", { name: "Admin" })
+    expect(admin).toHaveAttribute("href", "/admin")
+    expect(admin).toHaveFocus()
+    fireEvent.keyDown(menu, { key: "ArrowDown" })
+    const out = within(menu).getByRole("menuitem", { name: "Sign out" })
+    expect(out).toHaveFocus()
+    expect(out.closest("form")).toHaveAttribute("action", "/auth/logout")
+    fireEvent.keyDown(menu, { key: "Escape" })
+    expect(screen.queryByRole("menu")).toBeNull()
+    expect(account).toHaveFocus()
   })
 
   it("leaves sign-out to the proxy, and sign-in out where the portal has none", () => {
     const { unmount } = show(<ViewerMenu me={me({ signedIn: true, name: "ann", via: "proxy", private: true })} />)
-    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "ann" }))
+    expect(screen.getByText(/through the proxy/)).toBeInTheDocument()
+    expect(screen.queryByRole("menuitem", { name: "Sign out" })).not.toBeInTheDocument()
     unmount()
     show(<ViewerMenu me={me({ signIn: { oidc: false, token: false } })} />)
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument()

@@ -3,8 +3,18 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react"
-import { buttonClass } from "@/components/ui/button"
-import { BookIcon, CheckIcon, ChevronDownIcon, MonitorIcon, MoonIcon, SlidersIcon, SunIcon } from "@/components/ui/icons"
+import {
+  BookIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  LogInIcon,
+  LogOutIcon,
+  MonitorIcon,
+  MoonIcon,
+  ShieldIcon,
+  SlidersIcon,
+  SunIcon,
+} from "@/components/ui/icons"
 import { cn } from "@/lib/cn"
 import type { Schemas } from "@/lib/api/client"
 import { apply, useTheme, type Choice } from "@/lib/theme"
@@ -15,22 +25,32 @@ const themes = [
   { value: "light", label: "Light", Icon: SunIcon },
 ] as const
 
+/** The header's icon controls: one size, one hover, and the same mark for the current page and an open menu. */
+const tool =
+  "flex h-8 min-w-8 items-center justify-center gap-1 rounded-md px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
+
+const panel =
+  "absolute top-full right-0 z-50 mt-1.5 rounded-lg border border-border bg-popover/95 p-1 text-sm text-popover-foreground shadow-xl backdrop-blur-md"
+
+const item =
+  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground"
+
 /**
- * ThemeMenu picks system, dark or light (lib/theme.ts, public/theme-init.js): a button with the chosen mode's icon opens a menu of the
- * three, the chosen one checked. Arrows, Home and End move in it, Enter or a click chooses, Escape, Tab or a click elsewhere closes it.
+ * useMenu is a header menu's behaviour: its button opens it (or an arrow key), the checked item or else the first takes the focus;
+ * arrows, Home and End move, Escape closes it back to the button, and Tab or a press elsewhere closes it.
  */
-export function ThemeMenu() {
-  const theme = useTheme()
+function useMenu() {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLUListElement>(null)
   const id = useId()
-  const chosen = themes.find((t) => t.value === theme) ?? themes[0]
+  const items = () => [...(menu.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])]
 
   useEffect(() => {
     if (!open) return
-    menu.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus()
+    const all = items()
+    ;(all.find((i) => i.getAttribute("aria-checked") === "true") ?? all[0])?.focus()
     const away = (e: PointerEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false)
     }
@@ -42,57 +62,53 @@ export function ThemeMenu() {
     setOpen(false)
     button.current?.focus()
   }
-  const choose = (value: Choice) => {
-    apply(value)
-    close()
+  const buttonProps = {
+    ref: button,
+    type: "button" as const,
+    "aria-haspopup": "menu" as const,
+    "aria-expanded": open,
+    "aria-controls": open ? id : undefined,
+    onClick: () => setOpen((o) => !o),
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        setOpen(true)
+      }
+    },
   }
-  const move = (e: KeyboardEvent<HTMLUListElement>) => {
-    const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])]
-    const at = items.indexOf(document.activeElement as HTMLElement)
-    const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[e.key]
-    if (to !== undefined) {
-      e.preventDefault()
-      items[(to + items.length) % items.length]?.focus()
-    } else if (e.key === "Escape") {
-      e.preventDefault()
-      close()
-    } else if (e.key === "Tab") setOpen(false)
+  const menuProps = {
+    ref: menu,
+    id,
+    role: "menu" as const,
+    onKeyDown: (e: KeyboardEvent<HTMLUListElement>) => {
+      const all = items()
+      const at = all.indexOf(document.activeElement as HTMLElement)
+      const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: all.length - 1 }[e.key]
+      if (to !== undefined) {
+        e.preventDefault()
+        all[(to + all.length) % all.length]?.focus()
+      } else if (e.key === "Escape") {
+        e.preventDefault()
+        close()
+      } else if (e.key === "Tab") setOpen(false)
+    },
   }
+  return { open, root, close, dismiss: () => setOpen(false), buttonProps, menuProps }
+}
 
+/** ThemeMenu picks system, dark or light (lib/theme.ts, public/theme-init.js): the chosen mode's icon opens the three, it checked. */
+export function ThemeMenu() {
+  const theme = useTheme()
+  const { open, root, close, buttonProps, menuProps } = useMenu()
+  const chosen = themes.find((t) => t.value === theme) ?? themes[0]
   return (
     <div ref={root} className="relative">
-      <button
-        ref={button}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        aria-label={`Theme: ${chosen.label}`}
-        title={`Theme: ${chosen.label}`}
-        onClick={() => setOpen((o) => !o)}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-            e.preventDefault()
-            setOpen(true)
-          }
-        }}
-        className={cn(
-          "flex h-8 items-center gap-0.5 rounded-md px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-          open && "bg-accent text-foreground",
-        )}
-      >
+      <button {...buttonProps} aria-label={`Theme: ${chosen.label}`} title={`Theme: ${chosen.label}`} className={tool}>
         <chosen.Icon className="size-[1.125rem]" />
         <ChevronDownIcon className="size-3" />
       </button>
       {open && (
-        <ul
-          ref={menu}
-          id={id}
-          role="menu"
-          aria-label="Theme"
-          onKeyDown={move}
-          className="absolute top-full right-0 z-50 mt-1.5 flex w-36 flex-col rounded-lg border border-border bg-popover/95 p-1 text-sm text-popover-foreground shadow-xl backdrop-blur-md"
-        >
+        <ul {...menuProps} aria-label="Theme" className={cn(panel, "flex w-36 flex-col")}>
           {themes.map(({ value, label, Icon }) => (
             <li key={value} role="none">
               <button
@@ -100,11 +116,14 @@ export function ThemeMenu() {
                 role="menuitemradio"
                 aria-checked={theme === value}
                 tabIndex={-1}
-                onClick={() => choose(value)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground aria-checked:text-foreground"
+                onClick={() => {
+                  apply(value as Choice)
+                  close()
+                }}
+                className={cn(item, "aria-checked:text-foreground")}
               >
                 <Icon className="size-4" />
-                <span className="flex-1 text-left">{label}</span>
+                <span className="flex-1">{label}</span>
                 {theme === value && <CheckIcon className="size-4 text-primary" />}
               </button>
             </li>
@@ -114,9 +133,6 @@ export function ThemeMenu() {
     </div>
   )
 }
-
-const tool =
-  "grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground"
 
 /** PortalNav is the reader's own corner of the header: the Guide, the theme and Settings, as icons named for assistive technology. */
 export function PortalNav() {
@@ -159,38 +175,83 @@ export function MainNav({ ask = false }: { ask?: boolean }) {
   )
 }
 
+const via: Record<string, string> = { proxy: "the proxy", oidc: "single sign-on", token: "a token" }
+
+/** Divider parts the reader's tools from the viewer's own. */
+function Divider() {
+  return <span aria-hidden="true" className="h-5 w-px bg-border" />
+}
+
 /**
- * ViewerMenu is the header's viewer: the signed-in name with Admin and Sign out, or Sign in back to this page when the portal has
- * sign-in. A viewer named by the proxy signs out there.
+ * ViewerMenu is the header's viewer, after the reader's tools: the signed-in viewer's initial and name open a menu that says who they
+ * are and how they signed in, with Admin for an administrator and Sign out (a viewer named by the proxy signs out there); without a
+ * viewer, Sign in back to this page when the portal has sign-in. On a phone the initial alone.
  */
 export function ViewerMenu({ me }: { me: Schemas["Me"] | undefined }) {
   const path = usePathname()
+  const { open, root, dismiss, buttonProps, menuProps } = useMenu()
   if (!me) return null
-  if (me.signedIn)
+  if (!me.signedIn) {
+    if ((!me.signIn.oidc && !me.signIn.token) || path === "/signin") return null
     return (
-      <div className="flex items-center gap-1 text-sm">
-        <span className="max-w-40 truncate px-1" title={`Signed in as ${me.name}`}>
-          {me.name}
-        </span>
-        {me.admin && (
-          <Link href="/admin" className={nav} aria-current={path === "/admin" ? "page" : undefined}>
-            Admin
-          </Link>
-        )}
-        {me.via !== "proxy" && (
-          <form method="post" action="/auth/logout">
-            <button type="submit" className={buttonClass("ghost", "min-h-8 px-2.5")}>
-              Sign out
-            </button>
-          </form>
+      <>
+        <Divider />
+        <Link href={`/signin?return_to=${encodeURIComponent(path)}`} className={cn(tool, "px-2 text-sm")} title="Sign in">
+          <LogInIcon className="size-[1.125rem]" />
+          <span className="sr-only sm:not-sr-only">Sign in</span>
+        </Link>
+      </>
+    )
+  }
+  return (
+    <>
+      <Divider />
+      <div ref={root} className="relative">
+        <button
+          {...buttonProps}
+          title={`Signed in as ${me.name}`}
+          aria-current={path.startsWith("/admin") ? "page" : undefined}
+          className={cn(tool, "gap-2 text-sm sm:pr-1")}
+        >
+          <span
+            aria-hidden="true"
+            className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-semibold text-primary uppercase"
+          >
+            {[...me.name.trim()][0] ?? "?"}
+          </span>
+          <span className="sr-only max-w-40 truncate sm:not-sr-only">{me.name}</span>
+          <ChevronDownIcon className="hidden size-3 sm:block" />
+        </button>
+        {open && (
+          <div className={cn(panel, "w-56")}>
+            <p className="px-2 pt-1.5 pb-2 text-xs text-muted-foreground">
+              Signed in as <span className="font-medium text-foreground">{me.name}</span> through {via[me.via] ?? me.via}
+              {me.admin ? ", an administrator" : ""}.
+            </p>
+            <ul {...menuProps} aria-label="Account" className="flex flex-col border-t border-border pt-1">
+              {me.admin && (
+                <li role="none">
+                  <Link href="/admin" role="menuitem" tabIndex={-1} onClick={dismiss} className={item}>
+                    <ShieldIcon className="size-4" />
+                    Admin
+                  </Link>
+                </li>
+              )}
+              {me.via !== "proxy" && (
+                <li role="none">
+                  <form method="post" action="/auth/logout">
+                    <button type="submit" role="menuitem" tabIndex={-1} className={item}>
+                      <LogOutIcon className="size-4" />
+                      Sign out
+                    </button>
+                  </form>
+                </li>
+              )}
+            </ul>
+          </div>
         )}
       </div>
-    )
-  if ((!me.signIn.oidc && !me.signIn.token) || path === "/signin") return null
-  return (
-    <Link href={`/signin?return_to=${encodeURIComponent(path)}`} className={nav}>
-      Sign in
-    </Link>
+    </>
   )
 }
 

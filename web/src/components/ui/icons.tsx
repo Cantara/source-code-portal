@@ -98,3 +98,30 @@ export function ChevronDownIcon({ className }: { className?: string }) {
     </Icon>
   )
 }
+
+/** ShieldIcon stands for the operators' Admin page. */
+export function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M12 3 5 6v5.5c0 4.2 2.9 7.9 7 9.5 4.1-1.6 7-5.3 7-9.5V6Z" />
+    </Icon>
+  )
+}
+
+/** LogInIcon stands for signing in. */
+export function LogInIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l4-4-4-4M14 12H4" />
+    </Icon>
+  )
+}
+
+/** LogOutIcon stands for signing out. */
+export function LogOutIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M16 16l4-4-4-4M20 12H10" />
+    </Icon>
+  )
+}
