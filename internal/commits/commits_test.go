@@ -305,3 +305,119 @@ func TestGraphOrder(t *testing.T) {
 		}
 	}
 }
+
+// paged is a Fetcher of a default branch in pages and other branches, each able to fail.
+type paged struct {
+	main        [][]CommitInfo // page n is main[n-1]
+	mainErr     map[int]error  // by page
+	branches    []RefInfo
+	branchesErr error
+	tagsErr     error
+	side        map[string][]CommitInfo // by branch name
+	sideErr     map[string]error
+}
+
+func (f paged) Commits(_ context.Context, _, _, ref string, page int) ([]CommitInfo, bool, error) {
+	if ref != "" {
+		if err := f.sideErr[ref]; err != nil {
+			return nil, false, err
+		}
+		return f.side[ref], false, nil
+	}
+	if err := f.mainErr[page]; err != nil {
+		return nil, false, err
+	}
+	if page > len(f.main) {
+		return nil, false, nil
+	}
+	return f.main[page-1], page < len(f.main), nil
+}
+
+func (f paged) Branches(context.Context, string, string) ([]RefInfo, error) {
+	return f.branches, f.branchesErr
+}
+func (f paged) Tags(context.Context, string, string) ([]RefInfo, error) { return nil, f.tagsErr }
+
+func TestRunKeepsWhatAFailureCut(t *testing.T) {
+	at := time.Now().Add(-time.Hour)
+	commit := func(c byte, parent byte, age int) CommitInfo {
+		ci := CommitInfo{SHA: sha(c), Message: "change " + string(c), AuthorName: "Ann", Date: at.Add(-time.Duration(age) * time.Minute)}
+		if parent != 0 {
+			ci.Parents = []string{sha(parent)}
+		}
+		return ci
+	}
+	pages := [][]CommitInfo{{commit('a', 'b', 0), commit('b', 'c', 1)}, {commit('c', 'd', 2), commit('d', 0, 3)}}
+	malformed := &github.Error{Kind: github.Permanent, Code: "malformed", Err: errors.New("bad page")}
+	rate := &github.Error{Kind: github.RateLimited, Code: "rate_limited", Err: errors.New("403")}
+	feature := []RefInfo{{Name: "feature", SHA: sha('f')}, {Name: "broken", SHA: sha('e')}}
+	side := map[string][]CommitInfo{"feature": {commit('f', 'a', -5)}}
+	tests := map[string]struct {
+		f           paged
+		main, sides int
+		cut, err    bool
+	}{
+		"whole":                {f: paged{main: pages}, main: 4},
+		"page two fails":       {f: paged{main: pages, mainErr: map[int]error{2: malformed}}, main: 2, cut: true},
+		"page one fails":       {f: paged{main: pages, mainErr: map[int]error{1: malformed}}, err: true},
+		"rate limit stops":     {f: paged{main: pages, mainErr: map[int]error{2: rate}}, err: true},
+		"a branch fails":       {f: paged{main: pages, branches: feature, side: side, sideErr: map[string]error{"broken": malformed}}, main: 4, sides: 1, cut: true},
+		"the branches fail":    {f: paged{main: pages, branchesErr: malformed}, main: 4, cut: true},
+		"the tags fail":        {f: paged{main: pages, branches: feature[:1], side: side, tagsErr: malformed}, main: 4, sides: 1, cut: true},
+		"a branch rate limits": {f: paged{main: pages, branches: feature, side: side, sideErr: map[string]error{"broken": rate}}, err: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			res, err := New(map[string]Fetcher{"gh": tc.f}).Spec().Run(t.Context(), sync.Job{Key: Kind + "/acme/x", Source: "gh", Repo: "acme/x"})
+			if (err != nil) != tc.err {
+				t.Fatalf("err = %v, want an error %v", err, tc.err)
+			}
+			if err != nil {
+				return
+			}
+			var p payload
+			if err := json.Unmarshal(res.Payload, &p); err != nil {
+				t.Fatal(err)
+			}
+			if len(p.Main) != tc.main || len(p.Side) != tc.sides {
+				t.Errorf("main %d, side %d; want %d, %d", len(p.Main), len(p.Side), tc.main, tc.sides)
+			}
+			if cut := res.Again > 0; cut != tc.cut || cut && !p.Full.IsZero() {
+				t.Errorf("again %v, full %v; want cut %v and the next read in full", res.Again, p.Full, tc.cut)
+			}
+		})
+	}
+}
+
+func TestRunMergesACutReadWithTheHeldHistory(t *testing.T) {
+	at := time.Now().Add(-time.Hour)
+	held := []CommitInfo{{SHA: sha('c'), Message: "old", AuthorName: "Ann", Date: at.Add(-time.Hour), Parents: []string{sha('d')}},
+		{SHA: sha('d'), Message: "older", AuthorName: "Ann", Date: at.Add(-2 * time.Hour)}}
+	spec := New(map[string]Fetcher{"gh": paged{main: [][]CommitInfo{held}}}).Spec()
+	first, err := spec.Run(t.Context(), sync.Job{Key: Kind + "/acme/x", Source: "gh", Repo: "acme/x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pushed := []CommitInfo{{SHA: sha('a'), Message: "new", AuthorName: "Ann", Date: at, Parents: []string{sha('b')}},
+		{SHA: sha('b'), Message: "newer", AuthorName: "Ann", Date: at.Add(-time.Minute), Parents: []string{sha('c')}}}
+	cut := paged{main: [][]CommitInfo{pushed, held}, mainErr: map[int]error{2: &github.Error{Kind: github.Transient, Code: "transient", Err: errors.New("502")}}}
+	// A full read (the daily one) cut after its first page keeps what it held beyond it.
+	var p payload
+	_ = json.Unmarshal(first.Payload, &p)
+	p.Full = time.Time{}
+	prev, _ := json.Marshal(p)
+	res, err := New(map[string]Fetcher{"gh": cut}).Spec().Run(t.Context(), sync.Job{Key: Kind + "/acme/x", Source: "gh", Repo: "acme/x",
+		Prev: store.Item{State: snapshot.StateOK, Payload: prev}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got payload
+	_ = json.Unmarshal(res.Payload, &got)
+	shas := []string{}
+	for _, c := range got.Main {
+		shas = append(shas, c.SHA[:1])
+	}
+	if !slices.Equal(shas, []string{"a", "b", "c", "d"}) || res.Again == 0 {
+		t.Errorf("main = %v, again %v; want a b c d and a read again soon", shas, res.Again)
+	}
+}

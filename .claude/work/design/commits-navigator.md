@@ -34,7 +34,11 @@ only from the snapshot by the handlers:
 4. A commit gains its message body (cleaned with `untrusted.Strip`, at most 4 KiB) and its committer; parents as today. A message of
    any length is read: the list streams, keeping 16 KiB of its start and 8 KiB of its end (`design/github.md`), and a cut body keeps
    its closing trailers, so a long squashed pull request is still known as made with an AI.
-5. Payload schema 3; the facet holds commits (deduplicated by SHA) and refs (`{name, kind: branch|tag, sha, default}`).
+5. A failure keeps what was read: a page after the first that fails (anything but a rate limit or the source's credentials, which
+   pause the source and leave the stored history) keeps the pages before it merged with the held history; a branch, the branch list or
+   the tags that fail cost only themselves, never the default branch. Such a cut read runs again after 10 minutes, in full, so no gap
+   stays between the new pages and the held ones.
+6. Payload schema 3; the facet holds commits (deduplicated by SHA) and refs (`{name, kind: branch|tag, sha, default}`).
    A cold start costs about 7 calls per repository (the load test's bound). Budget: at 1,000 repositories about 1,000 x 600 commits x 400 B, 240 MB worst case; the caps above hold it, and the load test
    measures it.
 

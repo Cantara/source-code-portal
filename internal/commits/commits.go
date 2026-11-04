@@ -23,15 +23,16 @@ import (
 const Kind = "commits"
 
 const (
-	maxMain       = 500            // default-branch commits kept
-	maxBranch     = 100            // commits read per other branch
-	maxBranches   = 10             // other branches kept, the newest heads
-	fullEvery     = 24 * time.Hour // a full read drops what a force push rewrote
-	ttl           = 2 * time.Hour  // safety net: pushes notify the job
-	maxSubject    = 200            // runes
-	maxAuthor     = 100            // runes
-	maxBody       = 4096           // runes
-	maxLabel      = 100            // runes of a branch or tag name
+	maxMain       = 500              // default-branch commits kept
+	maxBranch     = 100              // commits read per other branch
+	maxBranches   = 10               // other branches kept, the newest heads
+	fullEvery     = 24 * time.Hour   // a full read drops what a force push rewrote
+	cutAgain      = 10 * time.Minute // a read cut by a failure runs again, in full, after this
+	ttl           = 2 * time.Hour    // safety net: pushes notify the job
+	maxSubject    = 200              // runes
+	maxAuthor     = 100              // runes
+	maxBody       = 4096             // runes
+	maxLabel      = 100              // runes of a branch or tag name
 	futureClamp   = 24 * time.Hour
 	maxParents    = 8 // an octopus merge beyond this keeps its first eight
 	payloadSchema = 3
@@ -97,43 +98,63 @@ func (c *Commits) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		}
 	}
 	read, err := line(ctx, f, owner, name, "", known, maxMain)
-	state := snapshot.StateOK
+	state, cut := snapshot.StateOK, false
 	var e *github.Error
 	switch {
 	case errors.As(err, &e) && e.Code == "empty":
 		state, read = snapshot.StateNoContent, nil
 	case github.IsNotFound(err):
 		state, read = snapshot.StateNotFound, nil
-	case err != nil:
+	case err != nil && (len(read) == 0 || !keeps(err)):
 		return sync.Result{}, err
+	case err != nil:
+		cut = true // the pages read before the failure are kept with the history held
 	}
 	old := slices.Concat(prev.Main, prev.Side)
 	main := normalise(read, old, now)
-	if !full {
+	if !full || cut {
 		main = union(main, prev.Main)
 	}
 	out.Main = main[:min(len(main), maxMain)]
 	if state == snapshot.StateOK {
-		if out.Side, out.Labels, err = sides(ctx, f, owner, name, out.Main, prev, full, now); err != nil {
+		var sideCut bool
+		if out.Side, out.Labels, sideCut, err = sides(ctx, f, owner, name, out.Main, prev, full, now); err != nil {
 			return sync.Result{}, err
 		}
+		cut = cut || sideCut
 	}
-	b, err := json.Marshal(out)
-	if err != nil {
+	res := sync.Result{State: state}
+	if cut {
+		// What a failure cut is read again soon and in full, so no gap stays between what was read and what was held.
+		out.Full, res.Again = time.Time{}, cutAgain
+	}
+	if res.Payload, err = json.Marshal(out); err != nil {
 		return sync.Result{}, err
 	}
-	return sync.Result{State: state, Payload: b, Unchanged: j.Prev.State == state && bytes.Equal(b, j.Prev.Payload)}, nil
+	res.Unchanged = j.Prev.State == state && bytes.Equal(res.Payload, j.Prev.Payload)
+	return res, nil
+}
+
+// keeps reports whether a read that failed with err keeps what it read: every failure but a pause of the source (a rate limit, its
+// credentials) and the run's own end, which the engine handles and which leave the stored history as it was.
+func keeps(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var e *github.Error
+	return !errors.As(err, &e) || e.Kind != github.RateLimited && e.Kind != github.Auth
 }
 
 // line reads the commits reachable from ref, page by page, up to limit new ones. It stops early once a page reaches a commit in known
-// and every parent of the new commits is new or known: the rest of the line is held already.
+// and every parent of the new commits is new or known: the rest of the line is held already. On a failure it returns the commits of
+// the pages read before it with the error.
 func line(ctx context.Context, f Fetcher, owner, name, ref string, known map[string]bool, limit int) ([]CommitInfo, error) {
 	var out []CommitInfo
 	seen := map[string]bool{}
 	for page := 1; len(out) < limit; page++ {
 		cs, more, err := f.Commits(ctx, owner, name, ref, page)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
 		overlap := false
 		for _, c := range cs {
@@ -189,15 +210,24 @@ func newestFirst(a, b Commit) int {
 }
 
 // sides reads the other branches and the tags: the commits of the branches whose heads are not on the default branch (the newest
-// maxBranches heads, bots' update branches left out), and a label for every branch and tag at a commit of the history.
-func sides(ctx context.Context, f Fetcher, owner, name string, main []Commit, prev *payload, full bool, now time.Time) ([]Commit, []Label, error) {
+// maxBranches heads, bots' update branches left out), and a label for every branch and tag at a commit of the history. A failure
+// that keeps (keeps) never costs the default branch: without the branches the held side commits stay, a branch that fails keeps
+// what was read of it, and cut says so.
+func sides(ctx context.Context, f Fetcher, owner, name string, main []Commit, prev *payload, full bool, now time.Time) ([]Commit, []Label, bool, error) {
 	branches, err := f.Branches(ctx, owner, name)
 	if err != nil {
-		return nil, nil, err
+		if !keeps(err) {
+			return nil, nil, false, err
+		}
+		return held(prev.Side, main), heldLabels(prev.Labels, main, prev.Side), true, nil
 	}
+	cut := false
 	tags, err := f.Tags(ctx, owner, name)
 	if err != nil {
-		return nil, nil, err
+		if !keeps(err) {
+			return nil, nil, false, err
+		}
+		tags, cut = nil, true
 	}
 	onMain := map[string]bool{}
 	for _, c := range main {
@@ -231,7 +261,10 @@ func sides(ctx context.Context, f Fetcher, owner, name string, main []Commit, pr
 			}
 			read, err := line(ctx, f, owner, name, b.Name, known, maxBranch)
 			if err != nil {
-				return nil, nil, err
+				if !keeps(err) {
+					return nil, nil, false, err
+				}
+				cut = true
 			}
 			for _, c := range normalise(read, prev.Side, now) {
 				held[c.SHA] = c
@@ -275,7 +308,37 @@ func sides(ctx context.Context, f Fetcher, owner, name string, main []Commit, pr
 			labels = append(labels, Label{Name: untrusted.Text(t.Name, maxLabel), Kind: "tag", SHA: sha})
 		}
 	}
-	return side, labels, nil
+	return side, labels, cut, nil
+}
+
+// held is the side commits of the last read that are not on main now.
+func held(side, main []Commit) []Commit {
+	on := map[string]bool{}
+	for _, c := range main {
+		on[c.SHA] = true
+	}
+	out := []Commit{}
+	for _, c := range side {
+		if !on[c.SHA] {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// heldLabels is the labels of the last read that still point at a commit of main or side.
+func heldLabels(labels []Label, main, side []Commit) []Label {
+	at := map[string]bool{}
+	for _, c := range slices.Concat(main, side) {
+		at[c.SHA] = true
+	}
+	out := []Label{}
+	for _, l := range labels {
+		if at[l.SHA] {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 func decode(b []byte) *payload {
