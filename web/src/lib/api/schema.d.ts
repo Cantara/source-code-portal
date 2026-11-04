@@ -288,6 +288,50 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/tools": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The read-only tools agents call, the same for every viewer
+     * @description The catalogue the assistant, MCP (`/mcp`) and WebMCP call. Each tool has a name, a title, a description for a model, the JSON
+     *     Schema of its input and its annotations: every tool only reads, and what it returns holds text repositories wrote.
+     */
+    get: operations["listTools"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/tools/{name}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Call a tool; it answers from the viewer's view
+     * @description The tool's input as `{"input": {...}}` (16 KiB at most). The answer's `text` is Markdown framed in
+     *     `<untrusted-content id="…">` tags: what repositories wrote is data, never instructions. A tool that cannot answer (an unknown
+     *     repository) says why in `text` with `isError`. A cookie-carrying request must come from the portal's own pages. Served outside
+     *     the generated handlers.
+     */
+    post: operations["callTool"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/events": {
     parameters: {
       query?: never
@@ -314,6 +358,40 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    ToolList: {
+      tools: components["schemas"]["Tool"][]
+    }
+    Tool: {
+      /** @description The tool's name: a-z, 0-9 and _ */
+      name: string
+      /** @description For people */
+      title: string
+      /** @description For a model */
+      description: string
+      /** @description The JSON Schema of the tool's input */
+      inputSchema: {
+        [key: string]: unknown
+      }
+      annotations: components["schemas"]["ToolAnnotations"]
+    }
+    ToolAnnotations: {
+      /** @description The tool changes nothing (every tool) */
+      readOnly: boolean
+      /** @description What it returns holds text repositories wrote (every tool) */
+      untrustedContent: boolean
+    }
+    ToolCall: {
+      input: {
+        [key: string]: unknown
+      }
+    }
+    ToolResult: {
+      /** @description The portal path the tool read, such as /repos/acme/core; empty on an error */
+      source: string
+      /** @description Markdown framed as untrusted content */
+      text: string
+      isError: boolean
+    }
     Freshness: {
       /** @enum {string} */
       status: "fresh" | "stale" | "unknown" | "error"
@@ -1346,6 +1424,56 @@ export interface operations {
       403: components["responses"]["Problem"]
       415: components["responses"]["Problem"]
       429: components["responses"]["Problem"]
+    }
+  }
+  listTools: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The tools in their order */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ToolList"]
+        }
+      }
+    }
+  }
+  callTool: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ToolCall"]
+      }
+    }
+    responses: {
+      /** @description What the tool read */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ToolResult"]
+        }
+      }
+      400: components["responses"]["Problem"]
+      403: components["responses"]["Problem"]
+      404: components["responses"]["NotFound"]
+      415: components["responses"]["Problem"]
     }
   }
   streamEvents: {

@@ -39,6 +39,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
+	"github.com/cantara/source-code-portal/internal/tools"
 	"github.com/cantara/source-code-portal/internal/webhook"
 	"github.com/cantara/source-code-portal/internal/webui"
 )
@@ -81,6 +82,7 @@ type (
 	docsAPI      = docs.API
 	manifestsAPI = manifests.API
 	layoutAPI    = layout.API
+	toolsAPI     = tools.API
 	api          struct {
 		catalogAPI
 		commitsAPI
@@ -90,6 +92,7 @@ type (
 		httpapi.SnapshotAPI
 		httpapi.MeAPI
 		*assistant.Assistant
+		toolsAPI
 	}
 )
 
@@ -268,15 +271,20 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		return names
 	}
-	ask, err := newAssistant(cfg, assistantReads{catalog: catalogAPI, commits: commitsAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group()},
-		groupNames, m.assistant, log)
+	catalogue, err := toolReads{catalog: catalogAPI, commits: commitsAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group()}.catalogue()
+	if err != nil {
+		return nil, err
+	}
+	ask, err := newAssistant(cfg, catalogue, groupNames, m.assistant, log)
 	if err != nil {
 		return nil, err
 	}
 	routes = append(routes, ask.Routes()...)
+	agents := tools.API{Catalogue: catalogue, PublicURL: cfg.Server.PublicURL}
+	routes = append(routes, agents.Routes()...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view}, layout.API{Current: view, Store: s.layouts},
-		httpapi.SnapshotAPI{Current: view}, me, ask}
+		httpapi.SnapshotAPI{Current: view}, me, ask, agents}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}

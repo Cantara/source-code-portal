@@ -2,8 +2,6 @@ package assistant
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/llm"
+	"github.com/cantara/source-code-portal/internal/tools"
 )
 
 // stream writes server-sent events; the pinger and the loop share it.
@@ -139,13 +138,14 @@ func (a *Assistant) fail(code string) (string, error) {
 func (a *Assistant) run(ctx context.Context, s *stream, history []llm.Message) (usage, string, error) {
 	b := a.o.Budget
 	var u usage
-	tools := make([]llm.Tool, len(a.o.Tools))
-	byName := make(map[string]Tool, len(a.o.Tools))
-	for i, t := range a.o.Tools {
-		tools[i], byName[t.Name] = t.Tool, t
+	var declared []llm.Tool
+	if a.o.Tools != nil {
+		for _, t := range a.o.Tools.Tools() {
+			declared = append(declared, llm.Tool{Name: t.Name, Description: t.Description, Schema: t.Schema})
+		}
 	}
-	nonce := newNonce()
-	req := llm.Request{System: a.system(ctx, nonce), Messages: history, Tools: tools}
+	nonce := tools.Nonce()
+	req := llm.Request{System: a.system(ctx, nonce), Messages: history, Tools: declared}
 	calls := 0
 	for turn := 1; ; turn++ {
 		last := turn >= b.MaxTurns || calls >= b.MaxToolCalls || u.InputTokens+u.OutputTokens >= b.MaxTokens
@@ -197,7 +197,7 @@ func (a *Assistant) run(ctx context.Context, s *stream, history []llm.Message) (
 		req.Messages = append(req.Messages, out)
 		for _, c := range out.ToolCalls {
 			calls++
-			req.Messages = append(req.Messages, a.call(ctx, s, byName, c, nonce, calls > b.MaxToolCalls))
+			req.Messages = append(req.Messages, a.call(ctx, s, c, nonce, calls > b.MaxToolCalls))
 		}
 		if err := s.err; err != nil {
 			return u, llm.CodeAborted, err
@@ -206,9 +206,13 @@ func (a *Assistant) run(ctx context.Context, s *stream, history []llm.Message) (
 }
 
 // call runs one tool call and frames its result as untrusted content.
-func (a *Assistant) call(ctx context.Context, s *stream, tools map[string]Tool, c llm.ToolCall, nonce string, over bool) llm.Message {
+func (a *Assistant) call(ctx context.Context, s *stream, c llm.ToolCall, nonce string, over bool) llm.Message {
 	res := llm.Message{Role: llm.ToolRole, ToolCallID: c.ID, IsError: true}
-	t, ok := tools[c.Name]
+	var t tools.Tool
+	ok := a.o.Tools != nil
+	if ok {
+		t, ok = a.o.Tools.Get(c.Name)
+	}
 	switch {
 	case !ok:
 		res.Content = "There is no tool named " + c.Name + "."
@@ -221,33 +225,18 @@ func (a *Assistant) call(ctx context.Context, s *stream, tools map[string]Tool, 
 		return res
 	}
 	label := t.Name
-	if t.Label != nil {
+	if t.Label != nil && tools.Check(t.Schema, c.Input) == nil {
 		label = t.Label(c.Input)
 	}
 	_ = s.send("tool", toolEvent{Name: t.Name, Label: label})
-	source, text, err := t.Run(ctx, c.Input)
+	r, err := a.o.Tools.Call(ctx, c.Name, c.Input, a.o.Budget.ToolResultChars)
 	if err != nil {
 		res.Content = err.Error()
 		return res
 	}
 	res.IsError = false
-	res.Content = frame(nonce, source, truncate(text, a.o.Budget.ToolResultChars))
+	res.Content = tools.Frame(nonce, r.Source, r.Text)
 	return res
-}
-
-// frame wraps what a tool read in tags the text cannot close: the tag carries a nonce, and the tag name is rewritten inside the text.
-func frame(nonce, source, text string) string {
-	text = strings.ReplaceAll(text, "untrusted-content", "untrusted_content")
-	source = strings.ReplaceAll(strings.ReplaceAll(source, `"`, "'"), "untrusted-content", "untrusted_content")
-	return fmt.Sprintf("<untrusted-content id=%q source=%q>\n%s\n</untrusted-content id=%q>", nonce, source, text, nonce)
-}
-
-func truncate(text string, n int) string {
-	r := []rune(text)
-	if len(r) <= n {
-		return text
-	}
-	return string(r[:n]) + "\n[truncated: " + fmt.Sprint(len(r)-n) + " more characters]"
 }
 
 func estimate(r llm.Request) int {
@@ -256,12 +245,6 @@ func estimate(r llm.Request) int {
 		n += len(m.Content)
 	}
 	return n / 4
-}
-
-func newNonce() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
 }
 
 func (a *Assistant) system(ctx context.Context, nonce string) string {
@@ -276,9 +259,11 @@ func (a *Assistant) system(ctx context.Context, nonce string) string {
 	if g := a.o.Groups(ctx); len(g) > 0 {
 		sb.WriteString("The groups: " + strings.Join(g, ", ") + ".\n")
 	}
-	names := make([]string, len(a.o.Tools))
-	for i, t := range a.o.Tools {
-		names[i] = t.Name
+	var names []string
+	if a.o.Tools != nil {
+		for _, t := range a.o.Tools.Tools() {
+			names = append(names, t.Name)
+		}
 	}
 	if len(names) > 0 {
 		sb.WriteString("The tools: " + strings.Join(names, ", ") + ".\n")

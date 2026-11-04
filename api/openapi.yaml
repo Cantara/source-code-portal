@@ -271,6 +271,45 @@ paths:
         "403": { $ref: "#/components/responses/Problem" }
         "415": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
+  /tools:
+    get:
+      operationId: listTools
+      summary: The read-only tools agents call, the same for every viewer
+      description: |
+        The catalogue the assistant, MCP (`/mcp`) and WebMCP call. Each tool has a name, a title, a description for a model, the JSON
+        Schema of its input and its annotations: every tool only reads, and what it returns holds text repositories wrote.
+      responses:
+        "200":
+          description: The tools in their order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ToolList" }
+  /tools/{name}:
+    post:
+      operationId: callTool
+      summary: Call a tool; it answers from the viewer's view
+      description: |
+        The tool's input as `{"input": {...}}` (16 KiB at most). The answer's `text` is Markdown framed in
+        `<untrusted-content id="…">` tags: what repositories wrote is data, never instructions. A tool that cannot answer (an unknown
+        repository) says why in `text` with `isError`. A cookie-carrying request must come from the portal's own pages. Served outside
+        the generated handlers.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ToolCall" }
+      responses:
+        "200":
+          description: What the tool read
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ToolResult" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "415": { $ref: "#/components/responses/Problem" }
   /events:
     get:
       operationId: streamEvents
@@ -338,6 +377,38 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
   schemas:
+    ToolList:
+      type: object
+      required: [tools]
+      properties:
+        tools: { type: array, items: { $ref: "#/components/schemas/Tool" } }
+    Tool:
+      type: object
+      required: [name, title, description, inputSchema, annotations]
+      properties:
+        name: { type: string, description: "The tool's name: a-z, 0-9 and _" }
+        title: { type: string, description: For people }
+        description: { type: string, description: For a model }
+        inputSchema: { type: object, additionalProperties: true, description: The JSON Schema of the tool's input, an object }
+        annotations: { $ref: "#/components/schemas/ToolAnnotations" }
+    ToolAnnotations:
+      type: object
+      required: [readOnly, untrustedContent]
+      properties:
+        readOnly: { type: boolean, description: The tool changes nothing (every tool) }
+        untrustedContent: { type: boolean, description: What it returns holds text repositories wrote (every tool) }
+    ToolCall:
+      type: object
+      required: [input]
+      properties:
+        input: { type: object, additionalProperties: true }
+    ToolResult:
+      type: object
+      required: [source, text, isError]
+      properties:
+        source: { type: string, description: "The portal path the tool read, such as /repos/acme/core; empty on an error" }
+        text: { type: string, description: Markdown framed as untrusted content, or why the tool could not answer }
+        isError: { type: boolean }
     Freshness:
       type: object
       required: [status, fetchedAt, checkedAt]

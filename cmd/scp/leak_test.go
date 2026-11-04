@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"io"
@@ -24,7 +25,8 @@ import (
 // The private repository's traces: its name, its commit subject, its README and its description. None may reach a public viewer.
 var hiddenMarks = []string{"zq-hidden", "zq hidden", "Zq Hidden", "q7 vault"} //nolint:gochecknoglobals // test table
 
-// fetch requests a path of the portal with headers; a stream ends at the deadline with what it sent.
+// fetch requests a path of the portal with headers; a stream ends at the deadline with what it sent. The pseudo-header ":post"
+// makes it a POST of its value as application/json.
 type fetch func(path string, headers ...string) (int, string, http.Header)
 
 // staff is the trusted proxy's identity of a member of the private group (the test is the proxy: it is on 127.0.0.1).
@@ -99,7 +101,15 @@ catalog:
 		defer stop()
 		req, _ := http.NewRequestWithContext(rctx, http.MethodGet, base+path, nil)
 		for i := 0; i+1 < len(headers); i += 2 {
-			req.Header.Set(headers[i], headers[i+1])
+			if headers[i] == ":post" {
+				req, _ = http.NewRequestWithContext(rctx, http.MethodPost, base+path, strings.NewReader(headers[i+1]))
+				req.Header.Set("Content-Type", "application/json")
+			}
+		}
+		for i := 0; i+1 < len(headers); i += 2 {
+			if headers[i] != ":post" {
+				req.Header.Set(headers[i], headers[i+1])
+			}
 		}
 		resp, err := client.Do(req)
 		if err != nil {
@@ -175,6 +185,56 @@ func TestNoLeak(t *testing.T) {
 		if _, b, _ := get(p, staff...); !strings.Contains(b, "zq-hidden") {
 			t.Errorf("staff %s does not show the private repository:\n%s", p, b)
 		}
+	}
+}
+
+// TestNoLeakThroughTools calls every tool of the catalogue as the public, with the private repository wherever a tool takes one:
+// no answer carries a trace of it, and each answers as for a repository that does not exist. A staff member's call reads it.
+func TestNoLeakThroughTools(t *testing.T) {
+	get := privatePortal(t, "access: {private_groups: [staff]}\n")
+	_, list, _ := get("/api/v1/tools")
+	var tl oapi.ToolList
+	if err := json.Unmarshal([]byte(list), &tl); err != nil || len(tl.Tools) < 8 {
+		t.Fatalf("tools = %s", list)
+	}
+	input := func(name, repo string) string {
+		return map[string]string{
+			"search_repositories": `{"input":{"query":"` + repo + `"}}`, "list_groups": `{"input":{}}`, "get_group": `{"input":{"group":"all"}}`,
+			"get_document":   `{"input":{"owner":"acme","name":"` + repo + `","path":"docs/guide.md"}}`,
+			"recent_commits": `{"input":{"repo":"acme/` + repo + `","work":["hand","ai","automation"]}}`,
+		}[name]
+	}
+	nonce := regexp.MustCompile(`id=\\"[0-9a-f]+\\"`)
+	for _, tool := range tl.Tools {
+		body := cmp.Or(input(tool.Name, "zq-hidden"), `{"input":{"owner":"acme","name":"zq-hidden"}}`)
+		code, b, _ := get("/api/v1/tools/"+tool.Name, ":post", body)
+		for _, m := range hiddenMarks {
+			if strings.Contains(strings.ReplaceAll(b, "zq-hidden", ""), m) || (code == 200 && !strings.Contains(body, "zq-hidden") && strings.Contains(b, m)) {
+				t.Errorf("public %s: %d carries %q:\n%s", tool.Name, code, m, b)
+			}
+		}
+		absent := strings.ReplaceAll(body, "zq-hidden", "nothere")
+		ac, ab, _ := get("/api/v1/tools/"+tool.Name, ":post", absent)
+		if ac != code || nonce.ReplaceAllString(ab, "") != nonce.ReplaceAllString(strings.ReplaceAll(b, "zq-hidden", "nothere"), "") {
+			t.Errorf("public %s answers %d, unlike a repository that does not exist (%d):\n%s\n%s", tool.Name, code, ac, b, ab)
+		}
+		if code, b, _ := get("/api/v1/tools/"+tool.Name, append([]string{":post", body}, staff...)...); code != 200 || strings.Contains(b, `"isError":true`) &&
+			tool.Name != "get_document" {
+			t.Errorf("staff %s: %d %s", tool.Name, code, b)
+		}
+	}
+	if _, b, _ := get("/api/v1/tools/repository_health", append([]string{":post", `{"input":{"owner":"acme","name":"zq-hidden"}}`}, staff...)...); !strings.Contains(b, "Health") {
+		t.Errorf("staff does not read the private repository's health: %s", b)
+	}
+	// A cookie-carrying call from another site is refused; a bad input is a problem, not a run.
+	if code, _, _ := get("/api/v1/tools/list_groups", ":post", `{"input":{}}`, "Cookie", "scp-session=x", "Sec-Fetch-Site", "cross-site"); code != http.StatusForbidden {
+		t.Errorf("a cross-site call = %d", code)
+	}
+	if code, b, _ := get("/api/v1/tools/search_repositories", ":post", `{"input":{"limit":"many"}}`); code != http.StatusBadRequest {
+		t.Errorf("a bad input = %d %s", code, b)
+	}
+	if code, _, _ := get("/api/v1/tools/drop_tables", ":post", `{"input":{}}`); code != http.StatusNotFound {
+		t.Errorf("an unknown tool = %d", code)
 	}
 }
 

@@ -64,40 +64,40 @@ func (e CommitKind) Valid() bool {
 
 // Defines values for DependencyScope.
 const (
-	Dev      DependencyScope = "dev"
-	Import   DependencyScope = "import"
-	Indirect DependencyScope = "indirect"
-	Optional DependencyScope = "optional"
-	Parent   DependencyScope = "parent"
-	Peer     DependencyScope = "peer"
-	Provided DependencyScope = "provided"
-	Runtime  DependencyScope = "runtime"
-	Test     DependencyScope = "test"
-	Tool     DependencyScope = "tool"
+	DependencyScopeDev      DependencyScope = "dev"
+	DependencyScopeImport   DependencyScope = "import"
+	DependencyScopeIndirect DependencyScope = "indirect"
+	DependencyScopeOptional DependencyScope = "optional"
+	DependencyScopeParent   DependencyScope = "parent"
+	DependencyScopePeer     DependencyScope = "peer"
+	DependencyScopeProvided DependencyScope = "provided"
+	DependencyScopeRuntime  DependencyScope = "runtime"
+	DependencyScopeTest     DependencyScope = "test"
+	DependencyScopeTool     DependencyScope = "tool"
 )
 
 // Valid indicates whether the value is a known member of the DependencyScope enum.
 func (e DependencyScope) Valid() bool {
 	switch e {
-	case Dev:
+	case DependencyScopeDev:
 		return true
-	case Import:
+	case DependencyScopeImport:
 		return true
-	case Indirect:
+	case DependencyScopeIndirect:
 		return true
-	case Optional:
+	case DependencyScopeOptional:
 		return true
-	case Parent:
+	case DependencyScopeParent:
 		return true
-	case Peer:
+	case DependencyScopePeer:
 		return true
-	case Provided:
+	case DependencyScopeProvided:
 		return true
-	case Runtime:
+	case DependencyScopeRuntime:
 		return true
-	case Test:
+	case DependencyScopeTest:
 		return true
-	case Tool:
+	case DependencyScopeTool:
 		return true
 	default:
 		return false
@@ -1349,6 +1349,37 @@ type Technology struct {
 	Toolchains []ToolchainVersions `json:"toolchains"`
 }
 
+// Tool defines model for Tool.
+type Tool struct {
+	Annotations ToolAnnotations `json:"annotations"`
+
+	// Description For a model
+	Description string `json:"description"`
+
+	// InputSchema The JSON Schema of the tool's input
+	InputSchema map[string]interface{} `json:"inputSchema"`
+
+	// Name The tool's name: a-z, 0-9 and _
+	Name string `json:"name"`
+
+	// Title For people
+	Title string `json:"title"`
+}
+
+// ToolAnnotations defines model for ToolAnnotations.
+type ToolAnnotations struct {
+	// ReadOnly The tool changes nothing (every tool)
+	ReadOnly bool `json:"readOnly"`
+
+	// UntrustedContent What it returns holds text repositories wrote (every tool)
+	UntrustedContent bool `json:"untrustedContent"`
+}
+
+// ToolList defines model for ToolList.
+type ToolList struct {
+	Tools []Tool `json:"tools"`
+}
+
 // Toolchain defines model for Toolchain.
 type Toolchain struct {
 	Name    ToolchainName `json:"name"`
@@ -1482,6 +1513,9 @@ type ServerInterface interface {
 	// GetSnapshot Data health; the web UI reads it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(w http.ResponseWriter, r *http.Request)
+	// ListTools The read-only tools agents call, the same for every viewer
+	// (GET /tools)
+	ListTools(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -2043,6 +2077,20 @@ func (siw *ServerInterfaceWrapper) GetSnapshot(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListTools operation middleware
+func (siw *ServerInterfaceWrapper) ListTools(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTools(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -2177,6 +2225,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assistant", wrapper.GetAssistant)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tools", wrapper.ListTools)
 
 	return m
 }
@@ -2926,6 +2975,27 @@ func (response GetSnapshot304Response) VisitGetSnapshotResponse(w http.ResponseW
 	return nil
 }
 
+type ListToolsRequestObject struct {
+}
+
+type ListToolsResponseObject interface {
+	VisitListToolsResponse(w http.ResponseWriter) error
+}
+
+type ListTools200JSONResponse ToolList
+
+func (response ListTools200JSONResponse) VisitListToolsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// GetAssistant Whether the assistant is on and the viewer may ask it
@@ -2970,6 +3040,9 @@ type StrictServerInterface interface {
 	// GetSnapshot Data health; the web UI reads it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(ctx context.Context, request GetSnapshotRequestObject) (GetSnapshotResponseObject, error)
+	// ListTools The read-only tools agents call, the same for every viewer
+	// (GET /tools)
+	ListTools(ctx context.Context, request ListToolsRequestObject) (ListToolsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -3367,6 +3440,30 @@ func (sh *strictHandler) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSnapshotResponseObject); ok {
 		if err := validResponse.VisitGetSnapshotResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTools operation middleware
+func (sh *strictHandler) ListTools(w http.ResponseWriter, r *http.Request) {
+	var request ListToolsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTools(ctx, request.(ListToolsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTools")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListToolsResponseObject); ok {
+		if err := validResponse.VisitListToolsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

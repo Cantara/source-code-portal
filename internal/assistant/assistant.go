@@ -14,6 +14,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/llm"
+	"github.com/cantara/source-code-portal/internal/tools"
 )
 
 // Routes of the assistant outside the generated handlers.
@@ -22,20 +23,11 @@ const (
 	TestPattern = "POST /api/v1/admin/assistant/test"
 )
 
-// Tool is a read-only tool, wired in cmd/scp over the viewer's view (Run gets the request's context).
-type Tool struct {
-	llm.Tool
-	// Label says what a call reads, for the viewer: "Reading acme/core".
-	Label func(input map[string]any) string
-	// Run returns what the tool read and where from (a path of the portal); an error is told to the model.
-	Run func(ctx context.Context, input map[string]any) (source, text string, err error)
-}
-
 // Options configures the assistant; a nil Chat turns it off.
 type Options struct {
 	Chat   llm.Chat
-	Tools  []Tool
-	Access string // signed-in, admin or everyone
+	Tools  *tools.Catalogue // the read-only tools over the viewer's view (cmd/scp/tools.go); nil: none
+	Access string           // signed-in, admin or everyone
 	Budget Budget
 	// PublicURL is the portal's origin for the CSRF rule and the system prompt.
 	PublicURL string
