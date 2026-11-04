@@ -128,7 +128,9 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js 24 executable that runs the bundle |
 | `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4); empty: the built-in layout, no saving |
-| `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`), `url` (https): `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy |
+| `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy |
+| `packages.registries[].network` | `public` | `public`: reached through the public-only guard; `private`: on your network (http allowed, without credentials) |
+| `packages.registries[].auth` | none | `user` and `password_file` (Basic; the password may be an access token), or `token_file` (a bearer token), with `header` to send it in another header (`X-JFrog-Art-Api`, or `Authorization` for Cargo's raw token) |
 | `packages.public` | `true` | ask the public registries too (Maven Central, npm, PyPI, crates.io, proxy.golang.org, CocoaPods trunk) for public repositories; `false`: only the configured ones and those the build files name |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 
@@ -335,7 +337,39 @@ packages:
 A registry a build file names is reached only over https and only at public addresses: a repository cannot make the portal call into
 your network. Lookups run at most four at a time per registry host; a registry that answers 429 or 503 is paused (its `Retry-After`,
 else one minute doubling to fifteen), and one that fails keeps the release last known. Packages are looked up every six hours and on
-every push and tag. Registries that need credentials come in a later release.
+every push and tag.
+
+**Private registries.** Configure each registry the portal should sign in to. Its credentials are files, like every secret, and are
+sent only to URLs under the registry's own `url` (scheme, host, port and path): never to a registry a build file names, never to
+another path on the same host, and never across a redirect that leaves it. Use a read-only account or token.
+
+```yaml
+packages:
+  registries:
+    # Nexus or Reposilite: a user and its password or a user token
+    - { id: nexus, ecosystem: maven, url: https://nexus.example.org/repository/maven-releases/,
+        auth: { user: scp-reader, password_file: /run/secrets/nexus-password } }
+    # Artifactory: an identity token as a bearer token, or an API key in its own header
+    - { id: art-npm, ecosystem: npm, url: https://example.jfrog.io/artifactory/api/npm/npm/,
+        auth: { token_file: /run/secrets/artifactory-token } }
+    - { id: art-pypi, ecosystem: pypi, url: https://example.jfrog.io/artifactory/api/pypi/pypi/simple/,
+        auth: { token_file: /run/secrets/artifactory-key, header: X-JFrog-Art-Api } }
+    # GitHub Packages: a classic token with read:packages (Basic for Maven, bearer for npm)
+    - { id: github-maven, ecosystem: maven, url: https://maven.pkg.github.com/example/,
+        auth: { user: scp, password_file: /run/secrets/github-packages-token } }
+    - { id: github-npm, ecosystem: npm, url: https://npm.pkg.github.com/,
+        auth: { token_file: /run/secrets/github-packages-token } }
+    # A Cargo registry's sparse index: the token as it is, in Authorization
+    - { id: acme, ecosystem: cargo, url: https://cargo.example.org/index/,
+        auth: { token_file: /run/secrets/cargo-token, header: Authorization } }
+    # Verdaccio, devpi or Athens on your network, without credentials
+    - { id: lan-npm, ecosystem: npm, url: http://verdaccio.internal:4873/, network: private }
+    - { id: athens, ecosystem: go, url: https://athens.internal/, network: private }
+```
+
+GitHub Packages does not take the portal's GitHub App: its registries need a token with `read:packages`. A Cargo crate whose
+`publish = ["acme"]` names a registry is looked up in the configured Cargo registry of that `id`. `config check` refuses a registry
+without an ecosystem the portal reads, with credentials over http, or with both kinds of credentials.
 
 ## 3. Run
 

@@ -73,7 +73,7 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
   {
     at: "shared",
     title: "What they share",
-    body: "Said once: the licence and the language at least 80% of the repositories share, and how many have a GitHub release.",
+    body: "Said once: the licence and the language at least 80% of the repositories share, and how many are released: a GitHub release or a published package (section 12).",
   },
 ]
 
@@ -149,6 +149,7 @@ const parts = [
       { id: "github", title: "Connect GitHub" },
       { id: "run", title: "Run your own portal" },
       { id: "access", title: "Sign-in and private repositories" },
+      { id: "packages", title: "Packages and private registries" },
       { id: "more", title: "Options and documents" },
     ],
   },
@@ -866,8 +867,58 @@ auth:
         </Section>
 
         <Section
-          id="more"
+          id="packages"
           n={12}
+          title="Packages and private registries"
+          lede="A release is often a package, not a GitHub release. The portal reads what a repository publishes from its build files and asks the registry for the newest version."
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            {[
+              [
+                "Java and Kotlin",
+                "pom.xml and its parent POMs, or a Gradle build with maven-publish: the Maven repository it publishes to, then Maven Central.",
+              ],
+              ["TypeScript, JavaScript and React", "package.json, unless private: its publishConfig registry, then npm."],
+              ["Python", "pyproject.toml or setup.cfg: your indexes, then PyPI."],
+              ["Rust", "Cargo.toml, unless publish = false: the registries it names, then crates.io."],
+              ["Go", "go.mod: the module proxy, or the repository's own tags."],
+              ["Swift", "Package.swift: the tags; a podspec: CocoaPods."],
+            ].map(([t, d]) => (
+              <div key={t} className="panel p-4">
+                <p className="text-sm font-semibold">{t}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{d}</p>
+              </div>
+            ))}
+          </div>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            The newest stable version shows on the release chip, such as <code className="font-mono text-xs">3.0.21 · Maven</code>
+            , and in the repository page&apos;s Packages panel, and it counts as a release for health. Public registries need no
+            setup. A private repository&apos;s package names are never sent to a public registry, only to yours.
+          </p>
+          <Code label="Private registries in scp.yaml">{`packages:
+  registries:
+    - id: nexus                      # a user and a password or token
+      ecosystem: maven
+      url: https://nexus.example.org/repository/releases/
+      auth: { user: scp-reader, password_file: /run/secrets/nexus-password }
+    - id: github-npm                 # a token with read:packages
+      ecosystem: npm
+      url: https://npm.pkg.github.com/
+      auth: { token_file: /run/secrets/github-packages-token }
+    - id: lan                        # on your network, no credentials
+      ecosystem: pypi
+      url: http://devpi.internal/root/prod/+simple/
+      network: private`}</Code>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            A registry&apos;s credentials go only to its own address: never to a registry a build file names, and never along a
+            redirect that leaves it. Use a read-only account. The operator guide has examples for Artifactory, GitHub Packages,
+            Cargo registries and Go proxies.
+          </p>
+        </Section>
+
+        <Section
+          id="more"
+          n={13}
           title="Options and documents"
           lede="Add what you need when you need it; the documents cover every key."
         >
@@ -876,6 +927,7 @@ auth:
               ["Webhooks", "pushes show within seconds"],
               ["Sign-in", "single sign-on through your OpenID Connect provider, and access tokens"],
               ["Private repositories", "shown only to the groups you name"],
+              ["Private registries", "the newest version of your packages from Nexus, Artifactory or GitHub Packages"],
               ["The assistant", "questions about the catalogue in plain language, with your model provider"],
               ["The design mode", "administrators arrange the dashboard for everyone"],
               ["Several instances", "one portal served together through Hazelcast"],

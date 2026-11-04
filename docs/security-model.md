@@ -36,13 +36,16 @@ none of the operator duties below except the network layout.
 - **Addresses in repositories are not trusted.** An external image in a README and a package registry a build file names are
   reached only over https at public addresses, checked on the address dialled, so neither a redirect nor a DNS answer reaches your
   network. What a registry answers is cleaned like repository text, and its addresses are linked only when https.
+- **Registry credentials.** A configured package registry's credentials are sent only to URLs under its own `url`, never to a
+  registry a build file names and never across a redirect that leaves it (`internal/packages/private_test.go`). A private
+  repository's package names are asked only of those registries, never of a public one.
 
 ## What you provide
 
 - **One instance per audience.** The portal knows one boundary: private or not. Run one instance for each group of people who may see
   the same repositories, with its own GitHub App installed on **only those repositories** (*Selected repositories*), with *Contents*
   and *Metadata* read-only and nothing else. The installation is the boundary GitHub enforces; `exclude` is a second fence.
-- **Secrets from files.** The App key, webhook secret, session key, token secrets and LLM key are read from files (a secrets manager's
+- **Secrets from files.** The App key, webhook secret, session key, token secrets, registry credentials and LLM key are read from files (a secrets manager's
   mount). Rotate the webhook secret with `webhook.previous_secret_file`. Rotate the App key, session key and tokens by replacing the
   file and restarting; a new session key signs everyone out.
 - **The network layout.** Clients reach the public listener only through your TLS proxy. If a proxy authenticates viewers, it must

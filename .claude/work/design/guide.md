@@ -14,7 +14,8 @@ and make it yours (every preference). **Part 2, Run a portal**, in the order of 
 permissions and webhook, its key and installation; a personal access token only to try one), run your own (the App in `scp.yaml`,
 the groups, check, run), sign-in and private repositories (what an anonymous,
 a signed-in and an administrator viewer see, that the server filters every answer, access tokens first, in three steps (the
-secrets, the configuration, handing them out and signing in), then single sign-on: any OpenID Connect provider, GitHub accounts through Dex), and options and documents (the
+secrets, the configuration, handing them out and signing in), then single sign-on: any OpenID Connect provider, GitHub accounts through Dex), packages and private registries (what is read
+per language, the release chip, private registries with their credentials), and options and documents (the
 options, the documents and the plugin).
 
 - **Contents**: one `nav` "Guide" grouped by part; chips under the hero on a narrow screen, a sticky "On this page" list beside the
