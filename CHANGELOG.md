@@ -4,6 +4,23 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.2
+
+AI agents can ask the portal what a person would, through the portal's own read-only tools. No configuration change is needed to
+upgrade: nothing new to set, and no language model runs on the portal for it.
+
+- One tool catalogue for agents: search the repositories, list and read groups, read a repository or a document, the recent
+  commits (with the work that counts), a repository's health and its published packages. The assistant (`/ask`) uses it too. Every
+  call answers from the caller's view, and what it returns is framed as untrusted repository text.
+- MCP at `/mcp` (Model Context Protocol, Streamable HTTP, stateless, protocol 2026-07-28 and earlier) for Claude Code and other MCP
+  clients: `claude mcp add --transport http scp https://portal.example.org/mcp`. Without a token the public view; with an access
+  token (`auth.tokens`) the token's. A browser's session cookie is never an identity there, and a page of another site is refused.
+- WebMCP (`document.modelContext`, the W3C Community Group draft): in a browser with WebMCP the pages offer the same tools to the
+  browser's agent with the reader's own sign-in, plus `current_page`, `open_page` and `set_preferences`. Without WebMCP nothing
+  changes.
+- `GET /api/v1/tools` lists the tools and `POST /api/v1/tools/{name}` calls one; `/llms.txt` names `/mcp`.
+- The Guide has a section on agents; the operator guide (2.6), the API guide and the security model cover them.
+
 ## 2.2.1
 
 A release is also what a repository publishes to a package registry. No configuration change is needed to upgrade: the new
