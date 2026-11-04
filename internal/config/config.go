@@ -33,6 +33,7 @@ type Config struct {
 	Cluster   Cluster   `mapstructure:"cluster"`
 	Web       Web       `mapstructure:"web"`
 	Layout    Layout    `mapstructure:"layout"`
+	Packages  Packages  `mapstructure:"packages"`
 	Ops       Ops       `mapstructure:"ops"`
 }
 
@@ -106,6 +107,7 @@ func defaults() map[string]any {
 		"web.dir":                      "",
 		"web.node":                     "node",
 		"layout.dir":                   "",
+		"packages.public":              true,
 	}
 }
 
@@ -241,6 +243,7 @@ func (c Config) validate() []string {
 	p = append(p, c.Cluster.validate()...)
 	p = append(p, c.Web.validate()...)
 	p = append(p, c.Layout.validate()...)
+	p = append(p, c.Packages.validate()...)
 	slices.Sort(p)
 	return p
 }

@@ -51,8 +51,9 @@ func TestDefaults(t *testing.T) {
 			OIDC: OIDC{Scopes: []string{"openid", "email", "profile"}, GroupsClaim: "groups"}},
 		Assistant: Assistant{Access: "signed-in", Concurrency: 4, MaxTurns: 8, MaxToolCalls: 16, MaxTokens: 16000, MaxHistory: 40,
 			MaxInputChars: 60000, ToolResultChars: 12000},
-		Cluster: Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},
-		Web:     Web{Node: "node"},
+		Cluster:  Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},
+		Web:      Web{Node: "node"},
+		Packages: Packages{Public: true},
 	}
 	if diff := cmp.Diff(want, cfg, cmp.Comparer(func(a, b Secret) bool { return string(a.v) == string(b.v) })); diff != "" {
 		t.Errorf("defaults (-want +got):\n%s", diff)
@@ -151,6 +152,9 @@ func TestRefused(t *testing.T) {
 		"bad assistant access":    {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_ASSISTANT_ACCESS": "anyone"}, want: "assistant.access"},
 		"signed-in without auth":  {env: map[string]string{"SCP_LLM_PROVIDER": "ollama"}, want: "needs a way to know the viewer"},
 		"too many turns":          {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_ASSISTANT_ACCESS": "everyone", "SCP_ASSISTANT_MAX_TURNS": "99"}, want: "assistant.max_turns"},
+		"unknown ecosystem":       {file: "packages:\n  registries: [{id: x, ecosystem: cobol, url: 'https://r.example/'}]\n", want: "packages.registries[0].ecosystem"},
+		"registry over http":      {file: "packages:\n  registries: [{id: x, ecosystem: maven, url: 'http://r.example/'}]\n", want: "packages.registries[0].url"},
+		"registry id twice":       {file: "packages:\n  registries: [{id: x, ecosystem: maven, url: 'https://a.example/'}, {id: x, ecosystem: npm, url: 'https://b.example/'}]\n", want: "used twice"},
 		"unknown group source":    {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {
