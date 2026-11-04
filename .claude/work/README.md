@@ -24,6 +24,7 @@ What Source Code Portal is, how it is built, and the work in progress. Binding o
 | `design/assistant.md` | A1, in progress: LLM providers and the read-only assistant. |
 | `design/seo.md` | M13, built: search engines. |
 | `design/hardening.md` | H1, built: a hardened private instance (issue #5). |
+| `design/agents.md` | W1 to W3, in progress: one tool catalogue for the assistant, MCP (`/mcp`) and WebMCP. |
 | `design/guide.md` | G1, built: the Getting started page and its screenshots, the operators' Claude Code plugin. |
 | `design/layout.md` | L1 to L4, built: the landing page of signals, layouts and the design mode, AI-assisted commits, the work that counts and Settings. |
 | `design/packages.md` | R1 to R4, R1 in progress: published packages, one provider per package manager (Maven, npm, PyPI, Cargo, Go, Swift, NuGet, RubyGems, Packagist), the registries a build file names, configured private registries with their credentials, structured concurrency per job. |
