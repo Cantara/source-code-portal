@@ -499,7 +499,9 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, 
 	if transport == nil {
 		transport = egress.Guarded(10 * time.Second)
 	}
-	providers := []packages.Provider{packages.Maven{Central: d.public["maven"]}, packages.NPM{Registry: d.public["npm"]}}
+	providers := []packages.Provider{packages.Maven{Central: d.public["maven"]}, packages.NPM{Registry: d.public["npm"]},
+		packages.PyPI{Simple: d.public["pypi"]}, packages.Cargo{API: d.public["cargo"]}, packages.Go{Proxy: d.public["go"]},
+		packages.Swift{}, packages.CocoaPods{Trunk: d.public["cocoapods"]}}
 	registries := make([]packages.Registry, 0, len(cfg.Registries))
 	for _, r := range cfg.Registries {
 		u := r.URL

@@ -1,7 +1,15 @@
 import type { Schemas } from "@/lib/api/client"
 
 /** The package managers' names as people write them, by ecosystem. */
-const ecosystems: Record<string, string> = { maven: "Maven", npm: "npm" }
+const ecosystems: Record<string, string> = {
+  maven: "Maven",
+  npm: "npm",
+  pypi: "PyPI",
+  cargo: "crates.io",
+  go: "Go",
+  swift: "Swift",
+  cocoapods: "CocoaPods",
+}
 
 /** ecosystemLabel is a package manager's name for the pages; an unknown one shows as it came. */
 export function ecosystemLabel(ecosystem: string): string {

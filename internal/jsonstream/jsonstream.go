@@ -70,6 +70,10 @@ func (d *Reader) peek() (byte, error) {
 	}
 }
 
+// Peek is the first byte of the next value, left unread: '"' a string, '{' an object, '[' an array, 't' or 'f' a boolean, 'n' null,
+// else a number.
+func (d *Reader) Peek() (byte, error) { return d.peek() }
+
 // Array calls each for every element of an array; each reads the element with one of the Reader's methods. Anything but an array
 // is skipped and calls nothing.
 func (d *Reader) Array(each func() error) error {

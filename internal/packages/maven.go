@@ -38,13 +38,24 @@ func (m Maven) central() string { return cmp.Or(m.Central, mavenCentral) }
 // Ecosystem is "maven".
 func (Maven) Ecosystem() string { return "maven" }
 
-// Wants reports whether path is a POM.
-func (Maven) Wants(p string) bool { return path.Base(p) == "pom.xml" }
+// Wants reports whether path is a POM or a Gradle build's file: build.gradle(.kts), settings.gradle(.kts), gradle.properties.
+func (Maven) Wants(p string) bool {
+	switch path.Base(p) {
+	case "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradle.properties":
+		return true
+	}
+	return false
+}
 
-// Coordinates reads every POM: its group (or its parent's), artifact, parent and the repositories it publishes to and reads from.
+// Coordinates reads every POM (its group or its parent's, artifact, parent, and the repositories it publishes to and reads from)
+// and every Gradle build that publishes (maven-publish or a publishing block): its group and root project's name and the
+// repositories of its publishing block.
 func (Maven) Coordinates(files []File) []Coordinate {
-	var out []Coordinate
+	out := gradleCoordinates(files)
 	for _, f := range files {
+		if path.Base(f.Path) != "pom.xml" {
+			continue
+		}
 		p, err := readPOM(bytes.NewReader(f.Content))
 		if err != nil || p.artifact == "" || p.group() == "" || strings.Contains(p.group()+p.artifact, "${") {
 			continue
@@ -359,4 +370,65 @@ func walkXML(r io.Reader, each func(at []string, text string)) error {
 			text.Reset()
 		}
 	}
+}
+
+var (
+	gradleGroup    = regexp.MustCompile(`(?m)^\s*group\s*=?\s*["']([A-Za-z0-9_.-]{1,200})["']`)
+	gradleProperty = regexp.MustCompile(`(?m)^\s*group\s*[=:]\s*([A-Za-z0-9_.-]{1,200})\s*$`)
+	gradleRoot     = regexp.MustCompile(`rootProject\.name\s*=\s*["']([A-Za-z0-9_.-]{1,200})["']`)
+	gradleArtifact = regexp.MustCompile(`artifactId\s*=\s*["']([A-Za-z0-9_.-]{1,200})["']`)
+	gradleURL      = regexp.MustCompile(`url\s*(?:=\s*)?(?:uri\s*\(\s*)?["'](https?://[^"'\s]{1,500})["']`)
+)
+
+// gradleCoordinates reads the root Gradle build, read as text (it is code, never run): a build that applies maven-publish or has a
+// publishing block publishes group:name, the name its publication's artifactId or the root project's.
+func gradleCoordinates(files []File) []Coordinate {
+	var build, settings, props *File
+	for i, f := range files {
+		switch f.Path {
+		case "build.gradle", "build.gradle.kts":
+			build = &files[i]
+		case "settings.gradle", "settings.gradle.kts":
+			settings = &files[i]
+		case "gradle.properties":
+			props = &files[i]
+		}
+	}
+	if build == nil {
+		return nil
+	}
+	text := string(build.Content)
+	at := strings.Index(text, "publishing")
+	if at < 0 && !strings.Contains(text, "maven-publish") {
+		return nil
+	}
+	group := ""
+	if m := gradleGroup.FindStringSubmatch(text); m != nil {
+		group = m[1]
+	} else if props != nil {
+		if m := gradleProperty.FindStringSubmatch(string(props.Content)); m != nil {
+			group = m[1]
+		}
+	}
+	artifact := ""
+	if at >= 0 {
+		if m := gradleArtifact.FindStringSubmatch(text[at:]); m != nil {
+			artifact = m[1]
+		}
+	}
+	if artifact == "" && settings != nil {
+		if m := gradleRoot.FindStringSubmatch(string(settings.Content)); m != nil {
+			artifact = m[1]
+		}
+	}
+	if group == "" || artifact == "" {
+		return nil
+	}
+	c := Coordinate{Ecosystem: "maven", Name: group + ":" + artifact, Path: build.Path}
+	if at >= 0 {
+		for _, m := range gradleURL.FindAllStringSubmatch(text[at:], 10) {
+			c.Publish = append(c.Publish, m[1])
+		}
+	}
+	return []Coordinate{c}
 }
