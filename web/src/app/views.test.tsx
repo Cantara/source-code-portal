@@ -32,7 +32,7 @@ function show(view: ReactNode, path = "/", qc = client()) {
 
 describe("pages", () => {
   it("renders the dashboard with the fleet, the products' signals and the team's latest commits", async () => {
-    show(<DashboardView />)
+    show(<DashboardView work={["hand", "ai"]} />)
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()
     expect(await screen.findByRole("link", { name: "IAM" })).toHaveAttribute("href", "/groups/iam")
     expect(screen.getByText("Commit 1")).toBeInTheDocument()
@@ -87,17 +87,17 @@ describe("pages", () => {
     expect(screen.getByRole("heading", { name: "Latest commits with AI" })).toBeInTheDocument()
   })
 
-  it("counts automation too when the reader's lens names it, and drops the latest commits' own switch", async () => {
-    show(<DashboardView work={["hand", "ai", "automation"]} />)
+  it("counts every kind by default, automation too, and drops the latest commits' own switch", async () => {
+    show(<DashboardView />)
     const card = (await screen.findByRole("link", { name: "IAM" })).closest("li") as HTMLElement
     expect(card).toHaveTextContent("13 commits")
     expect(
       within(card).getByRole("img", {
-        name: /^Commits by the team or automation per week.*; by automation 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 5$/,
+        name: /^Commits per week.*; by automation 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 5$/,
       }),
     ).toBeInTheDocument()
     expect(card).toHaveTextContent("Last change by the team or automation")
-    expect(screen.getByRole("heading", { name: "Latest commits by the team or automation" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Latest commits" })).toBeInTheDocument()
     expect(screen.queryByRole("checkbox", { name: "Include automation" })).not.toBeInTheDocument()
   })
 

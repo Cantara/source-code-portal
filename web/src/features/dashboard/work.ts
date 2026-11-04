@@ -1,5 +1,5 @@
 import type { Schemas } from "@/lib/api/client"
-import { by, has, isTeam, type Work } from "@/lib/preferences"
+import { by, has, isEvery, type Work } from "@/lib/preferences"
 
 type Activity = Schemas["Activity"]
 
@@ -34,7 +34,7 @@ export function series(a: Activity, w: Work): Part[] {
 
 /** weekly is a sparkline's label: what the bars count, by week. */
 export function weekly(a: Activity, w: Work): string {
-  const head = `Commits ${isTeam(w) ? "" : `${by(w)} `}per week, the last 12 weeks, the oldest first:`
+  const head = `Commits ${isEvery(w) ? "" : `${by(w)} `}per week, the last 12 weeks, the oldest first:`
   const parts = [
     has(w, "hand") && `by hand ${a.weeklyHand.join(", ")}`,
     has(w, "ai") && `with AI ${a.weeklyAi.join(", ")}`,

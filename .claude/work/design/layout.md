@@ -105,8 +105,8 @@ flat object per element whose kind reads only its own fields):
 
 People and agents work together, and automation maintains, so none is ranked: a card leads with the commits of the work that counts and
 names every kind under it. The reader's lens (P-42, P-43) is a set of kinds, any one or more of **By hand**, **With AI** and **By
-automation** (CI, dependency and release bots, and sweeps): a preference in the cookie `scp-work` (`hand,ai`), people's work (by hand
-and with AI) until the reader chooses. The dashboard route reads it and asks `GET /dashboard?work=hand,ai` (comma-separated, the
+automation** (CI, dependency and release bots, and sweeps): a preference in the cookie `scp-work` (`hand,ai`), every kind until the
+reader chooses. The dashboard route reads it and asks `GET /dashboard?work=hand,ai` (comma-separated, the
 clients' `querySerializer`), and Go computes the lens (`commits.Work`, a bit set; `oapi.WorkOrDefault` orders the echo): the counted
 number, the last change, the recent repositories, the members' last change (so the fleet map and the Active tile) and the latest
 commits; who made the work is people only (automation names none). Every kind's counts are always in `Activity` (`hand`, `ai`,

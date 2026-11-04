@@ -347,7 +347,7 @@ const (
 // counts.
 func Dashboard(s *snapshot.Snapshot, d *oapi.Dashboard) {
 	now := time.Now()
-	w := WorkOf(d.Work, WorkTeam)
+	w := WorkOf(d.Work, WorkEvery)
 	all, _ := feed(s, "")
 	for _, r := range all {
 		if len(d.Latest) == dashboardCommits {

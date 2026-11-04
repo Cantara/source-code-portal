@@ -340,8 +340,8 @@ export function GuideView({ version }: { version: string }) {
             ))}
           </ul>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            The age is of the last change of the work that counts (section 6). A bot's dependency update does not make a
-            repository look alive, and neither does a sweep: one change landing in more than 10 repositories on one day.
+            The age is of the last change of the work that counts (section 6), every kind until you choose: a bot's dependency
+            update keeps a repository alive too. Count people's work alone to see which ones people still change.
           </p>
         </Section>
 
@@ -475,9 +475,9 @@ export function GuideView({ version }: { version: string }) {
                 <Link href="/settings" className="font-medium text-primary hover:underline">
                   Settings
                 </Link>{" "}
-                choose what the dashboard counts, any of the three; people&apos;s work, by hand and with AI, until you choose. A
-                maintenance view is automation alone. The choice is kept in your browser, and the other kinds stay in sight on
-                every card.
+                choose what the dashboard counts, any of the three; all three until you choose. People&apos;s work alone is by
+                hand and with AI, a maintenance view automation alone. The choice is kept in your browser, and the other kinds
+                stay in sight on every card.
               </p>
             </div>
             <Figure caption="Settings: the work that counts.">

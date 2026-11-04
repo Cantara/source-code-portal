@@ -915,7 +915,7 @@ export interface components {
     }
   }
   parameters: {
-    /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit */
+    /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts every kind without it, as /commits lists every commit */
     Work: components["schemas"]["Work"]
     /** @description The page, from 1 */
     PageNumber: number
@@ -932,7 +932,7 @@ export interface operations {
   getDashboard: {
     parameters: {
       query?: {
-        /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit */
+        /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts every kind without it, as /commits lists every commit */
         work?: components["parameters"]["Work"]
       }
       header?: never
@@ -962,7 +962,7 @@ export interface operations {
         repo?: string
         /** @description false leaves out commits made by automation */
         automation?: boolean
-        /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit */
+        /** @description The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts every kind without it, as /commits lists every commit */
         work?: components["parameters"]["Work"]
         /** @description The page, from 1 */
         page?: components["parameters"]["PageNumber"]

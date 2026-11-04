@@ -1352,7 +1352,7 @@ type ListCommitsParams struct {
 	// Automation false leaves out commits made by automation
 	Automation *bool `form:"automation,omitempty" json:"automation,omitempty"`
 
-	// Work The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit
+	// Work The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts every kind without it, as /commits lists every commit
 	Work *Work `form:"work,omitempty" json:"work,omitempty"`
 
 	// Page The page, from 1
@@ -1362,7 +1362,7 @@ type ListCommitsParams struct {
 
 // GetDashboardParams defines parameters for GetDashboard.
 type GetDashboardParams struct {
-	// Work The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai without it, /commits lists every commit
+	// Work The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts every kind without it, as /commits lists every commit
 	Work *Work `form:"work,omitempty" json:"work,omitempty"`
 }
 

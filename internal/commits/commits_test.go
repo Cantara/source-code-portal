@@ -195,7 +195,14 @@ func TestSweepsAndActivity(t *testing.T) {
 	if at, _ := LastAuthored(s, "acme/r5", WorkTeam); !at.Equal(ago(2)) {
 		t.Errorf("a repository holding only the sweep: %v, want the oldest read commit", at)
 	}
-	d := oapi.Dashboard{Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
+	// Without a lens the dashboard counts every kind: the bot's update a day ago is the latest commit.
+	every := oapi.Dashboard{Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
+	Dashboard(s, &every)
+	if len(every.Latest) == 0 || every.Latest[0].Kind != oapi.CommitKindAutomation || !every.Groups[0].Members[0].LastAuthoredAt.Equal(ago(1)) {
+		t.Errorf("the default lens: latest %+v, member %+v; want every kind", every.Latest, every.Groups[0].Members[0])
+	}
+	d := oapi.Dashboard{Work: oapi.Work{oapi.WorkKindHand, oapi.WorkKindAi},
+		Groups: []oapi.DashboardGroup{{Id: "g", Members: []oapi.DashboardMember{{Address: "acme/r0"}}}}}
 	Dashboard(s, &d)
 	g := d.Groups[0].Activity
 	if g.Hand != 1 || g.Ai != 1 || g.Automation != 1 || g.Sweeps != 1 || g.AuthorCount != 1 || len(g.Authors) != 1 || g.Authors[0].Name != "Ada" {

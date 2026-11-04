@@ -154,8 +154,8 @@ const (
 	WorkAI                          // assisted or by an agent
 	WorkAutomation                  // automation and sweeps
 
-	WorkTeam  = WorkHand | WorkAI // people's work: the dashboard's default
-	WorkEvery = WorkTeam | WorkAutomation
+	WorkTeam  = WorkHand | WorkAI         // people's work: what health counts
+	WorkEvery = WorkTeam | WorkAutomation // every kind: the dashboard's default
 )
 
 // WorkOf is the lens of the kinds a request names; none when it names no known kind.

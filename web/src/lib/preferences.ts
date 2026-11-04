@@ -25,8 +25,8 @@ export type WorkKind = Schemas["WorkKind"]
 
 export const workCookie = "scp-work"
 
-/** team is people's work, by hand and with AI: the default. */
-export const team: Work = ["hand", "ai"]
+/** every is each kind of work, by hand, with AI and by automation: the default. */
+export const every: Work = ["hand", "ai", "automation"]
 
 export const kinds: { value: WorkKind; label: string; about: string }[] = [
   { value: "hand", label: "By hand", about: "People's commits with no trace of an AI." },
@@ -42,18 +42,18 @@ export const kinds: { value: WorkKind; label: string; about: string }[] = [
   },
 ]
 
-/** workOf is the kinds v names (a cookie's "hand,ai"), once each and in order; people's work when it names none. */
+/** workOf is the kinds v names (a cookie's "hand,ai"), once each and in order; every kind when it names none. */
 export function workOf(v: unknown): Work {
   const named = typeof v === "string" ? v.split(",") : Array.isArray(v) ? v : []
   const w = kinds.map((k) => k.value).filter((k) => named.includes(k))
-  return w.length > 0 ? w : team
+  return w.length > 0 ? w : every
 }
 
 /** has reports whether the lens counts kind k. */
 export const has = (w: Work, k: WorkKind) => w.includes(k)
 
-/** isTeam reports whether the lens is people's work exactly, by hand and with AI. */
-export const isTeam = (w: Work) => w.length === 2 && has(w, "hand") && has(w, "ai")
+/** isEvery reports whether the lens counts every kind, the default: a label then needs no qualifier. */
+export const isEvery = (w: Work) => w.length === kinds.length
 
 const named: Record<WorkKind, string> = { hand: "by hand", ai: "with AI", automation: "by automation" }
 

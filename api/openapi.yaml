@@ -300,8 +300,8 @@ components:
       explode: false
       description: >-
         The work that counts (the reader's lens), comma-separated kinds: hand (people's commits with no trace of an AI), ai (an AI
-        co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts hand,ai
-        without it, /commits lists every commit
+        co-author or a coding agent) and automation (CI, dependency and release bots, and sweeps). /dashboard counts every kind
+        without it, as /commits lists every commit
       schema: { $ref: "#/components/schemas/Work" }
     PageNumber:
       name: page

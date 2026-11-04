@@ -11,7 +11,7 @@ import { FindingList, HealthScore, levels } from "@/entities/health/health"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
 import { Sparkline } from "@/shared/sparkline"
-import { by, isTeam, remember, viewCookie, type Work } from "@/lib/preferences"
+import { by, isEvery, remember, viewCookie, type Work } from "@/lib/preferences"
 import { assistants, counted, maintenance, noun, series, share, weekly } from "./work"
 import type { ProductsView } from "./layout"
 
@@ -171,7 +171,7 @@ const columns = (w: Work): Column[] => [
   { key: "repos", label: "Repositories", numeric: true, value: (g) => g.repoCount, cell: (g) => count(g.repoCount) },
   {
     key: "commits",
-    label: isTeam(w) ? "Commits, 30 days" : `${by(w).replace(/^./, (c) => c.toUpperCase())}, 30 days`,
+    label: isEvery(w) ? "Commits, 30 days" : `${by(w).replace(/^./, (c) => c.toUpperCase())}, 30 days`,
     numeric: true,
     value: (g) => counted(g.activity, w),
     cell: (g) => (

@@ -4,7 +4,7 @@ import Link from "next/link"
 import type { Schemas } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
-import { by, team, type Work } from "@/lib/preferences"
+import { by, every, type Work } from "@/lib/preferences"
 import { Hint } from "@/shared/hint"
 import { Toggletip } from "@/shared/toggletip"
 import { levels } from "@/entities/health/health"
@@ -58,7 +58,7 @@ function summary(t: Record<Activity, number>): string {
  * (a Hint names each one with its activity and health the moment it is pointed at or tapped; a click opens it), while the
  * products below carry the keyboard's links. The legend's levels explain themselves the same way, from the keyboard too.
  */
-export function FleetMap({ groups, work = team, now }: { groups: Group[]; work?: Work; now: number }) {
+export function FleetMap({ groups, work = every, now }: { groups: Group[]; work?: Work; now: number }) {
   const all = new Map<string, Group["members"][number]>()
   for (const g of groups) for (const m of g.members) all.set(m.address, m)
   const total = tally([...all.values()], now)

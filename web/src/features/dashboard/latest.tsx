@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Commit } from "@/lib/api/client"
 import { CommitList } from "@/entities/commit/commit-list"
-import { by, has, type Work } from "@/lib/preferences"
+import { by, has, isEvery, type Work } from "@/lib/preferences"
 import { latestAllQuery } from "./api"
 
 /**
@@ -31,7 +31,7 @@ export function LatestCommits({
   return (
     <Card aria-labelledby="latest" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <CardTitle id="latest">{all ? "Latest commits" : `Latest commits ${by(work)}`}</CardTitle>
+        <CardTitle id="latest">{all || isEvery(work) ? "Latest commits" : `Latest commits ${by(work)}`}</CardTitle>
         <div className="flex items-center gap-4 text-sm">
           {!has(work, "automation") && (
             <label className="flex items-center gap-2 text-muted-foreground">
