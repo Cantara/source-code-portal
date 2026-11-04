@@ -125,3 +125,59 @@ export function LogOutIcon({ className }: { className?: string }) {
     </Icon>
   )
 }
+
+/** SyncOffIcon stands for a repository the portal cannot update: its two arrows, struck through. */
+export function SyncOffIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M20 11a8 8 0 0 0-13.7-4.7L4 8.5M4 13a8 8 0 0 0 13.7 4.7L20 15.5M4 4v4.5h4.5M20 20v-4.5h-4.5M3 3l18 18" />
+    </Icon>
+  )
+}
+
+/** ArchiveIcon stands for a dormant repository: archive it or revive it. */
+export function ArchiveIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4" />
+    </Icon>
+  )
+}
+
+/** HourglassIcon stands for a quiet repository: time passing without a change. */
+export function HourglassIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M6 3h12M6 21h12M7 3c0 4.5 5 5.5 5 9s-5 4.5-5 9M17 3c0 4.5-5 5.5-5 9s5 4.5 5 9" />
+    </Icon>
+  )
+}
+
+/** TagIcon stands for releases: a tag with a dot for unreleased changes. */
+export function TagIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9Z" />
+      <circle cx="8" cy="8" r="1.5" />
+    </Icon>
+  )
+}
+
+/** ScaleIcon stands for the licence: the scales of the law. */
+export function ScaleIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0ZM19 7l-3 7a3 3 0 0 0 6 0Z" />
+    </Icon>
+  )
+}
+
+/** InboxIcon stands for a backlog of open issues and pull requests. */
+export function InboxIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M3 13h5l1.5 3h5l1.5-3h5M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6Z" />
+    </Icon>
+  )
+}

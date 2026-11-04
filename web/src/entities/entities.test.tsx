@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import type { Repo } from "@/lib/api/client"
 import { product, repo } from "@/test/server"
-import { FindingList, HealthScore } from "./health/health"
+import { FindingList, HealthScore } from "./health/findings"
 import { HealthBadges } from "./repo/health-badges"
 import { activity, byActivity, pulse } from "./repo/health"
 import { VisibilityBadge } from "./repo/visibility-badge"
@@ -65,7 +65,9 @@ describe("health", () => {
     render(<FindingList findings={product.findings} />)
     expect(screen.getByRole("link", { name: "agent" })).toHaveAttribute("href", "/repos/acme/agent")
     expect(screen.getByText(/No change for 3 years/)).toBeInTheDocument()
-    expect(screen.getByText("−30")).toBeInTheDocument()
+    // The kind and weight are named for screen readers; the points show in the hint, not the row.
+    expect(screen.getByText(/Dormant, high, costs 30 points/)).toBeInTheDocument()
+    expect(screen.queryByText("−30")).toBeNull()
   })
 
   it("adds a health chip to a repository only when it is not good", () => {

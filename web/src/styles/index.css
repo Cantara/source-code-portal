@@ -179,6 +179,35 @@
     --lvl: var(--danger);
     --lvl-fg: var(--danger-fg);
   }
+  /* A finding's severity paints its icon's tile; the icon's shape names the kind, so colour is never the only signal. */
+  .sev-high {
+    --lvl: var(--danger); /* the hint's dot */
+    --sev: var(--danger);
+    --sev-fg: var(--danger-fg);
+  }
+  .sev-medium {
+    --lvl: var(--quiet); /* the hint's dot */
+    --sev: var(--quiet);
+    --sev-fg: var(--quiet-fg);
+  }
+  .sev-low {
+    --lvl: var(--muted-foreground); /* the hint's dot */
+    --sev: var(--muted-foreground);
+    --sev-fg: var(--muted-foreground);
+  }
+  .finding-icon {
+    display: grid;
+    place-items: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 0.375rem;
+    color: var(--sev-fg);
+    background: color-mix(in oklch, var(--sev) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--sev) 35%, transparent);
+  }
+  .score-arc {
+    stroke: var(--lvl);
+  }
   .led {
     @apply inline-block size-2 shrink-0 rounded-full;
     background: var(--lvl);

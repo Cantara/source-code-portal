@@ -7,7 +7,8 @@ import { cn } from "@/lib/cn"
 import { ago, count, plural } from "@/lib/format"
 import { addressPath, groupPath } from "@/lib/paths"
 import { Author } from "@/entities/commit/author"
-import { FindingList, HealthScore, levels } from "@/entities/health/health"
+import { levels } from "@/entities/health/health"
+import { FindingList, HealthScore } from "@/entities/health/findings"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
 import { Sparkline } from "@/shared/sparkline"
@@ -71,16 +72,7 @@ function ProductCard({ group, work: w, now }: { group: Group; work: Work; now: n
             {group.name}
           </Link>
         </h3>
-        {h && h.level !== "good" ? (
-          <HealthScore health={h} />
-        ) : (
-          h && (
-            <span className="font-mono text-xs text-muted-foreground" title="Health score: good">
-              <span className="sr-only">Health </span>
-              {h.score}
-            </span>
-          )
-        )}
+        {h && <HealthScore health={h} quiet />}
       </div>
       <div className="flex items-end justify-between gap-3">
         <p className="text-sm">
