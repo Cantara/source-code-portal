@@ -1,62 +1,62 @@
 {
   "callouts": {
     "name": {
-      "x": 4.3,
-      "y": 8.1
+      "x": 4.4,
+      "y": 8.5
     },
     "score": {
-      "x": 92.1,
-      "y": 7.5
+      "x": 91.9,
+      "y": 7.9
     },
     "work": {
-      "x": 4.3,
-      "y": 23.7
+      "x": 4.4,
+      "y": 24.9
     },
     "trend": {
-      "x": 80.8,
-      "y": 29.7
+      "x": 80.2,
+      "y": 31.2
     },
     "people": {
-      "x": 4.3,
-      "y": 41.9
+      "x": 4.4,
+      "y": 43.9
     },
     "recent": {
-      "x": 4.3,
-      "y": 53.5
+      "x": 4.4,
+      "y": 56.1
     },
     "findings": {
-      "x": 4.3,
-      "y": 79.6
+      "x": 4.4,
+      "y": 78.6
     },
     "shared": {
-      "x": 4.3,
-      "y": 92.5
+      "x": 4.4,
+      "y": 92.1
     }
   },
   "sizes": {
     "card": {
-      "width": 400,
-      "height": 333
+      "width": 388,
+      "height": 318
     },
     "card-watch": {
-      "width": 400,
-      "height": 333
+      "width": 388,
+      "height": 334
     },
     "fleet": {
       "width": 1232,
       "height": 97
     },
     "latest": {
-      "width": 1232,
-      "height": 376
+      "width": 416,
+      "height": 526
     },
     "settings": {
       "width": 504,
       "height": 314
     },
     "table": {
-      "width": 1230,
-      "height": 145
+      "width": 807,
+      "height": 251
     },
     "telemetry": {
       "width": 1232,

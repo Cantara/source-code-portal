@@ -307,7 +307,7 @@ export function GuideView({ version }: { version: string }) {
           lede="The row of tiles at the top of the dashboard: every repository of the portal, summed up. A light shows a state worth knowing."
         >
           <Figure caption="The telemetry of a portal with three products and thirteen repositories.">
-            <Shot name="telemetry" alt="Six tiles: People 5, Active 8, Automation 57, Findings 8, Products 3, In sync 100%." />
+            <Shot name="telemetry" alt="Six tiles: People 5, Active 12, Automation 57, Findings 8, Products 3, In sync 100%." />
           </Figure>
           <Terms
             items={[
@@ -353,7 +353,7 @@ export function GuideView({ version }: { version: string }) {
         >
           <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,30rem)_1fr]">
             <Figure className="lg:sticky lg:top-20">
-              <AnnotatedCard alt="The Payments card, its rows numbered 1 to 8: 26 commits, 6 by hand, 20 with AI, 22 by automation, its people, its recent repositories and three findings." />
+              <AnnotatedCard alt="The Payments card, its rows numbered 1 to 8: 53 commits, 6 by hand, 20 with AI, 22 by automation and 5 in sweeps, its people, its recent repositories and three findings." />
             </Figure>
             <ol className="flex flex-col gap-4">
               {card.map((c, i) => (
@@ -498,10 +498,10 @@ export function GuideView({ version }: { version: string }) {
               alt="The products table with columns for repositories, commits, share with AI, automation, people, last change, findings and health."
             />
           </Figure>
-          <Figure caption="The latest commits of the work that counts, the ones made with AI marked. Commits in the header holds them all, and each repository has its git graph.">
+          <Figure caption="The latest commits of the work that counts, every kind until you choose: here the bots' updates, the ones made with AI marked when they come. Commits in the header holds them all, and each repository has its git graph.">
             <Shot
               name="latest"
-              alt="The latest commits: subject, repository, author and age, with an AI mark on assisted commits."
+              alt="The latest commits: subject, repository, author and age, the newest five by dependency and CI bots."
             />
           </Figure>
         </Section>
