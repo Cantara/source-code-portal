@@ -197,7 +197,13 @@ Issues and pull requests are welcome. Keep changes small, follow [Conventional C
 
 ## Roadmap
 
-Next is search-engine support: structured data, richer sitemaps, social cards and IndexNow.
+1. **The next release**: the header's theme menu and account menu, every kind of work counted by default, and commits of any
+   length read without failing (a repository's commit list is read as a stream in bounded memory).
+2. **Embedding the portal in other sites** ([design](.claude/work/design/embed.md)): the portal's signals as versioned HTML
+   fragments that a host site composes on its server, on any stack. Each fragment keeps its own styles in a shadow root, takes the
+   host's look through `--scp-*` custom properties, and updates live through one small module of custom elements. Outbound
+   webhooks tell a host when the data changed, and a typed client serves hosts that draw their own. The portal's dashboard is
+   built from the same fragments, so the two never drift apart.
 
 ## Licence
 

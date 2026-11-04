@@ -26,6 +26,7 @@ What Source Code Portal is, how it is built, and the work in progress. Binding o
 | `design/hardening.md` | H1, built: a hardened private instance (issue #5). |
 | `design/guide.md` | G1, built: the Getting started page and its screenshots, the operators' Claude Code plugin. |
 | `design/layout.md` | L1 to L4, built: the landing page of signals, layouts and the design mode, AI-assisted commits, the work that counts and Settings. |
+| `design/embed.md` | E1 to E4, queued after the next release: the portal embedded in other sites as versioned HTML fragments composed on the host's server, themed by custom properties, live through custom elements; outbound snapshot webhooks; a typed client. |
 | `history/` | Finished work: the M0..M11 plan and decision log, the earlier detailed design, the UI brief and screenshots. Not kept in sync. |
 
 New decisions go into `decisions.md` and the note they change, in the same commit. When a milestone is done its note is folded into
