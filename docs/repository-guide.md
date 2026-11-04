@@ -11,7 +11,7 @@ from a repository and how to describe it.
 | README | a `README` file (any case and extension, `README.md` preferred) in `.github/`, else the root, else `docs/` |
 | Documentation | up to 50 Markdown files (`.md`, `.markdown`) under `docs/`, in path order |
 | Latest commits | the 30 newest commits of the default branch |
-| Release badge | the latest GitHub release |
+| Release | the latest GitHub release, else the newest version of a package the repository publishes (`pom.xml`, `package.json`: below) |
 | Title, owners, lifecycle, tags, links | the optional `scp.yaml` descriptor (below) |
 | Technology and dependencies | up to 30 package manifests: `go.mod`, `package.json` and `pom.xml`, at most four directories deep, outside `node_modules`, `vendor`, `test`, `tests`, `testdata`, `example`, `examples`, `fixtures` and hidden directories |
 
@@ -38,6 +38,11 @@ dependencies with their scopes, BOM imports and the Java version from `maven.com
 with `${property}` references replaced from the POM's own properties. A dependency whose name another catalogued repository declares
 (Go module path, npm package name, Maven `groupId:artifactId`) links the two repositories: each page lists what it uses and what uses it.
 A file over 512 KiB, or one that does not parse, is listed with the problem.
+
+Packages are what the repository publishes: a `pom.xml` (up to two directories deep) is its `groupId:artifactId`, looked up in the
+repository of its `distributionManagement` (or its parent POM's), the portal's configured registries and Maven Central; a
+`package.json` is its `name`, unless `"private": true`, looked up at its `publishConfig.registry`, the configured registries and
+registry.npmjs.org. The newest release shows on the release chip and in the page's *Packages* panel.
 
 Changes show within seconds when the portal's webhook is set up, otherwise after the next scheduled check (a push is noticed within
 the listing interval, five minutes by default).

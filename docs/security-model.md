@@ -33,6 +33,9 @@ none of the operator duties below except the network layout.
 - **Repository text is untrusted.** Rendered documents pass one sanitiser. Markdown answers, `/llms*.txt`, `/knowledge.yaml` and the
   assistant's tool results have control and invisible characters removed, and are marked as data, never instructions.
 - **Webhooks** are accepted only with a valid HMAC-SHA256 signature (current or previous secret).
+- **Addresses in repositories are not trusted.** An external image in a README and a package registry a build file names are
+  reached only over https at public addresses, checked on the address dialled, so neither a redirect nor a DNS answer reaches your
+  network. What a registry answers is cleaned like repository text, and its addresses are linked only when https.
 
 ## What you provide
 

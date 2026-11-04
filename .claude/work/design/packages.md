@@ -1,6 +1,6 @@
 # Published packages (R1 to R4)
 
-Status: R1 in progress (plan.md section 4). Binding order: ../plan.md > this note.
+Status: R1 built; R2 to R4 queued (plan.md section 4). Binding order: ../plan.md > this note.
 
 A repository's release is often not a GitHub release: a Java library is published to a Maven repository by a CI server, a
 TypeScript one to npm, a Rust crate to crates.io, a Go module is a tag that the module proxy serves. The portal reads the

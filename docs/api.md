@@ -23,7 +23,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/groups` | groups in configuration order |
 | `GET /api/v1/groups/{group}` | one group with its repositories |
 | `GET /api/v1/repos[?group=]` | every repository sorted by address, optionally of one group |
-| `GET /api/v1/repos/{owner}/{name}` | one repository with its `scp.yaml` descriptor and latest commits |
+| `GET /api/v1/repos/{owner}/{name}` | one repository with its `scp.yaml` descriptor and latest commits; every repository summary carries `release` (the latest GitHub release) and `packages` (what it publishes to a registry: `ecosystem`, `name`, `version`, `publishedAt`, `url`, `registry`, the newest first) |
 | `GET /api/v1/repos/{owner}/{name}/docs` | the repository's documents, README first |
 | `GET /api/v1/repos/{owner}/{name}/docs/{docId}` | one rendered document; `docId` is its path, percent-encoded into one segment (`docs%2Fsetup.md`); the path without its extension also matches |
 | `GET /api/v1/repos/{owner}/{name}/manifests` | the repository's `go.mod`, `package.json` and `pom.xml` files with their dependencies, the technology they state, and the catalogued repositories it uses and is used by |

@@ -128,6 +128,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js 24 executable that runs the bundle |
 | `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4); empty: the built-in layout, no saving |
+| `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`), `url` (https) |
+| `packages.public` | `true` | ask the public registries too (Maven Central, registry.npmjs.org); `false`: only the configured ones and those the build files name |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
@@ -304,6 +306,31 @@ layout:
   file written by hand or by configuration management is picked up too. A file that does not validate is not served: the last good
   layout stays, and `/api/v1/status` and the design mode say why.
 - A layout names groups, never repositories; a viewer sees only the groups with repositories they may see.
+
+### 2.5 Published packages
+
+A repository's release is often a package, not a GitHub release: a Java library published to a Maven repository by a CI server, a
+TypeScript one to npm. The portal reads the repository's build files and asks the registries for the newest release, which then shows
+where a GitHub release would: on the release chip (`3.0.21 · Maven`), in the repository page's *Packages* panel, in the group's
+released count and in the health's unreleased check.
+
+- **Maven** (`pom.xml`, up to two directories deep): the package is the POM's `groupId:artifactId`. It is looked up where the POM
+  publishes it, its `distributionManagement` repository, inherited through its `parent` POMs when it has none of its own (each parent
+  read from the repositories the POM lists, then Maven Central, at most five levels; a released parent is read once and kept), then in
+  the configured Maven registries, then Maven Central. The newest release is the one `maven-metadata.xml` names.
+- **npm** (`package.json`): the package is its `name`, unless it is `private`. It is looked up at its `publishConfig.registry`, the
+  configured npm registries, then registry.npmjs.org; the newest release is the `latest` tag.
+
+```yaml
+packages:
+  registries:
+    - { id: example, ecosystem: maven, url: https://maven.example.org/repository/releases/ }
+```
+
+A registry a build file names is reached only over https and only at public addresses: a repository cannot make the portal call into
+your network. Lookups run at most four at a time per registry host; a registry that answers 429 or 503 is paused (its `Retry-After`,
+else one minute doubling to fifteen), and one that fails keeps the release last known. Packages are looked up every six hours and on
+every push and tag. Registries that need credentials come in a later release.
 
 ## 3. Run
 
