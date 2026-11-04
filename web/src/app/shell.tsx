@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useRef } from "react"
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react"
 import { buttonClass } from "@/components/ui/button"
-import { BookIcon, MonitorIcon, MoonIcon, SlidersIcon, SunIcon } from "@/components/ui/icons"
+import { BookIcon, CheckIcon, ChevronDownIcon, MonitorIcon, MoonIcon, SlidersIcon, SunIcon } from "@/components/ui/icons"
+import { cn } from "@/lib/cn"
 import type { Schemas } from "@/lib/api/client"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 
@@ -14,38 +15,110 @@ const themes = [
   { value: "light", label: "Light", Icon: SunIcon },
 ] as const
 
-/** ThemeSelect picks system, dark or light (lib/theme.ts, public/theme-init.js): radio buttons drawn as one segmented control of icons. */
-export function ThemeSelect() {
+/**
+ * ThemeMenu picks system, dark or light (lib/theme.ts, public/theme-init.js): a button with the chosen mode's icon opens a menu of the
+ * three, the chosen one checked. Arrows, Home and End move in it, Enter or a click chooses, Escape, Tab or a click elsewhere closes it.
+ */
+export function ThemeMenu() {
   const theme = useTheme()
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLUListElement>(null)
+  const id = useId()
+  const chosen = themes.find((t) => t.value === theme) ?? themes[0]
+
+  useEffect(() => {
+    if (!open) return
+    menu.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus()
+    const away = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("pointerdown", away)
+    return () => document.removeEventListener("pointerdown", away)
+  }, [open])
+
+  const close = () => {
+    setOpen(false)
+    button.current?.focus()
+  }
+  const choose = (value: Choice) => {
+    apply(value)
+    close()
+  }
+  const move = (e: KeyboardEvent<HTMLUListElement>) => {
+    const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])]
+    const at = items.indexOf(document.activeElement as HTMLElement)
+    const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[e.key]
+    if (to !== undefined) {
+      e.preventDefault()
+      items[(to + items.length) % items.length]?.focus()
+    } else if (e.key === "Escape") {
+      e.preventDefault()
+      close()
+    } else if (e.key === "Tab") setOpen(false)
+  }
+
   return (
-    <fieldset className="flex items-center rounded-md border border-border bg-card/60 p-0.5">
-      <legend className="sr-only">Theme</legend>
-      {themes.map(({ value, label, Icon }) => (
-        <label
-          key={value}
-          title={label}
-          className="relative grid size-7 cursor-pointer place-items-center rounded-[0.3rem] text-muted-foreground transition-colors hover:text-foreground has-checked:bg-accent has-checked:text-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring"
+    <div ref={root} className="relative">
+      <button
+        ref={button}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        aria-label={`Theme: ${chosen.label}`}
+        title={`Theme: ${chosen.label}`}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault()
+            setOpen(true)
+          }
+        }}
+        className={cn(
+          "flex h-8 items-center gap-0.5 rounded-md px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+          open && "bg-accent text-foreground",
+        )}
+      >
+        <chosen.Icon className="size-[1.125rem]" />
+        <ChevronDownIcon className="size-3" />
+      </button>
+      {open && (
+        <ul
+          ref={menu}
+          id={id}
+          role="menu"
+          aria-label="Theme"
+          onKeyDown={move}
+          className="absolute top-full right-0 z-50 mt-1.5 flex w-36 flex-col rounded-lg border border-border bg-popover/95 p-1 text-sm text-popover-foreground shadow-xl backdrop-blur-md"
         >
-          <input
-            type="radio"
-            name="scp-theme"
-            value={value}
-            checked={theme === value}
-            onChange={() => apply(value as Choice)}
-            className="absolute inset-0 cursor-pointer appearance-none rounded-[0.3rem] outline-none"
-          />
-          <Icon className="pointer-events-none size-4" />
-          <span className="sr-only">{label}</span>
-        </label>
-      ))}
-    </fieldset>
+          {themes.map(({ value, label, Icon }) => (
+            <li key={value} role="none">
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={theme === value}
+                tabIndex={-1}
+                onClick={() => choose(value)}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground aria-checked:text-foreground"
+              >
+                <Icon className="size-4" />
+                <span className="flex-1 text-left">{label}</span>
+                {theme === value && <CheckIcon className="size-4 text-primary" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
 const tool =
   "grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-foreground"
 
-/** PortalNav is the reader's own corner of the header: the Guide and Settings, as icons named for assistive technology. */
+/** PortalNav is the reader's own corner of the header: the Guide, the theme and Settings, as icons named for assistive technology. */
 export function PortalNav() {
   const path = usePathname()
   return (
@@ -54,6 +127,7 @@ export function PortalNav() {
         <BookIcon className="size-[1.125rem]" />
         <span className="sr-only">Guide</span>
       </Link>
+      <ThemeMenu />
       <Link href="/settings" className={tool} title="Settings" aria-current={path === "/settings" ? "page" : undefined}>
         <SlidersIcon className="size-[1.125rem]" />
         <span className="sr-only">Settings</span>

@@ -80,3 +80,21 @@ export function PanelRightIcon({ open, className }: { open: boolean; className?:
     </Icon>
   )
 }
+
+/** CheckIcon marks the chosen item of a menu. */
+export function CheckIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </Icon>
+  )
+}
+
+/** ChevronDownIcon says a button opens a menu. */
+export function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M7 10l5 5 5-5" />
+    </Icon>
+  )
+}
