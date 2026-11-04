@@ -59,6 +59,7 @@ export function repo(name: string, over: Partial<S["Repo"]> = {}): S["Repo"] {
     lastCommitAt: at,
     lastAuthoredAt: at,
     release: { tag: "v1.0.0", url: `https://github.com/acme/${name}/releases/tag/v1.0.0`, publishedAt: at },
+    packages: [],
     language: "Go",
     groups: ["iam"],
     health: healthy,

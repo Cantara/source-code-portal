@@ -148,8 +148,11 @@ catalog:
 	}
 	cfg.Server.PublicAddr, cfg.Server.AdminAddr = "127.0.0.1:0", "127.0.0.1:0"
 
+	registry := newFakeRegistry(t) // whydah-sso publishes no.acme:sso to Maven Central
+	registry.set("repo1.maven.org", "/maven2/no/acme/sso/maven-metadata.xml",
+		"<metadata><versioning><release>4.2.0</release><lastUpdated>20260101120000</lastUpdated></versioning></metadata>")
 	serve := func() (stop func(), public, admin string) {
-		srv, err := newServer(t.Context(), cfg, testDeps(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
+		srv, err := newServer(t.Context(), cfg, deps{registries: registry}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -216,6 +219,12 @@ catalog:
 			return fetch(public+"/api/v1/dashboard", &d) == http.StatusOK && d.Freshness.Fresh == 3 &&
 				fetch(public+"/api/v1/repos/acme/whydah-core", &r) == http.StatusOK && r.Descriptor.Present &&
 				fetch(public+"/api/v1/repos/acme/whydah-core/docs", &l) == http.StatusOK && len(l.Docs) == 2
+		})
+		waitFor("packages", func() bool {
+			var r oapi.RepoDetail
+			return fetch(public+"/api/v1/repos/acme/whydah-sso", &r) == http.StatusOK && len(r.Repo.Packages) == 1 &&
+				r.Repo.Packages[0].Name == "no.acme:sso" && r.Repo.Packages[0].Version == "4.2.0" &&
+				r.Repo.Packages[0].Url == "https://central.sonatype.com/artifact/no.acme/sso/4.2.0"
 		})
 		waitFor("manifests", func() bool {
 			var m oapi.Manifests

@@ -4,6 +4,7 @@ import type { Repo } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
 import { activities, activity, lastChange, type Activity, type Pulse } from "./health"
 import { issuesUrl, licence } from "./licence"
+import { ecosystemLabel, newestPackage } from "./packages"
 import { cn } from "@/lib/cn"
 import { levels } from "@/entities/health/health"
 import { Hint } from "@/shared/hint"
@@ -49,6 +50,7 @@ export function ActivityLight({
 export function HealthBadges({ repo, now, className }: { repo: Repo; now: number; className?: string }) {
   const level = activity(repo, now)
   const lic = licence(repo.license)
+  const pkg = newestPackage(repo)
   const health = repo.health
   return (
     <span className={cn("flex flex-wrap items-center gap-1", className)}>
@@ -96,6 +98,34 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
               <span className="truncate">{repo.release?.tag}</span>
             </a>
           )}
+        />
+      ) : pkg ? (
+        <Hint
+          heading={`${ecosystemLabel(pkg.ecosystem)} ${pkg.version} at ${pkg.registry}`}
+          meta={pkg.publishedAt ? `${ago(pkg.publishedAt, now)} ago` : undefined}
+          swatch="lvl-recent"
+          rows={repo.packages.map((p) => ({ swatch: "lvl-recent", label: p.name, value: p.version }))}
+          render={(t) =>
+            pkg.url ? (
+              <a
+                {...t}
+                href={pkg.url}
+                rel="noreferrer nofollow"
+                aria-label={`${pkg.version} · ${ecosystemLabel(pkg.ecosystem)}, published package ${pkg.name}`}
+                className="lvl-recent chip max-w-48 hover:underline"
+              >
+                <span className="truncate">
+                  {pkg.version} · {ecosystemLabel(pkg.ecosystem)}
+                </span>
+              </a>
+            ) : (
+              <span {...t} className="lvl-recent chip max-w-48 cursor-help">
+                <span className="truncate">
+                  {pkg.version} · {ecosystemLabel(pkg.ecosystem)}
+                </span>
+              </span>
+            )
+          }
         />
       ) : (
         <Hint

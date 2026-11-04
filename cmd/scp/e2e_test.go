@@ -141,7 +141,12 @@ catalog:
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := newServer(t.Context(), cfg, testDeps(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	registry := newFakeRegistry(t) // both publish to Maven Central: whydah-sso shows its package where it has no GitHub release
+	for _, a := range []string{"whydah-core", "whydah-sso"} {
+		registry.set("repo1.maven.org", "/maven2/no/acme/"+a+"/maven-metadata.xml",
+			"<metadata><versioning><release>1.4.0</release><lastUpdated>"+start.Add(-48*time.Hour).UTC().Format("20060102150405")+"</lastUpdated></versioning></metadata>")
+	}
+	srv, err := newServer(t.Context(), cfg, deps{registries: registry}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

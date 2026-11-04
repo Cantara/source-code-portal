@@ -98,4 +98,22 @@ describe("health", () => {
     rerender(<HealthBadges repo={repo("A", { license: "NOASSERTION" })} now={now} />)
     expect(screen.getByText("no licence")).toBeInTheDocument()
   })
+
+  it("shows the newest published package where there is no GitHub release", () => {
+    const pkg = { ecosystem: "maven", name: "net.example:lib", version: "3.0.21", publishedAt: "2026-10-01T00:00:00Z" }
+    const withPackage = repo("A", {
+      release: null,
+      packages: [{ ...pkg, url: "https://repo.example/net/example/lib/3.0.21/", registry: "example" }],
+    })
+    const { rerender } = render(<HealthBadges repo={withPackage} now={now} />)
+    expect(screen.getByRole("link", { name: /^3\.0\.21 · Maven/ })).toHaveAttribute(
+      "href",
+      "https://repo.example/net/example/lib/3.0.21/",
+    )
+    expect(screen.queryByText("no release")).toBeNull()
+    rerender(<HealthBadges repo={repo("A")} now={now} />)
+    expect(screen.getByRole("link", { name: /Release/ })).toHaveTextContent("v1.0.0")
+    rerender(<HealthBadges repo={repo("A", { release: null })} now={now} />)
+    expect(screen.getByText("no release")).toBeInTheDocument()
+  })
 })

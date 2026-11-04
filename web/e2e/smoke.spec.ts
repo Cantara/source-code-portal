@@ -265,11 +265,23 @@ for (const path of ["/groups/whydah"]) {
     const repos = page.locator('a[href^="/repos/"]:not([href*="/commits"]):not([href*="/docs/"])')
     await expect.poll(() => repos.count()).toBeGreaterThanOrEqual(3)
     for (const row of await page.locator("li:has(> div > a[href^='/repos/']), tr:has(a[href^='/repos/'])").all()) {
-      await expect(row.getByText(/issues$/)).toBeVisible()
+      await expect(row.getByText(/issues?$/)).toBeVisible()
       await expect(row.getByText(/^(no licence|Apache-2\.0|MIT|[A-Z][\w.-]+)$/).first()).toBeVisible()
     }
   })
 }
+
+test("a published package shows where there is no GitHub release, and on the repository page", async ({ page }) => {
+  await page.goto("/groups/whydah")
+  await expect(page.getByRole("link", { name: /^1\.4\.0 · Maven, published package no\.acme:whydah-sso/ })).toBeVisible()
+  await page.goto("/repos/acme/whydah-core")
+  const card = page.getByRole("region", { name: "Packages" }).or(page.locator("[aria-labelledby=packages]"))
+  await expect(card).toContainText("no.acme:whydah-core")
+  await expect(card.getByRole("link", { name: "1.4.0" })).toHaveAttribute(
+    "href",
+    "https://central.sonatype.com/artifact/no.acme/whydah-core/1.4.0",
+  )
+})
 
 test("a repository page shows its SVG badges", async ({ page }) => {
   await page.goto("/repos/acme/whydah-core")
