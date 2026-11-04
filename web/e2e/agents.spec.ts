@@ -35,8 +35,7 @@ const run = (page: Page, name: string, input: unknown) =>
 
 test("the pages offer a browser's agent the portal's tools, which answer from the reader's view", async ({ page }) => {
   await withModelContext(page)
-  const response = await page.goto("/repos/acme/whydah-core")
-  expect(response?.headers()["permissions-policy"]).toContain("tools=(self)")
+  await page.goto("/repos/acme/whydah-core")
   await expect
     .poll(() => names(page))
     .toEqual([

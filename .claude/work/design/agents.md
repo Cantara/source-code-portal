@@ -93,7 +93,8 @@ feature `tools` (default `'self'`).
   - `set_preferences`: the work that counts (`hand`, `ai`, `automation`) and the products view (cards or table), as Settings does;
     not read-only, not consequential.
 - No admin tool: design mode, layouts and the provider test stay with the admin's own hands.
-- `Permissions-Policy: tools=(self)` on pages: a page of another origin framing the portal cannot reach the tools.
+- No `Permissions-Policy` entry for `tools`: its default allowlist is `'self'` already, so a page of another origin framing the
+  portal cannot reach the tools, and browsers without the feature warn about an entry they do not know on every page.
 - The Guide keeps no JavaScript of its own; the shell's component is there as on every page.
 
 ## Tests

@@ -36,8 +36,9 @@ none of the operator duties below except the network layout.
   assistant's tool results have control and invisible characters removed, and are marked as data, never instructions.
 - **Agents.** Every tool agents can call only reads. `/mcp` takes a bearer token or the authenticating proxy's identity, never a
   browser's session cookie, and refuses a request whose `Origin` is another site (the DNS rebinding guard MCP asks for); a tool call
-  carrying a cookie must come from the portal's own pages. The pages' WebMCP tools are for the page's own origin only
-  (`Permissions-Policy: tools=(self)`) and include no administrator's action.
+  carrying a cookie must come from the portal's own pages. The pages' WebMCP tools are for the page's own origin only (the
+  draft's default for the `tools` feature is `'self'`: a page of another site framing the portal cannot reach them) and include no
+  administrator's action.
 - **Webhooks** are accepted only with a valid HMAC-SHA256 signature (current or previous secret).
 - **Addresses in repositories are not trusted.** An external image in a README and a package registry a build file names are
   reached only over https at public addresses, checked on the address dialled, so neither a redirect nor a DNS answer reaches your
