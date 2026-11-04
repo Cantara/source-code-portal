@@ -361,6 +361,8 @@ export interface components {
       lastAuthoredAt: string | null
       /** @description The latest release; null when there is none or it is not read yet */
       release: components["schemas"]["Release"] | null
+      /** @description The packages it publishes to a registry with their newest release, the newest first; empty when none is known */
+      packages: components["schemas"]["Package"][]
       /** @description Language of the first package manifest; empty when there is none */
       language: string
       /** @description Group ids in configuration order */
@@ -403,6 +405,23 @@ export interface components {
       /** @description Most costly first; the dashboard carries the first 5 */
       findings: components["schemas"]["RepoFinding"][]
       findingCount: number
+    }
+    Package: {
+      /** @description The package manager: maven, npm, ... */
+      ecosystem: string
+      /** @description group:artifact for Maven, the package name elsewhere */
+      name: string
+      /** @description The newest release at the registry */
+      version: string
+      /**
+       * Format: date-time
+       * @description When the registry says it was published; null when it does not say
+       */
+      publishedAt: string | null
+      /** @description The package at its registry, https; empty when the registry gave no address */
+      url: string
+      /** @description The configured registry's id */
+      registry: string
     }
     Release: {
       tag: string

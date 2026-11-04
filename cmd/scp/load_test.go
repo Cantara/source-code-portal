@@ -93,7 +93,7 @@ func TestLoad1000(t *testing.T) {
 
 	// Cold start on fake time.
 	synctest.Test(t, func(t *testing.T) {
-		srv, err := newServer(t.Context(), cfg, deps{github: inMemory{gh.Config.Handler}}, log)
+		srv, err := newServer(t.Context(), cfg, deps{github: inMemory{gh.Config.Handler}, registries: newFakeRegistry(t)}, log)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,7 +132,7 @@ func TestLoad1000(t *testing.T) {
 	})
 
 	// Warm start on real time, then concurrent load on the public handler.
-	srv, err := newServer(t.Context(), cfg, deps{}, log)
+	srv, err := newServer(t.Context(), cfg, testDeps(t), log)
 	if err != nil {
 		t.Fatal(err)
 	}

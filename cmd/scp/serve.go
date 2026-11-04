@@ -34,6 +34,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/layout"
 	"github.com/cantara/source-code-portal/internal/llms"
 	"github.com/cantara/source-code-portal/internal/manifests"
+	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
@@ -109,9 +110,13 @@ type server struct {
 
 // deps are the outside services; the zero value is the real ones.
 type deps struct {
-	github  http.RoundTripper                              // transport to GitHub
-	images  http.RoundTripper                              // transport to external images (egress.Guarded when nil)
-	cluster func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
+	github http.RoundTripper // transport to GitHub
+	images http.RoundTripper // transport to external images (egress.Guarded when nil)
+	// registries is the transport to package registries (egress.Guarded when nil) and public the public registries' addresses by
+	// ecosystem in its place (the providers' own when empty): the tests' loopback registries.
+	registries http.RoundTripper
+	public     map[string]string
+	cluster    func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
 }
 
 // newServer opens the store, wires the features and binds both listeners.
@@ -124,11 +129,12 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	fetchers := map[string]commits.Fetcher{}
 	trees := map[string]docs.GitHub{}
 	manifestTrees := map[string]manifests.GitHub{}
+	packageTrees := map[string]packages.GitHub{}
 	releases := map[string]badges.Releases{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
 		src := gh.Source(s.ID)
-		sources[s.ID], trees[s.ID], manifestTrees[s.ID] = src, src, src
+		sources[s.ID], trees[s.ID], manifestTrees[s.ID], packageTrees[s.ID] = src, src, src, src
 		fetchers[s.ID], releases[s.ID] = commits.FromGitHub(src), badges.FromGitHub(src)
 		ids = append(ids, s.ID)
 	}
@@ -161,7 +167,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	documents := docs.New(trees, safehtml.New())
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
 	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
-		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec()} {
+		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d).Spec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
@@ -247,7 +253,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	catalogAPI := catalog.API{Current: view,
 		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
-		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, repoHealthAPI},
+		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo, repoHealthAPI},
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
 	commitsAPI := commits.API{Current: view}
 	groupNames := func(ctx context.Context) []string {
@@ -480,4 +486,22 @@ func robots(closed bool, open http.Handler) http.Handler {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "User-agent: *\nDisallow: /\n")
 	})
+}
+
+// newPackages is the packages feature with its providers, in the order a repository's packages are read.
+func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps) *packages.Packages {
+	transport := d.registries
+	if transport == nil {
+		transport = egress.Guarded(10 * time.Second)
+	}
+	providers := []packages.Provider{packages.Maven{Central: d.public["maven"]}, packages.NPM{Registry: d.public["npm"]}}
+	registries := make([]packages.Registry, 0, len(cfg.Registries))
+	for _, r := range cfg.Registries {
+		u := r.URL
+		if !strings.HasSuffix(u, "/") {
+			u += "/"
+		}
+		registries = append(registries, packages.Registry{ID: r.ID, Ecosystem: r.Ecosystem, URL: u})
+	}
+	return packages.New(trees, providers, packages.NewClient(transport), registries, cfg.Public)
 }

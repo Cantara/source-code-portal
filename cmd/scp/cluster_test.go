@@ -93,7 +93,7 @@ catalog:
 		stop          func()
 	}
 	start := func(name string) *node {
-		srv, err := newServer(t.Context(), instance(name), deps{cluster: dial()}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		srv, err := newServer(t.Context(), instance(name), deps{cluster: dial(), registries: newFakeRegistry(t)}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 		if err != nil {
 			t.Fatal(err)
 		}

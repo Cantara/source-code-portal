@@ -8,6 +8,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
@@ -30,10 +31,24 @@ func assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.R
 	if at, before := commits.LastAuthored(s, r.Key(), commits.WorkTeam); !at.IsZero() {
 		sig.LastChange, sig.Automated, sig.Before = at, before || last.After(at), before
 	}
-	if rel, _ := badges.ReleaseOf(e); rel != nil {
-		sig.Release, sig.Released = rel.Tag, rel.Published
+	if tag, at, ok := released(e); ok {
+		sig.Release, sig.Released = tag, at
 	}
 	return health.Assess(sig, now)
+}
+
+// released is a repository's newest release: its GitHub release or the newest version of a package it publishes, whichever is
+// newer (a package whose registry gives no date counts when there is no GitHub release).
+func released(e *snapshot.RepoEntry) (string, time.Time, bool) {
+	rel, _ := badges.ReleaseOf(e)
+	pk := packages.Newest(e)
+	switch {
+	case pk != nil && (rel == nil || pk.Latest.Published.After(rel.Published)):
+		return pk.Latest.Version, pk.Latest.Published, true
+	case rel != nil:
+		return rel.Tag, rel.Published, true
+	}
+	return "", time.Time{}, false
 }
 
 // weigh is the health of the repositories keys (def is the default repository) present in the snapshot.

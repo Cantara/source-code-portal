@@ -348,7 +348,7 @@ components:
     Repo:
       type: object
       required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, topics, archived, fork,
-                 stars, openIssues, pushedAt, lastCommitAt, lastAuthoredAt, release, language, groups, health, freshness]
+                 stars, openIssues, pushedAt, lastCommitAt, lastAuthoredAt, release, packages, language, groups, health, freshness]
       properties:
         address: { type: string, description: "Lower-case owner/name, used in URLs" }
         owner: { type: string }
@@ -368,6 +368,7 @@ components:
         lastCommitAt: { type: [string, "null"], format: date-time, description: The newest default-branch commit; null until read }
         lastAuthoredAt: { type: [string, "null"], format: date-time, description: "The newest default-branch commit of people's work (by hand or with AI), not automation (bots, release plugins) or a sweep; when no read commit is, the oldest read one (people's is older); null until read" }
         release: { oneOf: [{ $ref: "#/components/schemas/Release" }, { type: "null" }], description: The latest release; null when there is none or it is not read yet }
+        packages: { type: array, items: { $ref: "#/components/schemas/Package" }, description: "The packages it publishes to a registry with their newest release, the newest first; empty when none is known" }
         language: { type: string, description: Language of the first package manifest; empty when there is none }
         groups: { type: array, items: { type: string }, description: Group ids in configuration order }
         health: { oneOf: [{ $ref: "#/components/schemas/Health" }, { type: "null" }], description: Null for an archived or deprecated repository }
@@ -406,6 +407,16 @@ components:
         watch: { type: integer, description: Repositories at watch }
         findings: { type: array, items: { $ref: "#/components/schemas/RepoFinding" }, description: "Most costly first; the dashboard carries the first 5" }
         findingCount: { type: integer }
+    Package:
+      type: object
+      required: [ecosystem, name, version, publishedAt, url, registry]
+      properties:
+        ecosystem: { type: string, description: "The package manager: maven, npm, ..." }
+        name: { type: string, description: "group:artifact for Maven, the package name elsewhere" }
+        version: { type: string, description: The newest release at the registry }
+        publishedAt: { type: [string, "null"], format: date-time, description: When the registry says it was published; null when it does not say }
+        url: { type: string, description: "The package at its registry, https; empty when the registry gave no address" }
+        registry: { type: string, description: The configured registry's id, else the registry's host }
     Release:
       type: object
       required: [tag, url, publishedAt]

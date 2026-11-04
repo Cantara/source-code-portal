@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/cantara/source-code-portal/internal/github"
+	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -308,6 +309,35 @@ func Newest(e *snapshot.RepoEntry) *Package {
 		}
 	}
 	return out
+}
+
+// Repo adds the published packages to a repository summary, the newest release first.
+func Repo(_ *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
+	ps, _ := facet.Get(e)
+	out := []oapi.Package{}
+	for _, pk := range ps {
+		if pk.Latest == nil {
+			continue
+		}
+		op := oapi.Package{Ecosystem: pk.Ecosystem, Name: pk.Name, Version: pk.Latest.Version, Url: pk.Latest.URL, Registry: pk.Latest.Registry}
+		if !pk.Latest.Published.IsZero() {
+			at := pk.Latest.Published.UTC()
+			op.PublishedAt = &at
+		}
+		out = append(out, op)
+	}
+	slices.SortStableFunc(out, func(a, b oapi.Package) int {
+		switch {
+		case a.PublishedAt == nil && b.PublishedAt == nil:
+			return 0
+		case a.PublishedAt == nil:
+			return 1
+		case b.PublishedAt == nil:
+			return -1
+		}
+		return b.PublishedAt.Compare(*a.PublishedAt)
+	})
+	r.Packages = out
 }
 
 func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {

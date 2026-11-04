@@ -330,6 +330,9 @@ func (r assistantReads) health(ctx context.Context, in map[string]any) (string, 
 	if p.Release != nil {
 		fmt.Fprintf(&b, "Latest release %s.\n", p.Release.Tag)
 	}
+	for _, pk := range p.Packages {
+		fmt.Fprintf(&b, "Publishes %s %s, newest %s at %s.\n", pk.Ecosystem, pk.Name, pk.Version, pk.Registry)
+	}
 	fmt.Fprintf(&b, "Open issues and pull requests: %d. License: %s.\n", p.OpenIssues, orUnknown(p.License))
 	return snapshot.RepoPage(snapshot.RepoKey(p.Address)), b.String(), nil
 }

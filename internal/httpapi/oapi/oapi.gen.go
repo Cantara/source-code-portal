@@ -1109,6 +1109,27 @@ type Me struct {
 // MeVia How the viewer is identified; none when anonymous
 type MeVia string
 
+// Package defines model for Package.
+type Package struct {
+	// Ecosystem The package manager: maven, npm, ...
+	Ecosystem string `json:"ecosystem"`
+
+	// Name group:artifact for Maven, the package name elsewhere
+	Name string `json:"name"`
+
+	// PublishedAt When the registry says it was published; null when it does not say
+	PublishedAt *time.Time `json:"publishedAt"`
+
+	// Registry The configured registry's id
+	Registry string `json:"registry"`
+
+	// Url The package at its registry, https; empty when the registry gave no address
+	Url string `json:"url"`
+
+	// Version The newest release at the registry
+	Version string `json:"version"`
+}
+
 // Page defines model for Page.
 type Page struct {
 	// Number This page
@@ -1223,9 +1244,12 @@ type Repo struct {
 	Name    string `json:"name"`
 
 	// OpenIssues Open issues and pull requests
-	OpenIssues int       `json:"openIssues"`
-	Owner      string    `json:"owner"`
-	PushedAt   time.Time `json:"pushedAt"`
+	OpenIssues int    `json:"openIssues"`
+	Owner      string `json:"owner"`
+
+	// Packages The packages it publishes to a registry with their newest release, the newest first; empty when none is known
+	Packages []Package `json:"packages"`
+	PushedAt time.Time `json:"pushedAt"`
 
 	// Release The latest release; null when there is none or it is not read yet
 	Release    *Release `json:"release"`

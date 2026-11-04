@@ -64,7 +64,7 @@ github:
 		t.Fatal(err)
 	}
 	cfg.Server.PublicAddr, cfg.Server.AdminAddr = addr, "127.0.0.1:0"
-	srv, err := newServer(t.Context(), cfg, deps{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	srv, err := newServer(t.Context(), cfg, testDeps(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

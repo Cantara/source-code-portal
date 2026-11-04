@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -27,7 +26,7 @@ func dashboardSummaryAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
 			var r oapi.Repo
 			manifests.Repo(s, e, &r)
 			languages[r.Language]++
-			if rel, _ := badges.ReleaseOf(e); rel != nil {
+			if _, _, ok := released(e); ok {
 				g.Summary.Released++
 			}
 		}
