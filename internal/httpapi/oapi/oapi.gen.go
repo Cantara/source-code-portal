@@ -406,19 +406,25 @@ func (e LayoutElementView) Valid() bool {
 
 // Defines values for ManifestEcosystem.
 const (
+	ManifestEcosystemCargo ManifestEcosystem = "cargo"
 	ManifestEcosystemGo    ManifestEcosystem = "go"
 	ManifestEcosystemMaven ManifestEcosystem = "maven"
 	ManifestEcosystemNpm   ManifestEcosystem = "npm"
+	ManifestEcosystemPypi  ManifestEcosystem = "pypi"
 )
 
 // Valid indicates whether the value is a known member of the ManifestEcosystem enum.
 func (e ManifestEcosystem) Valid() bool {
 	switch e {
+	case ManifestEcosystemCargo:
+		return true
 	case ManifestEcosystemGo:
 		return true
 	case ManifestEcosystemMaven:
 		return true
 	case ManifestEcosystemNpm:
+		return true
+	case ManifestEcosystemPypi:
 		return true
 	default:
 		return false
@@ -481,9 +487,11 @@ func (e RepoFindingCode) Valid() bool {
 
 // Defines values for ToolchainName.
 const (
-	ToolchainNameGo   ToolchainName = "go"
-	ToolchainNameJava ToolchainName = "java"
-	ToolchainNameNode ToolchainName = "node"
+	ToolchainNameGo     ToolchainName = "go"
+	ToolchainNameJava   ToolchainName = "java"
+	ToolchainNameNode   ToolchainName = "node"
+	ToolchainNamePython ToolchainName = "python"
+	ToolchainNameRust   ToolchainName = "rust"
 )
 
 // Valid indicates whether the value is a known member of the ToolchainName enum.
@@ -495,6 +503,10 @@ func (e ToolchainName) Valid() bool {
 		return true
 	case ToolchainNameNode:
 		return true
+	case ToolchainNamePython:
+		return true
+	case ToolchainNameRust:
+		return true
 	default:
 		return false
 	}
@@ -502,9 +514,11 @@ func (e ToolchainName) Valid() bool {
 
 // Defines values for ToolchainVersionsName.
 const (
-	ToolchainVersionsNameGo   ToolchainVersionsName = "go"
-	ToolchainVersionsNameJava ToolchainVersionsName = "java"
-	ToolchainVersionsNameNode ToolchainVersionsName = "node"
+	ToolchainVersionsNameGo     ToolchainVersionsName = "go"
+	ToolchainVersionsNameJava   ToolchainVersionsName = "java"
+	ToolchainVersionsNameNode   ToolchainVersionsName = "node"
+	ToolchainVersionsNamePython ToolchainVersionsName = "python"
+	ToolchainVersionsNameRust   ToolchainVersionsName = "rust"
 )
 
 // Valid indicates whether the value is a known member of the ToolchainVersionsName enum.
@@ -515,6 +529,10 @@ func (e ToolchainVersionsName) Valid() bool {
 	case ToolchainVersionsNameJava:
 		return true
 	case ToolchainVersionsNameNode:
+		return true
+	case ToolchainVersionsNamePython:
+		return true
+	case ToolchainVersionsNameRust:
 		return true
 	default:
 		return false
@@ -1057,7 +1075,7 @@ type Manifest struct {
 	Ecosystem    ManifestEcosystem `json:"ecosystem"`
 	Language     string            `json:"language"`
 
-	// Name Go module path, npm package name or Maven groupId:artifactId; empty when the file names none
+	// Name Go module path, npm package name, Maven groupId:artifactId, crate or Python project name; empty when the file names none
 	Name      string        `json:"name"`
 	Path      string        `json:"path"`
 	Problems  []FileProblem `json:"problems"`

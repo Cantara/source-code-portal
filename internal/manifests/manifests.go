@@ -35,7 +35,8 @@ const (
 )
 
 // ecosystems maps a manifest's base name to its ecosystem.
-var ecosystems = map[string]string{"go.mod": "go", "package.json": "npm", "pom.xml": "maven"} //nolint:gochecknoglobals // fixed table
+var ecosystems = map[string]string{"go.mod": "go", "package.json": "npm", "pom.xml": "maven", "Cargo.toml": "cargo", //nolint:gochecknoglobals // fixed table
+	"pyproject.toml": "pypi"}
 
 // skipped are directory names whose manifests belong to vendored code, fixtures or examples.
 var skipped = map[string]bool{"node_modules": true, "vendor": true, "testdata": true, "test": true, "tests": true, //nolint:gochecknoglobals // fixed table
@@ -164,6 +165,11 @@ func parse(p string, b []byte, paths map[string]bool) Manifest {
 	case "npm":
 		dir := path.Dir(p)
 		m = parsePackageJSON(b, func(name string) bool { return paths[path.Join(dir, name)] })
+	case "cargo":
+		m = parseCargo(b)
+	case "pypi":
+		dir := path.Dir(p)
+		m = parsePyproject(b, func(name string) bool { return paths[path.Join(dir, name)] })
 	default:
 		m = parsePOM(b)
 	}

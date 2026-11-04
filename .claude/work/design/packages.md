@@ -1,6 +1,6 @@
 # Published packages (R1 to R4)
 
-Status: R1 built; R2 to R4 queued (plan.md section 4). Binding order: ../plan.md > this note.
+Status: R1 and R2 built; R3 and R4 queued (plan.md section 4). Binding order: ../plan.md > this note.
 
 A repository's release is often not a GitHub release: a Java library is published to a Maven repository by a CI server, a
 TypeScript one to npm, a Rust crate to crates.io, a Go module is a tag that the module proxy serves. The portal reads the
@@ -53,7 +53,7 @@ no private registries).
 | `pypi` | Python | `pyproject.toml` (`[project].name`, Poetry, Hatch), `setup.cfg` | `pypi.org` | the Simple API in JSON (PEP 691, `application/vnd.pypi.simple.v1+json`): versions, upload times (PEP 700) | devpi, Nexus, Artifactory, GitLab, CodeArtifact: HTTP Basic |
 | `cargo` | Rust | `Cargo.toml` (`[package].name`, `publish`, workspace members) | crates.io | the sparse index (`index.crates.io/<prefix>/<name>`, one JSON line per version), the newest not yanked | alternative registries with a sparse index (`config.json`, `auth-required`): the token as the `Authorization` header |
 | `go` | Go | `go.mod` (`module`) | `proxy.golang.org` | `<module>/@latest`: `Version`, `Time` (case-encoded path) | a private module is its tags on GitHub, which the commits job reads already; a private proxy (Athens, Artifactory) with HTTP Basic |
-| `swift` | Swift | `Package.swift` (the package name, read as text), `*.podspec` | the tags (SwiftPM resolves tags); CocoaPods trunk | tags; `trunk.cocoapods.org/api/v1/pods/<name>` | a Swift package registry (SE-0292): a bearer token or Basic |
+| `swift`, `cocoapods` | Swift, Objective-C | `Package.swift` (the package name, read as text); a root `*.podspec` | the tags (SwiftPM resolves tags); CocoaPods trunk | tags; `trunk.cocoapods.org/api/v1/pods/<name>` | a Swift package registry (SE-0292): a bearer token or Basic (R3) |
 | `nuget` | C#, F# | `*.csproj` (`PackageId`, `IsPackable`), `*.nuspec` | `api.nuget.org` | the flat container `v3-flatcontainer/<id>/index.json` from the service index | Azure Artifacts, Nexus, Artifactory, GitHub Packages: HTTP Basic (user and token) |
 | `rubygems` | Ruby | `*.gemspec` (`name`, read as text) | rubygems.org | `api/v1/versions/<name>/latest.json` | Gemfury, Artifactory, GitHub Packages: Basic or an API key header |
 | `packagist` | PHP | `composer.json` (`name`) | packagist.org | `p2/<vendor>/<name>.json` | Private Packagist, Satis: a bearer token or Basic |
@@ -68,7 +68,8 @@ container image (GHCR, Docker Hub) is a later provider of the same interface.
    so it is kept by its coordinates and never fetched again), npm's `publishConfig.registry` and `.npmrc` scopes, Cargo's
    `publish = ["<registry>"]`.
 2. The configured registries of that ecosystem (`packages.registries[]`), in their order.
-3. The ecosystem's public registry, unless the coordinate is private.
+3. The ecosystem's public registry, only for a public repository: a private or internal repository's coordinates are never sent to a
+   public registry (a Go module's versions are then its tags).
 
 The first registry that knows the package answers. A registry that does not know it (404) is the next one's turn; a registry that
 fails is a failure of this lookup only (the other packages of the repository are kept, P-49), retried with the job.

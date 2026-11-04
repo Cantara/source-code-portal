@@ -754,15 +754,15 @@ export interface components {
     }
     ToolchainVersions: {
       /** @enum {string} */
-      name: "go" | "node" | "java"
+      name: "go" | "node" | "java" | "rust" | "python"
       /** @description Every version the manifests state */
       versions: string[]
     }
     Manifest: {
       path: string
       /** @enum {string} */
-      ecosystem: "go" | "npm" | "maven"
-      /** @description Go module path, npm package name or Maven groupId:artifactId; empty when the file names none */
+      ecosystem: "go" | "npm" | "maven" | "cargo" | "pypi"
+      /** @description Go module path, npm package name, Maven groupId:artifactId, crate or Python project name; empty when the file names none */
       name: string
       version: string
       language: string
@@ -773,7 +773,7 @@ export interface components {
     }
     Toolchain: {
       /** @enum {string} */
-      name: "go" | "node" | "java"
+      name: "go" | "node" | "java" | "rust" | "python"
       version: string
     }
     Dependency: {

@@ -13,7 +13,7 @@ from a repository and how to describe it.
 | Latest commits | the 30 newest commits of the default branch |
 | Release | the latest GitHub release, else the newest version of a package the repository publishes (`pom.xml`, `package.json`: below) |
 | Title, owners, lifecycle, tags, links | the optional `scp.yaml` descriptor (below) |
-| Technology and dependencies | up to 30 package manifests: `go.mod`, `package.json` and `pom.xml`, at most four directories deep, outside `node_modules`, `vendor`, `test`, `tests`, `testdata`, `example`, `examples`, `fixtures` and hidden directories |
+| Technology and dependencies | up to 30 package manifests: `go.mod`, `package.json`, `pom.xml`, `Cargo.toml` and `pyproject.toml`, at most four directories deep, outside `node_modules`, `vendor`, `test`, `tests`, `testdata`, `example`, `examples`, `fixtures` and hidden directories |
 
 A document's front matter may set `title`, `order` (a number; lower comes first) and `hidden: true` (rendered and linkable, but not
 listed):
@@ -35,14 +35,30 @@ Manifests are read, never run: the portal shows what they declare. From `go.mod`
 `require` (`// indirect` shown as indirect) and `tool`; from `package.json` the name, version, `engines.node`, `packageManager` (or the
 lockfile beside it) and the four dependency fields; from `pom.xml` the coordinates (inherited from `parent`), the parent, the
 dependencies with their scopes, BOM imports and the Java version from `maven.compiler.release` (or `target`, `source`, `java.version`),
-with `${property}` references replaced from the POM's own properties. A dependency whose name another catalogued repository declares
+with `${property}` references replaced from the POM's own properties; from `Cargo.toml` the package, `rust-version` and the
+dependency tables (dev, build and target-specific ones included); from `pyproject.toml` the project (PEP 621 or Poetry),
+`requires-python`, the dependencies, optional dependencies and dependency groups, and the build tool from the build backend (or `uv.lock`
+and `poetry.lock` beside it). A dependency whose name another catalogued repository declares
 (Go module path, npm package name, Maven `groupId:artifactId`) links the two repositories: each page lists what it uses and what uses it.
 A file over 512 KiB, or one that does not parse, is listed with the problem.
 
-Packages are what the repository publishes: a `pom.xml` (up to two directories deep) is its `groupId:artifactId`, looked up in the
-repository of its `distributionManagement` (or its parent POM's), the portal's configured registries and Maven Central; a
-`package.json` is its `name`, unless `"private": true`, looked up at its `publishConfig.registry`, the configured registries and
-registry.npmjs.org. The newest release shows on the release chip and in the page's *Packages* panel.
+Packages are what the repository publishes, read from its build files up to two directories deep. The newest stable release (no
+pre-release, nothing yanked) shows on the release chip and in the page's *Packages* panel.
+
+| Build file | The package | Where it is looked up |
+|---|---|---|
+| `pom.xml` | `groupId:artifactId` | its `distributionManagement` repository (or its parent POM's), the configured Maven registries, Maven Central |
+| `build.gradle(.kts)` with `maven-publish` | `group` (or `gradle.properties`) and `rootProject.name` (or the publication's `artifactId`) | the repositories of its `publishing` block, the configured Maven registries, Maven Central |
+| `package.json` | `name`, unless `"private": true` | its `publishConfig.registry`, the configured npm registries, registry.npmjs.org |
+| `pyproject.toml`, `setup.cfg` | the project's name, unless a `Private ::` classifier or Poetry's `package-mode = false` | the configured indexes, pypi.org (the Simple API) |
+| `Cargo.toml` | the package, unless `publish = false` | the registries `publish` names (the configured Cargo registries' sparse indexes, crates.io) |
+| `go.mod` | the module path | the configured proxies and proxy.golang.org; else the repository's tags for the module's directory and major version |
+| `Package.swift` | the package's name | the repository's tags |
+| `*.podspec` | the pod's name | CocoaPods trunk |
+
+A private repository's packages are never named to a public registry (Maven Central, npm, PyPI, crates.io, the Go proxy, CocoaPods
+trunk): only to the registries its build files name and those the portal is configured with; a private Go module's versions are its
+tags.
 
 Changes show within seconds when the portal's webhook is set up, otherwise after the next scheduled check (a push is noticed within
 the listing interval, five minutes by default).

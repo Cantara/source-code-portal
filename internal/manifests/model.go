@@ -12,7 +12,7 @@ import (
 // Manifest is one package manifest of a repository (go.mod, package.json, pom.xml) with what it declares.
 type Manifest struct {
 	Path         string             `json:"path"`
-	Ecosystem    string             `json:"ecosystem"` // go | npm | maven
+	Ecosystem    string             `json:"ecosystem"` // go | npm | maven | cargo | pypi
 	Name         string             `json:"name"`      // Go module path, npm package name, Maven groupId:artifactId
 	Version      string             `json:"version,omitempty"`
 	Language     string             `json:"language"`

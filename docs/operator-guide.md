@@ -128,8 +128,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js 24 executable that runs the bundle |
 | `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4); empty: the built-in layout, no saving |
-| `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`), `url` (https) |
-| `packages.public` | `true` | ask the public registries too (Maven Central, registry.npmjs.org); `false`: only the configured ones and those the build files name |
+| `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`), `url` (https): `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy |
+| `packages.public` | `true` | ask the public registries too (Maven Central, npm, PyPI, crates.io, proxy.golang.org, CocoaPods trunk) for public repositories; `false`: only the configured ones and those the build files name |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
@@ -320,6 +320,11 @@ released count and in the health's unreleased check.
   the configured Maven registries, then Maven Central. The newest release is the one `maven-metadata.xml` names.
 - **npm** (`package.json`): the package is its `name`, unless it is `private`. It is looked up at its `publishConfig.registry`, the
   configured npm registries, then registry.npmjs.org; the newest release is the `latest` tag.
+- **Gradle** (Kotlin and Java) publishing with `maven-publish`, **PyPI** (`pyproject.toml`, `setup.cfg`), **Cargo** (`Cargo.toml`),
+  **Go** (`go.mod`: the module proxy, or the repository's tags), **Swift** (`Package.swift`: the tags) and **CocoaPods**: the
+  repository guide lists what each reads and where it asks.
+- A **private** repository's packages are never named to a public registry: only to the registries its build files name and the
+  configured ones.
 
 ```yaml
 packages:
