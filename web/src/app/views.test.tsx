@@ -96,7 +96,7 @@ describe("pages", () => {
         name: /^Commits per week.*; by automation 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 5$/,
       }),
     ).toBeInTheDocument()
-    expect(card).toHaveTextContent("Last change by the team or automation")
+    expect(card).toHaveTextContent(/Last change \d/)
     expect(screen.getByRole("heading", { name: "Latest commits" })).toBeInTheDocument()
     expect(screen.queryByRole("checkbox", { name: "Include automation" })).not.toBeInTheDocument()
   })

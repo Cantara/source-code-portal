@@ -12,7 +12,7 @@ import { FindingList, HealthScore } from "@/entities/health/findings"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
 import { Sparkline } from "@/shared/sparkline"
-import { by, isEvery, remember, viewCookie, type Work } from "@/lib/preferences"
+import { by, isEvery, qualifier, remember, viewCookie, type Work } from "@/lib/preferences"
 import { assistants, counted, maintenance, noun, series, share, weekly } from "./work"
 import type { ProductsView } from "./layout"
 
@@ -96,20 +96,20 @@ function ProductCard({ group, work: w, now }: { group: Group; work: Work; now: n
             <span className="text-foreground">{names(a)}</span>
           </span>
         ) : (
-          <span className="text-muted-foreground">No commit {by(w)} in 30 days</span>
+          <span className="text-muted-foreground">No commit{qualifier(w)} in 30 days</span>
         )}
         <span className="block text-xs text-muted-foreground">
           {a.lastAuthoredAt ? (
             <>
-              Last change {by(w)} <RelativeTime at={a.lastAuthoredAt} />
+              Last change{qualifier(w)} <RelativeTime at={a.lastAuthoredAt} />
             </>
           ) : (
-            `No change ${by(w)} read`
+            `No change${qualifier(w)} read`
           )}
         </span>
       </p>
       {a.recent.length > 0 && (
-        <ul aria-label={`Changed last ${by(w)}`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <ul aria-label={`Changed last${qualifier(w)}`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
           {a.recent.map((r) => (
             <li key={r.repo} className="flex min-w-0 items-baseline gap-1">
               <Link href={addressPath(r.repo)} className="truncate font-medium hover:underline">
@@ -196,7 +196,7 @@ const columns = (w: Work): Column[] => [
   },
   {
     key: "last",
-    label: `Last change ${by(w)}`,
+    label: `Last change${qualifier(w)}`,
     value: (g) => g.activity.lastAuthoredAt ?? "",
     cell: (g) => <RelativeTime at={g.activity.lastAuthoredAt} />,
   },

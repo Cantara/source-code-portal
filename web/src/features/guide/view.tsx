@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { cn } from "@/lib/cn"
 import { kinds } from "@/lib/preferences"
 import { levels } from "@/entities/health/health"
+import { FindingIcon, findingKinds, ScoreRing, severities } from "@/entities/health/kinds"
 import { activities } from "@/entities/repo/health"
 import shots from "./shots.json"
 
@@ -17,14 +18,14 @@ type Callout = keyof typeof shots.callouts
 
 const docs = "https://github.com/Cantara/source-code-portal/blob/main/docs"
 
-/** penalties are what each health finding costs a repository (internal/health/health.go). */
-const penalties: { finding: string; when: string; points: number }[] = [
-  { finding: "Dormant", when: "no change by the team for more than 2 years: archive it or revive it", points: 30 },
-  { finding: "Update failing", when: "the portal cannot update it from GitHub", points: 25 },
-  { finding: "Unreleased", when: "changes since the latest release, which is more than 90 days old", points: 20 },
-  { finding: "No licence", when: "a public repository without a licence GitHub detects", points: 20 },
-  { finding: "Issues", when: "more than 50 open issues and pull requests (more than 20: 10 points)", points: 20 },
-  { finding: "Quiet", when: "no change by the team for more than 6 months", points: 10 },
+/** findings are when each health finding is found and what it costs a repository (internal/health/health.go), the most costly first. */
+const findings: { code: keyof typeof findingKinds; when: string; points: number; also?: string }[] = [
+  { code: "dormant", when: "No change by the team for more than 2 years.", points: 30 },
+  { code: "failing", when: "The portal cannot update it from GitHub.", points: 25 },
+  { code: "unreleased", when: "Changes since the latest release, which is more than 90 days old.", points: 20 },
+  { code: "no-licence", when: "A public repository without a licence GitHub detects.", points: 20 },
+  { code: "issues", when: "More than 50 open issues and pull requests.", points: 20, also: "more than 20: 10 points" },
+  { code: "quiet", when: "No change by the team for more than 6 months.", points: 10 },
 ]
 
 /** card is the product card's rows, in the order of their callouts. */
@@ -37,7 +38,7 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
   {
     at: "score",
     title: "Health",
-    body: "The product's score out of 100. Quiet grey while it is good; a coloured light and the level in words at watch or attention.",
+    body: "The product's health: a ring filled to its score out of 100, in its level's colour, and the level in words when it is not good. Point at it for the levels.",
   },
   {
     at: "work",
@@ -67,7 +68,7 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
   {
     at: "findings",
     title: "The exceptions",
-    body: "The findings that cost the most points, the repository's own penalty in front. Nothing to see says “No exceptions.”",
+    body: "The findings that cost the most points, each with its kind's icon on a tile of its severity (section 5). Point at an icon for what it means and what it costs. Nothing to see says “No exceptions.”",
   },
   {
     at: "shared",
@@ -78,7 +79,8 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
 
 function Shot({ name, alt, className }: { name: Shot; alt: string; className?: string }) {
   const { width, height } = shots.sizes[name]
-  const img = "block h-auto w-full rounded-lg"
+  // At its own size (the capture's CSS pixels) and never larger: smaller on a narrow screen.
+  const img = "mx-auto block h-auto max-w-full rounded-lg"
   return (
     <>
       <img
@@ -103,11 +105,11 @@ function Shot({ name, alt, className }: { name: Shot; alt: string; className?: s
 
 function Figure({ children, caption, className }: { children: ReactNode; caption?: string; className?: string }) {
   return (
-    <figure className={cn("flex flex-col gap-2", className)}>
-      <div className="rounded-xl border border-border bg-gradient-to-br from-muted/60 to-background p-2 shadow-sm sm:p-4">
+    <figure className={cn("flex w-fit max-w-full flex-col gap-2", className)}>
+      <div className="rounded-xl border border-border bg-gradient-to-br from-muted/60 to-background p-2 shadow-sm sm:p-3">
         {children}
       </div>
-      {caption && <figcaption className="px-1 text-xs text-muted-foreground">{caption}</figcaption>}
+      {caption && <figcaption className="max-w-prose px-1 text-xs text-muted-foreground">{caption}</figcaption>}
     </figure>
   )
 }
@@ -126,16 +128,73 @@ function Marker({ n, className }: { n: number; className?: string }) {
   )
 }
 
-const sections = [
-  { id: "signals", title: "Signals, not lists" },
-  { id: "telemetry", title: "The fleet at a glance" },
-  { id: "fleet", title: "The fleet map" },
-  { id: "card", title: "A product card" },
-  { id: "health", title: "Health and findings" },
-  { id: "work", title: "The work that counts" },
-  { id: "lists", title: "Tables and commits" },
-  { id: "run", title: "Run your own portal" },
+/** parts are the guide's two halves, for its readers and for the people who run a portal, each a list of numbered sections. */
+const parts = [
+  {
+    title: "Read the portal",
+    sections: [
+      { id: "signals", title: "Signals, not lists" },
+      { id: "telemetry", title: "The fleet at a glance" },
+      { id: "fleet", title: "The fleet map" },
+      { id: "card", title: "A product card" },
+      { id: "health", title: "Health and findings" },
+      { id: "work", title: "The work that counts" },
+      { id: "lists", title: "Tables and commits" },
+      { id: "yours", title: "Make it yours" },
+    ],
+  },
+  {
+    title: "Run a portal",
+    sections: [
+      { id: "run", title: "Run your own portal" },
+      { id: "more", title: "Options and documents" },
+    ],
+  },
 ]
+
+/** Contents is the guide's table of contents: chips under the hero on a narrow screen, a sticky list beside the page on a wide one. */
+function Contents() {
+  let n = 0
+  return (
+    <nav aria-label="Guide" className="text-sm lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
+      <p className="mb-2 hidden text-xs font-medium tracking-widest text-muted-foreground uppercase lg:block">On this page</p>
+      <div className="flex flex-col gap-3 lg:gap-5">
+        {parts.map((part) => (
+          <div key={part.title}>
+            <p className="mb-1.5 font-mono text-[0.6875rem] tracking-widest text-primary uppercase">{part.title}</p>
+            <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-0 lg:border-l lg:border-border">
+              {part.sections.map((s) => {
+                n++
+                return (
+                  <li key={s.id}>
+                    <a
+                      href={`#${s.id}`}
+                      className="block rounded-full border border-border bg-background/70 px-3 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground lg:-ml-px lg:rounded-none lg:border-0 lg:border-l-2 lg:border-transparent lg:bg-transparent lg:py-1.5 lg:pl-3 lg:hover:border-primary"
+                    >
+                      <span className="mr-1.5 font-mono text-xs text-primary">{String(n).padStart(2, "0")}</span>
+                      {s.title}
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
+/** Part opens a half of the guide: who it is for, in a line. */
+function Part({ n, title, lede }: { n: number; title: string; lede: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 px-5 py-4">
+      <p className="font-mono text-xs tracking-widest text-primary uppercase">Part {n}</p>
+      <p className="mt-0.5 text-lg font-semibold tracking-tight">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{lede}</p>
+    </div>
+  )
+}
 
 function Section({
   id,
@@ -160,7 +219,7 @@ function Section({
       <h2 id={`${id}-title`} className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
         {title}
       </h2>
-      <p className="mt-2 max-w-3xl text-muted-foreground">{lede}</p>
+      <p className="mt-2 max-w-prose text-muted-foreground">{lede}</p>
       <div className="mt-6 flex flex-col gap-6">{children}</div>
     </section>
   )
@@ -200,7 +259,14 @@ function AnnotatedCard({ alt }: { alt: string }) {
   const { width, height } = shots.sizes.card
   const gutter = 44
   return (
-    <svg role="img" aria-label={alt} viewBox={`${-gutter} 0 ${width + gutter} ${height}`} className="block h-auto w-full">
+    <svg
+      role="img"
+      aria-label={alt}
+      viewBox={`${-gutter} 0 ${width + gutter} ${height}`}
+      width={width + gutter}
+      height={height}
+      className="block h-auto max-w-full"
+    >
       <image href="/guide/card-light.webp" width={width} height={height} className="dark:hidden" />
       <image href="/guide/card-dark.webp" width={width} height={height} className="hidden dark:block" />
       {card.map((c, i) => {
@@ -245,8 +311,8 @@ const dots = { hand: "bg-primary", ai: "bg-[var(--ai)]", automation: "bg-muted-f
 export function GuideView({ version }: { version: string }) {
   const tag = /^v?\d+\.\d+\.\d+$/.test(version) ? version.replace(/^v/, "") : "<version>"
   return (
-    <div className="flex flex-col gap-10">
-      <header className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-background to-[color-mix(in_oklch,var(--ai)_10%,transparent)] px-5 py-10 sm:px-10 sm:py-14">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-x-12 xl:grid-cols-[minmax(0,1fr)_15rem]">
+      <header className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-background to-[color-mix(in_oklch,var(--ai)_10%,transparent)] px-5 py-8 sm:px-10 sm:py-10 lg:col-start-1">
         <p className="font-mono text-xs tracking-widest text-primary uppercase">Getting started</p>
         <h1
           tabIndex={-1}
@@ -254,26 +320,35 @@ export function GuideView({ version }: { version: string }) {
         >
           Read the portal in five minutes, run your own in thirty
         </h1>
-        <p className="mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
+        <p className="mt-4 max-w-2xl text-base text-muted-foreground">
           Source Code Portal turns every repository of your GitHub organisations into a few signals: who works where, what needs a
-          look, and what automation keeps alive. This guide explains each of them, then how to put a portal on your own
-          repositories.
+          look, and what automation keeps alive. The first part explains how to read them; the second how to run a portal on your
+          own repositories.
         </p>
-        <nav aria-label="Guide" className="mt-6 flex flex-wrap gap-2 text-sm">
-          {sections.map((s, i) => (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              className="rounded-full border border-border bg-background/70 px-3 py-1 text-muted-foreground backdrop-blur transition-colors hover:border-primary/50 hover:text-foreground"
-            >
-              <span className="mr-1.5 font-mono text-xs text-primary">{String(i + 1).padStart(2, "0")}</span>
-              {s.title}
+        <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-2">
+          {[
+            ["#signals", "Part 1", "Read the portal", "The dashboard, a product card, health and the work that counts."],
+            ["#run", "Part 2", "Run a portal", "Access to GitHub, your products, checks, the container and the options."],
+          ].map(([href, n, t, d]) => (
+            <a key={href} href={href} className="panel flex flex-col gap-0.5 p-4 transition-colors hover:border-primary/50">
+              <span className="font-mono text-[0.6875rem] tracking-widest text-primary uppercase">{n}</span>
+              <span className="text-sm font-semibold">{t} →</span>
+              <span className="text-xs text-muted-foreground">{d}</span>
             </a>
           ))}
-        </nav>
+        </div>
       </header>
 
-      <div className="flex flex-col gap-14">
+      <aside className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        <Contents />
+      </aside>
+
+      <div className="flex min-w-0 flex-col gap-12 lg:col-start-1">
+        <Part
+          n={1}
+          title="Read the portal"
+          lede="For everyone who opens the dashboard: what each signal says and where to look first."
+        />
         <Section
           id="signals"
           n={1}
@@ -298,6 +373,9 @@ export function GuideView({ version }: { version: string }) {
               </div>
             ))}
           </div>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Every coloured signal explains itself: point at it, or tap it on a phone, and a small card names it and its values.
+          </p>
         </Section>
 
         <Section
@@ -339,9 +417,9 @@ export function GuideView({ version }: { version: string }) {
               </li>
             ))}
           </ul>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            The age is of the last change of the work that counts (section 6), every kind until you choose: a bot's dependency
-            update keeps a repository alive too. Count people's work alone to see which ones people still change.
+          <p className="max-w-prose text-sm text-muted-foreground">
+            The age is of the last change of the work that counts (section 6), every kind until you choose: a bot&apos;s
+            dependency update keeps a repository alive too. Count people&apos;s work alone to see which ones people still change.
           </p>
         </Section>
 
@@ -351,11 +429,11 @@ export function GuideView({ version }: { version: string }) {
           title="A product card"
           lede="Each product gets the same rows on every card, so the eye learns where to look. The numbers below match the picture."
         >
-          <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,30rem)_1fr]">
-            <Figure className="lg:sticky lg:top-20">
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,27rem)_1fr]">
+            <Figure className="xl:sticky xl:top-20">
               <AnnotatedCard alt="The Payments card, its rows numbered 1 to 8: 53 commits, 6 by hand, 20 with AI, 22 by automation and 5 in sweeps, its people, its recent repositories and three findings." />
             </Figure>
-            <ol className="flex flex-col gap-4">
+            <ol className="flex max-w-prose flex-col gap-4">
               {card.map((c, i) => (
                 <li key={c.at} className="flex gap-3">
                   <Marker n={i + 1} className="mt-0.5" />
@@ -375,58 +453,91 @@ export function GuideView({ version }: { version: string }) {
           title="Health and findings"
           lede="Each repository starts at 100 and loses the points of its findings. A product weighs its repositories into one score."
         >
-          <div className="grid gap-8 lg:grid-cols-[1fr_minmax(0,26rem)]">
-            <div className="flex flex-col gap-6">
-              <ul aria-label="Health levels" className="grid gap-3 sm:grid-cols-3">
-                {(
-                  [
-                    ["good", "80 to 100", "Shown quietly, in grey."],
-                    ["watch", "50 to 79", "A light and the level in words."],
-                    ["attention", "below 50", "Also when any repository of the product is."],
-                  ] as const
-                ).map(([l, range, note]) => (
-                  <li key={l} className={cn(levels[l].className, "panel flex flex-col gap-1 p-3")}>
-                    <span className="flex items-center gap-2 text-sm font-semibold">
-                      <span aria-hidden="true" className="led" />
-                      {levels[l].label}
-                    </span>
-                    <span className="font-mono text-xs">{range}</span>
-                    <span className="text-xs text-muted-foreground">{note}</span>
-                  </li>
+          <ul aria-label="Health levels" className="grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                ["good", 92, "80 to 100", "The ring alone: nothing to do."],
+                ["watch", 68, "50 to 79", "The ring and the word: worth a look."],
+                ["attention", 38, "below 50", "Also when any repository of the product is."],
+              ] as const
+            ).map(([l, score, range, note]) => (
+              <li key={l} className={cn(levels[l].className, "panel flex items-center gap-3 p-3")}>
+                <ScoreRing score={score} large />
+                <span className="flex flex-col">
+                  <span className="text-sm font-semibold">{levels[l].label}</span>
+                  <span className="font-mono text-xs">{range}</span>
+                  <span className="text-xs text-muted-foreground">{note}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="panel overflow-x-auto">
+            <table className="w-full text-sm">
+              <caption className="px-4 pt-3 text-left text-xs font-medium tracking-widest text-muted-foreground uppercase">
+                The findings, the most costly first
+              </caption>
+              <thead>
+                <tr className="border-b border-border text-xs text-muted-foreground">
+                  <th scope="col" className="w-10 px-4 py-2 text-left font-medium">
+                    <span className="sr-only">Icon</span>
+                  </th>
+                  <th scope="col" className="px-2 py-2 text-left font-medium">
+                    Finding
+                  </th>
+                  <th scope="col" className="hidden px-2 py-2 text-left font-medium sm:table-cell">
+                    When
+                  </th>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">
+                    Points
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {findings.map((f) => (
+                  <tr key={f.code} className="border-b border-border/60 align-top last:border-b-0">
+                    <td className="px-4 py-3">
+                      <FindingIcon code={f.code} penalty={f.points} />
+                    </td>
+                    <th scope="row" className="px-2 py-3 text-left font-normal">
+                      <span className="block font-semibold">{findingKinds[f.code].label}</span>
+                      <span className="block text-muted-foreground">{findingKinds[f.code].about}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground sm:hidden">
+                        {f.when}
+                        {f.also && ` (${f.also})`}
+                      </span>
+                    </th>
+                    <td className="hidden px-2 py-3 text-muted-foreground sm:table-cell">
+                      {f.when}
+                      {f.also && <span className="block text-xs">{f.also}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono whitespace-nowrap tabular-nums">−{f.points}</td>
+                  </tr>
                 ))}
-              </ul>
-              <div className="panel overflow-x-auto">
-                <table className="w-full text-sm">
-                  <caption className="px-3 pt-3 text-left text-xs font-medium tracking-widest text-muted-foreground uppercase">
-                    What a finding costs
-                  </caption>
-                  <thead>
-                    <tr className="border-b border-border text-xs text-muted-foreground">
-                      <th scope="col" className="px-3 py-2 text-left font-medium">
-                        Finding
-                      </th>
-                      <th scope="col" className="px-3 py-2 text-left font-medium">
-                        When
-                      </th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium">
-                        Points
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {penalties.map((p) => (
-                      <tr key={p.finding} className="border-b border-border/60 last:border-b-0">
-                        <th scope="row" className="px-3 py-2 text-left font-medium">
-                          {p.finding}
-                        </th>
-                        <td className="px-3 py-2 text-muted-foreground">{p.when}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">−{p.points}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="max-w-3xl text-sm text-muted-foreground">
+              </tbody>
+            </table>
+          </div>
+          <ul aria-label="Severity" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            {(
+              [
+                ["high", 30, "25 points or more"],
+                ["medium", 20, "20 points"],
+                ["low", 10, "10 points"],
+              ] as const
+            ).map(([sev, , note]) => (
+              <li key={sev} className="flex items-center gap-2">
+                <span aria-hidden="true" className={cn("finding-icon", severities[sev].className)} />
+                <span className="font-medium">{severities[sev].label}</span>
+                <span className="text-xs text-muted-foreground">{note}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="grid items-start gap-8 xl:grid-cols-[1fr_minmax(0,25rem)]">
+            <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
+              <p>
+                The icon says what a finding is, the colour of its tile how much it weighs: red is high, amber medium, grey low.
+                On a card, point at an icon or tap it for its name, what it costs and why it matters.
+              </p>
+              <p>
                 The age picks a penalty, it does not grow with it: four years and ten cost the same 30 points. The product&apos;s
                 score is the weighted mean of its repositories: one changed in the last 6 months counts twice, the product&apos;s
                 main repository three times more. So a forgotten side repository costs a product little, and a neglected main one
@@ -459,8 +570,8 @@ export function GuideView({ version }: { version: string }) {
               </li>
             ))}
           </ul>
-          <div className="grid items-start gap-8 lg:grid-cols-[1fr_minmax(0,32rem)]">
-            <div className="flex max-w-3xl flex-col gap-3 text-sm text-muted-foreground">
+          <div className="grid items-start gap-8 xl:grid-cols-[1fr_minmax(0,30rem)]">
+            <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
               <p>
                 A commit is <strong className="text-foreground">with AI</strong> when it carries an AI co-author (the{" "}
                 <code className="font-mono text-xs">Co-authored-by</code> trailer Claude Code, Copilot and Cursor write) or an AI
@@ -468,16 +579,15 @@ export function GuideView({ version }: { version: string }) {
               </p>
               <p>
                 A commit is <strong className="text-foreground">by automation</strong> when a bot made it (Renovate, Dependabot,
-                GitHub Actions, a release plugin), or when it is part of a sweep. Automation names no people: the people on a card
-                are always people.
+                GitHub Actions, a release plugin), or when it is part of a sweep: one change landing in more than 10 repositories
+                on one day. Automation names no people: the people on a card are always people.
               </p>
               <p>
                 <Link href="/settings" className="font-medium text-primary hover:underline">
                   Settings
                 </Link>{" "}
                 choose what the dashboard counts, any of the three; all three until you choose. People&apos;s work alone is by
-                hand and with AI, a maintenance view automation alone. The choice is kept in your browser, and the other kinds
-                stay in sight on every card.
+                hand and with AI, a maintenance view automation alone. The other kinds stay in sight on every card.
               </p>
             </div>
             <Figure caption="Settings: the work that counts.">
@@ -498,17 +608,53 @@ export function GuideView({ version }: { version: string }) {
               alt="The products table with columns for repositories, commits, share with AI, automation, people, last change, findings and health."
             />
           </Figure>
-          <Figure caption="The latest commits of the work that counts, every kind until you choose: here the bots' updates, the ones made with AI marked when they come. Commits in the header holds them all, and each repository has its git graph.">
-            <Shot
-              name="latest"
-              alt="The latest commits: subject, repository, author and age, the newest five by dependency and CI bots."
-            />
-          </Figure>
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,26rem)_1fr]">
+            <Figure caption="The latest commits, beside the products on a wide screen.">
+              <Shot
+                name="latest"
+                alt="The latest commits: subject, repository, author and age, the newest five by dependency and CI bots."
+              />
+            </Figure>
+            <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
+              <p>
+                The latest commits of the work that counts sit in a panel beside the products: fold it away with its button, or
+                drag its edge to make it wider. Commits made with AI carry a mark naming the assistant.
+              </p>
+              <p>
+                <strong className="text-foreground">Commits</strong> in the header holds every commit of every repository, to
+                filter by kind, product and author. Each repository has its own page with its README, documents, dependencies and
+                its history as a git graph.
+              </p>
+            </div>
+          </div>
         </Section>
 
         <Section
-          id="run"
+          id="yours"
           n={8}
+          title="Make it yours"
+          lede="What you choose is kept in your browser, never on the server, and every page follows it."
+        >
+          <Terms
+            items={[
+              ["The work that counts", "By hand, with AI, by automation: any of them (section 6)."],
+              ["Cards or a table", "The products' view, switched above them."],
+              ["The side panel", "The latest commits folded away or as wide as you dragged them."],
+              ["Page sizes", "How many commits a list shows at a time."],
+              ["Theme", "System, dark or light, from the header's theme menu."],
+              ["Sign in", "Where the portal has sign-in, private repositories show for the groups allowed to see them."],
+            ]}
+          />
+        </Section>
+
+        <Part
+          n={2}
+          title="Run a portal"
+          lede="For the people who put a portal on their own repositories: from nothing to a running portal, then the options."
+        />
+        <Section
+          id="run"
+          n={9}
           title="Run your own portal"
           lede="One binary or one container, one YAML file and read access to GitHub. Nothing to back up but the configuration and its secrets."
         >
@@ -555,23 +701,29 @@ scp config groups -c scp.yaml --repos repos.json   # where each repository lands
                 every repository and the pages say so meanwhile.
               </p>
             </Step>
-            <Step n={5} title="Then, when you want them">
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {[
-                  ["Webhooks", "pushes show within seconds"],
-                  ["Sign-in", "single sign-on through your OpenID Connect provider, and access tokens"],
-                  ["Private repositories", "shown only to the groups you name"],
-                  ["The assistant", "questions about the catalogue in plain language, with your model provider"],
-                  ["The design mode", "administrators arrange the dashboard for everyone"],
-                  ["Several instances", "one portal served together through Hazelcast"],
-                ].map(([t, d]) => (
-                  <li key={t} className="rounded-lg border border-border p-3">
-                    <span className="font-medium text-foreground">{t}</span>: {d}
-                  </li>
-                ))}
-              </ul>
-            </Step>
           </ol>
+        </Section>
+
+        <Section
+          id="more"
+          n={10}
+          title="Options and documents"
+          lede="Add what you need when you need it; the documents cover every key."
+        >
+          <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+            {[
+              ["Webhooks", "pushes show within seconds"],
+              ["Sign-in", "single sign-on through your OpenID Connect provider, and access tokens"],
+              ["Private repositories", "shown only to the groups you name"],
+              ["The assistant", "questions about the catalogue in plain language, with your model provider"],
+              ["The design mode", "administrators arrange the dashboard for everyone"],
+              ["Several instances", "one portal served together through Hazelcast"],
+            ].map(([t, d]) => (
+              <li key={t} className="rounded-lg border border-border p-3">
+                <span className="font-medium text-foreground">{t}</span>: {d}
+              </li>
+            ))}
+          </ul>
           <div className="grid gap-4 md:grid-cols-3">
             {[
               [

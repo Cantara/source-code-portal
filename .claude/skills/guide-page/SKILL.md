@@ -27,8 +27,9 @@ newcomer reads. The design note is `.claude/work/design/guide.md`.
 
 Never write a number or rule from memory. Read it where the pages take it, and keep the guide's words the portal's words:
 
-- Health levels and penalties: `internal/health/health.go` (`LevelOf`, `Assess`, `weight`). The page's `penalties` table copies
-  them; the level names come from `entities/health/health.tsx` (`levels`).
+- Health levels and penalties: `internal/health/health.go` (`LevelOf`, `Assess`, `weight`). The page's `findings` legend copies
+  when each is found and its points; the kinds, icons, severities and the score ring come from `entities/health/kinds.tsx`, the
+  level names from `entities/health/health.tsx` (`levels`).
 - Fleet map ranges: `web/src/entities/repo/health.ts` (`activities`, imported).
 - The kinds of work and their texts: `web/src/lib/preferences.ts` (`kinds`, imported); what is AI or automation:
   `internal/commits/kind.go` (`Classify`, the agents, the trailers, `botLike`) and sweeps in `internal/commits/model.go`.
@@ -61,7 +62,9 @@ now, so the pictures read the same whenever they are taken. Never take pictures 
 
 ## Design rules
 
-- One h1 (the hero), then numbered sections (`01` ...) with an h2 and a one-sentence lede; the contents chips list every section.
+- One h1 (the hero), then two parts (reading the portal, then running one), each of numbered sections (`01` ...) with an h2 and a
+  one-sentence lede; the contents (chips on a phone, the sticky "On this page" beside the page) list every section by part.
+- Pictures at their own size, never enlarged: a figure fits its picture. The table is taken with the side panel folded.
 - Explain in the reader's words, short sentences, no key names before section 8. A rule is said once, where it is used.
 - Every picture comes in both themes (`dark:hidden` / `hidden dark:block`), with a true alt text and a caption; its width and
   height come from `shots.json` so nothing shifts while it loads.

@@ -4,7 +4,7 @@ import Link from "next/link"
 import type { Schemas } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
-import { by, every, type Work } from "@/lib/preferences"
+import { by, every, qualifier, type Work } from "@/lib/preferences"
 import { Hint } from "@/shared/hint"
 import { Toggletip } from "@/shared/toggletip"
 import { levels } from "@/entities/health/health"
@@ -110,7 +110,7 @@ export function FleetMap({ groups, work = every, now }: { groups: Group[]; work?
                 </li>
               )}
             >
-              {a.level === "archived" ? "Archived on GitHub" : `Last change ${by(work)} ${short[a.level]}`}
+              {a.level === "archived" ? "Archived on GitHub" : `Last change${qualifier(work)} ${short[a.level]}`}
             </Hint>
           ))}
         </ul>

@@ -144,7 +144,7 @@ test("a fleet tile and a legend level name their signals at once, on hover or a 
   await page.keyboard.press("Escape")
   await expect(tip).toHaveCount(0)
   await fleet.getByRole("list", { name: "Activity of every repository" }).getByRole("listitem").first().focus()
-  await expect(tip).toContainText(/^Active.*Last change .* within 30 days$/)
+  await expect(tip).toContainText(/^Active.*Last change.* within 30 days$/)
 })
 
 test("the latest commits sit beside the products, fold away and widen, and the page remembers both", async ({

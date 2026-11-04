@@ -55,6 +55,9 @@ export const has = (w: Work, k: WorkKind) => w.includes(k)
 /** isEvery reports whether the lens counts every kind, the default: a label then needs no qualifier. */
 export const isEvery = (w: Work) => w.length === kinds.length
 
+/** qualifier is the lens as the end of a label, " by hand": nothing under the default, every kind, where the label needs none. */
+export const qualifier = (w: Work) => (isEvery(w) ? "" : ` ${by(w)}`)
+
 const named: Record<WorkKind, string> = { hand: "by hand", ai: "with AI", automation: "by automation" }
 
 /**

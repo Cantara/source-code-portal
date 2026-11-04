@@ -5,10 +5,18 @@ released portal (P-44, P-45).
 
 ## The guide page
 
-`/guide` ("Guide" in the header, the page titled *Getting started*) explains how to read the portal and how to run one, in eight
-numbered sections: signals not lists, the telemetry, the fleet map, a product card (its picture numbered row by row beside the
-explanations), health and findings (the levels and what each finding costs), the work that counts (the three kinds, Settings),
-tables and commits, and running a portal (access, groups, check, run, the options, the documents and the plugin).
+`/guide` ("Guide" in the header, the page titled *Getting started*) explains the portal in two parts, the readers'
+first and the operators' after, in ten numbered sections. **Part 1, Read the portal**: signals not lists, the telemetry, the fleet
+map, a product card (its picture numbered row by row beside the explanations), health and findings (the score rings of the three
+levels, the legend of the findings: each kind's icon on its severity's tile, what it means, when it is found and what it costs; the
+severities), the work that counts (the three kinds, Settings), tables and commits (the side panel, Commits, the repository page),
+and make it yours (every preference). **Part 2, Run a portal**: run your own (access, groups, check, run) and options and documents
+(the options, the documents and the plugin).
+
+- **Contents**: one `nav` "Guide" grouped by part; chips under the hero on a narrow screen, a sticky "On this page" list beside the
+  page from `lg`. The hero leads to both parts.
+- **Pictures at their own size**: an `<img>` has the capture's CSS pixels as its width and is never drawn larger (`max-w-full`), a
+  figure fits its picture; only a narrow screen makes them smaller. The prose keeps a reading width (`max-w-prose`).
 
 - **Pictures are screenshots of a made-up catalogue**: `cmd/scp` `TestServeForGuide` (organisation `acme`, products Payments,
   Identity and Developer tools, people named *Example*, dates relative to now) serves it on `GUIDE_SCP_ADDR`. Its cards show every
@@ -18,7 +26,7 @@ tables and commits, and running a portal (access, groups, check, run, the option
   where the product card's rows are; `publish.mjs` writes WebP (`cwebp -q 90`) to `web/public/guide/` and the sizes and callouts to
   `web/src/features/guide/shots.json`. The skill `guide-page` holds the procedure and the design rules.
 - **The facts are imported where they can be** (the fleet map's ranges from `entities/repo/health`, the kinds from
-  `lib/preferences`, the level names from `entities/health/health`); the penalty table copies `internal/health/health.go`.
+  `lib/preferences`, the level names from `entities/health/health`); the findings' kinds, icons and severities from `entities/health/kinds` (drawn without client JavaScript, as the cards draw them); when each is found and its points copy `internal/health/health.go`.
 - A server component without data or client JavaScript; each picture is two `<img>` (`dark:hidden`, `hidden dark:block`, lazy, sized
   from `shots.json`). The numbered card is one SVG holding both pictures and the numbers in a gutter, since the CSP forbids inline
   styles. The run commands name the running release (`SCP_VERSION`), `<version>` on a development build.

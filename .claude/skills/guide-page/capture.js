@@ -49,6 +49,8 @@ async (page) => {
       rows.findings = await at(li.locator(".border-t"))
       rows.shared = await at(li.locator(".border-t p").last())
     }
+    // The table at its full width: the latest commits' side panel folded away first.
+    await p.getByRole("button", { name: "Hide latest commits" }).click()
     await p.getByRole("button", { name: "table", exact: true }).click()
     await shot(p.getByRole("table"), "table")
     await p.goto(BASE + "/settings")
