@@ -3,6 +3,7 @@
 import type { Repo } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
 import { activities, activity, lastChange, type Activity, type Pulse } from "./health"
+import { issuesUrl, licence } from "./licence"
 import { cn } from "@/lib/cn"
 import { levels } from "@/entities/health/health"
 import { Hint } from "@/shared/hint"
@@ -47,7 +48,7 @@ export function ActivityLight({
  */
 export function HealthBadges({ repo, now, className }: { repo: Repo; now: number; className?: string }) {
   const level = activity(repo, now)
-  const licensed = repo.license !== "" && repo.license !== "NOASSERTION"
+  const lic = licence(repo.license)
   const health = repo.health
   return (
     <span className={cn("flex flex-wrap items-center gap-1", className)}>
@@ -107,23 +108,48 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
           )}
         />
       )}
+      {lic ? (
+        <Hint
+          heading={`Licence ${lic.spdx}`}
+          meta="its text at SPDX"
+          swatch="lvl-dormant"
+          render={(t) => (
+            <a
+              {...t}
+              href={lic.url}
+              rel="noreferrer nofollow"
+              aria-label={`${lic.short} licence, ${lic.spdx}`}
+              className="lvl-dormant chip hover:underline"
+            >
+              {lic.short}
+            </a>
+          )}
+        />
+      ) : (
+        <Hint
+          heading="No licence"
+          swatch="lvl-danger"
+          render={(t) => (
+            <span {...t} className="lvl-danger chip cursor-help">
+              no licence
+            </span>
+          )}
+        />
+      )}
       <Hint
-        heading={licensed ? `Licence ${repo.license}` : "No licence"}
-        swatch={licensed ? "lvl-dormant" : "lvl-danger"}
-        render={(t) => (
-          <span {...t} className={cn("chip cursor-help", licensed ? "lvl-dormant" : "lvl-danger")}>
-            {licensed ? repo.license : "no licence"}
-          </span>
-        )}
-      />
-      <Hint
-        heading={`${count(repo.openIssues)} open issues and pull requests`}
+        heading={`${count(repo.openIssues)} open ${repo.openIssues === 1 ? "issue or pull request" : "issues and pull requests"}`}
+        meta="on GitHub"
         swatch={repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant"}
         render={(t) => (
-          <span {...t} className={cn("chip cursor-help", repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant")}>
-            {count(repo.openIssues)}
-            <span className="sr-only"> open</span> issues
-          </span>
+          <a
+            {...t}
+            href={issuesUrl(repo.htmlUrl)}
+            rel="noreferrer"
+            aria-label={`${count(repo.openIssues)} ${repo.openIssues === 1 ? "issue" : "issues"} open on GitHub`}
+            className={cn("chip hover:underline", repo.openIssues > 20 ? "lvl-quiet" : "lvl-dormant")}
+          >
+            {count(repo.openIssues)} {repo.openIssues === 1 ? "issue" : "issues"}
+          </a>
         )}
       />
       {repo.language && <span className="chip">{repo.language}</span>}

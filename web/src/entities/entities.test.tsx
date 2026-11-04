@@ -80,4 +80,22 @@ describe("health", () => {
     expect(container.textContent).toMatch(/40 needs attention/)
     expect(container.textContent).toMatch(/No change for 3 years/)
   })
+
+  it("shows the licence short and links it and the issues to their pages", () => {
+    const { rerender } = render(<HealthBadges repo={repo("A", { openIssues: 1 })} now={now} />)
+    const apl = screen.getByRole("link", { name: "APL2 licence, Apache-2.0" })
+    expect(apl).toHaveTextContent("APL2")
+    expect(apl).toHaveAttribute("href", "https://spdx.org/licenses/Apache-2.0.html")
+    expect(screen.getByRole("link", { name: "1 issue open on GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/A/issues",
+    )
+    rerender(<HealthBadges repo={repo("A", { license: "GPL-3.0-or-later", openIssues: 4 })} now={now} />)
+    expect(screen.getByRole("link", { name: "GPL3 licence, GPL-3.0-or-later" })).toHaveTextContent("GPL3")
+    expect(screen.getByRole("link", { name: "4 issues open on GitHub" })).toBeInTheDocument()
+    rerender(<HealthBadges repo={repo("A", { license: "Zlib" })} now={now} />)
+    expect(screen.getByRole("link", { name: "Zlib licence, Zlib" })).toBeInTheDocument()
+    rerender(<HealthBadges repo={repo("A", { license: "NOASSERTION" })} now={now} />)
+    expect(screen.getByText("no licence")).toBeInTheDocument()
+  })
 })
