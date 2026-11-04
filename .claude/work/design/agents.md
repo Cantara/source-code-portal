@@ -1,6 +1,6 @@
 # Agents: one tool catalogue, MCP and WebMCP (W1 to W3)
 
-Status: W1 to W3 in progress (plan.md section 4), before E1. Binding order: ../plan.md > this note.
+Status: W1 to W3 built (plan.md section 4), before E1. Binding order: ../plan.md > this note.
 
 An AI agent asks the portal what a person would: which libraries have not released in a year, why a repository is at watch, who
 changed a product last. Today it reads pages (screenshots, HTML) or the JSON contract, both made for other readers. W1 to W3 give
@@ -84,7 +84,8 @@ feature `tools` (default `'self'`).
   does nothing and fetches nothing.
 - Registers the catalogue's tools from `/api/v1/tools` (`readOnlyHint`, `untrustedContentHint`); `execute` posts the call and returns
   `{source, text}`, `source` as an absolute URL of the portal.
-- Registers the page's own tools, re-registered as the reader moves:
+- Registers the page's own tools once; they read where the reader is when they run (the pathname through a ref), so moving between
+  pages fires no `toolchange`:
   - `current_page`: what the reader looks at: the page kind (dashboard, group, repository, document, commits, history, settings,
     guide, other), its path and title, and the repository (owner, name) or group id it is about; an agent resolves "this
     repository" with it.
@@ -100,7 +101,7 @@ feature `tools` (default `'self'`).
 - `internal/tools`: `Check` (table), `Frame` (a text cannot close its frame), `Call` (truncation, unknown tool).
 - `cmd/scp`: the tools API and `/mcp` (through the SDK's client on a loopback listener) as the public and with a token; the leak
   test calls every tool as the public for the private repository; an `Origin` of another site is refused.
-- `web`: Vitest for the registration (a fake `modelContext`: registered, unregistered on navigation, nothing without it); Playwright
+- `web`: Vitest for the registration (a fake `modelContext`: registered, unregistered when the shell goes, nothing without it); Playwright
   with a fake `document.modelContext` installed before the page loads: the tools register, `search_repositories` answers,
   `current_page` names the repository, `set_preferences` changes the lens, `open_page` refuses another origin.
 

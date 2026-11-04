@@ -27,7 +27,7 @@ const (
 
 const (
 	cspDefault      = "default-src 'none'; frame-ancestors 'none'; sandbox"
-	permissionsPage = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+	permissionsPage = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), tools=(self)"
 )
 
 var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)

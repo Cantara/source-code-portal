@@ -1,3 +1,4 @@
+import { WebMCP } from "@/features/agents/agents"
 import type { Metadata, Viewport } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
@@ -45,6 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body className="cosmos">
         <Providers now={renderedAt()}>
           <FocusOnNavigation />
+          <WebMCP />
           <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-2">
             Skip to content
           </a>

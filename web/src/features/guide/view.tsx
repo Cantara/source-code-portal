@@ -150,6 +150,7 @@ const parts = [
       { id: "run", title: "Run your own portal" },
       { id: "access", title: "Sign-in and private repositories" },
       { id: "packages", title: "Packages and private registries" },
+      { id: "agents", title: "Agents" },
       { id: "more", title: "Options and documents" },
     ],
   },
@@ -922,8 +923,42 @@ auth:
         </Section>
 
         <Section
-          id="more"
+          id="agents"
           n={13}
+          title="Agents"
+          lede="Your AI agents can ask the portal what you would: the same read-only tools its assistant uses, as the person who asks."
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            {[
+              [
+                "Claude Code and other MCP clients",
+                "Add the portal at /mcp. Without a token an agent sees what the public sees; with an access token it sees what the token's groups may see.",
+              ],
+              [
+                "Agents in the browser",
+                "In a browser with WebMCP, the portal's pages offer the same tools to the browser's agent, with your own sign-in, and tell it which page you are on.",
+              ],
+            ].map(([t, d]) => (
+              <div key={t} className="panel p-4">
+                <p className="text-sm font-semibold">{t}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{d}</p>
+              </div>
+            ))}
+          </div>
+          <Code label="Add the portal to Claude Code">{`claude mcp add --transport http scp https://portal.example.org/mcp
+# the private view, with an access token from auth.tokens:
+claude mcp add --transport http scp https://portal.example.org/mcp \
+  --header "Authorization: Bearer $SCP_TOKEN"`}</Code>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            The tools only read: search the repositories, read a group, a README or a document, the recent commits, a
+            repository&apos;s health and its packages. What they return is marked as text written in repositories, so an agent
+            treats it as data, not instructions. No language model runs on the portal for this: the agent brings its own.
+          </p>
+        </Section>
+
+        <Section
+          id="more"
+          n={14}
           title="Options and documents"
           lede="Add what you need when you need it; the documents cover every key."
         >
@@ -934,6 +969,7 @@ auth:
               ["Private repositories", "shown only to the groups you name"],
               ["Private registries", "the newest version of your packages from Nexus, Artifactory or GitHub Packages"],
               ["The assistant", "questions about the catalogue in plain language, with your model provider"],
+              ["Agents", "Claude Code and browser agents read the catalogue through /mcp and WebMCP"],
               ["The design mode", "administrators arrange the dashboard for everyone"],
               ["Several instances", "one portal served together through Hazelcast"],
             ].map(([t, d]) => (
