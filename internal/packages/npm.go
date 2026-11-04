@@ -71,7 +71,7 @@ func (n NPM) Latest(ctx context.Context, l *Lookup, c Coordinate) (*Version, err
 		public = []string{n.public()}
 	}
 	var failed error
-	for _, reg := range distinct(normalise(c.Publish), normalise(configured), public) {
+	for _, reg := range distinct(normalise(c.Publish), configured, public) {
 		v, err := n.document(ctx, l, reg, c.Name)
 		switch {
 		case errors.Is(err, ErrNotFound):

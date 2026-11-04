@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"container/list"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	gosync "sync"
 	"time"
 )
@@ -45,8 +47,9 @@ func (e *RegistryError) Unwrap() error { return e.Err }
 // Client reads registries for every job: a limit of requests in flight per host, a pause per host after it asked to slow down,
 // conditional requests from the answers it keeps, and a deadline per request. One slow or failing registry holds no other.
 type Client struct {
-	http *http.Client
-	now  func() time.Time
+	public, private *http.Client
+	registries      []Registry
+	now             func() time.Time
 
 	mu    gosync.Mutex
 	hosts map[string]*host
@@ -59,27 +62,60 @@ type host struct {
 	wait  time.Duration // the next pause without Retry-After
 }
 
-// NewClient reads registries through transport (egress.Guarded for the public ones).
-func NewClient(transport http.RoundTripper) *Client {
-	return &Client{
-		http: &http.Client{Transport: transport, CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return errors.New("too many redirects")
+// NewClient reads registries through public (egress.Guarded) and the configured registries on a private network through private.
+// A configured registry's credentials go only to its own URL: they are added to the requests under it and taken off a redirect
+// that leaves it.
+func NewClient(public, private http.RoundTripper, registries []Registry) *Client {
+	redirect := func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 3 {
+			return errors.New("too many redirects")
+		}
+		if r, ok := req.Context().Value(signedIn{}).(*Registry); ok && !under(req.URL.String(), r.URL) {
+			req.Header.Del("Authorization")
+			if r.Credential.Header != "" {
+				req.Header.Del(r.Credential.Header)
 			}
-			return nil
-		}},
-		now:   time.Now,
-		hosts: map[string]*host{},
-		cache: &cache{order: list.New(), byURL: map[string]*list.Element{}},
+		}
+		return nil
 	}
+	return &Client{
+		public:     &http.Client{Transport: public, CheckRedirect: redirect},
+		private:    &http.Client{Transport: private, CheckRedirect: redirect},
+		registries: registries,
+		now:        time.Now,
+		hosts:      map[string]*host{},
+		cache:      &cache{order: list.New(), byURL: map[string]*list.Element{}},
+	}
+}
+
+// signedIn is the context key of the registry whose credentials a request carries.
+type signedIn struct{}
+
+// under reports whether u is at or below the registry root (a URL ending in '/'): the same scheme, host and port, and the path below.
+func under(u, root string) bool { return strings.HasPrefix(u, root) || u+"/" == root }
+
+// registryOf is the configured registry u is under, the one with the longest root; nil for none.
+func (c *Client) registryOf(u string) *Registry {
+	var out *Registry
+	for i := range c.registries {
+		if r := &c.registries[i]; under(u, r.URL) && (out == nil || len(r.URL) > len(out.URL)) {
+			out = r
+		}
+	}
+	return out
 }
 
 // Get reads u with the Accept header accept and hands the body to read, which reads it as a stream. A 404 or 410 is ErrNotFound;
 // any other failure a *RegistryError.
 func (c *Client) Get(ctx context.Context, u, accept string, read func(io.Reader) error) error {
+	reg := c.registryOf(u)
 	pu, err := url.Parse(u)
-	if err != nil || pu.Scheme != "https" || pu.Host == "" {
+	if err != nil || pu.Host == "" || pu.Scheme != "https" && (pu.Scheme != "http" || reg == nil || !reg.Private) {
 		return &RegistryError{Host: "registry", Err: fmt.Errorf("%q is not an https URL", u)}
+	}
+	client := c.public
+	if reg != nil && reg.Private {
+		client = c.private
 	}
 	h := c.host(pu.Host)
 	if until := c.paused(h); !until.IsZero() {
@@ -100,6 +136,10 @@ func (c *Client) Get(ctx context.Context, u, accept string, read func(io.Reader)
 	}
 	req.Header.Set("Accept", accept)
 	req.Header.Set("User-Agent", "source-code-portal (package versions)")
+	if reg != nil && reg.Credential != nil && pu.Scheme == "https" {
+		reg.Credential.apply(req.Header)
+		req = req.WithContext(context.WithValue(req.Context(), signedIn{}, reg))
+	}
 	key := accept + " " + u
 	kept, ok := c.cache.get(key)
 	if ok {
@@ -110,7 +150,7 @@ func (c *Client) Get(ctx context.Context, u, accept string, read func(io.Reader)
 			req.Header.Set("If-Modified-Since", kept.modified)
 		}
 	}
-	resp, err := c.http.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return &RegistryError{Host: pu.Host, Err: err}
 	}
@@ -249,5 +289,24 @@ func (c *cache) put(key string, a answer) {
 		c.order.Remove(el)
 		delete(c.byURL, old.key)
 		c.size -= len(old.body)
+	}
+}
+
+// Credential signs a request in to its registry: Basic with User and Secret (the password or a token), else the token in Secret,
+// as a bearer token or in Header.
+type Credential struct {
+	User   string
+	Secret []byte
+	Header string
+}
+
+func (c *Credential) apply(h http.Header) {
+	switch {
+	case c.User != "":
+		h.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(c.User+":"+string(c.Secret))))
+	case c.Header != "":
+		h.Set(c.Header, string(c.Secret))
+	default:
+		h.Set("Authorization", "Bearer "+string(c.Secret))
 	}
 }

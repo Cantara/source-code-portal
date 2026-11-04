@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,6 +155,10 @@ func TestRefused(t *testing.T) {
 		"too many turns":          {env: map[string]string{"SCP_LLM_PROVIDER": "ollama", "SCP_ASSISTANT_ACCESS": "everyone", "SCP_ASSISTANT_MAX_TURNS": "99"}, want: "assistant.max_turns"},
 		"unknown ecosystem":       {file: "packages:\n  registries: [{id: x, ecosystem: cobol, url: 'https://r.example/'}]\n", want: "packages.registries[0].ecosystem"},
 		"registry over http":      {file: "packages:\n  registries: [{id: x, ecosystem: maven, url: 'http://r.example/'}]\n", want: "packages.registries[0].url"},
+		"credentials over http":   {file: "packages:\n  registries: [{id: x, ecosystem: npm, url: 'http://npm.lan/', network: private, auth: {token_file: /x}}]\n", want: "credentials are sent over https only"},
+		"basic and token":         {file: "packages:\n  registries: [{id: x, ecosystem: npm, url: 'https://npm.example/', auth: {user: ci, password_file: /x, token_file: /y}}]\n", want: "either user and password_file, or token_file"},
+		"user without password":   {file: "packages:\n  registries: [{id: x, ecosystem: npm, url: 'https://npm.example/', auth: {user: ci}}]\n", want: "go together"},
+		"bad network":             {file: "packages:\n  registries: [{id: x, ecosystem: npm, url: 'https://npm.example/', network: lan}]\n", want: "neither public nor private"},
 		"registry id twice":       {file: "packages:\n  registries: [{id: x, ecosystem: maven, url: 'https://a.example/'}, {id: x, ecosystem: npm, url: 'https://b.example/'}]\n", want: "used twice"},
 		"unknown group source":    {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
@@ -250,5 +255,28 @@ func TestAuth(t *testing.T) {
 	a := cfg.Auth
 	if !a.SignIn() || len(a.SessionKey.Reveal()) != 32 || len(a.Tokens[0].Secret.Reveal()) != 40 || a.OIDC.GroupsClaim != "groups" {
 		t.Errorf("auth = %+v", a)
+	}
+}
+
+func TestPackageRegistries(t *testing.T) {
+	token, password := write(t, "npm-token", "npm_secret\n"), write(t, "nexus-password", "s3cret")
+	cfg, _, err := Load(file(t, `packages:
+  public: false
+  registries:
+    - { id: lan, ecosystem: npm, url: 'http://npm.lan:4873/', network: private }
+    - { id: npm, ecosystem: npm, url: 'https://npm.example.org/', auth: { token_file: `+token+` } }
+    - { id: nexus, ecosystem: maven, url: 'https://nexus.example.org/repository/releases/', auth: { user: ci, password_file: `+password+` } }
+    - { id: art, ecosystem: pypi, url: 'https://art.example.org/api/pypi/simple/', auth: { token_file: `+token+`, header: X-JFrog-Art-Api } }
+`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := cfg.Packages.Registries
+	if cfg.Packages.Public || len(r) != 4 || r[0].Network != "private" || string(r[1].Auth.Token.Reveal()) != "npm_secret" ||
+		r[2].Auth.User != "ci" || string(r[2].Auth.Password.Reveal()) != "s3cret" || r[3].Auth.Header != "X-JFrog-Art-Api" {
+		t.Errorf("registries = %+v", r)
+	}
+	if strings.Contains(fmt.Sprintf("%v %+v", r, r), "secret") {
+		t.Error("a registry credential was printed")
 	}
 }

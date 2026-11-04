@@ -128,7 +128,7 @@ func (p PyPI) Latest(ctx context.Context, l *Lookup, c Coordinate) (*Version, er
 		roots = append(roots, p.public())
 	}
 	var failed error
-	for _, root := range distinct(normalise(roots)) {
+	for _, root := range distinct(roots) {
 		v, err := p.project(ctx, l, root, c.Name)
 		switch {
 		case errors.Is(err, ErrNotFound):

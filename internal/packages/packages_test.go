@@ -145,7 +145,7 @@ func TestMavenInheritsItsDistributionFromTheParent(t *testing.T) {
 	reg.set("/releases/no/example/parent/8/parent-8.pom", strings.ReplaceAll(parentPOM, "%REPO%", reg.URL))
 	reg.set("/releases/net/example/sso/TypeLib/maven-metadata.xml", typelibMetadata)
 	files := repo{"pom.xml": strings.ReplaceAll(childPOM, "%REPO%", reg.URL)}
-	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: public})
 
 	res, got := run(t, p, store.Item{})
 	if len(got.Packages) != 1 || got.Packages[0].Latest == nil {
@@ -173,13 +173,13 @@ func TestMavenFallsBackToCentral(t *testing.T) {
 		`<metadata><versioning><latest>2.0.0-SNAPSHOT</latest><versions><version>1.9</version><version>2.0.0-SNAPSHOT</version></versions></versioning></metadata>`)
 	files := repo{"pom.xml": `<project><groupId>org.example</groupId><artifactId>lib</artifactId></project>`,
 		"web/pom.xml": `<project><groupId>${g}</groupId><artifactId>skipped</artifactId></project>`}
-	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(central.Client().Transport), Public: true, Repo: public})
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(central.Client().Transport, nil, nil), Public: true, Repo: public})
 	_, got := run(t, p, store.Item{})
 	if len(got.Packages) != 1 || got.Packages[0].Latest == nil || got.Packages[0].Latest.Version != "1.9" {
 		t.Errorf("packages = %+v", got.Packages)
 	}
 	// Without the public registries nothing is asked.
-	p = New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(central.Client().Transport), Public: false, Repo: public})
+	p = New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: central.URL + "/maven2/"}}, Client: NewClient(central.Client().Transport, nil, nil), Public: false, Repo: public})
 	asked := len(central.ledger())
 	if _, got = run(t, p, store.Item{}); got.Packages[0].Latest != nil || len(central.ledger()) != asked {
 		t.Errorf("public off: %+v, asked %v", got.Packages, central.ledger()[asked:])
@@ -193,7 +193,7 @@ func TestNPM(t *testing.T) {
 		"time":{"created":"2020-01-01T00:00:00.000Z","2.4.0":"2025-01-01T00:00:00.000Z","2.4.1":"2025-05-05T10:00:00.000Z"}}`)
 	files := repo{"package.json": `{"name":"@acme/ui","version":"2.4.1"}`, "site/package.json": `{"name":"site","private":true}`,
 		"tests/package.json": `{"name":"fixture"}`}
-	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{NPM{Registry: reg.URL + "/"}}, Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{NPM{Registry: reg.URL + "/"}}, Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: public})
 	_, got := run(t, p, store.Item{})
 	if len(got.Packages) != 1 {
 		t.Fatalf("packages = %+v", got.Packages)
@@ -208,7 +208,7 @@ func TestAFailedLookupKeepsTheLastRelease(t *testing.T) {
 	reg := newRegistry(t)
 	reg.set("/maven2/org/example/lib/maven-metadata.xml", `<metadata><versioning><release>1.0</release></versioning></metadata>`)
 	files := repo{"pom.xml": `<project><groupId>org.example</groupId><artifactId>lib</artifactId></project>`}
-	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: public})
 	first, _ := run(t, p, store.Item{})
 	reg.mu.Lock()
 	reg.status["/maven2/org/example/lib/maven-metadata.xml"] = http.StatusBadGateway
@@ -233,7 +233,7 @@ func TestClientHoldsNoHostForAnother(t *testing.T) {
 	fast.set("/x", "ok")
 	transport := slow.Client().Transport.(*http.Transport).Clone()
 	transport.TLSClientConfig.InsecureSkipVerify = true // two loopback test servers with their own certificates
-	c := NewClient(transport)
+	c := NewClient(transport, nil, nil)
 	ctx, cancel := context.WithCancel(t.Context())
 	var wg gosync.WaitGroup
 	for range perHost + 2 { // every slot of the slow host taken, two more waiting
@@ -262,7 +262,7 @@ func TestClientPausesAHostThatAsksToSlowDown(t *testing.T) {
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer srv.Close()
-	c := NewClient(srv.Client().Transport)
+	c := NewClient(srv.Client().Transport, nil, nil)
 	read := func(io.Reader) error { return nil }
 	var re *RegistryError
 	if err := c.Get(t.Context(), srv.URL+"/a", "*/*", read); !errors.As(err, &re) || re.Status != http.StatusTooManyRequests {
@@ -282,7 +282,7 @@ func TestClientAsksConditionally(t *testing.T) {
 	reg := newRegistry(t)
 	reg.etag = true
 	reg.set("/doc", `{"a":1}`)
-	c := NewClient(reg.Client().Transport)
+	c := NewClient(reg.Client().Transport, nil, nil)
 	var bodies []string
 	for range 2 {
 		err := c.Get(t.Context(), reg.URL+"/doc", "application/json", func(r io.Reader) error {
@@ -316,7 +316,7 @@ func TestAPrivateRepositoryNeverNamesItsPackagesToAPublicRegistry(t *testing.T) 
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}, NPM{Registry: reg.URL + "/npm/"}},
-				Client: NewClient(reg.Client().Transport), Public: true, Repo: lookup})
+				Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: lookup})
 			_, got := run(t, p, store.Item{})
 			if len(got.Packages) != 2 || got.Packages[0].Latest == nil || got.Packages[0].Latest.Version != "2.0" || got.Packages[1].Latest != nil {
 				t.Errorf("packages = %+v", got.Packages)

@@ -382,6 +382,7 @@ func (c *Config) readSecrets() []string {
 	}
 	p = append(p, c.Auth.readSecrets(read)...)
 	c.LLM.readSecrets(read)
+	c.Packages.readSecrets(read)
 	slices.Sort(p)
 	return p
 }

@@ -77,7 +77,7 @@ func (g Go) Latest(ctx context.Context, l *Lookup, c Coordinate) (*Version, erro
 		proxies = append(proxies, g.proxy())
 	}
 	var failed error
-	for _, p := range distinct(normalise(proxies)) {
+	for _, p := range distinct(proxies) {
 		v, err := g.latest(ctx, l, p, c.Name)
 		switch {
 		case errors.Is(err, ErrNotFound):

@@ -25,7 +25,7 @@ func private(snapshot.RepoKey) (snapshot.Repo, bool) {
 
 func one(t *testing.T, gh GitHub, pr Provider, reg *registry, repo func(snapshot.RepoKey) (snapshot.Repo, bool)) Package {
 	t.Helper()
-	p := New(map[string]GitHub{"gh": gh}, Options{Providers: []Provider{pr}, Client: NewClient(reg.Client().Transport), Public: true, Repo: repo})
+	p := New(map[string]GitHub{"gh": gh}, Options{Providers: []Provider{pr}, Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: repo})
 	_, got := run(t, p, store.Item{})
 	if len(got.Packages) != 1 {
 		t.Fatalf("packages = %+v", got.Packages)
@@ -96,7 +96,7 @@ func TestCargoSparseIndex(t *testing.T) {
 	reg.set("/index/ac/me/acme-core", "{\"name\":\"acme-core\",\"vers\":\"1.0.0\"}\n{\"name\":\"acme-core\",\"vers\":\"1.1.0\",\"yanked\":true}\n"+
 		"{\"name\":\"acme-core\",\"vers\":\"1.0.1\"}\n")
 	files := repo{"Cargo.toml": "[package]\nname = \"acme-core\"\npublish = [\"acme\"]\n"}
-	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Cargo{API: reg.URL + "/"}}, Client: NewClient(reg.Client().Transport),
+	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Cargo{API: reg.URL + "/"}}, Client: NewClient(reg.Client().Transport, nil, nil),
 		Registries: []Registry{{ID: "acme", Ecosystem: "cargo", URL: reg.URL + "/index/"}}, Public: true, Repo: public})
 	_, got := run(t, p, store.Item{})
 	if v := got.Packages[0].Latest; v == nil || v.Version != "1.0.1" || v.Registry != "acme" {
@@ -146,7 +146,7 @@ func TestSwiftAndCocoaPods(t *testing.T) {
 	files := tagged{repo{"Package.swift": "// swift-tools-version:5.9\nlet package = Package(\n    name: \"AcmeKit\",\n    products: []\n)\n",
 		"AcmeKit.podspec": "Pod::Spec.new do |s|\n  s.name = 'AcmeKit'\n  s.version = '2.1.0'\nend\n"}, []string{"2.0.0", "2.1.0", "2.2.0-beta"}}
 	p := New(map[string]GitHub{"gh": files}, Options{Providers: []Provider{Swift{}, CocoaPods{Trunk: reg.URL + "/"}},
-		Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
+		Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: public})
 	_, got := run(t, p, store.Item{})
 	byEco := map[string]*Version{}
 	for _, pk := range got.Packages {
@@ -172,7 +172,7 @@ func TestGradle(t *testing.T) {
 	}
 	// A Gradle build that does not publish is no package.
 	p := New(map[string]GitHub{"gh": repo{"build.gradle": "plugins { id 'application' }\ngroup = 'org.acme'\n", "settings.gradle": "rootProject.name = 'app'\n"}},
-		Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport), Public: true, Repo: public})
+		Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: public})
 	if _, got := run(t, p, store.Item{}); len(got.Packages) != 0 {
 		t.Errorf("an application build is a package: %+v", got.Packages)
 	}

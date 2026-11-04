@@ -91,7 +91,7 @@ func (cg Cargo) Latest(ctx context.Context, l *Lookup, c Coordinate) (*Version, 
 		if len(named) > 0 && !named[r.ID] {
 			continue
 		}
-		v, err := cg.index(ctx, l, registryURL(r.URL), c.Name)
+		v, err := cg.index(ctx, l, r.URL, c.Name)
 		switch {
 		case errors.Is(err, ErrNotFound):
 			continue

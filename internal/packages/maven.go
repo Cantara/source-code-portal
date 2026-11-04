@@ -92,7 +92,7 @@ func (m Maven) Latest(ctx context.Context, l *Lookup, c Coordinate) (*Version, e
 		public = []string{m.central()}
 	}
 	var failed error
-	for _, repo := range distinct(normalise(publish), normalise(configured), public) {
+	for _, repo := range distinct(normalise(publish), configured, public) {
 		v, err := m.metadata(ctx, l, repo, group, artifact)
 		switch {
 		case errors.Is(err, ErrNotFound):
@@ -152,7 +152,7 @@ func (m Maven) parent(ctx context.Context, l *Lookup, gav string, resolve []stri
 		configured = append(configured, r.URL)
 	}
 	var failed error
-	for _, repo := range distinct(normalise(resolve), normalise(configured), []string{m.central()}) {
+	for _, repo := range distinct(normalise(resolve), configured, []string{m.central()}) {
 		var p *pom
 		err := l.Get(ctx, repo+groupPath(g)+"/"+a+"/"+v+"/"+a+"-"+v+".pom", mavenXMLAccept, func(r io.Reader) error {
 			var err error

@@ -51,9 +51,11 @@ type Version struct {
 
 // Registry is a configured registry.
 type Registry struct {
-	ID        string
-	Ecosystem string
-	URL       string
+	ID         string
+	Ecosystem  string
+	URL        string      // its root, ending in '/'
+	Private    bool        // on the operator's network: not through the public-only guard, http allowed
+	Credential *Credential // nil: none
 }
 
 // Lookup is what a provider reads registries through during one job: the shared client, the configured registries, whether the

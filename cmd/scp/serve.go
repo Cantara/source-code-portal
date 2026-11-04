@@ -495,9 +495,9 @@ func robots(closed bool, open http.Handler) http.Handler {
 
 // newPackages is the packages feature with its providers, in the order a repository's packages are read.
 func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, repo func(snapshot.RepoKey) (snapshot.Repo, bool)) *packages.Packages {
-	transport := d.registries
-	if transport == nil {
-		transport = egress.Guarded(10 * time.Second)
+	public, private := d.registries, d.registries
+	if public == nil {
+		public, private = egress.Guarded(10*time.Second), http.DefaultTransport
 	}
 	providers := []packages.Provider{packages.Maven{Central: d.public["maven"]}, packages.NPM{Registry: d.public["npm"]},
 		packages.PyPI{Simple: d.public["pypi"]}, packages.Cargo{API: d.public["cargo"]}, packages.Go{Proxy: d.public["go"]},
@@ -508,8 +508,15 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, 
 		if !strings.HasSuffix(u, "/") {
 			u += "/"
 		}
-		registries = append(registries, packages.Registry{ID: r.ID, Ecosystem: r.Ecosystem, URL: u})
+		reg := packages.Registry{ID: r.ID, Ecosystem: r.Ecosystem, URL: u, Private: r.Network == "private"}
+		switch a := r.Auth; {
+		case a.User != "":
+			reg.Credential = &packages.Credential{User: a.User, Secret: a.Password.Reveal()}
+		case a.TokenFile != "":
+			reg.Credential = &packages.Credential{Secret: a.Token.Reveal(), Header: a.Header}
+		}
+		registries = append(registries, reg)
 	}
-	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(transport), Registries: registries,
+	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(public, private, registries), Registries: registries,
 		Public: cfg.Public, Repo: repo})
 }
