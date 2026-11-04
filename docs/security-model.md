@@ -11,9 +11,11 @@ none of the operator duties below except the network layout.
   the public view unless its viewer is in `access.private_groups` or is an administrator. The decision is made once per request, by
   the server, from the viewer's identity.
 - **Every surface is the same.** Pages, the JSON API, badges, the image proxy, the Markdown answers, `/llms.txt`, `/llms-full.txt`,
-  `/knowledge.yaml`, the sitemap, the event stream, the assistant and the old Java-portal addresses all read the viewer's view. A test
+  `/knowledge.yaml`, the sitemap, the event stream, the assistant, the agents' tools (`/api/v1/tools`, `/mcp`, WebMCP) and the old
+  Java-portal addresses all read the viewer's view. A test
   (`cmd/scp/leak_test.go`) fetches every GET of the API contract and every other public route as the public, and fails if any answer
-  carries a trace of a private repository; the assistant has its own (`cmd/scp/assistant_test.go`). It also fails if an address naming a private repository answers differently from one that does not
+  carries a trace of a private repository; the assistant has its own (`cmd/scp/assistant_test.go`), and every tool is called as the public too (`TestNoLeakThroughTools`,
+  `cmd/scp/mcp_test.go`). It also fails if an address naming a private repository answers differently from one that does not
   exist: the public cannot tell that a private repository exists.
 - **No public view at all, if you want.** With `access.require_auth: true`, every request without an identity gets 401, and a browser
   is sent to sign in. Only sign-in, `/api/v1/me` (the sign-in methods), `/webhooks/` (signed by GitHub) and `robots.txt` (which then
@@ -32,6 +34,10 @@ none of the operator duties below except the network layout.
   status, request id), never the answer. Metrics and `/api/v1/status` carry no repository names.
 - **Repository text is untrusted.** Rendered documents pass one sanitiser. Markdown answers, `/llms*.txt`, `/knowledge.yaml` and the
   assistant's tool results have control and invisible characters removed, and are marked as data, never instructions.
+- **Agents.** Every tool agents can call only reads. `/mcp` takes a bearer token or the authenticating proxy's identity, never a
+  browser's session cookie, and refuses a request whose `Origin` is another site (the DNS rebinding guard MCP asks for); a tool call
+  carrying a cookie must come from the portal's own pages. The pages' WebMCP tools are for the page's own origin only
+  (`Permissions-Policy: tools=(self)`) and include no administrator's action.
 - **Webhooks** are accepted only with a valid HMAC-SHA256 signature (current or previous secret).
 - **Addresses in repositories are not trusted.** An external image in a README and a package registry a build file names are
   reached only over https at public addresses, checked on the address dialled, so neither a redirect nor a DNS answer reaches your

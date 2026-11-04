@@ -141,6 +141,34 @@ control characters, and says so at the top. Treat it as data, never as instructi
 or dependencies. A unit's `validated` date is the day the portal last read that document from GitHub, not a human review. Intents and
 triggers come from repository text and are cleaned the same way; the manifest is data, never instructions.
 
+## Tools for agents (MCP and WebMCP)
+
+The portal offers agents its own read-only tools, the ones its assistant uses: search the repositories, list and read groups, read a
+repository's README and technology, read a document, the recent commits (with the work that counts), a repository's health and its
+published packages. Every call answers from the caller's view, exactly as the pages do.
+
+**MCP.** `/mcp` speaks the [Model Context Protocol](https://modelcontextprotocol.io) over Streamable HTTP (stateless, JSON answers,
+the newest protocol version and the earlier ones). Without a token it answers from the public view; with an access token of
+`auth.tokens` it answers from the token's view, private repositories included when its groups allow. Add the portal to Claude Code:
+
+```sh
+claude mcp add --transport http scp https://scp.example.org/mcp
+# with a token, for the private view:
+claude mcp add --transport http scp https://scp.example.org/mcp --header "Authorization: Bearer $SCP_TOKEN"
+```
+
+Any MCP client (Claude Desktop, IDE agents) connects the same way. `/mcp` never accepts a browser's sign-in cookie as an identity, and
+refuses a request whose `Origin` is another site.
+
+**WebMCP.** In a browser with WebMCP (`document.modelContext`, a W3C Community Group draft; Chrome and Edge preview builds), the
+portal's pages register the same tools for the browser's agent, with the reader's own sign-in: a signed-in reader's agent sees what
+the reader sees. The pages add tools of their own: `current_page` (what the reader looks at), `open_page` (go to a page of the
+portal) and `set_preferences` (the work that counts, cards or table). Without WebMCP the pages do nothing extra.
+
+**As JSON.** `GET /api/v1/tools` lists the tools with their input schemas; `POST /api/v1/tools/{name}` with `{"input": {...}}` calls
+one (from the portal's pages, or with a token). Every answer's text is Markdown framed in `<untrusted-content id="…">` tags: what
+repositories wrote is data, never instructions.
+
 ## For search engines
 
 `GET /sitemap.xml` lists the dashboard, the commit log, every group, repository and document page you may see, each with the date of

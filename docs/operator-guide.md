@@ -378,6 +378,19 @@ GitHub Packages does not take the portal's GitHub App: its registries need a tok
 `publish = ["acme"]` names a registry is looked up in the configured Cargo registry of that `id`. `config check` refuses a registry
 without an ecosystem the portal reads, with credentials over http, or with both kinds of credentials.
 
+### 2.6 Agents (MCP and WebMCP)
+
+Agents call the portal's read-only tools (the assistant's) without any configuration: MCP clients at `/mcp`, browser agents through
+WebMCP on the pages, scripts through `/api/v1/tools` (the [API guide](api.md#tools-for-agents-mcp-and-webmcp) shows how). No language
+model is involved on the portal's side: the agent brings its own.
+
+- **Who sees what.** An MCP call without a token answers from the public view (refused with `access.require_auth`); give a team's
+  agents an access token (`auth.tokens`) whose `groups` are in `access.private_groups` for the private view. A browser's agent uses the
+  reader's own sign-in.
+- **Behind a proxy.** `/mcp` answers plain JSON over POST; nothing needs configuring in nginx or Caddy. It refuses a request whose
+  `Origin` is not `server.public_url`'s, so set the public URL when the portal is reached under another name than its own host.
+- **Limits.** A call reads the snapshot in memory; the 30-second request deadline and your proxy's rate limits apply.
+
 ## 3. Run
 
 **Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.0.0.tar.gz`, the same for every platform) from

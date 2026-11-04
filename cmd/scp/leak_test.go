@@ -39,6 +39,13 @@ var staff = []string{"X-Forwarded-User", "ann", "X-Forwarded-Groups", "staff"} /
 // with extra appended to its configuration, and waits until a staff member sees everything.
 func privatePortal(t *testing.T, extra string) fetch {
 	t.Helper()
+	get, _ := privatePortalAt(t, extra)
+	return get
+}
+
+// privatePortalAt is privatePortal with the portal's base URL.
+func privatePortalAt(t *testing.T, extra string) (fetch, string) {
+	t.Helper()
 	gh := githubtest.New(t)
 	gh.AddToken("ghp_test")
 	open := gh.AddRepo("acme", gogh.Repository{Name: new("open"), Visibility: new("public"), Description: new("open tools")})
@@ -126,7 +133,7 @@ catalog:
 		_, mf, _ := get("/api/v1/repos/acme/open/manifests", staff...)
 		if json.Unmarshal([]byte(b), &d) == nil && d.Freshness.Fresh == 2 && len(d.Latest) == 2 && strings.Contains(docs, "guide") &&
 			strings.Contains(mf, "zq-hidden") {
-			return get
+			return get, base
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("not loaded within 10s: %s\n%s\n%s", b, docs, mf)

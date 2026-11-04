@@ -129,3 +129,15 @@ cosign verify ghcr.io/cantara/source-code-portal:<version> \
   --certificate-identity https://github.com/Cantara/source-code-portal/.github/workflows/release.yml@refs/tags/v<version> \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
+
+## Agents (MCP)
+
+`/mcp` serves the portal's read-only tools to MCP clients; nothing to configure. Check it after a deploy and give a team's agents a
+token from `auth.tokens` (its `groups` in `access.private_groups` for the private view):
+
+```sh
+curl -s https://portal.example.org/api/v1/tools | head -c 300      # the tools agents get
+claude mcp add --transport http scp https://portal.example.org/mcp --header "Authorization: Bearer $SCP_TOKEN"
+```
+
+`/mcp` refuses an `Origin` other than `server.public_url`'s: set the public URL when the proxy serves another host name.

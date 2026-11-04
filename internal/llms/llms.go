@@ -287,7 +287,8 @@ func (l *LLMs) buildIndex(s *snapshot.Snapshot) []byte {
 		repos.WriteString(l.repoLine(s.Repos[k]))
 	}
 	optional := fmt.Sprintf("\n## Optional\n\n- [llms-full.txt](%s): every README in one file\n- [OpenAPI](%s): the JSON API contract\n"+
-		"- [Repositories](%s): every repository as JSON\n", l.url("/llms-full.txt"), l.url("/api/v1/openapi.yaml"), l.url("/api/v1/repos"))
+		"- [Repositories](%s): every repository as JSON\n- [MCP](%s): the portal's read-only tools for agents (Model Context Protocol, Streamable HTTP; "+
+		"listed as JSON at %s)\n", l.url("/llms-full.txt"), l.url("/api/v1/openapi.yaml"), l.url("/api/v1/repos"), l.url("/mcp"), l.url("/api/v1/tools"))
 	if b.Len()+repos.Len()+len(optional) <= maxIndexBytes {
 		b.Write(repos.Bytes())
 	}

@@ -34,6 +34,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/layout"
 	"github.com/cantara/source-code-portal/internal/llms"
 	"github.com/cantara/source-code-portal/internal/manifests"
+	"github.com/cantara/source-code-portal/internal/mcpserver"
 	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -282,6 +283,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, ask.Routes()...)
 	agents := tools.API{Catalogue: catalogue, PublicURL: cfg.Server.PublicURL}
 	routes = append(routes, agents.Routes()...)
+	routes = append(routes, mcpserver.Routes(mcpserver.Options{Catalogue: catalogue, Version: version, PublicURL: cfg.Server.PublicURL,
+		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view}, layout.API{Current: view, Store: s.layouts},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents}
