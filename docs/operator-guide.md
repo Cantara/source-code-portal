@@ -368,9 +368,10 @@ packages:
     # NuGet (Nexus, Artifactory, GitHub Packages): the feed's root, where its index.json is
     - { id: nuget, ecosystem: nuget, url: https://nexus.example.org/repository/nuget-hosted/,
         auth: { user: scp-reader, password_file: /run/secrets/nexus-password } }
-    # Gemfury, Gemstash or Artifactory; Private Packagist or Satis
-    - { id: gems, ecosystem: rubygems, url: https://gems.example.org/, auth: { token_file: /run/secrets/gems-token } }
-    - { id: php, ecosystem: packagist, url: https://repo.packagist.com/example/, auth: { token_file: /run/secrets/packagist-token } }
+    # A gem server (Artifactory, Nexus, Gemstash) with a user and its password
+    - { id: gems, ecosystem: rubygems, url: https://gems.example.org/, auth: { user: scp-reader, password_file: /run/secrets/gems-password } }
+    # Private Packagist: Basic with the user "token" and the token as its password
+    - { id: php, ecosystem: packagist, url: https://repo.packagist.com/example/, auth: { user: token, password_file: /run/secrets/packagist-token } }
 ```
 
 GitHub Packages does not take the portal's GitHub App: its registries need a token with `read:packages`. A Cargo crate whose
