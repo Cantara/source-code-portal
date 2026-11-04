@@ -6,13 +6,13 @@ Guidance for Claude Code in this repository. The coding instructions are importe
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`, public)
 is Source Code Portal (SCP) in Go with a server-rendered Next.js web UI. The first release is `v2.0.0`, which the owner's team tags;
-**S1 (sign-in and admin)**, **A1 (assistant)**, **M13 (search engines)** and **H1 (hardened private instance)** are built; **L1 (landing page of signals)**, **L2 (layouts and design mode)**, **L3 (AI-assisted commits)**, **L4 (the work that counts and Settings)** and **G1 (the guide page and the operators' plugin)** are built; **E1 to E4 (embedding in other sites, `design/embed.md`)** are queued after the next release. Coding instructions for the repository itself are in
+**S1 (sign-in and admin)**, **A1 (assistant)**, **M13 (search engines)** and **H1 (hardened private instance)** are built; **L1 (landing page of signals)**, **L2 (layouts and design mode)**, **L3 (AI-assisted commits)**, **L4 (the work that counts and Settings)** and **G1 (the guide page and the operators' plugin)** are built; **R1 (published packages, `design/packages.md`)** is in progress, R2 to R4 follow; **E1 to E4 (embedding in other sites, `design/embed.md`)** are queued after the next release. Coding instructions for the repository itself are in
 the root `AGENTS.md` (imported above).
 
 - **`.claude/work/plan.md` is the binding plan**: what SCP is, architecture and rules, stack, the work in progress. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: one note per area, as built (GitHub, sync/snapshot/store, catalog, content, manifests, access, cluster,
-  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13), `hardening.md` (H1), `layout.md` (L1 to L4), `guide.md` (G1) and `embed.md` (E1 to E4, queued). Binding below `plan.md`.
+  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13), `hardening.md` (H1), `layout.md` (L1 to L4), `guide.md` (G1), `packages.md` (R1 to R4) and `embed.md` (E1 to E4, queued). Binding below `plan.md`.
 - `.claude/work/decisions.md`: the decisions in force.
 - `.claude/skills/guide-page/`: the skill that keeps `/guide` current: the demo catalogue, the screenshots (Playwright MCP,
   `capture.js`, `publish.mjs`) and the design rules.
