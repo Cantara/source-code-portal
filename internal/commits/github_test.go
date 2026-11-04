@@ -44,6 +44,42 @@ func TestFromGitHub(t *testing.T) {
 	}
 }
 
+// A page of squashed pull requests, each message tens of kilobytes, streams: each commit keeps its message's start and its closing
+// trailers, so the commit is still known as made with an AI.
+func TestFromGitHubReadsLongMessages(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("squashed")})
+	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	long := "Squash a large pull request (#1)\n\n" + strings.Repeat("- one of many changes, described at length\n", 2000) +
+		"\nCo-authored-by: Claude <noreply@anthropic.com>"
+	cs := make([]githubtest.Commit, 100)
+	for i := range cs {
+		cs[i] = githubtest.Commit{SHA: fmt.Sprintf("%040x", i+1), Message: long, AuthorName: "Ann", AuthorLogin: "ann", Date: at.Add(-time.Duration(i) * time.Hour)}
+	}
+	srv.SetCommits(id, cs...) // a page of about 9 MB
+	srv.AddToken("ghp_test")
+	c, err := github.New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, TokenFile: "x",
+		Token: config.NewSecret([]byte("ghp_test"))}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := FromGitHub(c.Source("gh")).Commits(t.Context(), "acme", "squashed", "", 1)
+	if err != nil || len(got) != 100 {
+		t.Fatalf("commits = %d, %v", len(got), err)
+	}
+	m := got[0].Message
+	if len(m) > maxMessageHead+maxMessageTail+16 || !strings.HasPrefix(m, "Squash a large pull request (#1)") ||
+		!strings.Contains(m, "\n\n…\n\n") || !strings.HasSuffix(m, "Co-authored-by: Claude <noreply@anthropic.com>") {
+		t.Fatalf("message: %d bytes, %q … %q", len(m), m[:40], m[len(m)-60:])
+	}
+	if got[99].AuthorLogin != "ann" || len(got[99].Parents) != 0 || len(got[0].Parents) != 1 || !got[0].Date.Equal(at) {
+		t.Errorf("fields = %+v", got[99])
+	}
+	if origin, ai := Classify(&Commit{Subject: "Squash", Body: body(m), AuthorName: "Ann", AuthorLogin: "ann"}); origin != OriginAssisted || ai != "Claude" {
+		t.Errorf("classified %v %q, want assisted by Claude", origin, ai)
+	}
+}
+
 // TestHistory is acceptance criterion 1 of the commit navigator: what a cold, a warm and a pushed run read and keep.
 func TestHistory(t *testing.T) {
 	srv := githubtest.New(t)

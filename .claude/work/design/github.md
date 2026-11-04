@@ -21,6 +21,11 @@ webhook events the portal reacts to and the `sync` event each becomes.
   `open_issues_count`.
 - Blob SHAs from the tree are the persisted validators: a blob is fetched only when its SHA changed.
 - ETags live in memory, keyed by the hashed `Authorization` value: within one token lifetime an authorised 304 costs no rate limit.
+  A response of at most 1 MiB is kept for its ETag; a larger one passes through whole, read as it streams, and is not kept.
+- No repository's content fails a read by its size. The commits list is read as a stream (`internal/jsonstream`), not decoded
+  whole: each commit keeps bounded fields (16 KiB of a message's start and 8 KiB of its end, where the trailers are; 1 KiB of a
+  name, login, address, date or SHA; 64 parents), and everything else is skipped as it is read, so a page costs a few megabytes
+  of memory whatever its size. A body that breaks off mid-page is transient; one that is not JSON is `malformed`.
 - One go-github client per token or App installation, so each installation keeps its own rate bucket.
 - API version `2022-11-28`, sent on every request (`X-GitHub-Api-Version`), on github.com and GHES alike.
 - The issue count is `open_issues_count`, labelled "open issues and PRs": it includes pull requests and comes with the listing.
@@ -61,7 +66,7 @@ methods here; a call only one feature makes lives in that feature over `REST` an
 | repos of another user | `Repositories.ListByUser` (`type=owner`, sorted) | token | `GET /users/{u}/repos` |
 | account kind | `Users.Get` | token | `GET /users/{u}`, `GET /user` |
 | one repo | `Repositories.Get` | either | `GET /repos/{o}/{r}` |
-| commits | `Repositories.ListCommits` (`PerPage: n`, default branch) | either | `GET /repos/{o}/{r}/commits` |
+| commits | `BareDo` on the client's request, read by `jsonstream` (`per_page=100`, `page`, `sha`) | either | `GET /repos/{o}/{r}/commits` |
 | tree | `Git.GetTree(ref, recursive)` | either | `GET /repos/{o}/{r}/git/trees/{ref}` |
 | README, docs, `scp.yaml`, manifests, images | `Git.GetBlobRaw` | either | `GET /repos/{o}/{r}/git/blobs/{sha}` |
 | release | `Repositories.GetLatestRelease` | either | `GET /repos/{o}/{r}/releases/latest` |
