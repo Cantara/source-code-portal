@@ -3,6 +3,7 @@ package manifests
 import (
 	"context"
 	"log/slog"
+	"path"
 	"slices"
 	"strings"
 	"testing"
@@ -24,13 +25,15 @@ type repo struct {
 	blobs int
 }
 
-func (r *repo) Tree(context.Context, string, string, string, bool) ([]github.TreeEntry, error) {
+func (r *repo) Files(_ context.Context, _, _ string, keep func(string) bool) ([]github.TreeEntry, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
 	var out []github.TreeEntry
 	for p, c := range r.files {
-		out = append(out, github.TreeEntry{Path: p, Type: "blob", SHA: "blob:" + c, Size: int64(len(c))})
+		if dir := path.Dir(p); dir == "." || keep(dir) {
+			out = append(out, github.TreeEntry{Path: p, Type: "blob", SHA: "blob:" + c, Size: int64(len(c))})
+		}
 	}
 	return out, nil
 }

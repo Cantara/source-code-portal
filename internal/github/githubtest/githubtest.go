@@ -47,6 +47,7 @@ type Server struct {
 	tags     map[int64]map[string]string   // by repository id: tag name -> commit SHA
 	files    map[int64]map[string]string   // by repository id: path -> content
 	releases map[int64]*gh.RepositoryRelease
+	treeMax  int // entries of a recursive tree before it is truncated, as GitHub's 100,000; 0: never
 	nextID   int64
 	used     map[string]int // credential -> requests charged this window
 	reset    time.Time
@@ -571,6 +572,14 @@ func (s *Server) SetFile(id int64, path, content string) {
 	s.files[id][path] = content
 }
 
+// SetTreeLimit makes a recursive tree of more than n entries come truncated, its first n entries only, as GitHub truncates one past
+// 100,000 entries or 7 MB; 0 lifts the limit.
+func (s *Server) SetTreeLimit(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.treeMax = n
+}
+
 // SetRelease sets the latest release of the repository with id; an empty tag removes it.
 func (s *Server) SetRelease(id int64, tag, name string, published time.Time) {
 	s.mu.Lock()
@@ -850,6 +859,9 @@ func (s *Server) getTree(w http.ResponseWriter, req *http.Request) {
 		}
 		if found != nil && req.URL.Query().Get("recursive") != "" {
 			found = s.flatten(id, foundDir, found)
+			if s.treeMax > 0 && len(found.Entries) > s.treeMax {
+				found.Entries, found.Truncated = found.Entries[:s.treeMax], new(true)
+			}
 		}
 	}
 	s.mu.Unlock()

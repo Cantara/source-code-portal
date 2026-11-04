@@ -25,7 +25,8 @@ webhook events the portal reacts to and the `sync` event each becomes.
 - No repository's content fails a read by its size. The commits list is read as a stream (`internal/jsonstream`), not decoded
   whole: each commit keeps bounded fields (16 KiB of a message's start and 8 KiB of its end, where the trailers are; 1 KiB of a
   name, login, address, date or SHA; 64 parents), and everything else is skipped as it is read, so a page costs a few megabytes
-  of memory whatever its size. A body that breaks off mid-page is transient; one that is not JSON is `malformed`.
+  of memory whatever its size. A body that breaks off mid-page is transient; one that is not JSON is `malformed`. Trees stream the
+  same way (path, type, SHA, size and `truncated`); `Files` keeps only the blobs of the directories its caller searches.
 - One go-github client per token or App installation, so each installation keeps its own rate bucket.
 - API version `2022-11-28`, sent on every request (`X-GitHub-Api-Version`), on github.com and GHES alike.
 - The issue count is `open_issues_count`, labelled "open issues and PRs": it includes pull requests and comes with the listing.
@@ -48,6 +49,7 @@ func (s *Source) RefreshInstallations(ctx context.Context) error                
 func (s *Source) ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error)    // complete listing, newest push first, or an error
 func (s *Source) Repo(ctx context.Context, owner, name string) (snapshot.Repo, error)
 func (s *Source) Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]TreeEntry, error) // "HEAD" = default branch
+func (s *Source) Files(ctx context.Context, owner, name string, keep func(dir string) bool) ([]TreeEntry, error) // blobs in the kept directories
 func (s *Source) Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
 func (s *Source) WebURL() string // https://github.com/ or the GHES host
 func (s *Source) REST(ctx context.Context, owner string) (*gh.Client, error) // owner's client, for calls only one feature makes
@@ -67,7 +69,7 @@ methods here; a call only one feature makes lives in that feature over `REST` an
 | account kind | `Users.Get` | token | `GET /users/{u}`, `GET /user` |
 | one repo | `Repositories.Get` | either | `GET /repos/{o}/{r}` |
 | commits | `BareDo` on the client's request, read by `jsonstream` (`per_page=100`, `page`, `sha`) | either | `GET /repos/{o}/{r}/commits` |
-| tree | `Git.GetTree(ref, recursive)` | either | `GET /repos/{o}/{r}/git/trees/{ref}` |
+| tree | `BareDo`, read by `jsonstream` (`recursive=1`) | either | `GET /repos/{o}/{r}/git/trees/{ref}` |
 | README, docs, `scp.yaml`, manifests, images | `Git.GetBlobRaw` | either | `GET /repos/{o}/{r}/git/blobs/{sha}` |
 | release | `Repositories.GetLatestRelease` | either | `GET /repos/{o}/{r}/releases/latest` |
 
@@ -110,7 +112,8 @@ API version header, conditional cache, rate observer), then `http.Transport`. `s
    - `docs` (content.md): the `HEAD` tree, the `.github` tree and the recursive `docs` tree; `Blob` for the README and documents whose
      SHA changed; recursive trees of at most 5 other top-level directories that hold referenced images.
    - `catalog.descriptor` (catalog.md): the `HEAD` tree (and `.github` when needed), `Blob` when the descriptor SHA changed.
-   - `manifests` (manifests.md): one recursive `HEAD` tree, `Blob` for manifests whose SHA changed.
+   - `manifests` (manifests.md): `Files`: one recursive `HEAD` tree, or, when GitHub truncated it, the kept directories one by one
+     (at most 100 calls); `Blob` for manifests whose SHA changed.
    - `badges.release` (content.md): `Repositories.GetLatestRelease`, in `badges`; 404 means "no release".
 9. **Webhook events handled** (verified and deduplicated first, `http-api.md` behaviour 4; `webhook.Normalise` maps them, the `cmd/scp`
    sink calls `Notify` for a repository or `NotifySource` for an owner):

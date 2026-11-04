@@ -367,21 +367,11 @@ type TreeEntry struct {
 }
 
 // Tree returns the entries of one tree; recursive includes every entry below it, with paths relative to it. ref is a tree SHA or a
-// branch name; "HEAD" is the default branch.
+// branch name; "HEAD" is the default branch. The answer streams (readTree); a recursive tree GitHub truncated holds what it sent,
+// and Files is the reader for a search of a whole repository.
 func (s *Source) Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]TreeEntry, error) {
-	c, err := s.client(ctx, owner)
-	if err != nil {
-		return nil, err
-	}
-	t, resp, err := c.Git.GetTree(ctx, owner, name, ref, recursive)
-	if err != nil {
-		return nil, classify(resp, err)
-	}
-	out := make([]TreeEntry, 0, len(t.Entries))
-	for _, e := range t.Entries {
-		out = append(out, TreeEntry{Path: e.GetPath(), Type: e.GetType(), SHA: e.GetSHA(), Size: int64(e.GetSize())})
-	}
-	return out, nil
+	entries, _, err := s.readTree(ctx, owner, name, ref, recursive, func(TreeEntry) bool { return true })
+	return entries, err
 }
 
 // WebURL is the web host of the source with a trailing slash: https://github.com/ for github.com, the GHES host otherwise.

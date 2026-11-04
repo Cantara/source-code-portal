@@ -10,8 +10,10 @@ Status: as built. Binding order: ../plan.md > this note.
 
 ## Decisions
 - Declared dependencies only: no lockfiles, no registry lookups, no build tools run. The manifest says what the repository asks for.
-- One recursive tree call on `HEAD` finds the files (with ETag, so an unchanged tree costs nothing); a blob is fetched only when its SHA
-  changed or the parser version moved. The tree's truncation flag is ignored, as in docs: very large trees lose their deepest files.
+- One recursive tree call on `HEAD` finds the files (`github.Files`, with ETag, so an unchanged tree costs nothing); a blob is fetched
+  only when its SHA changed or the parser version moved. The tree streams and only the files of the searched directories are kept, so
+  a repository of any size costs only what is kept. A tree GitHub truncated (past 100,000 entries or 7 MB) is read again directory by
+  directory, the searched ones only, shallow first, at most 100 calls: a giant repository keeps its manifests.
 - Discovery: base names `go.mod`, `package.json`, `pom.xml`; at most 4 directory levels; directories `node_modules`, `vendor`, `testdata`,
   `test`, `tests`, `example`, `examples`, `fixtures` and any starting with `.` are skipped; shallow paths first, then by path; at most 30
   files; files over 512 KiB are listed with a `too-large` problem and not fetched.

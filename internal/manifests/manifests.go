@@ -41,9 +41,10 @@ var ecosystems = map[string]string{"go.mod": "go", "package.json": "npm", "pom.x
 var skipped = map[string]bool{"node_modules": true, "vendor": true, "testdata": true, "test": true, "tests": true, //nolint:gochecknoglobals // fixed table
 	"example": true, "examples": true, "fixtures": true}
 
-// GitHub reads trees and blobs of one source; *github.Source implements it.
+// GitHub reads files and blobs of one source; *github.Source implements it.
 type GitHub interface {
-	Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]github.TreeEntry, error)
+	// Files returns the blobs of the default branch in the root and the directories keep admits.
+	Files(ctx context.Context, owner, name string, keep func(dir string) bool) ([]github.TreeEntry, error)
 	Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
 }
 
@@ -86,7 +87,7 @@ func (m *Manifests) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		return sync.Result{}, errors.New("manifests: unknown source " + j.Source)
 	}
 	owner, name, _ := strings.Cut(string(j.Repo), "/")
-	tree, err := gh.Tree(ctx, owner, name, "HEAD", true)
+	tree, err := gh.Files(ctx, owner, name, searched)
 	var e *github.Error
 	switch {
 	case errors.As(err, &e) && e.Code == "empty":
@@ -130,20 +131,21 @@ func (m *Manifests) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	return result(snapshot.StateOK, next, j.Prev)
 }
 
-// discover picks the manifests of a recursive tree: shallow paths first, then by path, at most maxFiles.
+// searched reports whether manifests are looked for in dir: at most maxDirDepth deep, not in vendored code, tests, examples or a
+// hidden directory.
+func searched(dir string) bool {
+	if dir == "." || dir == "" {
+		return true
+	}
+	segs := strings.Split(dir, "/")
+	return len(segs) <= maxDirDepth && !slices.ContainsFunc(segs, func(s string) bool { return skipped[s] || strings.HasPrefix(s, ".") })
+}
+
+// discover picks the manifests among files: shallow paths first, then by path, at most maxFiles.
 func discover(tree []github.TreeEntry) []github.TreeEntry {
 	var out []github.TreeEntry
 	for _, e := range tree {
-		if e.Type != "blob" || ecosystems[path.Base(e.Path)] == "" {
-			continue
-		}
-		dir := path.Dir(e.Path)
-		if dir == "." {
-			out = append(out, e)
-			continue
-		}
-		segs := strings.Split(dir, "/")
-		if len(segs) <= maxDirDepth && !slices.ContainsFunc(segs, func(s string) bool { return skipped[s] || strings.HasPrefix(s, ".") }) {
+		if e.Type == "blob" && ecosystems[path.Base(e.Path)] != "" && searched(path.Dir(e.Path)) {
 			out = append(out, e)
 		}
 	}

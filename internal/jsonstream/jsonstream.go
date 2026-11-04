@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -16,6 +17,7 @@ import (
 const (
 	bufferSize = 64 << 10
 	maxKey     = 256 // bytes of an object's key kept; a longer key matches nothing a caller asks for
+	maxNumber  = 32  // bytes of a number kept for Int; a longer one is no int64
 )
 
 // ErrSyntax is wrapped by every error of a document that is not JSON. Any other error is the reader's.
@@ -268,6 +270,57 @@ func (d *Reader) hex4() (rune, error) {
 		}
 	}
 	return r, nil
+}
+
+// Bool reads true or false; anything else reads as false.
+func (d *Reader) Bool() (bool, error) {
+	b, err := d.peek()
+	if err != nil {
+		return false, err
+	}
+	switch b {
+	case 't':
+		return true, d.literal("true")
+	case 'f':
+		return false, d.literal("false")
+	}
+	return false, d.Skip()
+}
+
+// Int reads an integer; anything else, a fraction or a number beyond int64 reads as 0.
+func (d *Reader) Int() (int64, error) {
+	b, err := d.peek()
+	if err != nil {
+		return 0, err
+	}
+	if b != '-' && (b < '0' || b > '9') {
+		return 0, d.Skip()
+	}
+	var buf []byte
+	for {
+		c, err := d.r.ReadByte()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return 0, err
+		}
+		if c != '-' && c != '+' && c != '.' && c != 'e' && c != 'E' && (c < '0' || c > '9') {
+			if err := d.r.UnreadByte(); err != nil {
+				return 0, err
+			}
+			break
+		}
+		d.off++
+		if len(buf) < maxNumber {
+			buf = append(buf, c)
+		}
+	}
+	n, err := strconv.ParseInt(string(buf), 10, 64)
+	if err != nil {
+		return 0, nil //nolint:nilerr // a number that is no int64 reads as 0, as the package's other kinds do
+	}
+	return n, nil
 }
 
 // Skip reads the next value, of any kind and size, and keeps nothing of it.

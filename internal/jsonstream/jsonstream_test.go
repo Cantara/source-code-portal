@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -41,6 +42,38 @@ func TestReadsWhatIsAskedAndSkipsTheRest(t *testing.T) {
 		if c {
 			t.Errorf("string %d is cut", i)
 		}
+	}
+}
+
+func TestBoolsAndInts(t *testing.T) {
+	doc := `[{"b": true, "n": 42}, {"b": false, "n": -7}, {"b": "true", "n": 2.5}, {"b": null, "n": 99999999999999999999},
+		{"n": 1e3}, {"n": "12"}, {"n": 9223372036854775807}]`
+	d := New(strings.NewReader(doc))
+	var bools []bool
+	var ints []int64
+	err := d.Array(func() error {
+		return d.Object(func(key string) error {
+			switch key {
+			case "b":
+				b, err := d.Bool()
+				bools = append(bools, b)
+				return err
+			case "n":
+				n, err := d.Int()
+				ints = append(ints, n)
+				return err
+			}
+			return d.Skip()
+		})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []bool{true, false, false, false}; !slices.Equal(bools, want) {
+		t.Errorf("bools = %v, want %v", bools, want)
+	}
+	if want := []int64{42, -7, 0, 0, 0, 0, 9223372036854775807}; !slices.Equal(ints, want) {
+		t.Errorf("ints = %v, want %v", ints, want)
 	}
 }
 

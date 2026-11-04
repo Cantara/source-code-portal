@@ -309,3 +309,40 @@ func TestRateBookResetInstant(t *testing.T) {
 		t.Errorf("at the reset: %v, want 1 (a fraction kept at the reset instant made the dispatcher spin)", f)
 	}
 }
+
+func TestFilesStreamsTheTreeAndWalksATruncatedOne(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("big")})
+	srv.SetCommits(id, githubtest.Commit{SHA: strings.Repeat("a", 40), Message: "first", AuthorName: "Bo", Date: time.Now()})
+	for _, p := range []string{"go.mod", "README.md", "api/go.mod", "web/package.json", "web/pnpm-lock.yaml", "vendor/x/go.mod",
+		"a/b/c/d/go.mod", "a/b/c/d/e/go.mod"} {
+		srv.SetFile(id, p, "content of "+p)
+	}
+	for i := range 50 {
+		srv.SetFile(id, fmt.Sprintf("vendor/lib%02d/file.go", i), "package lib")
+	}
+	s := tokenSource(t, srv, "acme")
+	keep := func(dir string) bool { return !strings.HasPrefix(dir, "vendor") && strings.Count(dir, "/") < 4 }
+	want := []string{"README.md", "a/b/c/d/go.mod", "api/go.mod", "go.mod", "web/package.json", "web/pnpm-lock.yaml"}
+	paths := func(es []TreeEntry) []string {
+		var out []string
+		for _, e := range es {
+			if e.Type != "blob" || e.SHA == "" || e.Size == 0 {
+				t.Errorf("entry %+v", e)
+			}
+			out = append(out, e.Path)
+		}
+		slices.Sort(out)
+		return out
+	}
+
+	got, err := s.Files(t.Context(), "acme", "big", keep)
+	if err != nil || !slices.Equal(paths(got), want) {
+		t.Errorf("files = %v, %v; want %v", paths(got), err, want)
+	}
+	srv.SetTreeLimit(10) // the vendored files push the tree past GitHub's limit: the walk finds the same files
+	got, err = s.Files(t.Context(), "acme", "big", keep)
+	if err != nil || !slices.Equal(paths(got), want) {
+		t.Errorf("files of a truncated tree = %v, %v; want %v", paths(got), err, want)
+	}
+}
