@@ -147,6 +147,8 @@ const parts = [
     title: "Run a portal",
     sections: [
       { id: "run", title: "Run your own portal" },
+      { id: "github", title: "Connect GitHub" },
+      { id: "access", title: "Sign-in and private repositories" },
       { id: "more", title: "Options and documents" },
     ],
   },
@@ -328,7 +330,7 @@ export function GuideView({ version }: { version: string }) {
         <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-2">
           {[
             ["#signals", "Part 1", "Read the portal", "The dashboard, a product card, health and the work that counts."],
-            ["#run", "Part 2", "Run a portal", "Access to GitHub, your products, checks, the container and the options."],
+            ["#run", "Part 2", "Run a portal", "Your products, the container, a GitHub App, sign-in and private repositories."],
           ].map(([href, n, t, d]) => (
             <a key={href} href={href} className="panel flex flex-col gap-0.5 p-4 transition-colors hover:border-primary/50">
               <span className="font-mono text-[0.6875rem] tracking-widest text-primary uppercase">{n}</span>
@@ -661,9 +663,8 @@ export function GuideView({ version }: { version: string }) {
           <ol className="flex flex-col gap-6">
             <Step n={1} title="Give it read access to GitHub">
               <p>
-                A GitHub App with <em>Contents</em> and <em>Metadata</em> read-only (its own rate limit, and webhooks for updates
-                within seconds), or a personal access token in a file. Secrets are always files, never values in the
-                configuration.
+                A GitHub App, read-only, is the way to run a portal (section 10); a personal access token in a file is enough to
+                try one. Secrets are always files, never values in the configuration.
               </p>
             </Step>
             <Step n={2} title="Describe your products">
@@ -705,8 +706,121 @@ scp config groups -c scp.yaml --repos repos.json   # where each repository lands
         </Section>
 
         <Section
-          id="more"
+          id="github"
           n={10}
+          title="Connect GitHub"
+          lede="The portal reads your repositories through a GitHub App of your organisation: read-only, with its own rate limit, and told by GitHub the moment something changes."
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              ["Read-only", "Contents and Metadata, read. The portal never writes to GitHub."],
+              ["Your organisation's", "Not a person's account: nothing breaks when someone leaves."],
+              ["Updates within seconds", "GitHub sends a webhook on every push, release and repository change."],
+            ].map(([t, d]) => (
+              <div key={t} className="panel p-4">
+                <p className="text-sm font-semibold">{t}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{d}</p>
+              </div>
+            ))}
+          </div>
+          <ol className="flex flex-col gap-6">
+            <Step n={1} title="Create the App">
+              <p>
+                In your organisation&apos;s <em>Settings</em>, <em>Developer settings</em>, <em>GitHub Apps</em>,{" "}
+                <em>New GitHub App</em>. Repository permissions: <em>Contents</em> and <em>Metadata</em>, read-only, nothing else.
+                Webhook URL <code className="font-mono text-xs">https://your-portal/webhooks/github</code> with a secret of your
+                own; events <em>Push</em>, <em>Release</em> and <em>Repository</em>. Install it only on this account.
+              </p>
+            </Step>
+            <Step n={2} title="Keep its key and install it">
+              <p>
+                Note the <em>App ID</em> and generate a private key: the <code className="font-mono text-xs">.pem</code> file is a
+                secret, kept beside the webhook secret. Then <em>Install App</em> on the organisation, for all repositories or the
+                ones the portal shows.
+              </p>
+            </Step>
+            <Step n={3} title="Tell the portal">
+              <Code label="The GitHub App in scp.yaml">{`github:
+  sources:
+    - id: github
+      orgs: [your-org]
+      app: { id: 123456, private_key_file: /run/secrets/scp-app.pem }
+      include_private: true        # private repositories too, for the people of section 11
+webhook:
+  secret_file: /run/secrets/webhook-secret`}</Code>
+              <p>
+                Without <code className="font-mono text-xs">include_private</code> the portal lists public repositories only,
+                whatever the App may read.
+              </p>
+            </Step>
+          </ol>
+        </Section>
+
+        <Section
+          id="access"
+          n={11}
+          title="Sign-in and private repositories"
+          lede="Everyone sees the public repositories. People who sign in and belong to a group you name see the private ones too; nobody else ever does."
+        >
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              ["Not signed in", "The public repositories: the dashboard, the pages, the search, the badges and the API."],
+              [
+                "Signed in, in a private group",
+                "The private repositories as well, everywhere the public ones are, and only for them.",
+              ],
+              [
+                "An administrator",
+                "Also the Admin page with the portal's status, and the design mode for the dashboard when it has a layout store.",
+              ],
+            ].map(([t, d]) => (
+              <div key={t} className="panel p-4">
+                <p className="text-sm font-semibold">{t}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{d}</p>
+              </div>
+            ))}
+          </div>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            The server decides, on every request, never the browser: each page, API answer, search result, badge, sitemap and
+            Markdown file is made from what the viewer may see, and the address of a private repository answers a stranger as one
+            that does not exist. Answers for a signed-in viewer are never kept by a shared cache. Or set{" "}
+            <code className="font-mono text-xs">require_auth</code> and the portal has no public view at all.
+          </p>
+          <Terms
+            items={[
+              [
+                "Your sign-in provider",
+                "Any OpenID Connect provider: Entra ID, Google Workspace, Okta, Keycloak, Authentik, Zitadel, or Whydah through its OAuth2 service.",
+              ],
+              [
+                "GitHub accounts",
+                "GitHub signs no one in by OpenID Connect itself: put Dex in between, with its GitHub connector, and your teams become groups (org:team).",
+              ],
+              ["Access tokens", "For scripts, and for people without a provider: a token signs in at Sign in, or calls the API."],
+            ]}
+          />
+          <Code label="Sign-in in scp.yaml">{`access:
+  private_groups: [developers]       # who sees private repositories; ["*"] is everyone who signs in
+auth:
+  session_key_file: /run/secrets/session-key
+  admin_groups: [portal-admins]
+  oidc:
+    issuer: https://login.example.org     # your provider, Whydah, or Dex for GitHub accounts
+    client_id: source-code-portal
+    client_secret_file: /run/secrets/oidc-secret
+    scopes: [openid, email, profile, groups]
+  tokens:
+    - { name: ci, secret_file: /run/secrets/token-ci, groups: [developers] }`}</Code>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Register the portal at the provider as a web application with the redirect address{" "}
+            <code className="font-mono text-xs">https://your-portal/auth/callback</code>. The operator guide covers an
+            authenticating proxy in front of the portal as well.
+          </p>
+        </Section>
+
+        <Section
+          id="more"
+          n={12}
           title="Options and documents"
           lede="Add what you need when you need it; the documents cover every key."
         >
