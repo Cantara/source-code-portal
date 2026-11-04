@@ -9,6 +9,9 @@ const ecosystems: Record<string, string> = {
   go: "Go",
   swift: "Swift",
   cocoapods: "CocoaPods",
+  nuget: "NuGet",
+  rubygems: "RubyGems",
+  packagist: "Packagist",
 }
 
 /** ecosystemLabel is a package manager's name for the pages; an unknown one shows as it came. */

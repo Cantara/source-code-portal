@@ -50,7 +50,7 @@ an error, as is an unknown key in the file.
 | `cluster` | `addresses`, `name`, `namespace` | several instances through Hazelcast 5 on a private network |
 | `web` | `dir`, `node` | set in the image; for the binary, the unpacked `bundle/` |
 | `layout` | `dir` | the administrators' dashboard designs; back it up |
-| `packages` | `public` (`true`), `registries[]`: `id`, `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`), `url`, `network` (`public`, or `private`: on your network, http allowed), `auth` (`user` and `password_file`, or `token_file` with an optional `header`) | credentials go only to the registry's own URL; GitHub Packages needs a token with `read:packages`, not the App |
+| `packages` | `public` (`true`), `registries[]`: `id`, `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`, `network` (`public`, or `private`: on your network, http allowed), `auth` (`user` and `password_file`, or `token_file` with an optional `header`) | credentials go only to the registry's own URL; GitHub Packages needs a token with `read:packages`, not the App |
 | `ops` | `pprof` | profiles on the admin listener |
 
 ## Matchers

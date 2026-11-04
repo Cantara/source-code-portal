@@ -883,6 +883,11 @@ auth:
               ["Rust", "Cargo.toml, unless publish = false: the registries it names, then crates.io."],
               ["Go", "go.mod: the module proxy, or the repository's own tags."],
               ["Swift", "Package.swift: the tags; a podspec: CocoaPods."],
+              ["C# and F#", "A project that packs, or a nuspec: your NuGet feeds, then nuget.org."],
+              [
+                "Ruby and PHP",
+                "A gemspec: your gem servers, then RubyGems. composer.json: your Composer repositories, then Packagist.",
+              ],
             ].map(([t, d]) => (
               <div key={t} className="panel p-4">
                 <p className="text-sm font-semibold">{t}</p>

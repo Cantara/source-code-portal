@@ -10,7 +10,7 @@ import (
 
 // Ecosystems are the package managers the portal has a provider for (design/packages.md).
 // Swift packages and CocoaPods have no registry of their own to configure: their versions are tags and CocoaPods trunk.
-var Ecosystems = []string{"maven", "npm", "pypi", "cargo", "go"} //nolint:gochecknoglobals // a constant table
+var Ecosystems = []string{"maven", "npm", "pypi", "cargo", "go", "nuget", "rubygems", "packagist"} //nolint:gochecknoglobals // a constant table
 
 // Packages configures where the portal looks up what a repository publishes: its configured registries, in order, after the ones a
 // build file names and before the ecosystem's public registry.

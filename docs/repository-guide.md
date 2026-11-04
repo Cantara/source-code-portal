@@ -55,9 +55,12 @@ pre-release, nothing yanked) shows on the release chip and in the page's *Packag
 | `go.mod` | the module path | the configured proxies and proxy.golang.org; else the repository's tags for the module's directory and major version |
 | `Package.swift` | the package's name | the repository's tags |
 | `*.podspec` | the pod's name | CocoaPods trunk |
+| `*.csproj`, `*.fsproj`, `*.vbproj` that pack (`PackageId`, `IsPackable` or `GeneratePackageOnBuild`), `*.nuspec` | the `PackageId` (else the project's file name), the nuspec's `id` | the configured NuGet feeds, nuget.org |
+| `*.gemspec` at the root | the gem's `name` | the configured gem servers (the compact index), rubygems.org |
+| `composer.json`, unless `"type": "project"` | `name` | the configured Composer repositories (`p2` metadata), Packagist |
 
 A private repository's packages are never named to a public registry (Maven Central, npm, PyPI, crates.io, the Go proxy, CocoaPods
-trunk): only to the registries its build files name and those the portal is configured with; a private Go module's versions are its
+trunk, nuget.org, rubygems.org, Packagist): only to the registries its build files name and those the portal is configured with; a private Go module's versions are its
 tags.
 
 Changes show within seconds when the portal's webhook is set up, otherwise after the next scheduled check (a push is noticed within

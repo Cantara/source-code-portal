@@ -501,7 +501,8 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, 
 	}
 	providers := []packages.Provider{packages.Maven{Central: d.public["maven"]}, packages.NPM{Registry: d.public["npm"]},
 		packages.PyPI{Simple: d.public["pypi"]}, packages.Cargo{API: d.public["cargo"]}, packages.Go{Proxy: d.public["go"]},
-		packages.Swift{}, packages.CocoaPods{Trunk: d.public["cocoapods"]}}
+		packages.Swift{}, packages.CocoaPods{Trunk: d.public["cocoapods"]}, packages.NuGet{Flat: d.public["nuget"]},
+		packages.RubyGems{Server: d.public["rubygems"]}, packages.Packagist{Repository: d.public["packagist"]}}
 	registries := make([]packages.Registry, 0, len(cfg.Registries))
 	for _, r := range cfg.Registries {
 		u := r.URL

@@ -1,6 +1,6 @@
 # Published packages (R1 to R4)
 
-Status: R1 to R3 built; R4 queued (plan.md section 4). Binding order: ../plan.md > this note.
+Status: R1 to R4 built (plan.md section 4). Binding order: ../plan.md > this note.
 
 A repository's release is often not a GitHub release: a Java library is published to a Maven repository by a CI server, a
 TypeScript one to npm, a Rust crate to crates.io, a Go module is a tag that the module proxy serves. The portal reads the
@@ -54,9 +54,9 @@ no private registries).
 | `cargo` | Rust | `Cargo.toml` (`[package].name`, `publish`, workspace members) | crates.io | the sparse index (`index.crates.io/<prefix>/<name>`, one JSON line per version), the newest not yanked | alternative registries with a sparse index (`config.json`, `auth-required`): the token as the `Authorization` header |
 | `go` | Go | `go.mod` (`module`) | `proxy.golang.org` | `<module>/@latest`: `Version`, `Time` (case-encoded path) | a private module is its tags on GitHub, which the commits job reads already; a private proxy (Athens, Artifactory) with HTTP Basic |
 | `swift`, `cocoapods` | Swift, Objective-C | `Package.swift` (the package name, read as text); a root `*.podspec` | the tags (SwiftPM resolves tags); CocoaPods trunk | tags; `trunk.cocoapods.org/api/v1/pods/<name>` | a Swift package registry (SE-0292): a bearer token or Basic (R3) |
-| `nuget` | C#, F# | `*.csproj` (`PackageId`, `IsPackable`), `*.nuspec` | `api.nuget.org` | the flat container `v3-flatcontainer/<id>/index.json` from the service index | Azure Artifacts, Nexus, Artifactory, GitHub Packages: HTTP Basic (user and token) |
-| `rubygems` | Ruby | `*.gemspec` (`name`, read as text) | rubygems.org | `api/v1/versions/<name>/latest.json` | Gemfury, Artifactory, GitHub Packages: Basic or an API key header |
-| `packagist` | PHP | `composer.json` (`name`) | packagist.org | `p2/<vendor>/<name>.json` | Private Packagist, Satis: a bearer token or Basic |
+| `nuget` | C#, F# | `*.csproj`, `*.fsproj`, `*.vbproj` that pack (`PackageId`, `IsPackable`, `GeneratePackageOnBuild`), `*.nuspec` | `api.nuget.org` | the flat container `<id>/index.json`; a configured feed's `PackageBaseAddress` from its service index `<url>index.json`, which must lie under its `url` (no published date) | Nexus, Artifactory, GitHub Packages: HTTP Basic (user and token); Azure Artifacts keeps its packages outside the feed's path and is not read |
+| `rubygems` | Ruby | a root `*.gemspec` (`name`, read as text) | rubygems.org | `api/v1/versions/<name>.json` (a version with a letter is a pre-release); a configured server's compact index `info/<name>`, else its versions API | Gemfury, Artifactory, GitHub Packages, Gemstash: Basic or an API key header |
+| `packagist` | PHP | `composer.json` (`name`, not `"type": "project"`) | packagist.org | `p2/<vendor>/<name>.json` (streamed; tagged releases only) | Private Packagist, Satis, Repman, Artifactory: a bearer token or Basic |
 
 R1 ships `maven` and `npm`; R2 `pypi`, `cargo`, `go`, `swift`; R3 private registries; R4 `nuget`, `rubygems`, `packagist`. A
 container image (GHCR, Docker Hub) is a later provider of the same interface.
