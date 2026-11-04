@@ -663,8 +663,10 @@ export function GuideView({ version }: { version: string }) {
           <ol className="flex flex-col gap-6">
             <Step n={1} title="Give it read access to GitHub">
               <p>
-                A GitHub App, read-only, is the way to run a portal (section 10); a personal access token in a file is enough to
-                try one. Secrets are always files, never values in the configuration.
+                A GitHub App, read-only, is the way to run a portal (section 10); to try one, a GitHub personal access token is
+                enough: a fine-grained one with read access to public repositories, or a classic one without scopes, its text
+                alone in a file. It is the portal&apos;s key to GitHub, not a way for people to sign in (section 11). Secrets are
+                always files, never values in the configuration.
               </p>
             </Step>
             <Step n={2} title="Describe your products">
@@ -676,7 +678,7 @@ export function GuideView({ version }: { version: string }) {
   sources:
     - id: github
       orgs: [your-org]
-      token_file: /run/secrets/github-token
+      token_file: /run/secrets/github-token   # the GitHub token of step 1; or app: (section 10)
 catalog:
   groups:
     - id: payments
