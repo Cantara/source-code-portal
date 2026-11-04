@@ -22,7 +22,8 @@ budget, retries and pauses.
 - `modernc.org/sqlite`, WAL, one connection: pure Go; the database is a cache, so `synchronous=NORMAL` and quarantine-on-doubt fit.
 - Own migration runner on `PRAGMA user_version`: forward-only, a rollback is deleting the cache file.
 - Content SHAs are the persisted validators; ETags stay in the GitHub client's memory (github.md): they are bound to a rotating token.
-- A permanent error is recorded on the item, which is next due after 24 h: the item row carries all retry state.
+- A permanent error is recorded on the item, which is next due after 24 h: the item row carries all retry state. A new release
+  (`Engine.Release`, the version and build; `meta.release` holds the one that last ran) runs every failed item again at the warm start.
 - Time is `time.Now()`/`time.Timer`; tests use `testing/synctest`: virtual time comes from the bubble.
 
 ## Shapes (minimal Go types/interfaces and table sketches)
@@ -116,7 +117,8 @@ CREATE TABLE item (key TEXT PRIMARY KEY, kind TEXT NOT NULL,
      reset by one success. The attempt is not counted and the row is untouched; a pause in force is not extended, so one limit seen
      by several jobs in flight pauses once.
    - auth failed (401) -> pause the source 5 min, doubling to 1 h, likewise without an attempt.
-   - permanent (permission errors, a recovered panic with code `panic`) -> error recorded, next due after 24 h.
+   - permanent (permission errors, a recovered panic with code `panic`) -> error recorded, next due after 24 h, or at the first start of
+     a new release.
    - a job that reports `not_found`, `no_content`, `too_large` or `unsupported` stores that state as a normal result.
 6. **Catalogue**: a listing job's `Result.Catalogue` replaces the source's `repo` rows in the same transaction (repositories that left or
    changed address are deleted and their items cascade; an address taken by another identity moves over); the engine drops the entries
@@ -154,7 +156,7 @@ are constants in `internal/sync` and `cmd/scp`.
 
 ## Tests (what proves it)
 - `internal/sync` in `synctest` bubbles with a real store in a temp dir: `TestRunsAndReschedules`, `TestTransientKeepsPayloadAndBacksOff`,
-  `TestRateLimitPausesWithoutAttempt`, `TestPermanentRetriesAfterADay`, `TestPanicIsPermanent`, `TestCatalogueAddsAndRemovesRepoJobs`,
+  `TestRateLimitPausesWithoutAttempt`, `TestPermanentRetriesAfterADay`, `TestNewReleaseRunsFailedJobsAgain`, `TestPanicIsPermanent`, `TestCatalogueAddsAndRemovesRepoJobs`,
   `TestNotifyCoalesces`, `TestConcurrencyLimit`, `TestBudgetHoldsBackfill`, `TestWarmStartPublishesAndKeepsSchedule`,
   `TestWarmStartHonoursAShorterTTL`, `TestBackoffBounds`, `TestRegisterRefuses`, `TestNotifySource`, `TestObserveDepthAlive`; the
   cluster side in `share_test.go`; `goleak`.

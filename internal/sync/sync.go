@@ -33,6 +33,7 @@ const (
 	authWaitMax    = time.Hour
 	idleWake       = time.Minute
 	defaultTimeout = 2 * time.Minute
+	metaRelease    = "release" // the store's meta key of the release that last ran on it
 )
 
 // Priority orders due jobs; lower runs first.
@@ -130,7 +131,8 @@ type Engine struct {
 	pub     *snapshot.Publisher
 	budget  Budget
 	sources []string
-	n       int // concurrency
+	n       int    // concurrency
+	release string // the running release, for the warm start
 	log     *slog.Logger
 
 	specs []*Spec
@@ -203,6 +205,10 @@ func (e *Engine) Lead(on bool) {
 
 // Warm is closed when the warm start has published the store's content.
 func (e *Engine) Warm() <-chan struct{} { return e.warm }
+
+// Release names the release the engine runs, before Run. When it differs from the release that last ran on the store, the warm start
+// runs every failed job again at once: a failure the new release may have fixed is not left to its backoff (up to a day).
+func (e *Engine) Release(v string) { e.release = v }
 
 // Observe sets fn to receive every finished job: its kind, result (ok, not_modified, error, rate_limited) and duration. Call it
 // before Run.
@@ -827,7 +833,31 @@ func (e *Engine) warmStart(ctx context.Context) error {
 		e.repos[r.Key] = r
 		e.addRepoEntries(r, stored, now)
 	}
+	retried := 0
+	if e.release != "" {
+		last, err := e.store.Meta(ctx, metaRelease)
+		if err != nil {
+			e.mu.Unlock()
+			return fmt.Errorf("store: %w", err)
+		}
+		if last != e.release {
+			for _, en := range e.entries {
+				if en.item.Attempts > 0 {
+					en.due, en.prio, en.backoff = now, PrioBackfill, false
+					retried++
+				}
+			}
+		}
+	}
 	e.mu.Unlock()
+	if e.release != "" {
+		if err := e.store.SetMeta(ctx, metaRelease, e.release); err != nil {
+			e.log.Error("store write failed", "key", metaRelease, "err", err)
+		}
+		if retried > 0 {
+			e.log.Info("new release: failed jobs run again", "release", e.release, "jobs", retried)
+		}
+	}
 
 	e.pub.Update(func(b *snapshot.Builder) {
 		for _, s := range e.specs { // registration order: the catalogue before what hangs off it

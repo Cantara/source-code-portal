@@ -143,6 +143,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 	}()
 	s.engine = sync.New(s.store, s.pub, gh, ids, cfg.Sync.Concurrency, log)
+	bi := readBuildInfo()
+	s.engine.Release(bi.Version + "+" + bi.Build) // a new build runs failed jobs again
 	if len(cfg.Cluster.Addresses) > 0 {
 		dial := d.cluster
 		if dial == nil {

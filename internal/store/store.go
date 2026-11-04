@@ -322,6 +322,23 @@ func replaceCatalogue(ctx context.Context, tx *sql.Tx, source string, repos []Re
 	return nil
 }
 
+// Meta returns the value stored under key, "" when there is none.
+func (s *DB) Meta(ctx context.Context, key string) (string, error) {
+	var v string
+	err := s.db.QueryRowContext(ctx, "SELECT value FROM meta WHERE key = ?", key).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return v, err
+}
+
+// SetMeta stores value under key.
+func (s *DB) SetMeta(ctx context.Context, key, value string) error {
+	_, err := s.db.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+		key, value)
+	return err
+}
+
 // RetainSources deletes repositories and items of sources that are no longer configured, and items of unknown kinds.
 func (s *DB) RetainSources(ctx context.Context, sources, kinds []string) error {
 	tx, err := s.db.BeginTx(ctx, nil)

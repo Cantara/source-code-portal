@@ -239,6 +239,49 @@ func TestPermanentRetriesAfterADay(t *testing.T) {
 	})
 }
 
+func TestNewReleaseRunsFailedJobsAgain(t *testing.T) {
+	dir := t.TempDir()
+	start := func(t *testing.T, release string, c *counter) *rig {
+		t.Helper()
+		r := newRig(t, dir, nil, 1, sourceSpec(c, time.Hour))
+		r.eng.Release(release)
+		r.run()
+		time.Sleep(time.Second)
+		return r
+	}
+	synctest.Test(t, func(t *testing.T) {
+		r := start(t, "1.0.0", &counter{errs: []error{fakeErr{perm: true, code: "malformed"}}})
+		r.stop()
+	})
+	synctest.Test(t, func(t *testing.T) { // the same release keeps the day's wait
+		c := &counter{}
+		r := start(t, "1.0.0", c)
+		if c.n.Load() != 0 {
+			t.Errorf("the same release ran the failed job again")
+		}
+		r.stop()
+	})
+	synctest.Test(t, func(t *testing.T) {
+		c := &counter{}
+		r := start(t, "1.0.1", c)
+		if c.n.Load() != 1 {
+			t.Errorf("a new release ran the failed job %d times, want 1", c.n.Load())
+		}
+		if it := r.stored("list/gh"); it.State != snapshot.StateOK || it.Attempts != 0 {
+			t.Errorf("stored = %+v, want ok", it)
+		}
+		r.stop()
+	})
+	synctest.Test(t, func(t *testing.T) { // nothing failed: a new release runs nothing early
+		c := &counter{}
+		r := start(t, "1.0.2", c)
+		if c.n.Load() != 0 {
+			t.Errorf("a new release ran a healthy job %d times", c.n.Load())
+		}
+		r.stop()
+	})
+}
+
 func TestPanicIsPermanent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		r := newRig(t, t.TempDir(), nil, 4, Spec{Kind: "list", PerSource: true, TTL: time.Hour,
