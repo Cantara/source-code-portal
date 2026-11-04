@@ -128,7 +128,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js 24 executable that runs the bundle |
 | `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4); empty: the built-in layout, no saving |
-| `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy |
+| `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy, `nuget` the feed whose `index.json` is the service index, `rubygems` a gem server, `packagist` a Composer repository |
 | `packages.registries[].network` | `public` | `public`: reached through the public-only guard; `private`: on your network (http allowed, without credentials) |
 | `packages.registries[].auth` | none | `user` and `password_file` (Basic; the password may be an access token), or `token_file` (a bearer token), with `header` to send it in another header (`X-JFrog-Art-Api`, or `Authorization` for Cargo's raw token) |
 | `packages.public` | `true` | ask the public registries too (Maven Central, npm, PyPI, crates.io, proxy.golang.org, CocoaPods trunk, nuget.org, rubygems.org, Packagist) for public repositories; `false`: only the configured ones and those the build files name |
@@ -365,6 +365,12 @@ packages:
     # Verdaccio, devpi or Athens on your network, without credentials
     - { id: lan-npm, ecosystem: npm, url: http://verdaccio.internal:4873/, network: private }
     - { id: athens, ecosystem: go, url: https://athens.internal/, network: private }
+    # NuGet (Nexus, Artifactory, GitHub Packages): the feed's root, where its index.json is
+    - { id: nuget, ecosystem: nuget, url: https://nexus.example.org/repository/nuget-hosted/,
+        auth: { user: scp-reader, password_file: /run/secrets/nexus-password } }
+    # Gemfury, Gemstash or Artifactory; Private Packagist or Satis
+    - { id: gems, ecosystem: rubygems, url: https://gems.example.org/, auth: { token_file: /run/secrets/gems-token } }
+    - { id: php, ecosystem: packagist, url: https://repo.packagist.com/example/, auth: { token_file: /run/secrets/packagist-token } }
 ```
 
 GitHub Packages does not take the portal's GitHub App: its registries need a token with `read:packages`. A Cargo crate whose
