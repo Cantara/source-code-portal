@@ -786,35 +786,67 @@ webhook:
             that does not exist. Answers for a signed-in viewer are never kept by a shared cache. Or set{" "}
             <code className="font-mono text-xs">require_auth</code> and the portal has no public view at all.
           </p>
+          <ol className="flex flex-col gap-6">
+            <Step n={1} title="Make a session key and a token per person or script">
+              <p>
+                Access tokens need no sign-in provider: the portal checks them itself. A token is a random secret in a file, one
+                per person or script, so each can be withdrawn alone. The session key seals the cookie that keeps a browser signed
+                in.
+              </p>
+              <Code label="Make the secrets">{`head -c 32 /dev/urandom | base64 > /run/secrets/session-key
+head -c 32 /dev/urandom | base64 > /run/secrets/token-ada
+head -c 32 /dev/urandom | base64 > /run/secrets/token-ci`}</Code>
+            </Step>
+            <Step n={2} title="Name the tokens and their groups">
+              <Code label="Access tokens in scp.yaml">{`access:
+  private_groups: [developers]       # who sees private repositories; ["*"] is everyone who signs in
+auth:
+  session_key_file: /run/secrets/session-key
+  tokens:
+    - { name: ada, secret_file: /run/secrets/token-ada, groups: [developers], admin: true }
+    - { name: ci, secret_file: /run/secrets/token-ci, groups: [developers] }`}</Code>
+              <p>
+                A token&apos;s groups decide what it sees; <code className="font-mono text-xs">admin: true</code> makes it an
+                administrator.
+              </p>
+            </Step>
+            <Step n={3} title="Hand them out and sign in">
+              <p>
+                Give each person their token&apos;s text privately. In the browser they choose <em>Sign in</em> and paste it; a
+                script sends it on every request:
+              </p>
+              <Code label="A token from a script">{`curl -H "Authorization: Bearer $(cat token)" https://your-portal/llms-full.txt`}</Code>
+              <p>
+                A wrong token is refused, never served as a stranger. To withdraw one, remove it from{" "}
+                <code className="font-mono text-xs">scp.yaml</code> and restart: its browser sessions end with it.
+              </p>
+            </Step>
+          </ol>
+          <h3 className="text-lg font-semibold">Single sign-on, when you have a provider</h3>
           <Terms
             items={[
               [
                 "Your sign-in provider",
-                "Any OpenID Connect provider: Entra ID, Google Workspace, Okta, Keycloak, Authentik, Zitadel, or Whydah through its OAuth2 service.",
+                "Any OpenID Connect provider: Entra ID, Google Workspace, Okta, Keycloak, Authentik, Zitadel. Its groups decide who sees private repositories.",
               ],
               [
                 "GitHub accounts",
                 "GitHub signs no one in by OpenID Connect itself: put Dex in between, with its GitHub connector, and your teams become groups (org:team).",
               ],
-              ["Access tokens", "For scripts, and for people without a provider: a token signs in at Sign in, or calls the API."],
             ]}
           />
-          <Code label="Sign-in in scp.yaml">{`access:
-  private_groups: [developers]       # who sees private repositories; ["*"] is everyone who signs in
-auth:
+          <Code label="Single sign-on in scp.yaml">{`auth:
   session_key_file: /run/secrets/session-key
   admin_groups: [portal-admins]
   oidc:
-    issuer: https://login.example.org     # your provider, Whydah, or Dex for GitHub accounts
+    issuer: https://login.example.org     # your provider, or Dex for GitHub accounts
     client_id: source-code-portal
     client_secret_file: /run/secrets/oidc-secret
-    scopes: [openid, email, profile, groups]
-  tokens:
-    - { name: ci, secret_file: /run/secrets/token-ci, groups: [developers] }`}</Code>
+    scopes: [openid, email, profile, groups]`}</Code>
           <p className="max-w-prose text-sm text-muted-foreground">
             Register the portal at the provider as a web application with the redirect address{" "}
-            <code className="font-mono text-xs">https://your-portal/auth/callback</code>. The operator guide covers an
-            authenticating proxy in front of the portal as well.
+            <code className="font-mono text-xs">https://your-portal/auth/callback</code>. Tokens and single sign-on work side by
+            side. The operator guide covers an authenticating proxy in front of the portal as well.
           </p>
         </Section>
 
