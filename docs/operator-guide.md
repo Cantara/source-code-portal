@@ -12,6 +12,29 @@ can serve one portal together through Hazelcast (section 3.1).
 SCP needs read access to the repositories of the organisations and user accounts it shows. Use a GitHub App (recommended: its own rate limit of up to 12,500
 requests an hour per installation) or a personal access token (5,000 an hour).
 
+**What each feature needs.** The portal only reads: every permission below is *Read-only*, and it never writes to GitHub. A feature
+whose permissions are missing stays empty; the events give updates within seconds (without them, or without a webhook, each feature
+refreshes on its schedule).
+
+<!-- prerequisites: kept equal to internal/prereq by cmd/scp's TestPrerequisitesDocumented -->
+| Feature | Read permissions | Webhook events |
+|---|---|---|
+| The catalogue: repositories, README and documents, manifests, commits, releases, packages | Contents, Metadata | Push, Release, Repository |
+| Pull requests | Pull requests, Checks, Commit statuses | Pull request, Pull request review, Check suite, Status |
+| Issues | Issues | Issues, Issue comment |
+<!-- /prerequisites -->
+
+**When something is missing, the portal says so.** It reads the App's grants from its installations at every listing and warns where
+it matters: the page of the feature (`/pulls`, `/issues`) says the feature is off, the *Admin* page's *GitHub prerequisites* card and
+`/api/v1/status`'s warnings say which permissions and events are missing on which installation and how to fix it, and the log has a
+`prerequisites unmet` line when that changes. With a token, which GitHub does not let the portal ask, the warning comes when GitHub
+refuses a feature's reads (403) for most repositories. `GET /api/v1/prerequisites` gives the same; only an administrator sees the
+missing permissions, the accounts and the fix.
+
+**After changing an App's permissions** GitHub asks each installation to accept them: an owner of the organisation (Organization
+settings, GitHub Apps, the App, *Review request*). Until then the installation keeps its old permissions and the warning stays. Check
+it with `gh api /orgs/<org>/installations --jq '.installations[] | {app_slug, permissions, events}'`.
+
 **GitHub App.** Create an App in the organisation's settings, or for a user account in your own (Developer settings, GitHub Apps):
 1. Repository permissions, all read-only: *Contents*, *Metadata*, *Issues*, *Pull requests*, *Checks* and *Commit statuses*. Nothing
    else. *Issues* lists the open issues; the last three show the open pull requests and whose turn each is; without them the portal
@@ -662,6 +685,7 @@ steps, and job failures. Secrets are never logged.
 | Symptom | Look at |
 |---|---|
 | `config check` exits 2 | every problem is listed with its key; unknown keys and `SCP_*` variables are errors |
+| `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub prerequisites* card names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation (section 1) |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
 | A repository is missing | it must be public, not a fork (unless `include_forks`), not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it) |
 | Pushes show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository, `scp_webhook_deliveries_total` by result |

@@ -105,6 +105,20 @@ paths:
         "304": { $ref: "#/components/responses/NotModified" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /prerequisites:
+    get:
+      operationId: getPrerequisites
+      summary: The features whose GitHub prerequisites do not hold, and how to fix them
+      description: |
+        What each feature needs from GitHub (read permissions, webhook events) checked against the GitHub App's installations, or for
+        a token against the reads GitHub refused (design/prerequisites.md). Empty when every prerequisite holds. The source, the
+        accounts, the missing permissions and events and the fix are given to administrators only.
+      responses:
+        "200":
+          description: The unmet prerequisites
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PrerequisiteList" }
   /groups:
     get:
       operationId: listGroups
@@ -844,6 +858,24 @@ components:
         at: { type: [string, "null"], description: "The commit `at` named, when it is on this page" }
         page: { $ref: "#/components/schemas/Page" }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    PrerequisiteList:
+      type: object
+      required: [unmet]
+      properties:
+        unmet: { type: array, items: { $ref: "#/components/schemas/Prerequisite" } }
+    Prerequisite:
+      type: object
+      required: [feature, title, effect]
+      properties:
+        feature: { type: string, enum: [catalogue, pulls, issues] }
+        title: { type: string }
+        effect: { type: string, description: What a reader sees without it }
+        source: { type: string, description: "The configured source; administrators only" }
+        owners: { type: array, items: { type: string }, description: "The accounts whose installation lacks it; administrators only" }
+        permissions: { type: array, items: { type: string }, description: "The missing read permissions as GitHub's settings name them; administrators only" }
+        events: { type: array, items: { type: string }, description: "The missing webhook events as GitHub's settings name them; administrators only" }
+        refused: { type: boolean, description: "A token GitHub refused, whose permissions cannot be asked; administrators only" }
+        fix: { type: string, description: "What to do about it; administrators only" }
     QueueSort:
       type: string
       enum: [waiting, newest, updated]

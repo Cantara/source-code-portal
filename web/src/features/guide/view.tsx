@@ -872,6 +872,13 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
                 <em>Release</em>, <em>Repository</em>, <em>Issues</em>, <em>Issue comment</em>, <em>Pull request</em>,{" "}
                 <em>Pull request review</em>, <em>Check suite</em> and <em>Status</em>. Install it only on this account.
               </p>
+              <p>
+                Each permission serves a part of the portal: <em>Contents</em> and <em>Metadata</em> the repositories, documents
+                and commits, <em>Issues</em> the open issues, and <em>Pull requests</em>, <em>Checks</em> and{" "}
+                <em>Commit statuses</em> the open pull requests. Without one, that part stays empty, and the portal says so on its
+                page and on the <em>Admin</em> page. Permissions added later take effect once an owner of the organisation accepts
+                them on the installation.
+              </p>
             </Step>
             <Step n={3} title="Keep its key and install it">
               <p>

@@ -267,6 +267,7 @@ export const defaults = [
       freshness: fresh,
     }),
   ),
+  http.get("/prerequisites", ({ response }) => response(200).json({ unmet: [] })),
   http.get("/issues", ({ response }) =>
     response(200).json({
       issues: [

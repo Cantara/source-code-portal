@@ -43,7 +43,8 @@ a status page on the admin port; a signed multi-platform image and release archi
 Rules (checked as described in `design/principles.md`):
 
 1. Request handlers read only the current immutable snapshot. Sync jobs are the only code that writes SQLite; they and the image
-   proxy (document images, cached) are the only code that talks to GitHub.
+   proxy (document images, cached) are the only code that talks to GitHub, and only to read: read permissions, GET requests and
+   GraphQL queries, never a write or a mutation (P-71).
 2. Features do not import features. Each feature owns its data on the snapshot (typed facets on the repository entries, indexes over
    all of them), its jobs and its feature-only GitHub calls; a consumer declares the small function it needs and `cmd/scp` wires it. `cmd/scp/boundary_test.go` enforces the imports. The web UI keeps the same rule for `web/src/features`.
 3. Failure is data: each item carries its freshness; the last good state is served.
@@ -108,6 +109,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | PR3 | Open pull requests, the rest: the tool, search, badges, llms; docs, the Guide, the plugin | as Q3 and W3 for the tool and search; the badges pass the leak test | done |
 | IS1 | Open issues, the data and the page (`design/issues.md`, P-69): the `issues` job (a conditional REST listing, pull requests skipped), the facet, `/api/v1/issues`, `/issues` in the header (where each stands, the states as filters), the repository's panel, the group's links | an unchanged repository costs one 304; the listing's pull requests are left out; the leak test passes; Playwright filters `/issues` with and without JavaScript; axe clean in both themes | done |
 | IS2 | Open issues, the rest: the tool, search, llms, the sitemap; docs, the Guide, the plugin | as PR3 | done |
+| PQ1 | Prerequisites (`design/prerequisites.md`, P-71): `internal/prereq` (what each feature needs), the App's grants from its installations, a token's refusals from the jobs, `/api/v1/prerequisites`, the warning on `/pulls` and `/issues`, the Admin card, the status and the log; the docs, the Guide, the skills and the example configuration | an App without *Issues* warns on `/issues` and in Admin; a refused token warns on `/pulls`; nothing shows when all hold; the public answer names no permission; a test keeps the docs' table equal to `prereq.Needs` | done |
 | E1 | Embedding, the contract (`design/embed.md`): versioned HTML fragments for host sites, their parameters, parts and `--scp-*` custom properties, `embed.origins` | a contract test fails when a fragment's parameter, part or custom property changes without a new version | dequeued: the owner returns to it later |
 | E2 | Embedding, the fragments: product card, fleet map, telemetry, latest commits, repository health in declarative shadow roots; the dashboard built from them | the dashboard renders through the fragments with its gates unchanged; a fragment alone renders in a blank page without script | dequeued |
 | E3 | Embedding, the behaviour module `/embed/v1/scp.js`: custom elements, hints, live updates, theming | a static host page with two fragments themes them, updates both on one push and passes axe | dequeued |

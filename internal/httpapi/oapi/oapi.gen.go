@@ -545,6 +545,27 @@ func (e MeVia) Valid() bool {
 	}
 }
 
+// Defines values for PrerequisiteFeature.
+const (
+	PrerequisiteFeatureCatalogue PrerequisiteFeature = "catalogue"
+	PrerequisiteFeatureIssues    PrerequisiteFeature = "issues"
+	PrerequisiteFeaturePulls     PrerequisiteFeature = "pulls"
+)
+
+// Valid indicates whether the value is a known member of the PrerequisiteFeature enum.
+func (e PrerequisiteFeature) Valid() bool {
+	switch e {
+	case PrerequisiteFeatureCatalogue:
+		return true
+	case PrerequisiteFeatureIssues:
+		return true
+	case PrerequisiteFeaturePulls:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PullRequestChecks.
 const (
 	PullRequestChecksFailing PullRequestChecks = "failing"
@@ -1647,6 +1668,40 @@ type Person struct {
 	Name string `json:"name"`
 }
 
+// Prerequisite defines model for Prerequisite.
+type Prerequisite struct {
+	// Effect What a reader sees without it
+	Effect string `json:"effect"`
+
+	// Events The missing webhook events as GitHub's settings name them; administrators only
+	Events  *[]string           `json:"events,omitempty"`
+	Feature PrerequisiteFeature `json:"feature"`
+
+	// Fix What to do about it; administrators only
+	Fix *string `json:"fix,omitempty"`
+
+	// Owners The accounts whose installation lacks it; administrators only
+	Owners *[]string `json:"owners,omitempty"`
+
+	// Permissions The missing read permissions as GitHub's settings name them; administrators only
+	Permissions *[]string `json:"permissions,omitempty"`
+
+	// Refused A token GitHub refused, whose permissions cannot be asked; administrators only
+	Refused *bool `json:"refused,omitempty"`
+
+	// Source The configured source; administrators only
+	Source *string `json:"source,omitempty"`
+	Title  string  `json:"title"`
+}
+
+// PrerequisiteFeature defines model for Prerequisite.Feature.
+type PrerequisiteFeature string
+
+// PrerequisiteList defines model for PrerequisiteList.
+type PrerequisiteList struct {
+	Unmet []Prerequisite `json:"unmet"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Code   string  `json:"code"`
@@ -2202,6 +2257,9 @@ type ServerInterface interface {
 	// GetPage A page's layout, its elements resolved against the viewer's view
 	// (GET /pages/{page})
 	GetPage(w http.ResponseWriter, r *http.Request, page GetPageParamsPage)
+	// GetPrerequisites The features whose GitHub prerequisites do not hold, and how to fix them
+	// (GET /prerequisites)
+	GetPrerequisites(w http.ResponseWriter, r *http.Request)
 	// ListPulls Open pull requests across repositories, whose turn first, one page at a time
 	// (GET /pulls)
 	ListPulls(w http.ResponseWriter, r *http.Request, params ListPullsParams)
@@ -2589,6 +2647,20 @@ func (siw *ServerInterfaceWrapper) GetPage(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetPage(w, r, page)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPrerequisites operation middleware
+func (siw *ServerInterfaceWrapper) GetPrerequisites(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPrerequisites(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3304,6 +3376,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commits", wrapper.ListCommits)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pulls", wrapper.ListPulls)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues", wrapper.ListIssues)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prerequisites", wrapper.GetPrerequisites)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group}", wrapper.GetGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos", wrapper.ListRepos)
@@ -3705,6 +3778,27 @@ func (response GetPage404ApplicationProblemPlusJSONResponse) VisitGetPageRespons
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPrerequisitesRequestObject struct {
+}
+
+type GetPrerequisitesResponseObject interface {
+	VisitGetPrerequisitesResponse(w http.ResponseWriter) error
+}
+
+type GetPrerequisites200JSONResponse PrerequisiteList
+
+func (response GetPrerequisites200JSONResponse) VisitGetPrerequisitesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -4406,6 +4500,9 @@ type StrictServerInterface interface {
 	// GetPage A page's layout, its elements resolved against the viewer's view
 	// (GET /pages/{page})
 	GetPage(ctx context.Context, request GetPageRequestObject) (GetPageResponseObject, error)
+	// GetPrerequisites The features whose GitHub prerequisites do not hold, and how to fix them
+	// (GET /prerequisites)
+	GetPrerequisites(ctx context.Context, request GetPrerequisitesRequestObject) (GetPrerequisitesResponseObject, error)
 	// ListPulls Open pull requests across repositories, whose turn first, one page at a time
 	// (GET /pulls)
 	ListPulls(ctx context.Context, request ListPullsRequestObject) (ListPullsResponseObject, error)
@@ -4678,6 +4775,30 @@ func (sh *strictHandler) GetPage(w http.ResponseWriter, r *http.Request, page Ge
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetPageResponseObject); ok {
 		if err := validResponse.VisitGetPageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPrerequisites operation middleware
+func (sh *strictHandler) GetPrerequisites(w http.ResponseWriter, r *http.Request) {
+	var request GetPrerequisitesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPrerequisites(ctx, request.(GetPrerequisitesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPrerequisites")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPrerequisitesResponseObject); ok {
+		if err := validResponse.VisitGetPrerequisitesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

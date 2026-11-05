@@ -8,6 +8,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/prereq"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -23,6 +24,7 @@ type status struct {
 	rate         func() map[string]float64
 	webhook      bool
 	layouts      func() []string // why stored layouts are not served
+	prereqs      func() []prereq.Unmet
 	cluster      interface {
 		Leader() bool
 		Connected() bool
@@ -126,6 +128,9 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	}
 	if st.layouts != nil {
 		b.Warnings = append(b.Warnings, st.layouts()...)
+	}
+	if st.prereqs != nil {
+		b.Warnings = append(b.Warnings, warnings(st.prereqs())...)
 	}
 	slices.Sort(b.Warnings)
 	st.mu.Lock()

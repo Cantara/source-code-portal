@@ -48,6 +48,7 @@ export const keys = {
     ] as const,
   page: (page: string) => ["page", page] as const,
   me: () => ["me"] as const,
+  prerequisites: () => ["prerequisites"] as const,
   assistant: () => ["assistant"] as const,
   search: (q: string, kind: string, page: number) => ["search", q, kind, page] as const,
   suggest: (q: string) => ["search", "suggest", q] as const,
@@ -55,6 +56,10 @@ export const keys = {
 
 export const meQuery = (api: Api) =>
   queryOptions({ queryKey: keys.me(), queryFn: ({ signal }) => unwrap(api.GET("/me", { signal })) })
+
+/** prerequisitesQuery is the features whose GitHub prerequisites do not hold (design/prerequisites.md); an administrator gets the fix. */
+export const prerequisitesQuery = (api: Api) =>
+  queryOptions({ queryKey: keys.prerequisites(), queryFn: ({ signal }) => unwrap(api.GET("/prerequisites", { signal })) })
 
 export const rulesQuery = (api: Api) =>
   queryOptions({ queryKey: keys.rules(), queryFn: ({ signal }) => unwrap(api.GET("/rules", { signal })) })

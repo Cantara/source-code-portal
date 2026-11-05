@@ -32,6 +32,11 @@ In GitHub, the organisation's *Settings*, *Developer settings*, *GitHub Apps*, *
 - Subscribe to events: *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*, *Check suite*, *Status*.
 - Where can it be installed: *Only on this account*.
 
+Each permission serves a feature: *Contents* and *Metadata* the catalogue, *Issues* the open issues, *Pull requests*, *Checks* and
+*Commit statuses* the open pull requests and whose turn each is. Without one, that feature stays empty, and the portal says so on its
+page and on the *Admin* page (operator guide, section 1). Changing them later needs the installation to accept them: an organisation
+owner, Organization settings, GitHub Apps, *Review request*.
+
 Create it, note the *App ID*, generate a private key and store it as `/srv/scp/secrets/scp-app.pem` (group 65532, mode 0640). Then
 *Install App* on the organisation, *All repositories* (or the ones the portal shows).
 

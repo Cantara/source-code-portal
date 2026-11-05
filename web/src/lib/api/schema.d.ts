@@ -91,6 +91,28 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/prerequisites": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The features whose GitHub prerequisites do not hold, and how to fix them
+     * @description What each feature needs from GitHub (read permissions, webhook events) checked against the GitHub App's installations, or for
+     *     a token against the reads GitHub refused (design/prerequisites.md). Empty when every prerequisite holds. The source, the
+     *     accounts, the missing permissions and events and the fix are given to administrators only.
+     */
+    get: operations["getPrerequisites"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/groups": {
     parameters: {
       query?: never
@@ -848,6 +870,28 @@ export interface components {
       page: components["schemas"]["Page"]
       freshness: components["schemas"]["Freshness"]
     }
+    PrerequisiteList: {
+      unmet: components["schemas"]["Prerequisite"][]
+    }
+    Prerequisite: {
+      /** @enum {string} */
+      feature: "catalogue" | "pulls" | "issues"
+      title: string
+      /** @description What a reader sees without it */
+      effect: string
+      /** @description The configured source; administrators only */
+      source?: string
+      /** @description The accounts whose installation lacks it; administrators only */
+      owners?: string[]
+      /** @description The missing read permissions as GitHub's settings name them; administrators only */
+      permissions?: string[]
+      /** @description The missing webhook events as GitHub's settings name them; administrators only */
+      events?: string[]
+      /** @description A token GitHub refused, whose permissions cannot be asked; administrators only */
+      refused?: boolean
+      /** @description What to do about it; administrators only */
+      fix?: string
+    }
     /**
      * @description The order of a list of open pull requests or issues: whose turn first (waiting), newest first, updated last first
      * @default waiting
@@ -1577,6 +1621,26 @@ export interface operations {
       304: components["responses"]["NotModified"]
       400: components["responses"]["BadRequest"]
       404: components["responses"]["NotFound"]
+    }
+  }
+  getPrerequisites: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The unmet prerequisites */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["PrerequisiteList"]
+        }
+      }
     }
   }
   listGroups: {

@@ -60,9 +60,13 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    repositories only, webhooks on.
 2. **Access to GitHub.** A GitHub App is best (its own rate limit, webhooks, private repositories by installation): *Contents*,
    *Metadata*, *Issues*, *Pull requests*, *Checks* and *Commit statuses* read-only, webhook URL `<public_url>/webhooks/github` with a
-   random secret, events *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*, *Check
-   suite*, *Status*, installed on the
-   accounts. A token (fine-grained, public repositories read; or a classic one without scopes) is fine to start.
+   random secret, events *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*,
+   *Check suite*, *Status*, installed on the
+   accounts. Each permission serves a feature, and a missing one leaves it empty (the table is the operator guide's section 1):
+   *Contents* and *Metadata* the catalogue, *Issues* `/issues`, *Pull requests*, *Checks* and *Commit statuses* `/pulls`. Tell
+   them that the portal only reads (every permission *Read-only*) and that a later change must be accepted on each installation by an
+   organisation owner (Organization settings, GitHub Apps, *Review request*). A token (fine-grained, public repositories read; or a
+   classic one without scopes) is fine to start.
    Walk them through the GitHub pages; they create it.
 3. **Secrets.** In a directory only root and UID 65532 read:
    ```sh
@@ -110,6 +114,7 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
 | Symptom | Look at |
 |---|---|
 | `config check` exits 2 | each problem names its key; unknown keys and unknown `SCP_*` variables are errors |
+| `/pulls` or `/issues` says the feature is off, or stays empty | *Admin*, *GitHub prerequisites* (or `/api/v1/status` warnings, the log's `prerequisites unmet`): the missing permissions and events and the installation; grant them in the App's *Permissions & events*, accept them on the installation, then check with `gh api /orgs/<org>/installations --jq '.installations[] \| {app_slug, permissions, events}'` |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for 401/403 (credential, App not installed, missing permission) |
 | A repository is missing | public (or `include_private` with access), not a fork, not in `exclude`, in a listed account; `scp config groups` |
 | Pushes show only after minutes | the webhook: GitHub's delivery log, `scp_webhook_deliveries_total` by result; without one the portal lists every 5 minutes |

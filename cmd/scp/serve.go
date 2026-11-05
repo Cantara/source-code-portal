@@ -105,6 +105,7 @@ type (
 		toolsAPI
 		searchAPI
 		rulesAPI
+		*prereqs
 	}
 )
 
@@ -119,6 +120,7 @@ type server struct {
 	web               *webui.Server   // nil without web.dir
 	layouts           *layout.Store
 	notices           *announce.Notices
+	prereqs           *prereqs
 	stopping          atomic.Bool
 	public, admin     *http.Server
 	publicLn, adminLn net.Listener
@@ -227,7 +229,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 	s.layouts = layout.Open(cfg.Layout.Dir, log)
 	s.notices = announce.Open(cfg.Announcements, cfg.Layout.Dir, time.Now, log)
-	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
+	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: cfg.Webhook.Secret.IsSet(),
+		log: log.With("component", "prerequisites")}
+	st := &status{ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		webhook: cfg.Webhook.Secret.IsSet(), layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
 		deliveries: map[string]int{}}
 	if s.member != nil {
@@ -309,7 +313,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
 	features := api{catalogAPI, commitsAPI, pulls.API{Current: view}, issues.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For},
-		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{}}
+		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{}, s.prereqs}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}
@@ -408,6 +412,19 @@ func loopback(addr net.Addr) string {
 	return "http://" + net.JoinHostPort(host, port)
 }
 
+// watchPrereqs checks the prerequisites at every publish (the App's installations are listed again with each source's listing),
+// so a change is logged when it happens, not when a page asks.
+func (s *server) watchPrereqs(ctx context.Context) {
+	for {
+		s.prereqs.check()
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.pub.Published():
+		}
+	}
+}
+
 // deliver hands a webhook event to the engine of every instance (through the cluster when there is one, else or when it fails to
 // this one's): per repository when repo is set, else per source.
 func (s *server) deliver(ev sync.Event, repo snapshot.RepoKey, source string) {
@@ -460,6 +477,9 @@ func (s *server) run(ctx context.Context) error {
 	go func() { s.notices.Run(layoutsCtx); close(noticesDone) }()
 	defer func() { stopLayouts(); <-noticesDone }()
 	defer func() { stopLayouts(); <-layoutsDone }()
+	checksDone := make(chan struct{})
+	go func() { s.watchPrereqs(layoutsCtx); close(checksDone) }()
+	defer func() { stopLayouts(); <-checksDone }()
 	memberCtx, stopMember := context.WithCancel(context.WithoutCancel(ctx))
 	memberDone := make(chan error, 1)
 	if s.member != nil {

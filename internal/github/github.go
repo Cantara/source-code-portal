@@ -4,11 +4,13 @@ package github
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -112,6 +114,7 @@ type Source struct {
 	mu       sync.Mutex
 	token    *credential            // token mode
 	owners   map[string]*credential // App mode: lower-case owner login -> installation
+	grants   []Grant                // App mode: what each installation may read, from the last listing
 	accounts map[string]account     // token mode: lower-case owner login -> what it is, looked up once
 }
 
@@ -206,11 +209,13 @@ func (s *Source) RefreshInstallations(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	owners := map[string]*credential{}
+	grants := []Grant{}
 	for _, in := range installs {
 		login := strings.ToLower(in.GetAccount().GetLogin())
 		if login == "" || in.SuspendedAt != nil || len(allowed) > 0 && !allowed[login] {
 			continue
 		}
+		grants = append(grants, grantOf(login, in))
 		if prev := s.owners[login]; prev != nil {
 			owners[login] = prev // keep the token and rate state
 			continue
@@ -229,9 +234,46 @@ func (s *Source) RefreshInstallations(ctx context.Context) error {
 		}
 		owners[login] = &credential{client: client, rate: rate, user: in.GetAccount().GetType() == "User"}
 	}
-	s.owners = owners
+	s.owners, s.grants = owners, grants
 	return nil
 }
+
+// Grant is what an App's installation on an account may read (permission name to "read" or "write", as GitHub names them:
+// contents, metadata, issues, pull_requests, checks, statuses) and the webhook events it is sent.
+type Grant struct {
+	Owner       string
+	Permissions map[string]string
+	Events      []string
+}
+
+func grantOf(login string, in *gh.Installation) Grant {
+	g := Grant{Owner: login, Permissions: map[string]string{}, Events: slices.Clone(in.Events)}
+	if in.Permissions != nil {
+		var m map[string]*string
+		if b, err := json.Marshal(in.Permissions); err == nil && json.Unmarshal(b, &m) == nil {
+			for k, v := range m {
+				if v != nil && *v != "" {
+					g.Permissions[k] = *v
+				}
+			}
+		}
+	}
+	return g
+}
+
+// Grants is what the App's installations may read, from the last listing; known is false in token mode, where GitHub does not tell
+// (a fine-grained token's access cannot be asked), and before the first listing.
+func (s *Source) Grants() (grants []Grant, known bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.app == nil || s.grants == nil {
+		return nil, false
+	}
+	return slices.Clone(s.grants), true
+}
+
+// App reports whether the source reads through a GitHub App, not a token.
+func (s *Source) App() bool { return s.app != nil }
 
 // REST returns the go-github client for owner's credential, for the calls only one feature makes; classify their failures with
 // Classify.

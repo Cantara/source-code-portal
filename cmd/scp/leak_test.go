@@ -43,8 +43,8 @@ func privatePortal(t *testing.T, extra string) fetch {
 	return get
 }
 
-// privatePortalAt is privatePortal with the portal's base URL.
-func privatePortalAt(t *testing.T, extra string) (fetch, string) {
+// privatePortalAt is privatePortal with the portal's base URL; setup changes the fake GitHub before the portal starts.
+func privatePortalAt(t *testing.T, extra string, setup ...func(*githubtest.Server)) (fetch, string) {
 	t.Helper()
 	gh := githubtest.New(t)
 	gh.AddToken("ghp_test")
@@ -63,6 +63,9 @@ func privatePortalAt(t *testing.T, extra string) (fetch, string) {
 		Base: "main", Head: "zq-hidden-work", HeadSHA: strings.Repeat("c", 40)})
 	gh.SetIssues(hidden, githubtest.Issue{Number: 2, Title: "zq hidden issue in the q7 vault", Author: "ann", Created: at, Updated: at,
 		Labels: []string{"zq-hidden"}})
+	for _, f := range setup {
+		f(gh)
+	}
 
 	dir := t.TempDir()
 	token := filepath.Join(dir, "token")

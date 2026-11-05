@@ -16,6 +16,22 @@ store:
   path: /data/scp.db
 sync:
   concurrency: 4
+# PREREQUISITES ON GITHUB: what the GitHub App (or token) must be granted. The portal only reads: every permission Read-only, never
+# a write. A missing permission leaves its feature empty, and the portal warns on that feature's page and on the Admin page.
+#
+#   Feature                              Read permissions                        Webhook events (with webhook.secret_file below)
+#   The catalogue: repositories, README  Contents, Metadata                      Push, Release, Repository
+#     and documents, manifests, commits,
+#     releases, packages
+#   Pull requests (/pulls)               Pull requests, Checks, Commit statuses  Pull request, Pull request review, Check suite, Status
+#   Issues (/issues)                     Issues                                  Issues, Issue comment
+#
+# A GitHub App: set them in the App's settings, "Permissions & events", then have an organisation owner accept them on each
+# installation (Organization settings, GitHub Apps, "Review request"); until then the installation keeps the old ones. Check with
+#   gh api /orgs/<org>/installations --jq '.installations[] | {app_slug, permissions, events}'
+# A fine-grained token: read access to the same (Contents, Metadata, Issues, Pull requests, Commit statuses; checks come with them).
+# Without webhooks every feature still refreshes on its schedule: the listing every catalog.reconcile_interval, pull requests and
+# issues every 15 minutes.
 github:
   sources:
     - id: github

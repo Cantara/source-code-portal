@@ -42,6 +42,8 @@ type Server struct {
 	tokens   map[string]string // accepted personal tokens -> the account login they belong to ("" for none)
 	users    map[string]bool   // lower-case logins of user accounts; every other owner is an organisation
 	installs map[int64]string  // installation id -> account login
+	grants   map[string]grant  // by account login (lower case); absent: every permission and event
+	t        testing.TB
 	issued   map[string]string // installation token -> account login
 	orgs     map[string][]*gh.Repository
 	commits  map[int64][]Commit            // by repository id, newest first
@@ -73,7 +75,7 @@ func New(t testing.TB) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
+	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, t: t, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
 		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
 		releases: map[int64]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
@@ -245,6 +247,12 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 			s.mu.Unlock()
 		}()
 		line := req.Method + " " + req.URL.Path
+		if !readOnly(req) {
+			// The portal is read-only towards GitHub (P-71): a write fails the test that sent it.
+			s.t.Errorf("githubtest: the portal sent a write to GitHub: %s", line)
+			writeError(rec, http.StatusForbidden, "the portal must not write to GitHub")
+			return
+		}
 		s.mu.Lock()
 		for _, f := range s.faults {
 			if f.times > 0 && strings.HasPrefix(line, f.pattern) {
@@ -263,6 +271,42 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 		s.mu.Unlock()
 		next.ServeHTTP(rec, req)
 	})
+}
+
+// readOnly reports whether req only reads: a GET or HEAD, a GraphQL query (checked for mutations where it is answered), or the
+// App's request for an installation token.
+func readOnly(req *http.Request) bool {
+	switch {
+	case req.Method == http.MethodGet || req.Method == http.MethodHead:
+		return true
+	case req.Method != http.MethodPost:
+		return false
+	case req.URL.Path == "/graphql":
+		return true
+	}
+	return strings.HasPrefix(req.URL.Path, "/app/installations/") && strings.HasSuffix(req.URL.Path, "/access_tokens")
+}
+
+// grant is what an installation of the App may read and which webhook events it is sent.
+type grant struct {
+	permissions map[string]string
+	events      []string
+}
+
+// AllPermissions and AllEvents are what the fake's installations grant unless SetGrants says otherwise: every permission and event
+// the portal asks for.
+var (
+	AllPermissions = map[string]string{"contents": "read", "metadata": "read", "issues": "read", "pull_requests": "read", //nolint:gochecknoglobals // test data
+		"checks": "read", "statuses": "read"}
+	AllEvents = []string{"push", "release", "repository", "issues", "issue_comment", "pull_request", "pull_request_review", //nolint:gochecknoglobals // test data
+		"check_suite", "status"}
+)
+
+// SetGrants sets what the App's installation on login may read and which events it is sent.
+func (s *Server) SetGrants(login string, permissions map[string]string, events []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.grants[strings.ToLower(login)] = grant{permissions: maps.Clone(permissions), events: slices.Clone(events)}
 }
 
 // charge authenticates a REST call and counts it against the credential's limit. It writes the error and returns "" when the
@@ -355,7 +399,15 @@ func (s *Server) listInstallations(w http.ResponseWriter, req *http.Request) {
 		if s.users[strings.ToLower(s.installs[id])] {
 			kind = "User"
 		}
-		out = append(out, &gh.Installation{ID: new(id), Account: &gh.User{Login: new(s.installs[id]), Type: new(kind)}})
+		g, ok := s.grants[strings.ToLower(s.installs[id])]
+		if !ok {
+			g = grant{permissions: AllPermissions, events: AllEvents}
+		}
+		var perms gh.InstallationPermissions
+		b, _ := json.Marshal(g.permissions)
+		_ = json.Unmarshal(b, &perms)
+		out = append(out, &gh.Installation{ID: new(id), Account: &gh.User{Login: new(s.installs[id]), Type: new(kind)}, Permissions: &perms,
+			Events: slices.Clone(g.events)})
 	}
 	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, out)
@@ -934,6 +986,11 @@ func (s *Server) graphQL(w http.ResponseWriter, req *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if q := strings.TrimSpace(body.Query); strings.HasPrefix(q, "mutation") {
+		s.t.Errorf("githubtest: the portal sent a GraphQL mutation (P-71): %.80s", q)
+		writeError(w, http.StatusForbidden, "the portal must not write to GitHub")
+		return
+	}
 	r := s.lookup(body.Variables["owner"], body.Variables["name"])
 	if r == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"repository": nil},

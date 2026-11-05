@@ -80,6 +80,7 @@ func TestAppMode(t *testing.T) {
 	srv := githubtest.New(t)
 	srv.Install("acme")
 	srv.Install("other")
+	srv.SetGrants("acme", map[string]string{"contents": "read", "metadata": "read"}, []string{"push"})
 	srv.AddRepo("acme", gh.Repository{Name: new("one")})
 	c, err := New(config.GitHub{Sources: []config.Source{{
 		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme", "missing"},
@@ -98,6 +99,10 @@ func TestAppMode(t *testing.T) {
 	}
 	if frac, _ := c.Remaining("gh", "other"); frac != 1 {
 		t.Errorf("filtered installation has a rate: %v", frac)
+	}
+	if g, known := s.Grants(); !known || len(g) != 1 || g[0].Owner != "acme" || g[0].Permissions["contents"] != "read" ||
+		g[0].Permissions["issues"] != "" || !slices.Equal(g[0].Events, []string{"push"}) {
+		t.Errorf("grants = %+v, %v; want acme's only, as the installation listing says", g, known)
 	}
 	_, err = s.ListRepos(t.Context(), "missing")
 	var e *Error

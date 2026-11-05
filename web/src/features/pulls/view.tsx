@@ -12,6 +12,7 @@ import { firstPageOf, rememberSize } from "@/lib/paging"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
 import { Pager } from "@/shared/pager"
+import { PrerequisiteNotice } from "@/shared/prerequisites"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { QueueChips, QueueForm } from "@/shared/queue"
 import { RelativeTime } from "@/shared/relative-time"
@@ -68,6 +69,7 @@ export function PullsView({ defaultSize }: { defaultSize: number }) {
           }}
         />
       </PageHeader>
+      <PrerequisiteNotice feature="pulls" />
       {error && !data && <ProblemAlert error={error} />}
       {data && (
         <section

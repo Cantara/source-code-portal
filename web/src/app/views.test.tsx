@@ -59,6 +59,55 @@ describe("pages", () => {
     expect(screen.getByRole("form", { name: "Filter issues" })).toHaveAttribute("action", "/issues")
   })
 
+  it("warns on /issues when the GitHub App lacks what issues need; an administrator gets the fix", async () => {
+    server.use(
+      http.get("/prerequisites", ({ response }) =>
+        response(200).json({ unmet: [{ feature: "issues", title: "Issues", effect: "Open issues are not read." }] }),
+      ),
+    )
+    show(<IssuesView defaultSize={50} />, "/issues")
+    const notice = await screen.findByRole("status", { name: "Disabled feature" })
+    expect(notice).toHaveTextContent("Open issues are not read.")
+    expect(notice).toHaveTextContent("An administrator of the portal can grant what it needs on GitHub.")
+    expect(within(notice).queryByRole("link")).toBeNull()
+  })
+
+  it("tells an administrator what to grant", async () => {
+    server.use(
+      http.get("/prerequisites", ({ response }) =>
+        response(200).json({
+          unmet: [
+            {
+              feature: "pulls",
+              title: "Pull requests",
+              effect: "Open pull requests are not read.",
+              source: "gh",
+              owners: ["acme"],
+              permissions: ["Pull requests", "Checks"],
+              events: [],
+              refused: false,
+              fix: "In the GitHub App's settings, Permissions & events: set Pull requests and Checks to Read-only.",
+            },
+          ],
+        }),
+      ),
+    )
+    show(<PullsView defaultSize={50} />, "/pulls")
+    const notice = await screen.findByRole("status", { name: "Disabled feature" })
+    expect(notice).toHaveTextContent("Missing read permissions: Pull requests, Checks.")
+    expect(notice).toHaveTextContent("Installation: acme (source gh).")
+    expect(within(notice).getByRole("link", { name: "What the portal needs from GitHub" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("operator-guide.md#1-connect-github"),
+    )
+  })
+
+  it("shows no warning when every prerequisite holds", async () => {
+    show(<IssuesView defaultSize={50} />, "/issues")
+    expect(await screen.findByRole("heading", { level: 1, name: "Issues" })).toBeInTheDocument()
+    expect(screen.queryByRole("status", { name: "Disabled feature" })).toBeNull()
+  })
+
   it("renders the dashboard with the fleet, the products' signals and the team's latest commits", async () => {
     show(<DashboardView work={["hand", "ai"]} />)
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()

@@ -7,9 +7,10 @@ import { Alert } from "@/components/ui/alert"
 import { Button, buttonClass } from "@/components/ui/button"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, get, ProblemError } from "@/lib/api/client"
-import { assistantQuery, meQuery } from "@/lib/api/queries"
+import { assistantQuery, meQuery, prerequisitesQuery } from "@/lib/api/queries"
 import { plural } from "@/lib/format"
 import { PageHeader } from "@/shared/page-header"
+import { PrerequisiteDetails, setupDocs } from "@/shared/prerequisites"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { AnnouncementsCard } from "./announcements"
@@ -130,6 +131,35 @@ export function Status({ s }: { s: AdminStatus }) {
 
 const access: Record<string, string> = { "signed-in": "signed-in viewers", admin: "administrators", everyone: "everyone" }
 
+/** PrerequisitesCard lists what the features need from GitHub and lack (design/prerequisites.md), each with its fix. */
+function PrerequisitesCard() {
+  const { data, error } = useQuery(prerequisitesQuery(api))
+  return (
+    <Card aria-labelledby="prerequisites">
+      <CardTitle id="prerequisites">GitHub prerequisites</CardTitle>
+      {error && <ProblemAlert error={error} />}
+      {data && data.unmet.length === 0 && (
+        <p className="mt-1 text-sm text-muted-foreground">Every feature has what it needs from GitHub.</p>
+      )}
+      {data && data.unmet.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-3 text-sm">
+          {data.unmet.map((p, i) => (
+            <li key={`${p.feature}-${p.source ?? ""}-${i}`} className="flex flex-col gap-1">
+              <p className="font-medium">
+                {p.title}: {p.effect}
+              </p>
+              <PrerequisiteDetails p={p} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <a href={setupDocs} rel="noreferrer" className="mt-2 inline-block text-sm hover:underline">
+        What the portal needs from GitHub
+      </a>
+    </Card>
+  )
+}
+
 /** AssistantCard shows the assistant's provider and tests it with one short completion. */
 export function AssistantCard() {
   const { data: a } = useQuery(assistantQuery(api))
@@ -211,6 +241,7 @@ export function AdminView() {
           <>
             <Status s={data} />
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <PrerequisitesCard />
               <AnnouncementsCard />
               <AssistantCard />
             </div>
