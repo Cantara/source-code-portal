@@ -98,7 +98,7 @@ web:
 # administrators write in /admin (announcements.json). Empty: the built-in layouts and the configured announcements, nothing saved.
 layout:
   dir: ""
-# The deployment's announcements, above the fleet on the dashboard and /present while their time lasts (locked in /admin). Plain
+# The deployment's announcements, at the top of the dashboard and /present while their time lasts (locked in /admin). Plain
 # text; times in RFC 3339 with their offset, shown as written; until is required unless ends is set.
 announcements: []
 #  - id: juleol-2026

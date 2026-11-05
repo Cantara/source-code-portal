@@ -5,7 +5,7 @@ import { screens } from "./screens"
 // the dashboard for signed-in viewers alone. The fake provider signs in Ada Lovelace, an administrator.
 const title = "Juleølsmaking på Rebel Makerspace"
 
-test("the dashboard shows the event above the fleet, keeps the signed-in notice from the public, and keeps a dismissal", async ({
+test("the dashboard shows the event at the top, keeps the signed-in notice from the public, and keeps a dismissal", async ({
   page,
 }) => {
   await page.goto("/")

@@ -315,7 +315,7 @@ layout:
 health, the products as tiles and the newest commits on one screen that never scrolls. A product at watch or attention gets a wide
 tile with its findings; the good ones take a line each and fold into "N more good" when they do not fit. It says at all times how
 current it is (*Live*, *Polling*, *Stale* after 2 minutes without new data, *Offline* after 10 or while the portal cannot be reached),
-keeps the screen awake, is dark unless the reader chose, reloads for a new release and once an hour, and shifts a pixel now and then
+keeps the screen awake, follows the reader's theme (a screen told it is on a wall is dark unless the reader chose), reloads for a new release and once an hour, and shifts a pixel now and then
 against burn-in. A tap shows its controls; an administrator designs it as the dashboard (`present.json` in `layout.dir`).
 
 - One screen per team: `/present?groups=payments,identity` keeps to those products, `?work=hand,ai` fixes the work that counts.
@@ -336,7 +336,7 @@ against burn-in. A tap shows its controls; an administrator designs it as the da
 #### 2.4.1 Announcements
 
 The portal carries the team's news: an event with a sign-up link, planned maintenance, a change everyone must know about. An
-announcement shows above the fleet on the dashboard and on `/present` (the `announcements` element in the design mode; move it like any
+announcement shows at the top of the dashboard and of `/present` (the `announcements` element in the design mode; move it like any
 other) while its time lasts, and goes away by itself. It is plain text with one link, never HTML or Markdown.
 
 - **Administrators** write them on the *Admin* page's *Announcements* card: the title, a line, when it starts and ends, where, a link

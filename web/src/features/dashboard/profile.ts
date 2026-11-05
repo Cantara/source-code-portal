@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useSyncExternalStore } from "react"
+import { paint } from "@/lib/theme"
 import { forget, profileCookie, profileOf, remember, wallCookie, type Profile } from "@/lib/preferences"
 
 /** size is the window's size as one value the store compares, "2560x1440". */
@@ -25,6 +26,7 @@ export function useProfile(guess: Profile, told: boolean, ask?: string) {
   useEffect(() => {
     if (wall) remember(wallCookie, "1")
     else forget(wallCookie)
+    paint() // a wall is dark unless the reader chose; a tablet or a desk follows the system
   }, [wall])
   useEffect(() => {
     if (seen) remember(profileCookie, profile)

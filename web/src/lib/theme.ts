@@ -43,11 +43,21 @@ export function apply(choice: Choice) {
 }
 
 /**
- * paint sets the dark class and colour scheme on the document from the current choice and the system preference; the presentation
- * page is dark unless the reader chose, as public/theme-init.js paints it.
+ * onWall reports whether this page is the presentation page on a screen told it is on a wall (`?profile=wall`, or the cookie
+ * scp-present-wall unless `?profile=auto`), as public/theme-init.js reads it.
  */
-function paint() {
-  const wall = window.location.pathname === "/present"
+export function onWall(): boolean {
+  if (window.location.pathname !== "/present") return false
+  const ask = new URLSearchParams(window.location.search).get("profile")
+  return ask === "wall" || (ask !== "auto" && /(?:^|;\s*)scp-present-wall=1(?:;|$)/.test(document.cookie))
+}
+
+/**
+ * paint sets the dark class and colour scheme on the document from the current choice and the system preference; a wall is dark
+ * unless the reader chose (design/present.md), as public/theme-init.js paints it.
+ */
+export function paint() {
+  const wall = onWall()
   const dark = isDark(current ?? stored(), wall || window.matchMedia(systemQuery).matches)
   document.documentElement.classList.toggle("dark", dark)
   document.documentElement.style.colorScheme = dark ? "dark" : "light"

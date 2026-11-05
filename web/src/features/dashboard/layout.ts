@@ -53,8 +53,8 @@ export function blank(kind: Kind): Element {
 
 /** defaultLayout is the landing page before its layout is read: the built-in one the API serves without a stored layout. */
 export const defaultLayout: Element[] = [
-  { kind: "telemetry" },
   { kind: "announcements" },
+  { kind: "telemetry" },
   { kind: "fleet-map" },
   { kind: "products", view: "cards" },
   { kind: "latest-commits", count: 10 },

@@ -144,7 +144,7 @@ export function PortalNav() {
         <BookIcon className="size-[1.125rem]" />
         <span className="sr-only">Guide</span>
       </Link>
-      {/* A whole page load: the presentation page draws its own screen, dark unless the reader chose. */}
+      {/* A whole page load: the presentation page draws its own screen, dark on a wall unless the reader chose. */}
       <a href="/present" className={tool} title="Present">
         <PresentIcon className="size-[1.125rem]" />
         <span className="sr-only">Present</span>

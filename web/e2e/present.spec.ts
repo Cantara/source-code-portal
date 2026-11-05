@@ -43,9 +43,13 @@ test("/present?groups= shows only the products it names", async ({ page }) => {
   await expect(products.getByRole("link", { name: "Other" })).toHaveCount(0)
 })
 
-test("/present is dark unless the reader chose, and a tap or a key shows its bar", async ({ page }) => {
+test("/present follows the system on a tablet, is dark on a wall unless the reader chose, and a tap or a key shows its bar", async ({
+  page,
+}) => {
   await page.emulateMedia({ colorScheme: "light" })
   await page.goto("/present")
+  await expect(page.locator("html")).not.toHaveClass(/dark/)
+  await page.goto("/present?profile=wall")
   await expect(page.locator("html")).toHaveClass(/dark/)
   const bar = page.getByRole("navigation", { name: "Presentation" })
   await expect(bar).toHaveCSS("opacity", "0")

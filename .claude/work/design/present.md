@@ -78,8 +78,9 @@ fits from 1024 to 1920 pixels wide.
   container, and as it narrows its elements keep what matters most (container queries): the strip drops the people and the share
   with AI first (below 48 rem), then the products (36 rem) and the repositories (28 rem); the good products fold sooner. The products at attention and at watch, their wide tiles and the data's age never go.
 - **Text**: 15 px for what is read (tiles, commits, the strip), numbers at 20 px; only the section labels and the fleet map's product
-  names are smaller. Dark theme unless the reader chose (`theme-init.js` and `lib/theme.ts` treat the system choice as dark on
-  `/present`); the theme's tokens only.
+  names are smaller. The reader's theme, as on every page; a wall (`?profile=wall`, the cookie `scp-present-wall`) is dark unless the
+  reader chose (`theme-init.js` and `lib/theme.ts` treat the system choice as dark there, and repaint when the tap bar says *On a
+  wall*); a tablet or a desk in a light room follows the system (P-66); the theme's tokens only.
 
 ## Behaviour
 
