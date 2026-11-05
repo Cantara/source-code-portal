@@ -77,6 +77,8 @@ github:
 catalog:
   groups:
     - {id: all, name: All, default_repo: zq-hidden, match: [{catch_all: true}]}
+announcements:
+  - {id: move, title: "zq-hidden moves to the q7 vault", audience: signed-in, until: "2999-01-01T00:00:00Z"}
 ` + strings.ReplaceAll(extra, "$DIR", dir)
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -162,7 +164,7 @@ func publicPaths(t *testing.T) []string {
 		"/badges/groups/all/health.svg", "/badges/groups/all/last-commit.svg", "/badges/groups/all/release.svg",
 		"/images/acme/zq-hidden/00000000000000000000000000000000", "/badge/license/zq-hidden/main", "/commits/zq-hidden",
 		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events", "/api/v1/admin/layouts/dashboard",
-		"/api/v1/pages/present", "/api/v1/admin/layouts/present",
+		"/api/v1/pages/present", "/api/v1/pages/dashboard", "/api/v1/admin/layouts/present", "/api/v1/admin/announcements",
 		// The search, by the private repository's name, its README's and commit's words, a filter and a prefix.
 		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=repo:zq-hidden",
 		"/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search?q=zq-hidden&in=repo", "/api/v1/search/suggest?q=zq-hidden",
@@ -193,7 +195,7 @@ func TestNoLeak(t *testing.T) {
 			}
 		}
 	}
-	for _, p := range []string{"/api/v1/repos/acme/zq-hidden", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests",
+	for _, p := range []string{"/api/v1/pages/dashboard", "/api/v1/pages/present", "/api/v1/repos/acme/zq-hidden", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests",
 		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search/suggest?q=zq-hid"} {
 		if _, b, _ := get(p, staff...); !strings.Contains(b, "zq-hidden") {
 			t.Errorf("staff %s does not show the private repository:\n%s", p, b)

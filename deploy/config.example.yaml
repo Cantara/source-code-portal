@@ -94,9 +94,24 @@ cluster:
 web:
   dir: "" # web/bundle
   node: node
-# The pages' layouts an administrator designs on the dashboard (Design this page); one JSON file per page. Empty: the built-in
-# layout, nothing saved.
+# The pages' layouts an administrator designs on the dashboard (Design this page), one JSON file per page, and the announcements
+# administrators write in /admin (announcements.json). Empty: the built-in layouts and the configured announcements, nothing saved.
 layout:
   dir: ""
+# The deployment's announcements, below the fleet on the dashboard and /present while their time lasts (locked in /admin). Plain
+# text; times in RFC 3339 with their offset, shown as written; until is required unless ends is set.
+announcements: []
+#  - id: juleol-2026
+#    title: Juleølsmaking på Rebel Makerspace
+#    text: Det avholdes juleølsmaking i år.
+#    tone: event # event, info, notice
+#    starts: "2026-11-26T18:00:00+01:00"
+#    ends: "2026-11-26T23:00:00+01:00"
+#    place: Rebel Makerspace
+#    link: {label: Meld deg på her, url: "https://example.org/pamelding"}
+#    lang: nb
+#    pages: [dashboard, present] # one or both
+#    audience: everyone # or signed-in
+#    published: true # false: held as a draft
 ops:
   pprof: false # /debug/pprof/ on the admin listener

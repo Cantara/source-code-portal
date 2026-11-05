@@ -287,3 +287,27 @@ export function GridIcon({ className }: { className?: string }) {
     </Icon>
   )
 }
+
+export function XIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Icon>
+  )
+}
+
+export function ArrowUpRightIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M7 17 17 7M8 7h9v9" />
+    </Icon>
+  )
+}
+
+export function MegaphoneIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1ZM15 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" />
+    </Icon>
+  )
+}

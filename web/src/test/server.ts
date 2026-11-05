@@ -127,6 +127,7 @@ export const defaults = [
     response(200).json({
       page: "dashboard",
       stored: false,
+      announcements: [],
       elements: [
         { kind: "telemetry" },
         { kind: "fleet-map" },

@@ -194,3 +194,20 @@ export function sideOf(v: unknown): Side {
 export function sideValue(s: Side): string {
   return `${s.open ? "open" : "closed"}:${s.width}`
 }
+
+/** dismissedCookie keeps the announcements a reader dismissed on the dashboard, each for its revision: an edit shows it again. */
+export const dismissedCookie = "scp-announcements"
+const maxDismissed = 20
+
+/** dismissedOf reads the cookie's `id:revision` pairs; anything else is dropped. */
+export function dismissedOf(v: unknown): string[] {
+  if (typeof v !== "string") return []
+  return v
+    .split(",")
+    .filter((p) => /^[a-z0-9][a-z0-9-]{0,62}:[0-9a-f]{1,32}$/.test(p))
+    .slice(-maxDismissed)
+}
+
+/** dismissedValue is the cookie's value with key added, the oldest dropped past 20. */
+export const dismissedValue = (dismissed: string[], key: string) =>
+  [...dismissed.filter((k) => k !== key), key].slice(-maxDismissed).join(",")

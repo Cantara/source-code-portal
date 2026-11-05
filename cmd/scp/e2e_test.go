@@ -112,6 +112,8 @@ func TestServeForPlaywright(t *testing.T) {
 	if err := os.Mkdir(layouts, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	// The announcements: an event in six days at a fixed offset (shown as written), and a notice for signed-in viewers alone.
+	now, oslo := time.Now().Truncate(time.Hour), time.FixedZone("CET", 3600)
 	body := `store: {path: ` + filepath.Join(dir, "scp.db") + `}
 server: {public_addr: "` + addr + `", admin_addr: "127.0.0.1:0", public_url: "http://` + addr + `"}
 web: {dir: ` + bundle + `}
@@ -130,6 +132,18 @@ catalog:
   groups:
     - {id: whydah, name: Whydah, description: Identity and access, default_repo: Whydah-Core, match: [{prefix: whydah-}]}
     - {id: other, name: Other, default_repo: tool, match: [{catch_all: true}]}
+announcements:
+  - id: juleol
+    title: Juleølsmaking på Rebel Makerspace
+    text: Det avholdes juleølsmaking i år.
+    tone: event
+    starts: "` + now.Add(6*24*time.Hour).In(oslo).Format(time.RFC3339) + `"
+    ends: "` + now.Add(6*24*time.Hour+5*time.Hour).In(oslo).Format(time.RFC3339) + `"
+    place: Rebel Makerspace
+    link: {label: Meld deg på her, url: "https://example.org/pamelding"}
+    lang: nb
+  - {id: vault-move, title: The vault moves to the new cluster, tone: notice, audience: signed-in, pages: [dashboard],
+     until: "` + now.Add(30*24*time.Hour).Format(time.RFC3339) + `"}
 `
 	if os.WriteFile(token, []byte("ghp_e2e"), 0o600) != nil || os.WriteFile(path, []byte(body), 0o600) != nil ||
 		os.WriteFile(key, []byte("e2e-session-key-e2e-session-key-0123"), 0o600) != nil ||

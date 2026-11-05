@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 
 	contract "github.com/cantara/source-code-portal/api"
+	"github.com/cantara/source-code-portal/internal/announce"
 	"github.com/cantara/source-code-portal/internal/assistant"
 	"github.com/cantara/source-code-portal/internal/auth"
 	"github.com/cantara/source-code-portal/internal/badges"
@@ -111,6 +112,7 @@ type server struct {
 	member            *cluster.Member // nil when the instance is alone
 	web               *webui.Server   // nil without web.dir
 	layouts           *layout.Store
+	notices           *announce.Notices
 	stopping          atomic.Bool
 	public, admin     *http.Server
 	publicLn, adminLn net.Listener
@@ -213,8 +215,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return !s.stopping.Load() && s.pub.Current().Catalogued && (s.web == nil || s.web.Ready())
 	}
 	s.layouts = layout.Open(cfg.Layout.Dir, log)
+	s.notices = announce.Open(cfg.Announcements, cfg.Layout.Dir, time.Now, log)
 	st := &status{ready: ready, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
-		webhook: cfg.Webhook.Secret.IsSet(), layouts: s.layouts.Problems, deliveries: map[string]int{}}
+		webhook: cfg.Webhook.Secret.IsSet(), layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
+		deliveries: map[string]int{}}
 	if s.member != nil {
 		st.cluster = s.member
 	}
@@ -291,7 +295,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, mcpserver.Routes(mcpserver.Options{Catalogue: catalogue, Version: version, PublicURL: cfg.Server.PublicURL,
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
-	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view}, layout.API{Current: view, Store: s.layouts},
+	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
+	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view},
+		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{}}
 	if s.web != nil {
 		opts.Build = s.web.Build
@@ -437,6 +443,9 @@ func (s *server) run(ctx context.Context) error {
 	layoutsCtx, stopLayouts := context.WithCancel(ctx)
 	layoutsDone := make(chan struct{})
 	go func() { s.layouts.Run(layoutsCtx); close(layoutsDone) }()
+	noticesDone := make(chan struct{})
+	go func() { s.notices.Run(layoutsCtx); close(noticesDone) }()
+	defer func() { stopLayouts(); <-noticesDone }()
 	defer func() { stopLayouts(); <-layoutsDone }()
 	memberCtx, stopMember := context.WithCancel(context.WithoutCancel(ctx))
 	memberDone := make(chan error, 1)

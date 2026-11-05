@@ -21,6 +21,11 @@ export const kinds: { kind: Kind; label: string; about: string }[] = [
     label: "Fleet map",
     about: "Every repository as a tile by product, coloured by its last change or by its health.",
   },
+  {
+    kind: "announcements",
+    label: "Announcements",
+    about: "The team's announcements for this page while they last, written in Admin; nothing when there are none.",
+  },
   { kind: "products", label: "Products", about: "The products as distilled cards, one sortable table or compact tiles." },
   {
     kind: "latest-commits",
@@ -50,6 +55,7 @@ export function blank(kind: Kind): Element {
 export const defaultLayout: Element[] = [
   { kind: "telemetry" },
   { kind: "fleet-map" },
+  { kind: "announcements" },
   { kind: "products", view: "cards" },
   { kind: "latest-commits", count: 10 },
 ]
@@ -58,6 +64,7 @@ export const defaultLayout: Element[] = [
 export const defaultPresent: Element[] = [
   { kind: "telemetry" },
   { kind: "fleet-map", color: "health" },
+  { kind: "announcements" },
   { kind: "products", view: "tiles" },
   { kind: "latest-commits", count: 30 },
 ]

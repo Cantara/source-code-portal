@@ -84,7 +84,7 @@ func layoutOf(kinds ...oapi.LayoutElementKind) Layout {
 func TestStoreSaveConflictReset(t *testing.T) {
 	dir := t.TempDir()
 	s := Open(dir, quiet())
-	if p := s.Get("dashboard"); p.Stored || p.Revision != "" || len(p.Layout.Elements) != 4 {
+	if p := s.Get("dashboard"); p.Stored || p.Revision != "" || len(p.Layout.Elements) != 5 {
 		t.Fatalf("before a save: %+v", p)
 	}
 	rev, err := s.Save("dashboard", layoutOf(oapi.LayoutElementKindTelemetry), "")
@@ -113,7 +113,7 @@ func TestStoreSaveConflictReset(t *testing.T) {
 	if err := s.Reset("dashboard", rev); err != nil {
 		t.Fatal(err)
 	}
-	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 4 {
+	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 5 {
 		t.Errorf("after a reset: %+v", p)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "dashboard.json")); !errors.Is(err, os.ErrNotExist) {
@@ -160,7 +160,7 @@ func TestStoreReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.reload("dashboard")
-	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 4 {
+	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 5 {
 		t.Errorf("removed: %+v", p)
 	}
 }
@@ -220,7 +220,7 @@ func TestAdminRoutes(t *testing.T) {
 		t.Errorf("not an admin: %d", w.Code)
 	}
 	b := read(do(admin, "GET", at, ""))
-	if b.Stored || !b.Writable || b.Revision != "" || len(b.Elements) != 4 {
+	if b.Stored || !b.Writable || b.Revision != "" || len(b.Elements) != 5 {
 		t.Fatalf("first read: %+v", b)
 	}
 	save := `{"revision":"","elements":[{"kind":"heading","text":"Ours"},{"kind":"products","view":"table"}]}`

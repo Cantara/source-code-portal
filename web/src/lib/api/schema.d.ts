@@ -893,7 +893,7 @@ export interface components {
     /** @description One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits takes count, heading takes text and note (plain text). */
     LayoutElement: {
       /** @enum {string} */
-      kind: "telemetry" | "fleet-map" | "products" | "latest-commits" | "heading"
+      kind: "telemetry" | "fleet-map" | "announcements" | "products" | "latest-commits" | "heading"
       /** @description Group ids in display order */
       groups?: string[]
       /**
@@ -916,6 +916,42 @@ export interface components {
       elements: components["schemas"]["LayoutElement"][]
       /** @description An admin's layout; false: the built-in one */
       stored: boolean
+      /** @description The announcements this viewer may see on this page now, in display order; the announcements element places them */
+      announcements: components["schemas"]["Announcement"][]
+    }
+    /** @description A short notice from the portal's admins or its deployment (design/announcements.md): plain text, one https link, a tone. Times keep the offset they were written with and are shown as written. */
+    Announcement: {
+      id: string
+      /** @description The digest of its fields: a reader's dismissal holds for this revision */
+      revision: string
+      title: string
+      text?: string
+      /** @enum {string} */
+      tone: "notice" | "event" | "info"
+      /** Format: date-time */
+      startsAt?: string
+      /** Format: date-time */
+      endsAt?: string
+      place?: string
+      link?: components["schemas"]["AnnouncementLink"]
+      /** @description The language of its text, a BCP 47 tag */
+      lang?: string
+      /**
+       * Format: date-time
+       * @description Shown until this time
+       */
+      until: string
+      qr?: components["schemas"]["QRCode"]
+    }
+    AnnouncementLink: {
+      label: string
+      /** Format: uri */
+      url: string
+    }
+    /** @description The link as a QR code: an SVG path over a square of size modules, the quiet zone not included */
+    QRCode: {
+      size: number
+      path: string
     }
     /** @description The work that counts: one or more kinds */
     Work: components["schemas"]["WorkKind"][]

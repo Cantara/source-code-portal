@@ -35,6 +35,8 @@ type Config struct {
 	Layout    Layout    `mapstructure:"layout"`
 	Packages  Packages  `mapstructure:"packages"`
 	Ops       Ops       `mapstructure:"ops"`
+	// Announcements are the deployment's announcements (design/announcements.md), locked in the admin's card.
+	Announcements []Announcement `mapstructure:"announcements"`
 }
 
 // Server configures the two listeners.
@@ -244,6 +246,7 @@ func (c Config) validate() []string {
 	p = append(p, c.Web.validate()...)
 	p = append(p, c.Layout.validate()...)
 	p = append(p, c.Packages.validate()...)
+	p = append(p, CheckAnnouncements("announcements", c.Announcements)...)
 	slices.Sort(p)
 	return p
 }

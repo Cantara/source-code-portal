@@ -75,6 +75,15 @@
   --lane-3: oklch(0.58 0.16 55);
   --lane-4: oklch(0.55 0.18 350);
   --lane-5: oklch(0.55 0.11 195);
+  /* Announcements' tones (design/announcements.md): hues of their own, never a level's; --*-on is text on the tone (AA). */
+  --announce-event: oklch(0.5 0.2 285);
+  --announce-event-fg: oklch(0.42 0.18 285);
+  --announce-notice: oklch(0.6 0.17 48);
+  --announce-notice-fg: oklch(0.45 0.14 45);
+  --announce-info: var(--primary);
+  --announce-info-fg: var(--primary);
+  --announce-on: oklch(0.99 0 0);
+  --announce-tint: 14%;
 }
 .dark {
   --background: oklch(0.135 0.025 262);
@@ -115,6 +124,12 @@
   --lane-3: oklch(0.8 0.14 70);
   --lane-4: oklch(0.75 0.15 350);
   --lane-5: oklch(0.8 0.11 190);
+  --announce-event: oklch(0.74 0.15 285);
+  --announce-event-fg: oklch(0.84 0.1 285);
+  --announce-notice: oklch(0.78 0.15 52);
+  --announce-notice-fg: oklch(0.86 0.11 58);
+  --announce-on: oklch(0.17 0.03 262);
+  --announce-tint: 24%;
 }
 
 @layer base {
@@ -180,6 +195,43 @@
   .lvl-danger {
     --lvl: var(--danger);
     --lvl-fg: var(--danger-fg);
+  }
+  /* An announcement's tone sets --tone and --tone-fg for its bar, tile, tint and button. */
+  .tone-event {
+    --tone: var(--announce-event);
+    --tone-fg: var(--announce-event-fg);
+  }
+  .tone-notice {
+    --tone: var(--announce-notice);
+    --tone-fg: var(--announce-notice-fg);
+  }
+  .tone-info {
+    --tone: var(--announce-info);
+    --tone-fg: var(--announce-info-fg);
+  }
+  .announcement {
+    border-color: color-mix(in oklch, var(--tone) 40%, var(--border));
+    border-left-color: var(--tone);
+    background:
+      linear-gradient(
+        100deg,
+        color-mix(in oklch, var(--tone) var(--announce-tint), transparent),
+        color-mix(in oklch, var(--tone) 5%, transparent) 70%
+      ),
+      var(--card);
+    box-shadow: 0 10px 36px -18px color-mix(in oklch, var(--tone) 60%, transparent);
+  }
+  .announcement-tile {
+    color: var(--tone-fg);
+    background: color-mix(in oklch, var(--tone) 14%, var(--card));
+    border: 1px solid color-mix(in oklch, var(--tone) 45%, transparent);
+  }
+  .announcement-action {
+    color: var(--announce-on);
+    background: var(--tone);
+  }
+  .announcement-action:hover {
+    background: color-mix(in oklch, var(--tone) 85%, var(--foreground));
   }
   /* A finding's severity paints its icon's tile; the icon's shape names the kind, so colour is never the only signal. */
   .sev-high {
@@ -289,8 +341,9 @@
   .lvl-active.led-live {
     animation: pulse-led 2.4s ease-in-out infinite;
   }
-  /* A commit that arrived while the presentation page was open. */
-  .arrive {
+  /* A commit that arrived while the presentation page was open, and an announcement as it appears. */
+  .arrive,
+  .announcement {
     animation: arrive 400ms ease-out;
   }
   @keyframes arrive {

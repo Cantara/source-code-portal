@@ -127,7 +127,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js 24 executable that runs the bundle |
-| `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4); empty: the built-in layout, no saving |
+| `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4) and the announcements written in Admin (`announcements.json`, section 2.4.1); empty: the built-in layouts and the configured announcements, no saving |
+| `announcements[]` | `[]` | the deployment's announcements (section 2.4.1): `id`, `title`, `text`, `tone`, `starts`, `ends`, `place`, `link` (`label`, `url`), `lang`, `pages`, `audience`, `from`, `until`, `published`; at most 20 |
 | `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy, `nuget` the feed whose `index.json` is the service index, `rubygems` a gem server, `packagist` a Composer repository |
 | `packages.registries[].network` | `public` | `public`: reached through the public-only guard; `private`: on your network (http allowed, without credentials) |
 | `packages.registries[].auth` | none | `user` and `password_file` (Basic; the password may be an access token), or `token_file` (a bearer token), with `header` to send it in another header (`X-JFrog-Art-Api`, or `Authorization` for Cargo's raw token) |
@@ -331,6 +332,41 @@ against burn-in. A tap shows its controls; an administrator designs it as the da
 - With `access.require_auth`, sign in once on the tablet: through single sign-on, or on `/signin` with a token of its own from
   `auth.tokens` (a screen is not a person: give it a name such as `wall-payments` and only the groups it should show). The page
   reloads every hour, which renews the session within `auth.session_ttl`.
+
+#### 2.4.1 Announcements
+
+The portal carries the team's news: an event with a sign-up link, planned maintenance, a change everyone must know about. An
+announcement shows below the fleet on the dashboard and on `/present` (the `announcements` element in the design mode; move it like any
+other) while its time lasts, and goes away by itself. It is plain text with one link, never HTML or Markdown.
+
+- **Administrators** write them on the *Admin* page's *Announcements* card: the title, a line, when it starts and ends, where, a link
+  and its words, the tone (*Event*, *Announcement* or *Notice*, each in a colour of its own, never a health colour), the language of
+  its text, the pages it shows on (the dashboard, `/present` or both), who sees it (everyone, or signed-in viewers only), when it shows
+  and until when. *Published* off keeps it as a draft. The preview beside the form is the card the pages draw. They are saved in
+  `layout.dir` (`announcements.json`), so without one the card cannot save.
+- **The deployment** sets them in `announcements[]`, checked by `scp config check`; the *Admin* card lists them, locked:
+
+```yaml
+announcements:
+  - id: juleol-2026
+    title: Juleølsmaking på Rebel Makerspace
+    text: Det avholdes juleølsmaking i år.
+    tone: event                        # event, info, notice
+    starts: "2026-11-26T18:00:00+01:00"
+    ends: "2026-11-26T23:00:00+01:00"  # also when it stops showing; else until is required
+    place: Rebel Makerspace
+    link: { label: Meld deg på her, url: "https://example.org/pamelding" }
+    lang: nb
+    pages: [dashboard, present]        # one or both
+    audience: everyone                 # or signed-in
+```
+
+- Times are RFC 3339 with their offset and are shown as written: 18:00 at `+01:00` reads 18:00 on every screen. `until` is required
+  unless `ends` is set; `from` defaults to at once. A link is https only.
+- At most three show at once: notices first, then events by their start, then the rest. A reader can dismiss one on the dashboard (it
+  stays dismissed in that browser until it is edited); on `/present` none is dismissible, and on a desk or a wall its link also shows
+  as a QR code for a phone.
+- A signed-in announcement is never sent to the public, on any page or in the API.
 
 ### 2.5 Published packages
 

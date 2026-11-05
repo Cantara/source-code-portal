@@ -12,6 +12,7 @@ import { plural } from "@/lib/format"
 import { PageHeader } from "@/shared/page-header"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
+import { AnnouncementsCard } from "./announcements"
 import { adminStatusQuery, testProvider, type AdminStatus } from "./api"
 
 const via: Record<string, string> = { proxy: "the proxy", oidc: "single sign-on", token: "a token" }
@@ -210,6 +211,7 @@ export function AdminView() {
           <>
             <Status s={data} />
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <AnnouncementsCard />
               <AssistantCard />
             </div>
           </>

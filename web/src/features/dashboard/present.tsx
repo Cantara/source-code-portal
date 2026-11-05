@@ -30,6 +30,8 @@ import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { meQuery } from "@/lib/api/queries"
 import { apply, useTheme, type Choice } from "@/lib/theme"
+import type { Notice } from "@/entities/announcement/announcement"
+import { Announcements } from "./announcements"
 import { dashboardQuery, moreQuery, morePages, pageQuery, workQuery } from "./api"
 import { dedupe } from "./latest"
 import { useProfile } from "./profile"
@@ -277,6 +279,7 @@ function Screen({
   onColumn,
   shown = data.work,
   picker,
+  notices = [],
 }: {
   layout: Element[]
   data: Schemas["Dashboard"]
@@ -293,6 +296,8 @@ function Screen({
   /** the kinds the commit column shows, and the label that chooses them */
   shown?: Work
   picker?: ReactNode
+  /** the announcements the server gave this page */
+  notices?: Notice[]
 }) {
   const now = useNow()
   const scope = only ? { ...data, groups: within(data.groups, undefined, only) } : data
@@ -315,6 +320,9 @@ function Screen({
         break
       case "products":
         left.push(<ProductTiles key={i} groups={groups(el)} work={data.work} now={now} fold />)
+        break
+      case "announcements":
+        left.push(<Announcements key={i} list={notices} wall />)
         break
       case "heading":
         left.push(
@@ -616,6 +624,7 @@ export function PresentView({
                 frame="relative h-[40rem]"
                 column={column}
                 profile={p.profile}
+                notices={page?.announcements}
               />
             )}
             onClose={() => setDesigning(false)}
@@ -635,6 +644,7 @@ export function PresentView({
             onColumn={resize}
             shown={s.shown}
             picker={picker}
+            notices={page?.announcements}
           />
           <Bar
             profile={p.profile}

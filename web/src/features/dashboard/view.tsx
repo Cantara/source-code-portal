@@ -23,12 +23,15 @@ export function DashboardView({
   view,
   side,
   show,
+  dismissed,
 }: {
   work?: Work
   view?: ProductsView
   side?: Side
   /** the kinds the reader shows in the latest commits (the cookie), if any */
   show?: Work
+  /** the announcements the reader dismissed (the cookie) */
+  dismissed?: string[]
 }) {
   const { data, error } = useQuery(dashboardQuery(api, work))
   const { data: page } = useQuery(pageQuery(api))
@@ -60,11 +63,19 @@ export function DashboardView({
           <Designer
             page="dashboard"
             groups={data.groups}
-            preview={(draft) => <Elements layout={draft} data={data} />}
+            preview={(draft) => <Elements layout={draft} data={data} notices={page?.announcements} />}
             onClose={() => setDesigning(false)}
           />
         ) : (
-          <Elements layout={layout} data={data} view={view} side={side} show={show} />
+          <Elements
+            layout={layout}
+            data={data}
+            view={view}
+            side={side}
+            show={show}
+            notices={page?.announcements}
+            dismissed={dismissed}
+          />
         ))}
     </>
   )

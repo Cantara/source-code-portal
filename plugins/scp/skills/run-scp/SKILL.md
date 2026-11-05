@@ -80,7 +80,7 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    [references/essentials.md](references/essentials.md). Set `server.public_url` (absolute links, HSTS on https) and
    `server.trusted_proxies` (only the reverse proxy's network). Add only the sections they asked for: `webhook`, `access` and
    `include_private`, `auth` (OIDC: redirect URI `<public_url>/auth/callback`, sign-out redirect `<public_url>/`), `llm` and
-   `assistant`, `layout.dir` (administrators' dashboard designs, a writable directory), `cluster` (several instances through
+   `assistant`, `layout.dir` (administrators' dashboard designs and announcements, a writable directory), `announcements[]` (the deployment's own, locked in Admin), `cluster` (several instances through
    Hazelcast). `config check` until it passes.
 6. **Deploy.** Write the files for their target from [references/deploy.md](references/deploy.md): Docker Compose with Caddy (the
    default), Kubernetes, or the binary under systemd. Pin the image to the version, never `latest`. Expose only `:9090` through the
@@ -90,7 +90,7 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    `curl -s localhost:9091/api/v1/status | jq .warnings` is empty. The dashboard shows the groups; a private repository is absent
    while signed out and present after sign-in; *Admin* shows for an administrator; *Test the provider* on *Admin* answers when the
    assistant is on; a push shows within seconds and GitHub's delivery log says 202.
-8. **Hand over.** Tell them what to back up (the configuration, the compose or manifests, `secrets/`, and `layout.dir`; never the
+8. **Hand over.** Tell them what to back up (the configuration, the compose or manifests, `secrets/`, and `layout.dir` with its layouts and `announcements.json`; never the
    cache), how to upgrade, and the alerts worth having (below).
 
 ## Changing a running portal

@@ -44,6 +44,27 @@ func (e ActivityLevel) Valid() bool {
 	}
 }
 
+// Defines values for AnnouncementTone.
+const (
+	Event  AnnouncementTone = "event"
+	Info   AnnouncementTone = "info"
+	Notice AnnouncementTone = "notice"
+)
+
+// Valid indicates whether the value is a known member of the AnnouncementTone enum.
+func (e AnnouncementTone) Valid() bool {
+	switch e {
+	case Event:
+		return true
+	case Info:
+		return true
+	case Notice:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AssistantStatusAccess.
 const (
 	Admin    AssistantStatusAccess = "admin"
@@ -376,6 +397,7 @@ func (e LayoutElementColor) Valid() bool {
 
 // Defines values for LayoutElementKind.
 const (
+	LayoutElementKindAnnouncements LayoutElementKind = "announcements"
 	LayoutElementKindFleetMap      LayoutElementKind = "fleet-map"
 	LayoutElementKindHeading       LayoutElementKind = "heading"
 	LayoutElementKindLatestCommits LayoutElementKind = "latest-commits"
@@ -386,6 +408,8 @@ const (
 // Valid indicates whether the value is a known member of the LayoutElementKind enum.
 func (e LayoutElementKind) Valid() bool {
 	switch e {
+	case LayoutElementKindAnnouncements:
+		return true
 	case LayoutElementKindFleetMap:
 		return true
 	case LayoutElementKindHeading:
@@ -669,6 +693,39 @@ type ActivityRule struct {
 
 	// WithinDays The age of the last change it covers; null: no bound
 	WithinDays *int `json:"withinDays"`
+}
+
+// Announcement A short notice from the portal's admins or its deployment (design/announcements.md): plain text, one https link, a tone. Times keep the offset they were written with and are shown as written.
+type Announcement struct {
+	EndsAt *time.Time `json:"endsAt,omitempty"`
+	Id     string     `json:"id"`
+
+	// Lang The language of its text, a BCP 47 tag
+	Lang  *string           `json:"lang,omitempty"`
+	Link  *AnnouncementLink `json:"link,omitempty"`
+	Place *string           `json:"place,omitempty"`
+
+	// Qr The link as a QR code: an SVG path over a square of size modules, the quiet zone not included
+	Qr *QRCode `json:"qr,omitempty"`
+
+	// Revision The digest of its fields: a reader's dismissal holds for this revision
+	Revision string           `json:"revision"`
+	StartsAt *time.Time       `json:"startsAt,omitempty"`
+	Text     *string          `json:"text,omitempty"`
+	Title    string           `json:"title"`
+	Tone     AnnouncementTone `json:"tone"`
+
+	// Until Shown until this time
+	Until time.Time `json:"until"`
+}
+
+// AnnouncementTone defines model for Announcement.Tone.
+type AnnouncementTone string
+
+// AnnouncementLink defines model for AnnouncementLink.
+type AnnouncementLink struct {
+	Label string `json:"label"`
+	Url   string `json:"url"`
 }
 
 // AssistantStatus defines model for AssistantStatus.
@@ -1260,8 +1317,10 @@ type Page struct {
 
 // PageLayout defines model for PageLayout.
 type PageLayout struct {
-	Elements []LayoutElement `json:"elements"`
-	Page     string          `json:"page"`
+	// Announcements The announcements this viewer may see on this page now, in display order; the announcements element places them
+	Announcements []Announcement  `json:"announcements"`
+	Elements      []LayoutElement `json:"elements"`
+	Page          string          `json:"page"`
 
 	// Stored An admin's layout; false: the built-in one
 	Stored bool `json:"stored"`
@@ -1312,6 +1371,12 @@ type ProductHealth struct {
 
 	// Watch Repositories at watch
 	Watch int `json:"watch"`
+}
+
+// QRCode The link as a QR code: an SVG path over a square of size modules, the quiet zone not included
+type QRCode struct {
+	Path string `json:"path"`
+	Size int    `json:"size"`
 }
 
 // RecentRepo defines model for RecentRepo.

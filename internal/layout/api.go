@@ -17,6 +17,8 @@ import (
 type API struct {
 	Current func(context.Context) *snapshot.Snapshot // the viewer's view
 	Store   *Store
+	// Notices are the announcements the viewer may see on a page now (design/announcements.md); nil: none.
+	Notices func(ctx context.Context, page string) []oapi.Announcement
 }
 
 func (a API) GetPage(ctx context.Context, req oapi.GetPageRequestObject) (oapi.GetPageResponseObject, error) {
@@ -26,7 +28,12 @@ func (a API) GetPage(ctx context.Context, req oapi.GetPageRequestObject) (oapi.G
 			oapi.NewProblem(http.StatusNotFound, "not-found", "Not Found", "no such page"))}, nil
 	}
 	p := a.Store.Get(page)
-	return oapi.GetPage200JSONResponse{Body: oapi.PageLayout{Page: page, Elements: Resolve(p.Layout, a.Current(ctx)), Stored: p.Stored}}, nil
+	notices := []oapi.Announcement{}
+	if a.Notices != nil {
+		notices = a.Notices(ctx, page)
+	}
+	return oapi.GetPage200JSONResponse{Body: oapi.PageLayout{Page: page, Elements: Resolve(p.Layout, a.Current(ctx)), Stored: p.Stored,
+		Announcements: notices}}, nil
 }
 
 // Resolve is l for a viewer of s: the groups the view has no repository of are left out, and an element whose groups all are.

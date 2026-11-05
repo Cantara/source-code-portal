@@ -39,7 +39,7 @@ type Layout struct {
 	Elements []oapi.LayoutElement `json:"elements"`
 }
 
-// Default is the built-in layout of page: the fleet at a glance, then the products, then people's commits. The presentation page
+// Default is the built-in layout of page: the fleet at a glance, the announcements, then the products, then people's commits. The presentation page
 // (design/present.md) shows the same compact: the fleet by health and the products as tiles.
 func Default(page string) Layout {
 	switch page {
@@ -48,6 +48,7 @@ func Default(page string) Layout {
 		return Layout{Elements: []oapi.LayoutElement{
 			{Kind: oapi.LayoutElementKindTelemetry},
 			{Kind: oapi.LayoutElementKindFleetMap, Color: new(oapi.LayoutElementColorHealth)},
+			{Kind: oapi.LayoutElementKindAnnouncements},
 			{Kind: oapi.LayoutElementKindProducts, View: new(oapi.Tiles)},
 			{Kind: oapi.LayoutElementKindLatestCommits, Count: new(30)},
 		}}
@@ -57,6 +58,7 @@ func Default(page string) Layout {
 	return Layout{Elements: []oapi.LayoutElement{
 		{Kind: oapi.LayoutElementKindTelemetry},
 		{Kind: oapi.LayoutElementKindFleetMap},
+		{Kind: oapi.LayoutElementKindAnnouncements},
 		{Kind: oapi.LayoutElementKindProducts, View: new(oapi.Cards)},
 		{Kind: oapi.LayoutElementKindLatestCommits, Count: new(10)},
 	}}
@@ -107,7 +109,7 @@ func check(e *oapi.LayoutElement) error {
 		takes["count"] = true
 	case oapi.LayoutElementKindHeading:
 		takes["text"], takes["note"] = true, true
-	case oapi.LayoutElementKindTelemetry:
+	case oapi.LayoutElementKindTelemetry, oapi.LayoutElementKindAnnouncements:
 	}
 	for field, set := range map[string]bool{"groups": e.Groups != nil, "view": e.View != nil, "count": e.Count != nil,
 		"text": e.Text != nil, "note": e.Note != nil, "color": e.Color != nil} {

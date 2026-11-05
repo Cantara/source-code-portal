@@ -6,6 +6,8 @@ import {
   columnsOf,
   commitsCookie,
   commitsOf,
+  dismissedCookie,
+  dismissedOf,
   productsView,
   profileCookie,
   profileNamed,
@@ -35,6 +37,7 @@ export const dashboardRoute: Route<object> = {
         view={view ? productsView(view, "cards") : undefined}
         side={sideOf(ctx.cookies[sideCookie])}
         show={commitsOf(ctx.cookies[commitsCookie])}
+        dismissed={dismissedOf(ctx.cookies[dismissedCookie])}
       />
     )
   },

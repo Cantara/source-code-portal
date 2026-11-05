@@ -947,7 +947,7 @@ scp config groups -c scp.yaml --repos repos.json   # where each repository lands
               ],
               [
                 "An administrator",
-                "Also the Admin page with the portal's status, and the design mode for the dashboard when it has a layout store.",
+                "Also the Admin page with the portal's status and its announcements, and the design mode for the dashboard when it has a layout store.",
               ],
             ].map(([t, d]) => (
               <div key={t} className="panel p-4">
@@ -1130,6 +1130,7 @@ claude mcp add --transport http scp https://portal.example.org/mcp \
               ["The assistant", "questions about the catalogue in plain language, with your model provider"],
               ["Agents", "Claude Code and browser agents read the catalogue through /mcp and WebMCP"],
               ["The design mode", "administrators arrange the dashboard and the presentation page for everyone"],
+              ["Announcements", "the team's news below the fleet, with a sign-up link and a QR code on the wall, until they end"],
               ["Several instances", "one portal served together through Hazelcast"],
             ].map(([t, d]) => (
               <li key={t} className="rounded-lg border border-border p-3">

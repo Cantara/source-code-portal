@@ -873,7 +873,7 @@ components:
         takes view, fleet-map takes color, latest-commits takes count, heading takes text and note (plain text).
       required: [kind]
       properties:
-        kind: { type: string, enum: [telemetry, fleet-map, products, latest-commits, heading] }
+        kind: { type: string, enum: [telemetry, fleet-map, announcements, products, latest-commits, heading] }
         groups: { type: array, items: { type: string }, minItems: 1, maxItems: 100, description: Group ids in display order }
         view: { type: string, enum: [cards, table, tiles], description: "How products are drawn until the reader switches; tiles: compact, for the presentation page" }
         color: { type: string, enum: [activity, health], description: "What colours the fleet map's tiles: the last change's age (the default) or the health level" }
@@ -882,11 +882,48 @@ components:
         note: { type: string, maxLength: 500 }
     PageLayout:
       type: object
-      required: [page, elements, stored]
+      required: [page, elements, stored, announcements]
       properties:
         page: { type: string }
         elements: { type: array, items: { $ref: "#/components/schemas/LayoutElement" } }
         stored: { type: boolean, description: "An admin's layout; false: the built-in one" }
+        announcements:
+          type: array
+          maxItems: 3
+          description: The announcements this viewer may see on this page now, in display order; the announcements element places them
+          items: { $ref: "#/components/schemas/Announcement" }
+    Announcement:
+      type: object
+      description: >-
+        A short notice from the portal's admins or its deployment (design/announcements.md): plain text, one https link, a tone. Times
+        keep the offset they were written with and are shown as written.
+      required: [id, revision, title, tone, until]
+      properties:
+        id: { type: string }
+        revision: { type: string, description: "The digest of its fields: a reader's dismissal holds for this revision" }
+        title: { type: string, maxLength: 80 }
+        text: { type: string, maxLength: 280 }
+        tone: { type: string, enum: [notice, event, info] }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        place: { type: string, maxLength: 80 }
+        link: { $ref: "#/components/schemas/AnnouncementLink" }
+        lang: { type: string, description: "The language of its text, a BCP 47 tag" }
+        until: { type: string, format: date-time, description: Shown until this time }
+        qr: { $ref: "#/components/schemas/QRCode" }
+    AnnouncementLink:
+      type: object
+      required: [label, url]
+      properties:
+        label: { type: string, maxLength: 40 }
+        url: { type: string, format: uri }
+    QRCode:
+      type: object
+      description: "The link as a QR code: an SVG path over a square of size modules, the quiet zone not included"
+      required: [size, path]
+      properties:
+        size: { type: integer }
+        path: { type: string }
     Work:
       type: array
       items: { $ref: "#/components/schemas/WorkKind" }

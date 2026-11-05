@@ -5,6 +5,8 @@ import type { Schemas } from "@/lib/api/client"
 import { useNow } from "@/lib/clock"
 import { sideOf, type Side, type Work } from "@/lib/preferences"
 import { PanelBoundary } from "@/shared/panel-boundary"
+import type { Notice } from "@/entities/announcement/announcement"
+import { Announcements } from "./announcements"
 import { FleetMap } from "./fleet-map"
 import { LatestCommits } from "./latest"
 import { Products } from "./products"
@@ -22,6 +24,8 @@ export function Elements({
   view,
   side = sideOf(undefined),
   show,
+  notices = [],
+  dismissed,
 }: {
   layout: Element[]
   data: Schemas["Dashboard"]
@@ -29,6 +33,9 @@ export function Elements({
   side?: Side
   /** the kinds the reader shows in the latest commits (the cookie), if any */
   show?: Work
+  /** the announcements the server gave this page, and the ones the reader dismissed */
+  notices?: Notice[]
+  dismissed?: string[]
 }) {
   const now = useNow()
   const draw = (el: Element, i: number, fold?: ReactNode) => {
@@ -61,6 +68,8 @@ export function Elements({
             />
           </PanelBoundary>
         )
+      case "announcements":
+        return <Announcements key={i} list={notices} dismissed={dismissed} />
       case "heading":
         return (
           <div key={i}>
