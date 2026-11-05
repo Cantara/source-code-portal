@@ -1,7 +1,7 @@
 "use client"
 
 import { QueryClientProvider } from "@tanstack/react-query"
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { api } from "@/lib/api/client"
 import { noteBuild } from "@/lib/build"
 import { NowProvider } from "@/lib/clock"
@@ -22,6 +22,11 @@ api.use({
  */
 export function Providers({ now, rules, children }: { now: number; rules?: Rules; children: ReactNode }) {
   const [qc] = useState(createQueryClient)
+  // The root's effects run after its children's: once this one has, the page answers to clicks. The end-to-end tests wait for it
+  // instead of pressing again until something happens.
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = ""
+  }, [])
   return (
     <NowProvider at={now}>
       <RulesProvider rules={rules}>

@@ -1,4 +1,4 @@
-import { test as base, expect } from "@playwright/test"
+import { test as base, expect, type Page } from "@playwright/test"
 
 /**
  * test fails on any CSP violation, uncaught page error or console error: the CSP check, which also catches a dependency that starts
@@ -23,5 +23,13 @@ export const test = base.extend<{ guard: undefined }>({
     { auto: true },
   ],
 })
+
+/**
+ * hydrated waits until the page's script runs (the root layout marks <html data-hydrated>): before that, a click on a control that
+ * needs it is lost.
+ */
+export async function hydrated(page: Page) {
+  await page.locator("html[data-hydrated]").waitFor({ state: "attached" })
+}
 
 export { expect }
