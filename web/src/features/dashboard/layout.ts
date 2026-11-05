@@ -54,6 +54,14 @@ export const defaultLayout: Element[] = [
   { kind: "latest-commits", count: 10 },
 ]
 
+/** defaultPresent is the presentation page before its layout is read (design/present.md): the API's built-in one. */
+export const defaultPresent: Element[] = [
+  { kind: "telemetry" },
+  { kind: "fleet-map", color: "health" },
+  { kind: "products", view: "tiles" },
+  { kind: "latest-commits", count: 30 },
+]
+
 /** pick is the groups an element selects (none: every group), in its order; ids no group has are left out. */
 export function pick<G extends { id: string }>(all: G[], groups: string[] | undefined): G[] {
   if (!groups) return all

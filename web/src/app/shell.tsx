@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import {
   BookIcon,
   CheckIcon,
@@ -278,4 +278,12 @@ export function Mark() {
       <circle cx="22" cy="20" r="2.2" fill="currentColor" />
     </svg>
   )
+}
+
+/** bare are the pages drawn without the header: the presentation page fills the screen on its own (design/present.md). */
+const bare = ["/present"]
+
+/** Chrome is the header and what goes with it, left out on a bare page. */
+export function Chrome({ children }: { children: ReactNode }) {
+  return bare.includes(usePathname()) ? null : children
 }

@@ -15,6 +15,7 @@ import { Sparkline } from "@/shared/sparkline"
 import { by, isEvery, qualifier, remember, viewCookie, type Work } from "@/lib/preferences"
 import { assistants, counted, maintenance, noun, series, share, weekly } from "./work"
 import type { ProductsView } from "./layout"
+import { ProductTiles } from "./tiles"
 
 type Group = Schemas["DashboardGroup"]
 
@@ -279,7 +280,10 @@ function ProductTable({ groups, work }: { groups: Group[]; work: Work }) {
   )
 }
 
-/** Products are the groups as distilled cards or as one table, the reader's choice remembered in a cookie. */
+/**
+ * Products are the groups as distilled cards or as one table, the reader's choice remembered in a cookie; a layout may draw them as
+ * compact tiles until the reader chooses.
+ */
 export function Products({
   groups,
   repoCount,
@@ -289,7 +293,7 @@ export function Products({
 }: {
   groups: Group[]
   repoCount: number
-  view: ProductsView
+  view: ProductsView | "tiles"
   work: Work
   now: number
 }) {
@@ -323,6 +327,8 @@ export function Products({
       </div>
       {groups.length === 0 ? (
         <EmptyState title="No groups configured">{plural(repoCount, "repository", "repositories")} in the catalogue.</EmptyState>
+      ) : view === "tiles" ? (
+        <ProductTiles groups={groups} work={work} now={now} heading={false} />
       ) : view === "table" ? (
         <ProductTable groups={groups} work={work} />
       ) : (

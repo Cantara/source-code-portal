@@ -11,6 +11,35 @@ import { levels } from "@/entities/health/health"
 import { activities, activityAt, type Activity } from "@/entities/repo/health"
 
 type Group = Schemas["DashboardGroup"]
+type Member = Group["members"][number]
+type Level = Schemas["HealthLevel"]
+
+/** Color is what colours the tiles: the age of the last change (the default) or the health level. */
+export type Color = "activity" | "health"
+
+const healthLevels: Level[] = ["attention", "watch", "good"]
+
+/** healthCell is a tile's classes by health: the level's colour and its shape, so colour is never alone; grey when not scored. */
+export function healthCell(level: Level | null): string {
+  if (!level) return "lvl-dormant"
+  return `${levels[level].className} ${level === "good" ? "" : `cell-${level}`}`
+}
+
+function healthTally(members: Member[]): Record<Level | "none", number> {
+  const t = { attention: 0, watch: 0, good: 0, none: 0 }
+  for (const m of members) t[m.level ?? "none"]++
+  return t
+}
+
+function healthSummary(members: Member[]): string {
+  const t = healthTally(members)
+  return (
+    [...healthLevels.map((l) => [t[l], levels[l].label.toLowerCase()] as const), [t.none, "not scored"] as const]
+      .filter(([n]) => n > 0)
+      .map(([n, l]) => `${count(n)} ${l}`)
+      .join(", ") || "no repositories"
+  )
+}
 
 const label = Object.fromEntries(activities.map((a) => [a.level, a.label])) as Record<Activity, string>
 
@@ -58,9 +87,20 @@ function summary(t: Record<Activity, number>): string {
  * (a Hint names each one with its activity and health the moment it is pointed at or tapped; a click opens it), while the
  * products below carry the keyboard's links. The legend's levels explain themselves the same way, from the keyboard too.
  */
-export function FleetMap({ groups, work = every, now }: { groups: Group[]; work?: Work; now: number }) {
-  const all = new Map<string, Group["members"][number]>()
+export function FleetMap({
+  groups,
+  work = every,
+  now,
+  color = "activity",
+}: {
+  groups: Group[]
+  work?: Work
+  now: number
+  color?: Color
+}) {
+  const all = new Map<string, Member>()
   for (const g of groups) for (const m of g.members) all.set(m.address, m)
+  if (color === "health") return <HealthMap groups={groups} members={[...all.values()]} work={work} now={now} />
   const total = tally([...all.values()], now)
   return (
     <section aria-labelledby="fleet" className="panel relative z-10 flex flex-col gap-3 p-4">
@@ -149,6 +189,64 @@ export function FleetMap({ groups, work = every, now }: { groups: Group[]; work?
                   />
                 )
               })}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/**
+ * HealthMap is the fleet map coloured by health: every repository one tile by product, attention outlined and watch round besides
+ * their colours, so the fleet's health reads at a glance and from across a room. The legend counts each level, once per repository.
+ */
+function HealthMap({ groups, members, work, now }: { groups: Group[]; members: Member[]; work: Work; now: number }) {
+  const total = healthTally(members)
+  return (
+    <section aria-labelledby="fleet" className="panel relative z-10 flex flex-col gap-2 p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="fleet" className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+          Fleet health
+        </h2>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Health of every repository">
+          {healthLevels.map((l) => (
+            <li key={l} className={`${levels[l].className} flex items-center gap-1.5`}>
+              <span aria-hidden="true" className={`cell ${healthCell(l)}`} />
+              {levels[l].label}
+              <span className="font-mono text-foreground tabular-nums">{count(total[l])}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <ul className="flex flex-wrap gap-x-5 gap-y-2">
+        {groups.map((g) => (
+          <li key={g.id} className="min-w-0 max-w-full">
+            <p className="flex items-baseline justify-between gap-2 text-xs">
+              <span className="truncate font-medium">{g.name}</span>
+              <span className="font-mono text-muted-foreground tabular-nums">{count(g.members.length)}</span>
+            </p>
+            <p className="sr-only">{healthSummary(g.members)}</p>
+            <div aria-hidden="true" className="mt-1 flex max-w-[20rem] flex-wrap gap-1">
+              {g.members.map((m) => (
+                <Hint
+                  key={m.address}
+                  heading={m.name}
+                  rows={[
+                    ...(m.level
+                      ? [{ swatch: levels[m.level].className, label: "Health", value: levels[m.level].label }]
+                      : [{ swatch: "lvl-dormant", label: "Health", value: "not scored" }]),
+                    {
+                      swatch: `lvl-${activityAt(m.lastAuthoredAt, m.archived, now)}`,
+                      label: `Last change${qualifier(work)}`,
+                      value: m.lastAuthoredAt ? `${ago(m.lastAuthoredAt, now)} ago` : "none read",
+                    },
+                  ]}
+                  render={(t) => (
+                    <Link {...t} href={addressPath(m.address)} tabIndex={-1} className={`cell ${healthCell(m.level)}`} />
+                  )}
+                />
+              ))}
             </div>
           </li>
         ))}

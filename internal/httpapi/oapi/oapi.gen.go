@@ -359,6 +359,24 @@ func (e LabelKind) Valid() bool {
 	}
 }
 
+// Defines values for LayoutElementColor.
+const (
+	LayoutElementColorActivity LayoutElementColor = "activity"
+	LayoutElementColorHealth   LayoutElementColor = "health"
+)
+
+// Valid indicates whether the value is a known member of the LayoutElementColor enum.
+func (e LayoutElementColor) Valid() bool {
+	switch e {
+	case LayoutElementColorActivity:
+		return true
+	case LayoutElementColorHealth:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LayoutElementKind.
 const (
 	LayoutElementKindFleetMap      LayoutElementKind = "fleet-map"
@@ -390,6 +408,7 @@ func (e LayoutElementKind) Valid() bool {
 const (
 	Cards LayoutElementView = "cards"
 	Table LayoutElementView = "table"
+	Tiles LayoutElementView = "tiles"
 )
 
 // Valid indicates whether the value is a known member of the LayoutElementView enum.
@@ -398,6 +417,8 @@ func (e LayoutElementView) Valid() bool {
 	case Cards:
 		return true
 	case Table:
+		return true
+	case Tiles:
 		return true
 	default:
 		return false
@@ -593,12 +614,15 @@ func (e WorkKind) Valid() bool {
 // Defines values for GetPageParamsPage.
 const (
 	GetPageParamsPageDashboard GetPageParamsPage = "dashboard"
+	GetPageParamsPagePresent   GetPageParamsPage = "present"
 )
 
 // Valid indicates whether the value is a known member of the GetPageParamsPage enum.
 func (e GetPageParamsPage) Valid() bool {
 	switch e {
 	case GetPageParamsPageDashboard:
+		return true
+	case GetPageParamsPagePresent:
 		return true
 	default:
 		return false
@@ -1071,8 +1095,11 @@ type Label struct {
 // LabelKind defines model for Label.Kind.
 type LabelKind string
 
-// LayoutElement One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, latest-commits takes count, heading takes text and note (plain text).
+// LayoutElement One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits takes count, heading takes text and note (plain text).
 type LayoutElement struct {
+	// Color What colours the fleet map's tiles: the last change's age (the default) or the health level
+	Color *LayoutElementColor `json:"color,omitempty"`
+
 	// Count How many commits
 	Count *int `json:"count,omitempty"`
 
@@ -1082,14 +1109,17 @@ type LayoutElement struct {
 	Note   *string           `json:"note,omitempty"`
 	Text   *string           `json:"text,omitempty"`
 
-	// View How products are drawn until the reader switches
+	// View How products are drawn until the reader switches; tiles: compact, for the presentation page
 	View *LayoutElementView `json:"view,omitempty"`
 }
+
+// LayoutElementColor What colours the fleet map's tiles: the last change's age (the default) or the health level
+type LayoutElementColor string
 
 // LayoutElementKind defines model for LayoutElement.Kind.
 type LayoutElementKind string
 
-// LayoutElementView How products are drawn until the reader switches
+// LayoutElementView How products are drawn until the reader switches; tiles: compact, for the presentation page
 type LayoutElementView string
 
 // Link defines model for Link.

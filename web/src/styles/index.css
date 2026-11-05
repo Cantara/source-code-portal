@@ -223,6 +223,14 @@
     @apply size-2.5 rounded-[2px];
     background: var(--lvl);
   }
+  /* The fleet map by health: a shape for each level besides its colour, so colour is never alone (design/present.md). */
+  .cell-watch {
+    @apply rounded-full;
+  }
+  .cell-attention {
+    outline: 1.5px solid var(--foreground);
+    outline-offset: 1px;
+  }
   /* A Hint's card (shared/hint.tsx) and the colour it explains. */
   .hint-swatch {
     @apply inline-block size-3 shrink-0 rounded-[3px];
@@ -278,6 +286,16 @@
   }
   .lvl-active.led-live {
     animation: pulse-led 2.4s ease-in-out infinite;
+  }
+  /* A commit that arrived while the presentation page was open. */
+  .arrive {
+    animation: arrive 400ms ease-out;
+  }
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      translate: 0 -0.75rem;
+    }
   }
   @keyframes pulse-led {
     50% {

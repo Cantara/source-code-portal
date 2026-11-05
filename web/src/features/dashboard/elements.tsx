@@ -33,7 +33,7 @@ export function Elements({
       case "telemetry":
         return <Telemetry key={i} data={data} now={now} />
       case "fleet-map":
-        return <FleetMap key={i} groups={pick(data.groups, el.groups)} work={data.work} now={now} />
+        return <FleetMap key={i} groups={pick(data.groups, el.groups)} work={data.work} now={now} color={el.color} />
       case "products":
         return (
           <Products

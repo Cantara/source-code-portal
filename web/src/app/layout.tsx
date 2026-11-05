@@ -7,7 +7,7 @@ import { LiveIndicator, StatusBanners } from "@/features/status/banners"
 import { unwrap } from "@/lib/api/client"
 import { origin, privateViewer, renderedAt, serverApi } from "@/lib/api/server"
 import { Providers } from "./providers"
-import { FocusOnNavigation, MainNav, Mark, PortalNav, ViewerMenu } from "./shell"
+import { Chrome, FocusOnNavigation, MainNav, Mark, PortalNav, ViewerMenu } from "./shell"
 import "@/styles/index.css"
 import "@/styles/docs.css"
 
@@ -49,32 +49,34 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <Providers now={renderedAt()}>
           <FocusOnNavigation />
           <WebMCP />
-          <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-2">
-            Skip to content
-          </a>
-          <header className="sticky top-0 z-40 border-b border-border bg-background/75 backdrop-blur-md">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 lg:px-6">
-              <Link href="/" className="group flex items-center gap-2.5 font-semibold tracking-tight">
-                <Mark />
-                <span>
-                  Source Code Portal
-                  <span className="ml-2 hidden font-mono text-[0.6875rem] font-normal tracking-widest text-muted-foreground uppercase sm:inline">
-                    Mission control
+          <Chrome>
+            <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-2">
+              Skip to content
+            </a>
+            <header className="sticky top-0 z-40 border-b border-border bg-background/75 backdrop-blur-md">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 lg:px-6">
+                <Link href="/" className="group flex items-center gap-2.5 font-semibold tracking-tight">
+                  <Mark />
+                  <span>
+                    Source Code Portal
+                    <span className="ml-2 hidden font-mono text-[0.6875rem] font-normal tracking-widest text-muted-foreground uppercase sm:inline">
+                      Mission control
+                    </span>
+                    <span className="ml-2 font-mono text-[0.6875rem] font-normal text-muted-foreground" title="Release">
+                      {release()}
+                    </span>
                   </span>
-                  <span className="ml-2 font-mono text-[0.6875rem] font-normal text-muted-foreground" title="Release">
-                    {release()}
-                  </span>
-                </span>
-              </Link>
-              <MainNav ask={!!assistant?.enabled && assistant.allowed} />
-              <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
-                <LiveIndicator />
-                <SearchBox />
-                <PortalNav />
-                <ViewerMenu me={me} />
+                </Link>
+                <MainNav ask={!!assistant?.enabled && assistant.allowed} />
+                <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
+                  <LiveIndicator />
+                  <SearchBox />
+                  <PortalNav />
+                  <ViewerMenu me={me} />
+                </div>
               </div>
-            </div>
-          </header>
+            </header>
+          </Chrome>
           <StatusBanners />
           <main id="main" className="px-4 py-5 lg:px-6">
             {children}

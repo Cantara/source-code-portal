@@ -27,7 +27,7 @@ const (
 )
 
 // pages are the pages that have a layout.
-var pages = []string{"dashboard"} //nolint:gochecknoglobals // a constant list
+var pages = []string{"dashboard", "present"} //nolint:gochecknoglobals // a constant list
 
 var groupID = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
@@ -39,9 +39,19 @@ type Layout struct {
 	Elements []oapi.LayoutElement `json:"elements"`
 }
 
-// Default is the built-in layout of page: the fleet at a glance, then the products, then people's commits.
+// Default is the built-in layout of page: the fleet at a glance, then the products, then people's commits. The presentation page
+// (design/present.md) shows the same compact: the fleet by health and the products as tiles.
 func Default(page string) Layout {
-	if page != "dashboard" {
+	switch page {
+	case "dashboard":
+	case "present":
+		return Layout{Elements: []oapi.LayoutElement{
+			{Kind: oapi.LayoutElementKindTelemetry},
+			{Kind: oapi.LayoutElementKindFleetMap, Color: new(oapi.LayoutElementColorHealth)},
+			{Kind: oapi.LayoutElementKindProducts, View: new(oapi.Tiles)},
+			{Kind: oapi.LayoutElementKindLatestCommits, Count: new(30)},
+		}}
+	default:
 		return Layout{Elements: []oapi.LayoutElement{}}
 	}
 	return Layout{Elements: []oapi.LayoutElement{
@@ -90,7 +100,7 @@ func check(e *oapi.LayoutElement) error {
 	takes := map[string]bool{}
 	switch e.Kind {
 	case oapi.LayoutElementKindFleetMap:
-		takes["groups"] = true
+		takes["groups"], takes["color"] = true, true
 	case oapi.LayoutElementKindProducts:
 		takes["groups"], takes["view"] = true, true
 	case oapi.LayoutElementKindLatestCommits:
@@ -100,7 +110,7 @@ func check(e *oapi.LayoutElement) error {
 	case oapi.LayoutElementKindTelemetry:
 	}
 	for field, set := range map[string]bool{"groups": e.Groups != nil, "view": e.View != nil, "count": e.Count != nil,
-		"text": e.Text != nil, "note": e.Note != nil} {
+		"text": e.Text != nil, "note": e.Note != nil, "color": e.Color != nil} {
 		if set && !takes[field] {
 			return fmt.Errorf("%s is not an option of this kind", field)
 		}
@@ -117,7 +127,10 @@ func check(e *oapi.LayoutElement) error {
 		}
 	}
 	if e.View != nil && !e.View.Valid() {
-		return fmt.Errorf("view: %q is neither cards nor table", *e.View)
+		return fmt.Errorf("view: %q is not cards, table or tiles", *e.View)
+	}
+	if e.Color != nil && !e.Color.Valid() {
+		return fmt.Errorf("color: %q is neither activity nor health", *e.Color)
 	}
 	if e.Count != nil && (*e.Count < 1 || *e.Count > maxCount) {
 		return fmt.Errorf("count: 1..%d", maxCount)

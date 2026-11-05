@@ -162,6 +162,7 @@ func publicPaths(t *testing.T) []string {
 		"/badges/groups/all/health.svg", "/badges/groups/all/last-commit.svg", "/badges/groups/all/release.svg",
 		"/images/acme/zq-hidden/00000000000000000000000000000000", "/badge/license/zq-hidden/main", "/commits/zq-hidden",
 		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events", "/api/v1/admin/layouts/dashboard",
+		"/api/v1/pages/present", "/api/v1/admin/layouts/present",
 		// The search, by the private repository's name, its README's and commit's words, a filter and a prefix.
 		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=repo:zq-hidden",
 		"/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search?q=zq-hidden&in=repo", "/api/v1/search/suggest?q=zq-hidden",

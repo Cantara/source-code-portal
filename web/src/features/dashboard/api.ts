@@ -11,11 +11,21 @@ export const dashboardQuery = (api: Api, work: Work) =>
     queryFn: ({ signal }) => unwrap(api.GET("/dashboard", { params: { query: { work } }, signal })),
   })
 
-/** pageQuery is the landing page's layout, resolved for the viewer. */
-export const pageQuery = (api: Api) =>
+/** Page is a page that has a layout: the landing page or the presentation page. */
+export type Page = "dashboard" | "present"
+
+/** pageQuery is a page's layout, resolved for the viewer. */
+export const pageQuery = (api: Api, page: Page = "dashboard") =>
   queryOptions({
-    queryKey: keys.page("dashboard"),
-    queryFn: ({ signal }) => unwrap(api.GET("/pages/{page}", { params: { path: { page: "dashboard" } }, signal })),
+    queryKey: keys.page(page),
+    queryFn: ({ signal }) => unwrap(api.GET("/pages/{page}", { params: { path: { page } }, signal })),
+  })
+
+/** workQuery is the newest commits of the work that counts, as many as limit, for the presentation page's column. */
+export const workQuery = (api: Api, work: Work, limit: number) =>
+  queryOptions({
+    queryKey: [...keys.commitLog("", "", true, limit, 1), work.join(",")],
+    queryFn: ({ signal }) => unwrap(api.GET("/commits", { params: { query: { work, limit } }, signal })),
   })
 
 /** latestAllQuery is the newest commits of every kind, automation and sweeps included, for the dashboard's "include automation". */

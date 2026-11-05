@@ -37,6 +37,9 @@ func TestParse(t *testing.T) {
 		"unknown field":     {body: `{"elements":[{"kind":"telemetry","colour":"red"}]}`, want: "unknown field"},
 		"foreign option":    {body: `{"elements":[{"kind":"telemetry","count":3}]}`, want: "count is not an option"},
 		"bad view":          {body: `{"elements":[{"kind":"products","view":"list"}]}`, want: "view"},
+		"present":           {body: `{"elements":[{"kind":"fleet-map","color":"health"},{"kind":"products","view":"tiles"}]}`},
+		"bad color":         {body: `{"elements":[{"kind":"fleet-map","color":"red"}]}`, want: "color"},
+		"foreign color":     {body: `{"elements":[{"kind":"products","color":"health"}]}`, want: "color is not an option"},
 		"no groups":         {body: `{"elements":[{"kind":"fleet-map","groups":[]}]}`, want: "groups: 1..100"},
 		"bad group":         {body: `{"elements":[{"kind":"fleet-map","groups":["Not An Id"]}]}`, want: "groups[0]"},
 		"twice":             {body: `{"elements":[{"kind":"fleet-map","groups":["a","a"]}]}`, want: "listed twice"},
@@ -63,8 +66,10 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
-	if err := Default("dashboard").Validate(); err != nil {
-		t.Errorf("the default layout: %v", err)
+	for _, page := range pages {
+		if err := Default(page).Validate(); err != nil {
+			t.Errorf("the default layout of %s: %v", page, err)
+		}
 	}
 }
 

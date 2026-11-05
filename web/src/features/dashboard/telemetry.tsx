@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { count, plural } from "@/lib/format"
@@ -98,6 +99,47 @@ export function Telemetry({ data, now }: { data: Schemas["Dashboard"]; now: numb
           level={f.error > 0 ? "lvl-danger" : "lvl-active"}
         />
       </dl>
+    </section>
+  )
+}
+
+/** Figure is one of the strip's numbers with what it counts. */
+function Figure({ value, label, level }: { value: string; label: string; level?: string }) {
+  return (
+    <div className={cn("flex items-baseline gap-1.5", level)}>
+      <dt className="sr-only">{label}</dt>
+      <dd className="flex items-baseline gap-1.5">
+        {level && <span aria-hidden="true" className="led self-center" />}
+        <span className="font-mono text-xl font-semibold tabular-nums">{value}</span>
+        <span className="text-[0.9375rem] text-muted-foreground" aria-hidden="true">
+          {label}
+        </span>
+      </dd>
+    </div>
+  )
+}
+
+/**
+ * TelemetryStrip is the telemetry in one line, for the presentation page: repositories, products, the products at attention and
+ * at watch, the people of the last 30 days and their share with AI; end is what closes the line (the data's age).
+ */
+export function TelemetryStrip({ data, end }: { data: Schemas["Dashboard"]; end?: ReactNode }) {
+  const a = data.activity
+  const attention = data.groups.filter((g) => g.health?.level === "attention").length
+  const watch = data.groups.filter((g) => g.health?.level === "watch").length
+  const all = a.hand + a.ai
+  return (
+    <section aria-label="Telemetry" className="panel flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-2">
+      <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <Figure value={count(data.repoCount)} label={data.repoCount === 1 ? "repository" : "repositories"} />
+        <Figure value={count(data.groups.length)} label={data.groups.length === 1 ? "product" : "products"} />
+        {attention > 0 && <Figure value={count(attention)} label="need attention" level={levels.attention.className} />}
+        {watch > 0 && <Figure value={count(watch)} label="to watch" level={levels.watch.className} />}
+        {attention === 0 && watch === 0 && <Figure value="0" label="need attention" level={levels.good.className} />}
+        <Figure value={count(a.authorCount)} label={a.authorCount === 1 ? "person in 30 days" : "people in 30 days"} />
+        {all > 0 && <Figure value={percent(a.ai, all)} label="with AI" />}
+      </dl>
+      {end}
     </section>
   )
 }

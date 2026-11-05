@@ -201,7 +201,7 @@ paths:
         viewer cannot see, or that have no repository the viewer can see, are left out; an element whose groups are all left out is
         left out.
       parameters:
-        - { name: page, in: path, required: true, schema: { type: string, enum: [dashboard] } }
+        - { name: page, in: path, required: true, schema: { type: string, enum: [dashboard, present] } }
       responses:
         "200":
           description: The page's layout
@@ -797,12 +797,13 @@ components:
       type: object
       description: >-
         One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products
-        takes view, latest-commits takes count, heading takes text and note (plain text).
+        takes view, fleet-map takes color, latest-commits takes count, heading takes text and note (plain text).
       required: [kind]
       properties:
         kind: { type: string, enum: [telemetry, fleet-map, products, latest-commits, heading] }
         groups: { type: array, items: { type: string }, minItems: 1, maxItems: 100, description: Group ids in display order }
-        view: { type: string, enum: [cards, table], description: "How products are drawn until the reader switches" }
+        view: { type: string, enum: [cards, table, tiles], description: "How products are drawn until the reader switches; tiles: compact, for the presentation page" }
+        color: { type: string, enum: [activity, health], description: "What colours the fleet map's tiles: the last change's age (the default) or the health level" }
         count: { type: integer, minimum: 1, maximum: 50, description: How many commits }
         text: { type: string, maxLength: 120 }
         note: { type: string, maxLength: 500 }
