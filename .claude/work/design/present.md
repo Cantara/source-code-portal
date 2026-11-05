@@ -49,15 +49,16 @@ fits from 1024 to 1920 pixels wide.
 ```
 
 - **Status strip**, one line: the brand at its start (the mark and SCP, a link to the dashboard; the mark alone in a narrow column),
-  then the dashboard's six signals in the same order (`signals` in `telemetry.tsx`, one list for both pages), each its icon and value
-  alone: the commits by hand, with AI and by automation (a commit with the kind's badge, in the kind's colour as the sparklines draw
-  it: commits, not people or bots, P-62), then the active repositories, the findings and the sync in their levels' colours; the name,
-  what it counts and its parts (the people, the assistants, the bots and sweeps, the activities, the products by level, the
-  repositories by freshness) in its hint. The freshness indicator closes it.
+  then the dashboard's seven signals in the same order (`signals` in `telemetry.tsx`, one list for both pages), each its icon and
+  value alone: the commits by hand, with AI and by automation (a commit with the kind's badge, in the kind's colour as the sparklines
+  draw it: commits, not people or bots, P-62), the active repositories, the findings, the products (a grid) and the sync (a cloud
+  with a check, crossed out in red while updates fail); the name, what it counts and its parts (the people, the assistants, the bots
+  and sweeps, the activities, the costliest findings, the products by level, the repositories by freshness) in its hint. As the
+  column narrows the active repositories go first, then the products, then the three kinds of commits together. The freshness indicator closes it.
 - **Fleet health**: the `fleet-map` coloured by health level instead of activity (one square per repository, the level's colour and
-  a shape, attention outlined and watch round, so colour is never alone), drawn dense: one strip of clusters, each product its squares in
-  a hairline box under its name in small type (cut to the squares' width, whole with its counts by level in the name's hint; a tap on
-  a square names its repository, a screen reader hears each product's counts), so the fleet reads as its products (P-62). The legend counts the levels on the title line. On Cantara's 134
+  a shape, attention outlined and watch round, so colour is never alone), drawn dense: one strip of clusters, each product's squares in
+  a hairline outline without a name (a tap on a square names its repository and its product; a screen reader hears each product's
+  counts), so the fleet reads as its products in the least room (P-62). The legend counts the levels on the title line. On Cantara's 134
   repositories in 13 products it is 106 px high where the labelled map took 240; 1,000 repositories take about 15 rows.
 - **Products as tiles**: a product at watch or attention takes a wide tile of three lines (name, then the level as the fleet map draws it, round for watch and outlined for attention, with how many repositories are at it, "● 6", the words in its hint;
   the last change, the release and the 12-week sparkline of the work that counts; its findings as the dashboard draws them: the finding's mark (the kind's icon on its severity's tile) and the repository, without the reason; the mark's hint tells the kind, severity, cost, what was found and the next step, and the mark opens the finding on its repository's page; two lines of them, the most costly first). A good

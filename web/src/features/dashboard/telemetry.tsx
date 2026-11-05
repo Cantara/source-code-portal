@@ -5,9 +5,9 @@ import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { count, plural } from "@/lib/format"
 import { by, has, kinds, type WorkKind } from "@/lib/preferences"
-import { activityRule, levelLabel, window, type Rules } from "@/lib/rules"
+import { activityRule, kindOf, levelLabel, window, type Rules } from "@/lib/rules"
 import { useRules } from "@/lib/rules-context"
-import { CommitIcon, FlagIcon, PulseIcon, RefreshIcon } from "@/components/ui/icons"
+import { CloudCheckIcon, CloudOffIcon, CommitIcon, FlagIcon, GridIcon, PulseIcon } from "@/components/ui/icons"
 import { levels } from "@/entities/health/health"
 import { Hint, type HintRow } from "@/shared/hint"
 import { assistants } from "./work"
@@ -21,7 +21,7 @@ function percent(part: number, whole: number): string {
 
 /** Signal is one indicator of the fleet, the same on the dashboard (a tile) and on the presentation page (an icon in the strip). */
 export type Signal = {
-  key: WorkKind | "active" | "findings" | "sync"
+  key: WorkKind | "active" | "findings" | "products" | "sync"
   /** what it counts, in words: "Commits by hand" */
   label: string
   value: string
@@ -40,12 +40,13 @@ export type Signal = {
 /** tones are the kinds of work's colours, as the sparklines and the cards draw them (no inline style: the CSP forbids it). */
 const tones: Record<WorkKind, string> = { hand: "text-primary", ai: "text-[var(--ai)]", automation: "text-muted-foreground" }
 const dots: Record<WorkKind, string> = { hand: "bg-primary", ai: "bg-[var(--ai)]", automation: "bg-muted-foreground" }
-const drops: Record<WorkKind, string> = { hand: "@max-xl:hidden", ai: "@max-xl:hidden", automation: "@max-3xl:hidden" }
+/** commitsDrop is where a narrowing strip drops the commits: the three kinds together, the last of what goes. */
+const commitsDrop = "@max-xl:hidden"
 
 /**
  * signals are the fleet's indicators in their order: the commits of each kind of work (by hand, with AI or by an agent, by
- * automation; each says whether Settings count it), the repositories the work that counts changed, what needs a look, and whether
- * the catalogue is current. The window and the names of the levels come from the server's rules, so they say what it does today.
+ * automation; each says whether Settings count it), the repositories the work that counts changed, what needs a look, the
+ * products by their health, and whether the catalogue is current. The window and the names of the levels come from the server's rules, so they say what it does today.
  */
 export function signals(data: Schemas["Dashboard"], rules: Rules): Signal[] {
   const a = data.activity
@@ -66,7 +67,7 @@ export function signals(data: Schemas["Dashboard"], rules: Rules): Signal[] {
     icon: <CommitIcon kind={k} />,
     rows: [...rows, { label: "In the work that counts", value: has(data.work, k) ? "yes" : "no, see Settings" }],
     tone: tones[k],
-    drop: drops[k],
+    drop: commitsDrop,
   })
   return [
     commits("hand", a.hand, `in the last ${days}, by ${plural(a.authorCount, "person", "people")}`, [
@@ -89,9 +90,7 @@ export function signals(data: Schemas["Dashboard"], rules: Rules): Signal[] {
       key: "active",
       label: "Active repositories",
       value: count(at("active")),
-      detail:
-        `of ${plural(members.size, "repository", "repositories")}, changed ${by(data.work)} in the last ${days}` +
-        (data.ungroupedCount > 0 ? `; ${count(data.ungroupedCount)} more in no product` : ""),
+      detail: `of ${plural(members.size, "repository", "repositories")}, changed ${by(data.work)} in the last ${days}`,
       icon: <PulseIcon />,
       rows: (["active", "recent", "quiet"] as const).map((l) => ({
         swatch: `lvl-${l}`,
@@ -112,19 +111,36 @@ export function signals(data: Schemas["Dashboard"], rules: Rules): Signal[] {
             ? `${count(products("watch"))} of ${ofProducts} to watch`
             : `none of ${ofProducts} needs attention`,
       icon: <FlagIcon />,
+      // The most costly first, as the dashboard weighs them: each its kind and repository.
+      rows: (h?.findings ?? []).slice(0, 3).map((x) => ({
+        swatch: levels[h?.level ?? "good"].className,
+        label: `${kindOf(x.code, rules).label}: ${x.repo.split("/")[1] ?? x.repo}`,
+        value: `−${x.penalty}`,
+      })),
+      level: h ? levels[h.level].className : undefined,
+    },
+    {
+      key: "products",
+      label: "Products",
+      value: count(data.groups.length),
+      detail:
+        `holding ${plural(members.size, "repository", "repositories")}` +
+        (data.ungroupedCount > 0 ? `; ${count(data.ungroupedCount)} more in none` : ""),
+      icon: <GridIcon />,
       rows: (["attention", "watch", "good"] as const).map((l) => ({
         swatch: levels[l].className,
         label: levelLabel(l, rules),
-        value: plural(products(l), "product", "products"),
+        value: count(products(l)),
       })),
-      level: h ? levels[h.level].className : undefined,
+      tone: "text-primary",
+      drop: "@max-2xl:hidden",
     },
     {
       key: "sync",
       label: "In sync",
       value: percent(f.fresh, checked),
       detail: f.error > 0 ? `${count(f.error)} failing to update from GitHub` : "the catalogue is current with GitHub",
-      icon: <RefreshIcon />,
+      icon: f.error > 0 ? <CloudOffIcon /> : <CloudCheckIcon />,
       rows: [
         { swatch: "lvl-active", label: "Current", value: count(f.fresh) },
         { swatch: "lvl-quiet", label: "Due for a check", value: count(f.stale + f.unknown) },
@@ -155,7 +171,7 @@ export function Telemetry({ data }: { data: Schemas["Dashboard"] }) {
   const rules = useRules()
   return (
     <section aria-label="Telemetry">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         {signals(data, rules).map((s) => (
           <SignalHint
             key={s.key}
@@ -187,8 +203,8 @@ export function Telemetry({ data }: { data: Schemas["Dashboard"] }) {
 /**
  * TelemetryStrip is the same signals in one line, for the presentation page: each its icon and value, what it counts and its parts
  * in its hint, so the line stays short. start opens the line (the brand), end closes it (the data's age). As its container narrows
- * it keeps what matters most: the repositories changed and automation's commits go first, then people's; the findings and the
- * sync always stay.
+ * it keeps what matters most: the active repositories go first, then the products, then the commits (the three kinds together,
+ * never one without the others); the findings and the sync always stay.
  */
 export function TelemetryStrip({ data, start, end }: { data: Schemas["Dashboard"]; start?: ReactNode; end?: ReactNode }) {
   const rules = useRules()

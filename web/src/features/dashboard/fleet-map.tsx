@@ -208,10 +208,12 @@ function HealthMap({
 }) {
   const rules = useRules()
   const total = healthTally(members)
-  const tile = (m: Member) => (
+  // A tile's hint names its product too: the dense strip draws the products as outlines without their names.
+  const tile = (g: Group) => (m: Member) => (
     <Hint
       key={m.address}
       heading={m.name}
+      meta={g.name}
       rows={[
         ...(m.level
           ? [{ swatch: levels[m.level].className, label: "Health", value: levelLabel(m.level, rules) }]
@@ -242,8 +244,8 @@ function HealthMap({
         </ul>
       </div>
       {dense ? (
-        // One strip of clusters: each product its tiles in a hairline box under its name (cut to the tiles' width, whole in its
-        // hint), so the fleet reads as its products at a glance.
+        // One strip of clusters: each product's tiles in a hairline outline, no names (a tile's hint names its product), so the
+        // fleet reads as its products in the least room.
         <>
           <ul className="sr-only">
             {groups.map((g) => (
@@ -252,26 +254,10 @@ function HealthMap({
               </li>
             ))}
           </ul>
-          <div aria-hidden="true" className="flex flex-wrap gap-1.5">
+          <div aria-hidden="true" className="flex flex-wrap gap-1">
             {groups.map((g) => (
-              <span key={g.id} className="flex flex-col gap-0.5 rounded-sm border border-border/70 px-1 pt-0.5 pb-1">
-                <Hint
-                  heading={g.name}
-                  meta={`${count(g.members.length)} ${g.members.length === 1 ? "repository" : "repositories"}`}
-                  rows={healthLevels
-                    .map((l) => ({ l, n: g.members.filter((m) => m.level === l).length }))
-                    .filter(({ n }) => n > 0)
-                    .map(({ l, n }) => ({ swatch: levels[l].className, label: levelLabel(l, rules), value: count(n) }))}
-                  render={(t) => (
-                    <span
-                      {...t}
-                      className="w-0 min-w-full cursor-help truncate text-[0.625rem] leading-none text-muted-foreground"
-                    >
-                      {g.name}
-                    </span>
-                  )}
-                />
-                <span className="flex flex-wrap gap-1">{g.members.map(tile)}</span>
+              <span key={g.id} className="flex flex-wrap gap-1 rounded-[0.3125rem] border border-border p-[3px]">
+                {g.members.map(tile(g))}
               </span>
             ))}
           </div>
@@ -286,7 +272,7 @@ function HealthMap({
               </p>
               <p className="sr-only">{healthSummary(g.members, rules)}</p>
               <div aria-hidden="true" className="mt-1 flex max-w-[20rem] flex-wrap gap-1">
-                {g.members.map(tile)}
+                {g.members.map(tile(g))}
               </div>
             </li>
           ))}

@@ -2,7 +2,7 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 import { cn } from "@/lib/cn"
 import { kinds } from "@/lib/preferences"
-import { CommitIcon, FlagIcon, PulseIcon, RefreshIcon } from "@/components/ui/icons"
+import { CloudCheckIcon, CommitIcon, FlagIcon, GridIcon, PulseIcon } from "@/components/ui/icons"
 import { levels } from "@/entities/health/health"
 import { FindingIcon, ScoreRing, severities } from "@/entities/health/kinds"
 import { activityRule, levelRanges, severityOf, span, window, type Rules } from "@/lib/rules"
@@ -409,12 +409,12 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
           id="telemetry"
           n={2}
           title="The fleet at a glance"
-          lede="The row of tiles at the top of the dashboard, and the line at the top of the presentation page: the same six signals, each with its icon. A commit with a badge counts commits of one kind of work; the others are coloured by their state. Point at one, or tap it, for its parts."
+          lede="The row of tiles at the top of the dashboard, and the line at the top of the presentation page: the same seven signals, each with its icon. A commit with a badge counts commits of one kind of work; the others are coloured by their state. Point at one, or tap it, for its parts."
         >
           <Figure caption="The telemetry of a portal with three products and thirteen repositories.">
             <Shot
               name="telemetry"
-              alt="Six tiles: 16 commits by hand by 5 people, 36 commits with AI, 69 commits by automation with 12 in sweeps, 12 active of 13 repositories, 8 findings with 1 of 3 products to watch, 100% in sync."
+              alt="Seven tiles: 16 commits by hand by 5 people, 36 commits with AI, 69 commits by automation with 12 in sweeps, 12 active of 13 repositories, 8 findings with 1 of 3 products to watch, 3 products holding 13 repositories, 100% in sync."
             />
           </Figure>
           <Terms
@@ -456,10 +456,17 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
               ],
               [
                 <>
-                  <RefreshIcon className="size-4 text-primary" />
+                  <GridIcon className="size-4 text-primary" />
+                  Products
+                </>,
+                "The products, the repositories they hold and those in none; how many are at each health level.",
+              ],
+              [
+                <>
+                  <CloudCheckIcon className="size-4 text-primary" />
                   In sync
                 </>,
-                "The share of repositories whose data is current; red when updates from GitHub fail.",
+                "The share of repositories whose data is current with GitHub; a crossed-out cloud in red when updates fail.",
               ],
             ]}
           />
@@ -740,7 +747,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
             <Figure caption="The presentation page on an iPad in landscape: the fleet's numbers and how current they are, every repository's health, a wide tile for the product to watch, one line for each good one, and the newest commits at the right.">
               <Shot
                 name="present"
-                alt="The presentation page: SCP and the six signals as icons and values in one line, live; the fleet health as one cluster per product, 3 to watch and 9 good; Developer tools as a wide tile at watch with its findings as icons, Payments and Identity as small tiles; the latest commits in a column at the right."
+                alt="The presentation page: SCP and the seven signals as icons and values in one line, live; the fleet health with each product's squares in an outline, 3 to watch and 9 good; Developer tools as a wide tile at watch with its findings as icons, Payments and Identity as small tiles; the latest commits in a column at the right."
               />
             </Figure>
             <div className="grid gap-6 lg:grid-cols-2">

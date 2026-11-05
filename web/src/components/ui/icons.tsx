@@ -226,9 +226,9 @@ const badges = { hand: person, ai: sparkles, automation: bot } as const
 export function CommitIcon({ kind, className }: { kind: keyof typeof badges; className?: string }) {
   return (
     <Icon className={className}>
-      <circle cx="8" cy="16" r="3.5" />
-      <path d="M1.5 16h3M11.5 16H15" />
-      <g transform="translate(12.5 0.5) scale(0.46)" strokeWidth="3.6">
+      <circle cx="6.5" cy="17.5" r="3" />
+      <path d="M1 17.5h2.5M9.5 17.5H13" />
+      <g transform="translate(9 0) scale(0.625)" strokeWidth="2.9">
         {badges[kind]}
       </g>
     </Icon>
@@ -244,11 +244,36 @@ export function PulseIcon({ className }: { className?: string }) {
   )
 }
 
-/** RefreshIcon stands for the catalogue in sync with GitHub. */
-export function RefreshIcon({ className }: { className?: string }) {
+const cloud = "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"
+
+/** CloudCheckIcon stands for the portal's copy of GitHub, current. */
+export function CloudCheckIcon({ className }: { className?: string }) {
   return (
     <Icon className={className}>
-      <path d="M20 11a8 8 0 0 0-13.7-4.7L4 8.5M4 13a8 8 0 0 0 13.7 4.7L20 15.5M4 4v4.5h4.5M20 20v-4.5h-4.5" />
+      <path d={cloud} />
+      <path d="m9.5 14 2 2 3.5-3.5" />
+    </Icon>
+  )
+}
+
+/** CloudOffIcon stands for the portal's copy of GitHub, failing to update. */
+export function CloudOffIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d={cloud} />
+      <path d="M3 3l18 18" />
+    </Icon>
+  )
+}
+
+/** GridIcon stands for the products: the fleet's groups of repositories. */
+export function GridIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
     </Icon>
   )
 }
