@@ -24,6 +24,8 @@ type metrics struct {
 	github     *prometheus.CounterVec
 	asks       *prometheus.CounterVec
 	askTokens  *prometheus.CounterVec
+	searches   *prometheus.CounterVec
+	searchTime *prometheus.HistogramVec
 }
 
 // gauges are read at scrape time from the live state.
@@ -52,11 +54,15 @@ func newMetrics(g gauges) *metrics {
 		[]string{"outcome"})
 	m.askTokens = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_assistant_tokens_total", Help: "Language model tokens the assistant used."},
 		[]string{"kind"})
+	m.searches = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_search_requests_total", Help: "Searches and suggestions answered."},
+		[]string{"op"})
+	m.searchTime = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "scp_search_duration_seconds", Help: "Time a search took.",
+		Buckets: []float64{.001, .0025, .005, .01, .025, .05, .1, .25, .5, 1}}, []string{"op"})
 	info := prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "scp_build_info", Help: "Build of the running binary."},
 		[]string{"version", "commit", "goversion"})
 	info.WithLabelValues(version, build, runtime.Version()).Set(1)
 	m.reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		m.requests, m.durations, m.deliveries, m.jobs, m.jobTime, m.github, m.asks, m.askTokens, info, newLive(g))
+		m.requests, m.durations, m.deliveries, m.jobs, m.jobTime, m.github, m.asks, m.askTokens, m.searches, m.searchTime, info, newLive(g))
 	return m
 }
 
@@ -72,6 +78,11 @@ func (m *metrics) request(listener, pattern, method string, status int, d time.D
 	}
 	m.requests.WithLabelValues(listener, pattern, method, strconv.Itoa(status)).Inc()
 	m.durations.WithLabelValues(listener, pattern).Observe(d.Seconds())
+}
+
+func (m *metrics) search(op string, d time.Duration) {
+	m.searches.WithLabelValues(op).Inc()
+	m.searchTime.WithLabelValues(op).Observe(d.Seconds())
 }
 
 func (m *metrics) delivery(event, result string) { m.deliveries.WithLabelValues(event, result).Inc() }

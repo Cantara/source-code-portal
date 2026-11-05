@@ -84,13 +84,13 @@ func TestMCP(t *testing.T) {
 		return r
 	}
 	hidden := map[string]any{"owner": "acme", "name": "zq-hidden"}
-	if r := call(public, "search_repositories", map[string]any{}); r.IsError || !strings.Contains(text(r), "acme/open") || strings.Contains(text(r), "zq-hidden") {
+	if r := call(public, "search", map[string]any{"query": "open"}); r.IsError || !strings.Contains(text(r), "acme/open") || strings.Contains(text(r), "zq-hidden") {
 		t.Errorf("public search = %s", text(r))
 	}
 	if r := call(public, "repository_health", hidden); !r.IsError || !strings.Contains(text(r), "not found") {
 		t.Errorf("public health of the private repository = %s", text(r))
 	}
-	if r := call(public, "search_repositories", map[string]any{"limit": "many"}); !r.IsError || !strings.Contains(text(r), "integer") {
+	if r := call(public, "search", map[string]any{"query": "open", "limit": "many"}); !r.IsError || !strings.Contains(text(r), "integer") {
 		t.Errorf("a bad argument = %s", text(r))
 	}
 	staff := mcpSession(t, base, botSecret)

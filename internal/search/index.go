@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -32,13 +33,15 @@ type Index struct {
 	sums   [kinds][fields]uint64
 	count  [kinds]uint64
 	w      weighting
+	took   time.Duration
 }
 
 // Stats is what an index holds, for the operator's status.
 type Stats struct {
-	Segments int `json:"segments"`
-	Terms    int `json:"terms"`
-	Bytes    int `json:"bytes"`
+	Segments int     `json:"segments"`
+	Terms    int     `json:"terms"`
+	Bytes    int     `json:"bytes"`
+	BuildMs  float64 `json:"buildMs"` // the last build's time, its reused segments included
 }
 
 const index snapshot.Index[*Index] = "search"
@@ -48,7 +51,7 @@ func Of(s *snapshot.Snapshot) *Index { return index.Get(s) }
 
 // Stats returns what ix holds.
 func (ix *Index) Stats() Stats {
-	var st Stats
+	st := Stats{BuildMs: float64(ix.took.Microseconds()) / 1000}
 	for _, sg := range ix.segs {
 		st.Segments++
 		st.Terms += sg.numTerms()
@@ -74,6 +77,7 @@ func Indexer(o Options) snapshot.Indexer {
 // and the view's groups. A segment neither this build nor the one before used is dropped: the full view and its public view build
 // one after the other, so each keeps the other's.
 func (c *cache) build(s *snapshot.Snapshot, o Options) *Index {
+	start := time.Now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.gen++
@@ -121,6 +125,7 @@ func (c *cache) build(s *snapshot.Snapshot, o Options) *Index {
 			delete(c.segs, k)
 		}
 	}
+	defer func() { ix.took = time.Since(start) }()
 	ix.groups = groupSegment(s)
 	ix.segs = append(ix.segs, ix.groups)
 	for _, sg := range ix.segs {

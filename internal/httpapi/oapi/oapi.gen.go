@@ -485,6 +485,36 @@ func (e RepoFindingCode) Valid() bool {
 	}
 }
 
+// Defines values for SearchKind.
+const (
+	SearchKindCommit  SearchKind = "commit"
+	SearchKindDep     SearchKind = "dep"
+	SearchKindDoc     SearchKind = "doc"
+	SearchKindGroup   SearchKind = "group"
+	SearchKindPackage SearchKind = "package"
+	SearchKindRepo    SearchKind = "repo"
+)
+
+// Valid indicates whether the value is a known member of the SearchKind enum.
+func (e SearchKind) Valid() bool {
+	switch e {
+	case SearchKindCommit:
+		return true
+	case SearchKindDep:
+		return true
+	case SearchKindDoc:
+		return true
+	case SearchKindGroup:
+		return true
+	case SearchKindPackage:
+		return true
+	case SearchKindRepo:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ToolchainName.
 const (
 	ToolchainNameGo     ToolchainName = "go"
@@ -1323,6 +1353,53 @@ type RepoList struct {
 	Repos []Repo `json:"repos"`
 }
 
+// SearchCorrection defines model for SearchCorrection.
+type SearchCorrection struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// SearchCounts defines model for SearchCounts.
+type SearchCounts struct {
+	Commit  int `json:"commit"`
+	Dep     int `json:"dep"`
+	Doc     int `json:"doc"`
+	Group   int `json:"group"`
+	Package int `json:"package"`
+	Repo    int `json:"repo"`
+}
+
+// SearchHit defines model for SearchHit.
+type SearchHit struct {
+	// At When it happened (a commit)
+	At   *time.Time `json:"at,omitempty"`
+	Kind SearchKind `json:"kind"`
+
+	// Repo The repository's address owner/name; absent for a group
+	Repo *string `json:"repo,omitempty"`
+
+	// Snippet Up to 240 characters around the first match, one line
+	Snippet []TextPart `json:"snippet"`
+	Title   []TextPart `json:"title"`
+
+	// Url The portal page the hit opens
+	Url string `json:"url"`
+}
+
+// SearchKind defines model for SearchKind.
+type SearchKind string
+
+// SearchResult defines model for SearchResult.
+type SearchResult struct {
+	Corrections []SearchCorrection `json:"corrections"`
+	Counts      SearchCounts       `json:"counts"`
+	Hits        []SearchHit        `json:"hits"`
+	Page        Page               `json:"page"`
+
+	// Query The query as searched
+	Query string `json:"query"`
+}
+
 // SnapshotInfo defines model for SnapshotInfo.
 type SnapshotInfo struct {
 	BuiltAt *time.Time `json:"builtAt"`
@@ -1342,11 +1419,23 @@ type SourceInfo struct {
 	Repos     int       `json:"repos"`
 }
 
+// Suggestions defines model for Suggestions.
+type Suggestions struct {
+	Hits []SearchHit `json:"hits"`
+}
+
 // Technology defines model for Technology.
 type Technology struct {
 	BuildTools []string            `json:"buildTools"`
 	Languages  []string            `json:"languages"`
 	Toolchains []ToolchainVersions `json:"toolchains"`
+}
+
+// TextPart defines model for TextPart.
+type TextPart struct {
+	// Mark The part matched the query
+	Mark *bool  `json:"mark,omitempty"`
+	Text string `json:"text"`
 }
 
 // Tool defines model for Tool.
@@ -1469,6 +1558,23 @@ type GetHistoryParams struct {
 	At *string `form:"at,omitempty" json:"at,omitempty"`
 }
 
+// SearchParams defines parameters for Search.
+type SearchParams struct {
+	Q string `form:"q" json:"q"`
+
+	// In One kind's hits on the page; the counts stay every kind's
+	In *SearchKind `form:"in,omitempty" json:"in,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// SuggestParams defines parameters for Suggest.
+type SuggestParams struct {
+	Q string `form:"q" json:"q"`
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetAssistant Whether the assistant is on and the viewer may ask it
@@ -1510,6 +1616,12 @@ type ServerInterface interface {
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(w http.ResponseWriter, r *http.Request, owner string, name string)
+	// Search Search what the portal holds, best first, one page at a time
+	// (GET /search)
+	Search(w http.ResponseWriter, r *http.Request, params SearchParams)
+	// Suggest Up to 8 repositories, groups and documents whose names or titles start with the words, for a search box
+	// (GET /search/suggest)
+	Suggest(w http.ResponseWriter, r *http.Request, params SuggestParams)
 	// GetSnapshot Data health; the web UI reads it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(w http.ResponseWriter, r *http.Request)
@@ -2063,6 +2175,111 @@ func (siw *ServerInterfaceWrapper) GetManifests(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// Search operation middleware
+func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "in" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "in", r.URL.Query(), &params.In, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "in"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "in", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Search(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Suggest operation middleware
+func (siw *ServerInterfaceWrapper) Suggest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SuggestParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Suggest(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSnapshot operation middleware
 func (siw *ServerInterfaceWrapper) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 
@@ -2225,6 +2442,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assistant", wrapper.GetAssistant)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search", wrapper.Search)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search/suggest", wrapper.Suggest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tools", wrapper.ListTools)
 
 	return m
@@ -2937,6 +3156,116 @@ func (response GetManifests404ApplicationProblemPlusJSONResponse) VisitGetManife
 	return err
 }
 
+type SearchRequestObject struct {
+	Params SearchParams
+}
+
+type SearchResponseObject interface {
+	VisitSearchResponse(w http.ResponseWriter) error
+}
+
+type Search200ResponseHeaders struct {
+	ETag *string
+}
+
+type Search200JSONResponse struct {
+	Body    SearchResult
+	Headers Search200ResponseHeaders
+}
+
+func (response Search200JSONResponse) VisitSearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Search304Response = NotModifiedResponse
+
+func (response Search304Response) VisitSearchResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type Search400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response Search400ApplicationProblemPlusJSONResponse) VisitSearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SuggestRequestObject struct {
+	Params SuggestParams
+}
+
+type SuggestResponseObject interface {
+	VisitSuggestResponse(w http.ResponseWriter) error
+}
+
+type Suggest200ResponseHeaders struct {
+	ETag *string
+}
+
+type Suggest200JSONResponse struct {
+	Body    Suggestions
+	Headers Suggest200ResponseHeaders
+}
+
+func (response Suggest200JSONResponse) VisitSuggestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Suggest304Response = NotModifiedResponse
+
+func (response Suggest304Response) VisitSuggestResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type Suggest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response Suggest400ApplicationProblemPlusJSONResponse) VisitSuggestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSnapshotRequestObject struct {
 }
 
@@ -3037,6 +3366,12 @@ type StrictServerInterface interface {
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(ctx context.Context, request GetManifestsRequestObject) (GetManifestsResponseObject, error)
+	// Search Search what the portal holds, best first, one page at a time
+	// (GET /search)
+	Search(ctx context.Context, request SearchRequestObject) (SearchResponseObject, error)
+	// Suggest Up to 8 repositories, groups and documents whose names or titles start with the words, for a search box
+	// (GET /search/suggest)
+	Suggest(ctx context.Context, request SuggestRequestObject) (SuggestResponseObject, error)
 	// GetSnapshot Data health; the web UI reads it to learn about new data
 	// (GET /snapshot)
 	GetSnapshot(ctx context.Context, request GetSnapshotRequestObject) (GetSnapshotResponseObject, error)
@@ -3416,6 +3751,58 @@ func (sh *strictHandler) GetManifests(w http.ResponseWriter, r *http.Request, ow
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetManifestsResponseObject); ok {
 		if err := validResponse.VisitGetManifestsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Search operation middleware
+func (sh *strictHandler) Search(w http.ResponseWriter, r *http.Request, params SearchParams) {
+	var request SearchRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Search(ctx, request.(SearchRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Search")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchResponseObject); ok {
+		if err := validResponse.VisitSearchResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Suggest operation middleware
+func (sh *strictHandler) Suggest(w http.ResponseWriter, r *http.Request, params SuggestParams) {
+	var request SuggestRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Suggest(ctx, request.(SuggestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Suggest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SuggestResponseObject); ok {
+		if err := validResponse.VisitSuggestResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -1,6 +1,6 @@
 # Search: one index of what the portal holds (Q1 to Q3)
 
-Status: Q1 built, Q2 in progress (plan.md section 4). Binding order: ../plan.md > this note.
+Status: Q1 and Q2 built, Q3 in progress (plan.md section 4). Binding order: ../plan.md > this note.
 
 A reader looks for something the portal already knows: the repository that does OAuth, the document that explains the session
 timeout, who uses `slf4j-api`, the commit that rotated the keys. Today there is no search: the assistant's `search_repositories`
@@ -110,7 +110,7 @@ and repository text never becomes markup (as the assistant's answers, P-28).
 - The tool catalogue: `search_repositories` becomes `search` over the index (every kind, the filters in its description), so the
   assistant, MCP and WebMCP get it at once; its answer is framed like every tool's (P-54).
 - `/llms.txt` names `/api/v1/search`; the admin status shows the index (segments, terms, bytes, the last build's time); the metrics
-  get `scp_search_requests_total{kind}` and `scp_search_duration_seconds`.
+  get `scp_search_requests_total{op}` and `scp_search_duration_seconds{op}` (`search`, `suggest`).
 
 ## Q3: the pages
 

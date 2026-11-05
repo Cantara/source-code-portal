@@ -271,6 +271,46 @@ paths:
         "403": { $ref: "#/components/responses/Problem" }
         "415": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
+  /search:
+    get:
+      operationId: search
+      summary: Search what the portal holds, best first, one page at a time
+      description: |
+        Searches the viewer's view: repositories, groups, document sections, manifests (`dep`), packages and default-branch commits,
+        not source code. `q` is words (all required), "phrases", -exclusions, OR between two words and filters `in:` (kinds,
+        comma-separated), `group:`, `repo:`, `lang:`, `topic:`, `lifecycle:`, `author:`, `kind:` (hand, ai, automation), `dep:`,
+        `before:` and `after:` (dates); the last word also matches as a prefix, and a word of five letters or more that nothing holds
+        is searched within one edit (`corrections`). At most 1,000 hits are kept; `counts` gives every kind's, `in` narrows the page
+        to one. Titles and snippets are plain text in parts, the matches flagged.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 1024 } }
+        - { name: in, in: query, required: false, description: "One kind's hits on the page; the counts stay every kind's", schema: { $ref: "#/components/schemas/SearchKind" } }
+        - { $ref: "#/components/parameters/PageNumber" }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses:
+        "200":
+          description: One page of hits
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResult" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /search/suggest:
+    get:
+      operationId: suggest
+      summary: Up to 8 repositories, groups and documents whose names or titles start with the words, for a search box
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 1024 } }
+      responses:
+        "200":
+          description: The suggestions, best first
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Suggestions" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /tools:
     get:
       operationId: listTools
@@ -377,6 +417,55 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
   schemas:
+    SearchKind:
+      type: string
+      enum: [repo, group, doc, dep, package, commit]
+    TextPart:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+        mark: { type: boolean, description: The part matched the query }
+    SearchHit:
+      type: object
+      required: [kind, title, url, snippet]
+      properties:
+        kind: { $ref: "#/components/schemas/SearchKind" }
+        title: { type: array, items: { $ref: "#/components/schemas/TextPart" } }
+        repo: { type: string, description: "The repository's address owner/name; absent for a group" }
+        url: { type: string, description: The portal page the hit opens, a path }
+        snippet: { type: array, items: { $ref: "#/components/schemas/TextPart" }, description: "Up to 240 characters around the first match, one line" }
+        at: { type: string, format: date-time, description: "When it happened (a commit)" }
+    SearchCounts:
+      type: object
+      required: [repo, group, doc, dep, package, commit]
+      properties:
+        repo: { type: integer }
+        group: { type: integer }
+        doc: { type: integer }
+        dep: { type: integer }
+        package: { type: integer }
+        commit: { type: integer }
+    SearchCorrection:
+      type: object
+      required: [from, to]
+      properties:
+        from: { type: string }
+        to: { type: string }
+    SearchResult:
+      type: object
+      required: [query, counts, corrections, hits, page]
+      properties:
+        query: { type: string, description: The query as searched, trimmed }
+        counts: { $ref: "#/components/schemas/SearchCounts" }
+        corrections: { type: array, items: { $ref: "#/components/schemas/SearchCorrection" } }
+        hits: { type: array, items: { $ref: "#/components/schemas/SearchHit" } }
+        page: { $ref: "#/components/schemas/Page" }
+    Suggestions:
+      type: object
+      required: [hits]
+      properties:
+        hits: { type: array, items: { $ref: "#/components/schemas/SearchHit" } }
     ToolList:
       type: object
       required: [tools]

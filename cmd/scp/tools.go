@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"slices"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,6 +18,7 @@ import (
 // The handlers the tools read through: the contract's methods and the llms Markdown pages, called in process with the request's
 // context, so a tool sees exactly what the viewer may see.
 type toolReads struct {
+	find             searchAPI
 	catalog          catalogAPI
 	commits          commitsAPI
 	repo, doc, group http.Handler
@@ -71,15 +72,15 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 		return tool(name, title, description, s, l, ru)
 	}
 	return tools.New(
-		tool("search_repositories", "Search repositories",
-			"Lists the catalogued repositories, optionally of one group and matching words in the name, description, topics or language; newest activity first.",
-			schema(nil, map[string]any{"query": prop("string", "Words to match; empty lists all"), "group": prop("string", "A group id"), "limit": limit}),
-			func(in map[string]any) string {
-				if q := arg(in, "query"); q != "" {
-					return "Searching for " + q
-				}
-				return "Listing repositories"
-			}, r.search),
+		tool("search", "Search the portal",
+			"Searches what the portal holds: repositories, groups, document sections (README and docs/), manifests and their dependencies, "+
+				"published packages and default-branch commits; not source code. The query is words (all required), \"phrases\", "+
+				"-exclusions, OR between two words, and filters: in:repo|group|doc|dep|package|commit, group:, repo:, lang:, topic:, "+
+				"lifecycle:, author:, kind:hand|ai|automation, dep: (a dependency's name), before: and after: (dates, 2026-11-05). Best first.",
+			schema([]string{"query"}, map[string]any{"query": prop("string", "The query, up to 256 characters"),
+				"in": map[string]any{"type": "string", "enum": []string{"repo", "group", "doc", "dep", "package", "commit"},
+					"description": "Only hits of this kind; the counts stay every kind's"}, "limit": limit}),
+			func(in map[string]any) string { return "Searching for " + arg(in, "query") }, r.search),
 		tool("list_groups", "List groups", "Lists the groups of repositories with their ids, names and sizes.", schema(nil, map[string]any{}),
 			func(map[string]any) string { return "Listing groups" }, r.listGroups),
 		tool("get_group", "Read a group", "Reads a group: its description, health and repositories.",
@@ -113,64 +114,65 @@ func day(t *time.Time) string {
 	return t.UTC().Format("2006-01-02")
 }
 
-func repoLine(b *strings.Builder, p oapi.Repo) {
-	fmt.Fprintf(b, "- [%s/%s](%s)", p.Owner, p.Name, snapshot.RepoPage(snapshot.RepoKey(p.Address)))
-	if p.Description != "" {
-		b.WriteString(": " + p.Description)
-	}
-	var facts []string
-	if p.Language != "" {
-		facts = append(facts, p.Language)
-	}
-	facts = append(facts, "last commit "+day(p.LastCommitAt))
-	if p.Health != nil {
-		facts = append(facts, fmt.Sprintf("health %d (%s)", p.Health.Score, p.Health.Level))
-	}
-	if p.Archived {
-		facts = append(facts, "archived")
-	}
-	if p.Visibility != "public" {
-		facts = append(facts, p.Visibility)
-	}
-	fmt.Fprintf(b, " (%s)\n", strings.Join(facts, ", "))
-}
-
+// search runs the portal's search (design/search.md) and lists the best hits with their snippets.
 func (r toolReads) search(ctx context.Context, in map[string]any) (tools.Result, error) {
-	var group *string
-	if g := arg(in, "group"); g != "" {
-		group = &g
+	limit := intArg(in, "limit", 20, 50)
+	params := oapi.SearchParams{Q: arg(in, "query"), Limit: &limit}
+	if k := arg(in, "in"); k != "" {
+		kind := oapi.SearchKind(k)
+		params.In = &kind
 	}
-	res, err := r.catalog.ListRepos(ctx, oapi.ListReposRequestObject{Params: oapi.ListReposParams{Group: group}})
+	res, err := r.find.Search(ctx, oapi.SearchRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
-	ok, isOK := res.(oapi.ListRepos200JSONResponse)
+	ok, isOK := res.(oapi.Search200JSONResponse)
 	if !isOK {
-		return tools.Result{}, fmt.Errorf("the group %q is %w", arg(in, "group"), errNotFound)
-	}
-	words := strings.Fields(strings.ToLower(arg(in, "query")))
-	repos := slices.DeleteFunc(ok.Body.Repos, func(p oapi.Repo) bool {
-		hay := strings.ToLower(strings.Join(append([]string{p.Address, p.Description, p.Language}, p.Topics...), " "))
-		for _, w := range words {
-			if !strings.Contains(hay, w) {
-				return true
-			}
+		if bad, isBad := res.(oapi.Search400ApplicationProblemPlusJSONResponse); isBad && bad.Detail != nil {
+			return tools.Result{}, &tools.InputError{Msg: "the query: " + *bad.Detail}
 		}
-		return false
-	})
-	slices.SortStableFunc(repos, func(a, b oapi.Repo) int { return b.PushedAt.Compare(a.PushedAt) })
-	limit := intArg(in, "limit", 20, 50)
+		return tools.Result{}, &tools.InputError{Msg: "the query cannot be searched"}
+	}
+	sr := ok.Body
+	c := sr.Counts
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d repositories match", len(repos))
-	if len(repos) > limit {
-		fmt.Fprintf(&b, "; the %d with the newest activity", limit)
-		repos = repos[:limit]
+	fmt.Fprintf(&b, "%d hits for %q: %d repositories, %d groups, %d document sections, %d manifests, %d packages, %d commits", sr.Page.Total,
+		sr.Query, c.Repo, c.Group, c.Doc, c.Dep, c.Package, c.Commit)
+	if sr.Page.Total > len(sr.Hits) {
+		fmt.Fprintf(&b, "; the best %d", len(sr.Hits))
 	}
-	b.WriteString(".\n\n")
-	for _, p := range repos {
-		repoLine(&b, p)
+	b.WriteString(".\n")
+	for _, fix := range sr.Corrections {
+		fmt.Fprintf(&b, "No document holds %q; searched for %q.\n", fix.From, fix.To)
 	}
-	return tools.Result{Source: "/repos", Text: b.String()}, nil
+	b.WriteString("\n")
+	for _, h := range sr.Hits {
+		fmt.Fprintf(&b, "- %s [%s](%s)", h.Kind, plainParts(h.Title), h.Url)
+		if h.Repo != nil && h.Kind != oapi.SearchKindRepo {
+			b.WriteString(" in " + *h.Repo)
+		}
+		if h.At != nil {
+			b.WriteString(", " + day(h.At))
+		}
+		if s := plainParts(h.Snippet); s != "" {
+			b.WriteString(": " + s)
+		}
+		b.WriteString("\n")
+	}
+	return tools.Result{Source: "/search?q=" + url.QueryEscape(sr.Query), Text: b.String()}, nil
+}
+
+// plainParts is a title or snippet as text, its matches in bold.
+func plainParts(ps []oapi.TextPart) string {
+	var b strings.Builder
+	for _, p := range ps {
+		if p.Mark != nil && *p.Mark {
+			b.WriteString("**" + p.Text + "**")
+		} else {
+			b.WriteString(p.Text)
+		}
+	}
+	return b.String()
 }
 
 func (r toolReads) listGroups(ctx context.Context, _ map[string]any) (tools.Result, error) {
@@ -234,7 +236,7 @@ func (r toolReads) resolve(ctx context.Context, in map[string]any) (oapi.RepoDet
 		}
 		break
 	}
-	return oapi.RepoDetail{}, fmt.Errorf("the repository %s/%s is %w; search_repositories finds names", arg(in, "owner"), arg(in, "name"), errNotFound)
+	return oapi.RepoDetail{}, fmt.Errorf("the repository %s/%s is %w; search finds them", arg(in, "owner"), arg(in, "name"), errNotFound)
 }
 
 func (r toolReads) getRepository(ctx context.Context, in map[string]any) (tools.Result, error) {

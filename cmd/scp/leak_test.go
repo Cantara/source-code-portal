@@ -161,7 +161,11 @@ func publicPaths(t *testing.T) []string {
 		"/badges/repos/acme/zq-hidden/issues.svg", "/badges/repos/acme/zq-hidden/health.svg", "/badges/groups/all/repos.svg",
 		"/badges/groups/all/health.svg", "/badges/groups/all/last-commit.svg", "/badges/groups/all/release.svg",
 		"/images/acme/zq-hidden/00000000000000000000000000000000", "/badge/license/zq-hidden/main", "/commits/zq-hidden",
-		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events", "/api/v1/admin/layouts/dashboard")
+		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events", "/api/v1/admin/layouts/dashboard",
+		// The search, by the private repository's name, its README's and commit's words, a filter and a prefix.
+		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=repo:zq-hidden",
+		"/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search?q=zq-hidden&in=repo", "/api/v1/search/suggest?q=zq-hidden",
+		"/api/v1/search/suggest?q=zq-hid")
 }
 
 // TestNoLeak fetches every public path as the public, in HTML and Markdown: no answer carries a trace of the private repository,
@@ -188,7 +192,8 @@ func TestNoLeak(t *testing.T) {
 			}
 		}
 	}
-	for _, p := range []string{"/api/v1/repos/acme/zq-hidden", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests"} {
+	for _, p := range []string{"/api/v1/repos/acme/zq-hidden", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests",
+		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search/suggest?q=zq-hid"} {
 		if _, b, _ := get(p, staff...); !strings.Contains(b, "zq-hidden") {
 			t.Errorf("staff %s does not show the private repository:\n%s", p, b)
 		}
@@ -206,7 +211,7 @@ func TestNoLeakThroughTools(t *testing.T) {
 	}
 	input := func(name, repo string) string {
 		return map[string]string{
-			"search_repositories": `{"input":{"query":"` + repo + `"}}`, "list_groups": `{"input":{}}`, "get_group": `{"input":{"group":"all"}}`,
+			"search": `{"input":{"query":"` + repo + `"}}`, "list_groups": `{"input":{}}`, "get_group": `{"input":{"group":"all"}}`,
 			"get_document":   `{"input":{"owner":"acme","name":"` + repo + `","path":"docs/guide.md"}}`,
 			"recent_commits": `{"input":{"repo":"acme/` + repo + `","work":["hand","ai","automation"]}}`,
 		}[name]
@@ -237,7 +242,7 @@ func TestNoLeakThroughTools(t *testing.T) {
 	if code, _, _ := get("/api/v1/tools/list_groups", ":post", `{"input":{}}`, "Cookie", "scp-session=x", "Sec-Fetch-Site", "cross-site"); code != http.StatusForbidden {
 		t.Errorf("a cross-site call = %d", code)
 	}
-	if code, b, _ := get("/api/v1/tools/search_repositories", ":post", `{"input":{"limit":"many"}}`); code != http.StatusBadRequest {
+	if code, b, _ := get("/api/v1/tools/search", ":post", `{"input":{"query":"open","limit":"many"}}`); code != http.StatusBadRequest {
 		t.Errorf("a bad input = %d %s", code, b)
 	}
 	if code, _, _ := get("/api/v1/tools/drop_tables", ":post", `{"input":{}}`); code != http.StatusNotFound {

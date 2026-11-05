@@ -8,6 +8,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
@@ -40,6 +41,7 @@ type statusBody struct {
 	Sources  []statusSource `json:"sources"`
 	Webhook  statusWebhook  `json:"webhook"`
 	Cluster  statusCluster  `json:"cluster"`
+	Search   search.Stats   `json:"search"`
 	Warnings []string       `json:"warnings"`
 }
 
@@ -90,6 +92,9 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		Snapshot: statusSnapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: len(s.Repos)}}
 	if !s.BuiltAt.IsZero() {
 		b.Snapshot.AgeSeconds = now.Sub(s.BuiltAt).Seconds()
+	}
+	if ix := search.Of(s); ix != nil {
+		b.Search = ix.Stats()
 	}
 	b.Queue.Waiting, b.Queue.Running = st.depth()
 	rates := st.rate()

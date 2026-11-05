@@ -24,9 +24,9 @@ function fake() {
 const list = {
   tools: [
     {
-      name: "search_repositories",
-      title: "Search repositories",
-      description: "Lists the repositories.",
+      name: "search",
+      title: "Search the portal",
+      description: "Searches what the portal holds.",
       inputSchema: { type: "object", properties: { query: { type: "string" } } },
       annotations: { readOnly: true, untrustedContent: true },
     },
@@ -64,7 +64,7 @@ describe("WebMCP", () => {
     let sent: unknown
     server.use(
       http.get("/tools", ({ response }) => response(200).json(list)),
-      raw.post("*/api/v1/tools/search_repositories", async ({ request }) => {
+      raw.post("*/api/v1/tools/search", async ({ request }) => {
         sent = await request.json()
         return HttpResponse.json({
           source: "/repos",
@@ -74,12 +74,10 @@ describe("WebMCP", () => {
       }),
     )
     const view = render(<WebMCP />)
-    await waitFor(() =>
-      expect([...tools.keys()].sort()).toEqual(["current_page", "open_page", "search_repositories", "set_preferences"]),
-    )
-    const search = tools.get("search_repositories")
+    await waitFor(() => expect([...tools.keys()].sort()).toEqual(["current_page", "open_page", "search", "set_preferences"]))
+    const search = tools.get("search")
     expect(search?.annotations).toEqual({ readOnlyHint: true, untrustedContentHint: true })
-    const r = (await run(tools, "search_repositories", { query: "core" })) as { text: string; source: string; isError: boolean }
+    const r = (await run(tools, "search", { query: "core" })) as { text: string; source: string; isError: boolean }
     expect(sent).toEqual({ input: { query: "core" } })
     expect(r.isError).toBe(false)
     expect(r.text).toContain("acme/core")

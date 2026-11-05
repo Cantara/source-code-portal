@@ -85,6 +85,7 @@ type (
 	manifestsAPI = manifests.API
 	layoutAPI    = layout.API
 	toolsAPI     = tools.API
+	searchAPI    = search.API
 	api          struct {
 		catalogAPI
 		commitsAPI
@@ -95,6 +96,7 @@ type (
 		httpapi.MeAPI
 		*assistant.Assistant
 		toolsAPI
+		searchAPI
 	}
 )
 
@@ -273,7 +275,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		return names
 	}
-	catalogue, err := toolReads{catalog: catalogAPI, commits: commitsAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group()}.catalogue()
+	searchAPI := search.API{Current: view, Observe: m.search}
+	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group()}.catalogue()
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +291,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view}, layout.API{Current: view, Store: s.layouts},
-		httpapi.SnapshotAPI{Current: view}, me, ask, agents}
+		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}

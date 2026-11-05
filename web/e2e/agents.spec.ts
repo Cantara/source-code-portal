@@ -48,7 +48,7 @@ test("the pages offer a browser's agent the portal's tools, which answer from th
       "recent_commits",
       "repository_health",
       "repository_packages",
-      "search_repositories",
+      "search",
       "set_preferences",
     ])
   expect(await page.evaluate(() => window.agentTools.get("repository_health")?.annotations)).toEqual({
@@ -64,8 +64,8 @@ test("the pages offer a browser's agent the portal's tools, which answer from th
   expect(health.source).toMatch(/\/repos\/acme\/whydah-core$/)
 
   // The public's agent finds no trace of the private repository.
-  const hidden = await run(page, "search_repositories", { query: "vault" })
-  expect(hidden.text).toContain("0 repositories match")
+  const hidden = await run(page, "search", { query: "vault" })
+  expect(hidden.text).toContain('0 hits for "vault"')
   expect(await run(page, "repository_health", { owner: "acme", name: "vault" })).toMatchObject({ isError: true })
 
   // The page's own tools: the reader's preferences and going to a page of the portal, never another site.
@@ -86,8 +86,8 @@ test("a signed-in reader's agent sees what the reader sees", async ({ page }) =>
   await page.getByLabel("Token").fill(token)
   await page.getByRole("button", { name: "Sign in with the token" }).click()
   await expect(page).not.toHaveURL(/\/signin/)
-  await expect.poll(() => names(page)).toContain("search_repositories")
-  const found = await run(page, "search_repositories", { query: "vault" })
+  await expect.poll(() => names(page)).toContain("search")
+  const found = await run(page, "search", { query: "vault" })
   expect(found.text).toContain("acme/vault")
 })
 
