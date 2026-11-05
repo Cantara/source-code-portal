@@ -56,9 +56,10 @@ fits from 1024 to 1920 pixels wide.
   the last change, the release and the 12-week sparkline of the work that counts; its one or two costliest findings as text). A good
   product takes a narrow tile of one line (name, last change, sparkline). When the tiles do not fit, the good ones fold from the end into
   "N more good", which links to the dashboard.
-- **Latest commits**, the right column at full height: repository, time, author and subject on two lines, the AI and automation marks
-  of the commit lists; as many as fit. A new commit slides in at the top (no motion with `prefers-reduced-motion`). It follows the
-  work that counts.
+- **Latest commits**, the right column at full height: the author's avatar (initials) at the left while the column is at least
+  17 rem wide, then the repository with the committer's alias and the time on the first line and the subject alone on the second,
+  with the AI and automation marks of the commit lists; as many as fit. A new commit slides in at the top (no motion with
+  `prefers-reduced-motion`). It follows the work that counts.
 - **The commit column's width**: in landscape its left edge is a handle (`role=separator`), as wide as the gap it replaces and a hairline to see, its hit area reaching past it for a finger: dragged by a finger or a pointer, or
   moved with the arrow keys, from 20% to 60% of the screen in steps of 5% (written grid classes: the CSP allows no style), a double
   tap back to 30%. The width is the reader's, in the cookie `scp-present-column`, so the server draws it. The left column is a

@@ -12,6 +12,7 @@ import { ago } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
 import { by, columnCookie, columnWidths, remember, type Work } from "@/lib/preferences"
 import { AiMark } from "@/entities/commit/ai-mark"
+import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { meQuery } from "@/lib/api/queries"
 import { apply, useTheme, type Choice } from "@/lib/theme"
@@ -73,7 +74,8 @@ function Freshness() {
 }
 
 /**
- * Stream is the newest commits of the work that counts, as many as the column holds: repository and time, then author and subject.
+ * Stream is the newest commits of the work that counts, as many as the column holds: the author's avatar while the column is wide
+ * enough, then the repository with who and when on one line and the subject on the next, the whole width its own.
  * A commit that arrives while the page is open slides in at the top (not with reduced motion).
  */
 function Stream({ commits, work }: { commits: Commit[]; work: Work }) {
@@ -89,28 +91,36 @@ function Stream({ commits, work }: { commits: Commit[]; work: Work }) {
         </h2>
         <span className="text-xs text-muted-foreground">{by(work)}</span>
       </div>
-      <ol className="min-h-0 flex-1 divide-y divide-border overflow-hidden">
-        {rows.map(({ c, id, fresh }) => (
-          <li key={id} className={cn("flex flex-col gap-0.5 px-3 py-2", fresh && "arrive")}>
-            <p className="flex items-baseline justify-between gap-2 text-[0.9375rem]">
-              <Link href={addressPath(c.repo)} className="truncate font-semibold hover:underline">
-                {c.repo.split("/")[1]}
-              </Link>
-              <time
-                dateTime={c.committedAt}
-                className="shrink-0 font-mono text-sm text-muted-foreground"
-                suppressHydrationWarning
-              >
-                {ago(c.committedAt, now)}
-              </time>
-            </p>
-            <p className="flex min-w-0 items-baseline gap-1.5 text-[0.9375rem]">
-              <span className="shrink-0 text-muted-foreground">{c.authorLogin || c.authorName}</span>
-              <AiMark commit={c} />
-              <span className="truncate">{c.subject}</span>
-            </p>
-          </li>
-        ))}
+      {/* A container: the avatars show while the column is wide enough for them. */}
+      <ol className="@container min-h-0 flex-1 divide-y divide-border overflow-hidden">
+        {rows.map(({ c, id, fresh }) => {
+          const who = c.authorLogin || c.authorName
+          return (
+            <li key={id} className={cn("flex items-center gap-2.5 px-3 py-2", fresh && "arrive")}>
+              <span className="@max-[17rem]:hidden">
+                <InitialsAvatar name={c.authorName || c.authorLogin} />
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <p className="flex items-baseline gap-2 text-[0.9375rem]">
+                  <Link href={addressPath(c.repo)} className="min-w-0 truncate font-semibold hover:underline">
+                    {c.repo.split("/")[1]}
+                  </Link>
+                  <span className="ml-auto flex max-w-[55%] shrink-0 items-baseline gap-1.5 text-sm text-muted-foreground">
+                    <span className="truncate">{who}</span>
+                    <span aria-hidden="true">·</span>
+                    <time dateTime={c.committedAt} className="shrink-0 font-mono" suppressHydrationWarning>
+                      {ago(c.committedAt, now)}
+                    </time>
+                  </span>
+                </p>
+                <p className="flex min-w-0 items-baseline gap-1.5 text-[0.9375rem]">
+                  <AiMark commit={c} />
+                  <span className="truncate">{c.subject}</span>
+                </p>
+              </div>
+            </li>
+          )
+        })}
       </ol>
     </section>
   )
