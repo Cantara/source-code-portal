@@ -28,7 +28,7 @@ What Source Code Portal is, how it is built, and the work in progress. Binding o
 | `design/guide.md` | G1, built: the Getting started page and its screenshots, the operators' Claude Code plugin. |
 | `design/layout.md` | L1 to L4, built: the landing page of signals, layouts and the design mode, AI-assisted commits, the work that counts and Settings. |
 | `design/packages.md` | R1 to R4, R1 in progress: published packages, one provider per package manager (Maven, npm, PyPI, Cargo, Go, Swift, NuGet, RubyGems, Packagist), the registries a build file names, configured private registries with their credentials, structured concurrency per job. |
-| `design/embed.md` | E1 to E4, queued after the next release: the portal embedded in other sites as versioned HTML fragments composed on the host's server, themed by custom properties, live through custom elements; outbound snapshot webhooks; a typed client. |
+| `design/embed.md` | E1 to E4, dequeued until the owner returns to them: the portal embedded in other sites as versioned HTML fragments composed on the host's server, themed by custom properties, live through custom elements; outbound snapshot webhooks; a typed client. |
 | `history/` | Finished work: the M0..M11 plan and decision log, the earlier detailed design, the UI brief and screenshots. Not kept in sync. |
 
 New decisions go into `decisions.md` and the note they change, in the same commit. When a milestone is done its note is folded into

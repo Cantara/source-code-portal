@@ -94,10 +94,10 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | W1 | Agents (`design/agents.md`): one tool catalogue (`internal/tools`) for the assistant, MCP and WebMCP; `GET`/`POST /api/v1/tools` | the assistant's tests pass on the catalogue; the leak test calls every tool as the public | done |
 | W2 | Agents: `/mcp`, the catalogue over MCP's Streamable HTTP, stateless, tokens or the public view | an MCP client lists and calls the tools, sees the private repository with a token and not without; another origin is refused | done |
 | W3 | Agents: WebMCP in the web UI (`document.modelContext`): the catalogue and the page's own tools; docs, the Guide, the plugin | Playwright with a fake `document.modelContext` registers and runs the tools, page-aware | done |
-| E1 | Embedding, the contract (`design/embed.md`): versioned HTML fragments for host sites, their parameters, parts and `--scp-*` custom properties, `embed.origins` | a contract test fails when a fragment's parameter, part or custom property changes without a new version | queued, after the next release |
-| E2 | Embedding, the fragments: product card, fleet map, telemetry, latest commits, repository health in declarative shadow roots; the dashboard built from them | the dashboard renders through the fragments with its gates unchanged; a fragment alone renders in a blank page without script | queued |
-| E3 | Embedding, the behaviour module `/embed/v1/scp.js`: custom elements, hints, live updates, theming | a static host page with two fragments themes them, updates both on one push and passes axe | queued |
-| E4 | Embedding, the host side: outbound snapshot webhooks, `@scp/client`, a reference host | the reference host shows a push within one snapshot through the webhook, without polling | queued |
+| E1 | Embedding, the contract (`design/embed.md`): versioned HTML fragments for host sites, their parameters, parts and `--scp-*` custom properties, `embed.origins` | a contract test fails when a fragment's parameter, part or custom property changes without a new version | dequeued: the owner returns to it later |
+| E2 | Embedding, the fragments: product card, fleet map, telemetry, latest commits, repository health in declarative shadow roots; the dashboard built from them | the dashboard renders through the fragments with its gates unchanged; a fragment alone renders in a blank page without script | dequeued |
+| E3 | Embedding, the behaviour module `/embed/v1/scp.js`: custom elements, hints, live updates, theming | a static host page with two fragments themes them, updates both on one push and passes axe | dequeued |
+| E4 | Embedding, the host side: outbound snapshot webhooks, `@scp/client`, a reference host | the reference host shows a push within one snapshot through the webhook, without polling | dequeued |
 
 Each milestone starts with its design note and lands as small commits on `main`, CI green.
 
