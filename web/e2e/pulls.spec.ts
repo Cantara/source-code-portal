@@ -12,7 +12,6 @@ test("/pulls lists whose turn first, its states filter, and passes axe in both t
     const list = page.getByRole("list", { name: "Pull requests" }).getByRole("listitem")
     await expect(list.first()).toContainText("Bridge the SSO session")
     await expect(list).toHaveCount(4) // the draft waits until asked
-    await page.waitForLoadState("networkidle")
     const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()
     expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
   }

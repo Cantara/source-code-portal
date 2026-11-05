@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright"
-import { expect, hydrated, test } from "./fixtures"
+import { expect, settled, test } from "./fixtures"
 import { screens } from "./screens"
 
 // design/present.md: the presentation page fits the screen it is on, without the header, every product a tile or in the fold.
@@ -54,7 +54,6 @@ test("/present follows the system on a tablet, is dark on a wall unless the read
   const bar = page.getByRole("navigation", { name: "Presentation" })
   await expect(bar).toHaveCSS("opacity", "0")
   await expect(bar.getByRole("button", { name: "Design this page" })).toHaveCount(0)
-  await hydrated(page)
   await page.mouse.click(10, 10)
   await expect(bar).toHaveCSS("opacity", "1")
   await bar.getByRole("button", { name: /^Theme/ }).click()
@@ -74,7 +73,6 @@ test("/present passes axe in both themes, the reader's choice", async ({ page })
     await page.reload()
     await expect(page.getByRole("heading", { level: 1, name: "Presentation" })).toBeAttached()
     await expect(page.locator("html")).toHaveClass(theme === "dark" ? /dark/ : /^(?!.*dark)/)
-    await page.waitForLoadState("networkidle")
     const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()
     expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
   }
@@ -101,19 +99,26 @@ test("the commit column widens by its edge, is remembered, and the left keeps wh
   await expect(page.getByRole("list", { name: "Health of every repository" })).toBeVisible()
   const size = await page.evaluate(() => [document.documentElement.scrollHeight, document.documentElement.clientHeight])
   expect(size[0]).toBe(size[1])
-  // A tap leaves the width; a double click or a double tap brings back the usual one.
+  // A tap leaves the width; a double click or a double tap brings back the usual one. The reload starts the double click with no tap
+  // before it, so it alone brings the width back.
   await edge.click()
   await expect(edge).toHaveAttribute("aria-valuenow", "60")
-  await page.waitForTimeout(500)
+  await page.reload()
   await edge.dblclick()
   await expect(edge).toHaveAttribute("aria-valuenow", "30")
 })
 
 test("a double tap on the commit column's edge brings back its usual width", async ({ browser }) => {
   const baseURL = test.info().project.use.baseURL ?? ""
-  const ctx = await browser.newContext({ baseURL, viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true })
+  const ctx = await browser.newContext({
+    baseURL,
+    viewport: { width: 1180, height: 820 },
+    hasTouch: true,
+    isMobile: true,
+    reducedMotion: "reduce",
+  })
   await ctx.addCookies([{ name: "scp-present-column", value: "handheld-landscape:50", url: baseURL }])
-  const page = await ctx.newPage()
+  const page = settled(await ctx.newPage())
   await page.goto("/present")
   const edge = page.getByRole("separator", { name: "Resize latest commits" })
   await expect(edge).toHaveAttribute("aria-valuenow", "50")

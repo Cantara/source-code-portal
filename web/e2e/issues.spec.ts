@@ -14,7 +14,6 @@ test("/issues lists what waits first, its states filter, and passes axe in both 
     await expect(items.first()).toContainText("Login loops after a password reset")
     await expect(items.nth(2)).toContainText("for ann")
     await expect(items.last()).toContainText("(automation)")
-    await page.waitForLoadState("networkidle")
     const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()
     expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
   }

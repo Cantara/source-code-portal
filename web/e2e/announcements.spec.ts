@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures"
+import { expect, settled, test } from "./fixtures"
 import { screens } from "./screens"
 
 // cmd/scp/e2e_test.go configures two announcements: an event in six days on both pages for everyone, with a link, and a notice on
@@ -57,7 +57,7 @@ test("an admin writes, previews, publishes and removes an announcement", { tag: 
   await form.getByRole("button", { name: "Save" }).click()
   await expect(card.getByRole("listitem").filter({ hasText: "Hackathon on Friday" })).toContainText("Live")
 
-  const anonymous = await browser.newPage()
+  const anonymous = settled(await browser.newPage({ reducedMotion: "reduce" }))
   await anonymous.goto("/")
   await expect(
     anonymous.getByRole("region", { name: "Announcements" }).getByRole("heading", { name: "Hackathon on Friday" }),

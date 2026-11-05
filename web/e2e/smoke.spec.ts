@@ -34,7 +34,6 @@ for (const [path, h1] of pages) {
       expect(res?.status()).toBe(200)
       await expect(page.getByRole("heading", { level: 1, name: h1, exact: true })).toBeVisible()
       await expect(page.locator("html")).toHaveClass(scheme === "dark" ? /dark/ : /^(?!.*dark)/)
-      await page.waitForLoadState("networkidle")
       await axe(page)
     }
   })
@@ -255,7 +254,6 @@ test("a page from the running bundle sees no new version", async ({ page }) => {
   const api = page.waitForResponse((r) => r.url().includes("/api/v1/"))
   await page.goto("/")
   expect((await api).headers()["x-scp-build"]).toBeTruthy()
-  await page.waitForLoadState("networkidle")
   await expect(page.getByText("A new version is available.")).toHaveCount(0)
 })
 
