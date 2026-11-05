@@ -12,7 +12,7 @@ import { FindingList, HealthScore } from "@/entities/health/findings"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
 import { Sparkline } from "@/shared/sparkline"
-import { by, isEvery, qualifier, remember, viewCookie, type Work } from "@/lib/preferences"
+import { by, has, isEvery, qualifier, remember, viewCookie, type Work } from "@/lib/preferences"
 import { assistants, counted, maintenance, noun, series, share, weekly } from "./work"
 import type { ProductsView } from "./layout"
 import { ProductTiles } from "./tiles"
@@ -200,6 +200,24 @@ const columns = (w: Work): Column[] => [
     label: `Last change${qualifier(w)}`,
     value: (g) => g.activity.lastAuthoredAt ?? "",
     cell: (g) => <RelativeTime at={g.activity.lastAuthoredAt} />,
+  },
+  {
+    key: "pulls",
+    label: "Pull requests",
+    numeric: true,
+    value: (g) => g.pulls.open,
+    cell: (g) => (
+      <Link
+        href={`/pulls?group=${encodeURIComponent(g.id)}${has(w, "automation") ? "" : "&by=people"}`}
+        className="hover:underline"
+        title={`${count(g.pulls.states.review)} waiting for a review, ${count(g.pulls.states.ready)} ready to merge`}
+      >
+        {count(g.pulls.open)}
+        {g.pulls.states.review > 0 && (
+          <span className="text-xs text-muted-foreground"> · {count(g.pulls.states.review)} to review</span>
+        )}
+      </Link>
+    ),
   },
   {
     key: "findings",

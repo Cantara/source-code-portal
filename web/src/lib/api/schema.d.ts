@@ -1003,7 +1003,7 @@ export interface components {
       /** @description Members with a release */
       released: number
     }
-    /** @description One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits and pulls take count (pulls also groups), heading takes text and note (plain text). */
+    /** @description One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits and pulls take count, heading takes text and note (plain text). */
     LayoutElement: {
       /** @enum {string} */
       kind: "telemetry" | "fleet-map" | "announcements" | "products" | "latest-commits" | "pulls" | "heading"

@@ -16,6 +16,7 @@ type Parent = Schemas["GroupRef"] | null | undefined
 export const crumbs = {
   commits: (): Crumb[] => [dashboard, { name: "Commits", path: "/commits" }],
   search: (): Crumb[] => [dashboard, { name: "Search", path: "/search" }],
+  pulls: (): Crumb[] => [dashboard, { name: "Pull requests", path: "/pulls" }],
   group: (id: string, name: string): Crumb[] => [dashboard, { name, path: groupPath(id) }],
   groupCommits: (id: string, name: string): Crumb[] => [
     ...crumbs.group(id, name),

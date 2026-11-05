@@ -1,7 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query"
 import { get, unwrap, type Api } from "@/lib/api/client"
-import { keys } from "@/lib/api/queries"
-import type { Work } from "@/lib/preferences"
+import { keys, type PullFilter } from "@/lib/api/queries"
+import { has, type Work } from "@/lib/preferences"
 import type { Element } from "./layout"
 
 /** dashboardQuery is the dashboard through the reader's lens, the work that counts. */
@@ -60,3 +60,9 @@ export const storedLayoutQuery = (page: Page) =>
     queryFn: ({ signal }) => get<StoredLayout>(layoutPath(page), signal),
     staleTime: 0,
   })
+
+/** byWork is whose pull requests the work that counts holds: automation's only when it counts automation (as the server counts). */
+export const byWork = (work: Work): PullFilter["by"] => (has(work, "automation") ? undefined : "people")
+
+/** pullsFilter is what the pulls element reads: the first count of the work that counts, whose turn first. */
+export const pullsFilter = (work: Work, n: number, group?: string): PullFilter => ({ group, by: byWork(work), size: n })

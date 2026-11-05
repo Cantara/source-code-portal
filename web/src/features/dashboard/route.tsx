@@ -19,14 +19,22 @@ import {
   workOf,
 } from "@/lib/preferences"
 import { DashboardView } from "./view"
+import { pullsQuery } from "@/lib/api/queries"
+import { pullsFilter } from "./api"
 import { PresentView } from "./present"
 import type { Search } from "@/lib/page"
 import { ld } from "@/lib/seo"
 
 /** dashboardRoute is `/`: the dashboard and its layout, through the reader's lens on people's work and products view. */
 export const dashboardRoute: Route<object> = {
-  load: ({ api, qc, cookies }) =>
-    Promise.all([load(qc, dashboardQuery(api, workOf(cookies[workCookie]))), prefetch(qc, pageQuery(api))]),
+  load: ({ api, qc, cookies }) => {
+    const work = workOf(cookies[workCookie])
+    return Promise.all([
+      load(qc, dashboardQuery(api, work)),
+      prefetch(qc, pageQuery(api)),
+      prefetch(qc, pullsQuery(api, pullsFilter(work, 5))),
+    ])
+  },
   metadata: () => ({ title: { absolute: "Dashboard · Source Code Portal" }, alternates: { canonical: "/" } }),
   structured: (_, base) => [ld.page(base, "/", "Dashboard", "CollectionPage", false)],
   render: (ctx) => {
@@ -59,7 +67,11 @@ const lens = (search: Search, cookies: Record<string, string>) => workOf(search.
  */
 export const presentRoute: Route<object> = {
   load: ({ api, qc, cookies, search }) =>
-    Promise.all([load(qc, dashboardQuery(api, lens(search, cookies))), prefetch(qc, pageQuery(api, "present"))]),
+    Promise.all([
+      load(qc, dashboardQuery(api, lens(search, cookies))),
+      prefetch(qc, pageQuery(api, "present")),
+      prefetch(qc, pullsQuery(api, pullsFilter(lens(search, cookies), 8))),
+    ]),
   metadata: () => ({
     title: "Presentation",
     robots: { index: false, follow: false },

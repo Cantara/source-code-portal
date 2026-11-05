@@ -12,11 +12,15 @@ import { LatestCommits } from "./latest"
 import { Products } from "./products"
 import { SidePanel } from "./side"
 import { Telemetry } from "./telemetry"
-import { pick, type Element, type ProductsView } from "./layout"
+import { kindLabel, pick, type Element, type Kind, type ProductsView } from "./layout"
+import { Pulls } from "./pulls"
+
+/** sideKinds are the elements that sit beside the products on a wide screen. */
+const sideKinds = new Set<Kind>(["pulls", "latest-commits"])
 
 /**
- * Elements draws a layout's elements in order from the dashboard's data. The latest commits right after the products become their
- * side panel on a wide screen (side: the reader's remembered panel).
+ * Elements draws a layout's elements in order from the dashboard's data. The pull requests and the latest commits right after the
+ * products become their side panel on a wide screen (side: the reader's remembered panel).
  */
 export function Elements({
   layout,
@@ -68,6 +72,8 @@ export function Elements({
             />
           </PanelBoundary>
         )
+      case "pulls":
+        return <Pulls key={i} work={data.work} counts={data.pulls} n={el.count ?? 5} fold={fold} />
       case "announcements":
         return <Announcements key={i} list={notices} dismissed={dismissed} />
       case "heading":
@@ -82,19 +88,24 @@ export function Elements({
   const out: ReactNode[] = []
   for (let i = 0; i < layout.length; i++) {
     const el = layout[i]
-    const next = layout[i + 1]
-    if (el?.kind === "products" && next?.kind === "latest-commits") {
-      const at = i + 1
+    // The pull requests and the latest commits right after the products are their side panel, in order, the first with the fold.
+    let end = i + 1
+    while (end < layout.length && sideKinds.has(layout[end]?.kind ?? "heading")) end++
+    if (el?.kind === "products" && end > i + 1) {
+      const start = i
+      const beside = layout.slice(i + 1, end)
       out.push(
         <SidePanel
           key={`side-${i}`}
-          label="Latest commits"
+          label={kindLabel((beside.find((x) => x.kind === "latest-commits") ?? beside[0] ?? el).kind)}
           initial={side}
           main={draw(el, i)}
-          aside={(fold) => draw(next, at, fold)}
+          aside={(fold) => (
+            <div className="flex flex-col gap-6">{beside.map((x, j) => draw(x, start + 1 + j, j === 0 ? fold : undefined))}</div>
+          )}
         />,
       )
-      i++
+      i = end - 1
     } else if (el) {
       out.push(draw(el, i))
     }

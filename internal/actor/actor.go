@@ -14,3 +14,14 @@ func Bot(s string) bool {
 	}
 	return strings.HasSuffix(s, "[bot]") || strings.HasSuffix(s, " bot") || strings.HasSuffix(s, "-bot") || strings.HasSuffix(s, "_bot")
 }
+
+// Branch reports whether a branch is a dependency bot's update branch (Renovate, Dependabot, Snyk). Snyk opens its pull requests
+// under the account of the person who connected it, so its branch, not its author, tells them apart.
+func Branch(name string) bool {
+	for _, p := range []string{"renovate/", "dependabot/", "snyk-fix-", "snyk-upgrade-"} {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}

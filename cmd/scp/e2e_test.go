@@ -101,6 +101,20 @@ func TestServeForPlaywright(t *testing.T) {
 	gh.SetFile(sso, "pom.xml", "<project><groupId>no.acme</groupId><artifactId>whydah-sso</artifactId><dependencies>"+
 		"<dependency><groupId>no.acme</groupId><artifactId>whydah-core</artifactId><version>1.0</version></dependency></dependencies></project>")
 	gh.SetRelease(core, "v1.2.0", "1.2.0", start)
+	// Open pull requests (design/pulls.md): one waiting for a review on the SSO branch, one ready, one failing, a draft and
+	// Renovate's update.
+	gh.SetPulls(core,
+		githubtest.Pull{Number: 12, Title: "Bridge the SSO session", Author: "bo", Created: start.Add(20 * time.Hour), Updated: start.Add(28 * time.Hour),
+			Base: "main", Head: "feature/sso", HeadSHA: fmt.Sprintf("%040x", 0xb2), Labels: []string{"enhancement"}, Requested: 1,
+			Review: "REVIEW_REQUIRED", Checks: "SUCCESS", Additions: 120, Deletions: 8, Files: 4},
+		githubtest.Pull{Number: 11, Title: "Explain the token lifetime", Author: "ann", Created: start, Updated: start.Add(40 * time.Hour),
+			Base: "main", Head: "docs/token", HeadSHA: fmt.Sprintf("%040x", 0xd1), Approved: true, Checks: "SUCCESS", Additions: 14, Deletions: 2, Files: 1},
+		githubtest.Pull{Number: 10, Title: "Draft: rotate the signing keys", Author: "ann", Draft: true, Created: start, Updated: start.Add(time.Hour),
+			Base: "main", Head: "keys", HeadSHA: fmt.Sprintf("%040x", 0xd2)},
+		githubtest.Pull{Number: 9, Title: "chore(deps): update slf4j", Author: "renovate[bot]", Bot: true, Created: start, Updated: start.Add(29 * time.Hour),
+			Base: "main", Head: "renovate/slf4j", HeadSHA: fmt.Sprintf("%040x", 0xc1), Checks: "SUCCESS", Additions: 1, Deletions: 1, Files: 1})
+	gh.SetPulls(sso, githubtest.Pull{Number: 3, Title: "Keep the session on refresh", Author: "bo", Created: start, Updated: start.Add(30 * time.Hour),
+		Base: "main", Head: "refresh", HeadSHA: fmt.Sprintf("%040x", 0xe1), Approved: true, Checks: "FAILURE", Additions: 30, Deletions: 12, Files: 2})
 
 	bundle, err := filepath.Abs("../../web/bundle")
 	if err != nil {

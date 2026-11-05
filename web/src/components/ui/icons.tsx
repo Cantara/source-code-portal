@@ -211,6 +211,19 @@ export function FlagIcon({ className }: { className?: string }) {
   )
 }
 
+/** PullIcon stands for a pull request: a branch that asks to merge back into another. */
+export function PullIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="18" r="2.5" />
+      <path d="M6 8.5v7M18 15.5V10a3 3 0 0 0-3-3h-4" />
+      <path d="m13 5-2 2 2 2" />
+    </Icon>
+  )
+}
+
 // The kinds of work, each a commit's badge (CommitIcon).
 const person = (
   <>

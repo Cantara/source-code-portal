@@ -1330,7 +1330,7 @@ type Label struct {
 // LabelKind defines model for Label.Kind.
 type LabelKind string
 
-// LayoutElement One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits and pulls take count (pulls also groups), heading takes text and note (plain text).
+// LayoutElement One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits and pulls take count, heading takes text and note (plain text).
 type LayoutElement struct {
 	// Color What colours the fleet map's tiles: the last change's age (the default) or the health level
 	Color *LayoutElementColor `json:"color,omitempty"`

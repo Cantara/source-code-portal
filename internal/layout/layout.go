@@ -39,7 +39,7 @@ type Layout struct {
 	Elements []oapi.LayoutElement `json:"elements"`
 }
 
-// Default is the built-in layout of page: the announcements first, below the header, then the fleet's numbers and map, then the products, then people's commits. The presentation page
+// Default is the built-in layout of page: the announcements first, below the header, then the fleet's numbers and map, then the products, then the pull requests whose turn it is and people's commits. The presentation page
 // (design/present.md) shows the same compact: the fleet by health and the products as tiles.
 func Default(page string) Layout {
 	switch page {
@@ -50,6 +50,7 @@ func Default(page string) Layout {
 			{Kind: oapi.LayoutElementKindAnnouncements},
 			{Kind: oapi.LayoutElementKindFleetMap, Color: new(oapi.LayoutElementColorHealth)},
 			{Kind: oapi.LayoutElementKindProducts, View: new(oapi.Tiles)},
+			{Kind: oapi.LayoutElementKindPulls, Count: new(8)},
 			{Kind: oapi.LayoutElementKindLatestCommits, Count: new(30)},
 		}}
 	default:
@@ -60,6 +61,7 @@ func Default(page string) Layout {
 		{Kind: oapi.LayoutElementKindTelemetry},
 		{Kind: oapi.LayoutElementKindFleetMap},
 		{Kind: oapi.LayoutElementKindProducts, View: new(oapi.Cards)},
+		{Kind: oapi.LayoutElementKindPulls, Count: new(5)},
 		{Kind: oapi.LayoutElementKindLatestCommits, Count: new(10)},
 	}}
 }
@@ -105,7 +107,7 @@ func check(e *oapi.LayoutElement) error {
 		takes["groups"], takes["color"] = true, true
 	case oapi.LayoutElementKindProducts:
 		takes["groups"], takes["view"] = true, true
-	case oapi.LayoutElementKindLatestCommits:
+	case oapi.LayoutElementKindLatestCommits, oapi.LayoutElementKindPulls:
 		takes["count"] = true
 	case oapi.LayoutElementKindHeading:
 		takes["text"], takes["note"] = true, true

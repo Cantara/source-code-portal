@@ -14,6 +14,7 @@ export const settingsRoute: Route<Record<string, never>> = {
         view: productsView(cookies[viewCookie], "cards"),
         commits: pageSize(cookies[sizeCookie("commits")], 0),
         history: pageSize(cookies[sizeCookie("history")], 0),
+        pulls: pageSize(cookies[sizeCookie("pulls")], 0),
       }}
     />
   ),

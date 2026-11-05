@@ -25,8 +25,9 @@ import { Hint } from "@/shared/hint"
 import { cn } from "@/lib/cn"
 import { FindingList, HealthScore } from "@/entities/health/findings"
 import { VisibilityBadge } from "@/entities/repo/visibility-badge"
-import { groupQuery } from "@/lib/api/queries"
-import { groupCommitsQuery } from "./api"
+import { groupQuery, pullsQuery } from "@/lib/api/queries"
+import { PullList } from "@/entities/pull/pull"
+import { groupCommitsQuery, groupPulls } from "./api"
 import { validateGroupSearch, type GroupSearch, type SortKey } from "./search"
 
 /** Column is one column of the repository table: its header, how it sorts and how a row draws it. */
@@ -52,6 +53,7 @@ const columns: Column[] = [
   { key: "from", label: "From", value: (r) => from(r) ?? "" },
   { key: "licence", label: "Licence", value: (r) => r.license },
   { key: "issues", label: "Issues", numeric: true, center: true, value: (r) => r.openIssues },
+  { key: "pulls", label: "PRs", numeric: true, center: true, value: (r) => r.openPulls ?? -1 },
   { key: "last", label: "Last change", value: (r) => lastChange(r) },
   { key: "findings", label: "Findings", numeric: true, center: true, value: (r) => r.health?.findings.length ?? -1 },
   { key: "health", label: "Health", numeric: true, value: (r) => r.health?.score ?? -1 },
@@ -249,6 +251,16 @@ export function GroupView({ group }: { group: string }) {
                               <span className="sr-only"> open issues</span>
                             </a>
                           </td>
+                          <td className="px-3 py-2 text-center font-mono tabular-nums">
+                            {r.openPulls === null ? (
+                              none
+                            ) : (
+                              <Link href={`/pulls?repo=${encodeURIComponent(r.address)}`} className="hover:underline">
+                                {count(r.openPulls)}
+                                <span className="sr-only"> open pull requests</span>
+                              </Link>
+                            )}
+                          </td>
                           <td className="px-3 py-2 font-mono whitespace-nowrap">
                             <RelativeTime at={lastChange(r)} />
                           </td>
@@ -268,6 +280,9 @@ export function GroupView({ group }: { group: string }) {
           </section>
           <div className="flex min-w-0 flex-col gap-6">
             {data.health && <GroupHealth health={data.health} />}
+            <PanelBoundary>
+              <GroupPulls group={group} />
+            </PanelBoundary>
             <PanelBoundary>
               <LatestCommits group={group} />
             </PanelBoundary>
@@ -294,6 +309,25 @@ function GroupHealth({ health }: { health: Schemas["ProductHealth"] }) {
       ) : (
         <FindingList findings={health.findings} className="mt-2" />
       )}
+    </Card>
+  )
+}
+
+/** GroupPulls is the group's open pull requests whose turn it is first, and the way to all of them on /pulls; none: nothing. */
+function GroupPulls({ group }: { group: string }) {
+  const { data, error } = useQuery(pullsQuery(api, groupPulls(group)))
+  if (data && data.counts.open === 0) return null
+  return (
+    <Card aria-labelledby="pulls">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <CardTitle id="pulls">Pull requests</CardTitle>
+        {data && <span className="text-xs text-muted-foreground">{count(data.counts.states.review)} waiting for a review</span>}
+      </div>
+      {error && !data && <ProblemAlert error={error} />}
+      {data && <PullList pulls={data.pulls} compact />}
+      <Link href={`/pulls?group=${encodeURIComponent(group)}`} className="mt-2 inline-block text-sm hover:underline">
+        {data ? `All ${count(data.counts.open)} open` : "All open pull requests"}
+      </Link>
     </Card>
   )
 }

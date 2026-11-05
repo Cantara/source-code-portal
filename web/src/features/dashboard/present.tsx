@@ -43,6 +43,7 @@ import { FleetMap } from "./fleet-map"
 import { defaultPresent, pick, type Element } from "./layout"
 import { TelemetryStrip } from "./telemetry"
 import { ProductTiles } from "./tiles"
+import { Pulls } from "./pulls"
 
 /** stale and offline are how long since the data was last known current before the page says so (design/present.md). */
 const stale = 2 * 60_000
@@ -307,6 +308,8 @@ function Screen({
   // The older commits the column reads as it scrolls keep to the products the address names, as the newest do.
   const members = new Set(scope.groups.flatMap((g) => g.members.map((m) => m.address)))
   const keep = (c: Commit) => !only || members.has(c.repo)
+  // One product named in the address: its pull requests; more than one: the fleet's, as the strip counts them.
+  const one = only?.length === 1 ? scope.groups[0] : undefined
   const left: ReactNode[] = []
   let strip = false
   layout.forEach((el, i) => {
@@ -325,6 +328,9 @@ function Screen({
         break
       case "announcements":
         left.push(<Announcements key={i} list={notices} wall />)
+        break
+      case "pulls":
+        left.push(<Pulls key={i} work={data.work} group={one?.id} counts={one?.pulls ?? data.pulls} n={el.count ?? 8} wall />)
         break
       case "heading":
         left.push(

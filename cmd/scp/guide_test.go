@@ -125,6 +125,20 @@ func TestServeForGuide(t *testing.T) {
 	cli := repo("dev-cli", "The developers' command line", "go", []work{{"bo", 3, 50, 9}, {"bo+claude", 7, 30, 1}}, true,
 		gogh.Repository{OpenIssuesCount: new(56)})
 	gh.SetRelease(cli, "v1.4.0", "1.4.0", days(200))
+	// Open pull requests (design/pulls.md): one waiting long for a review, one ready, one failing, and automation's updates.
+	pull := func(n int, title, who string, opened, updated float64, p githubtest.Pull) githubtest.Pull {
+		p.Number, p.Title, p.Author, p.Created, p.Updated, p.Base = n, title, who, days(opened), days(updated), "main"
+		p.Head, p.HeadSHA, p.Bot = fmt.Sprintf("change-%d", n), fmt.Sprintf("%040x", 0xf000+n), strings.HasSuffix(who, "[bot]")
+		return p
+	}
+	gh.SetPulls(api, pull(41, "Retry a declined card once", "bo", 12, 9, githubtest.Pull{Review: "REVIEW_REQUIRED", Checks: "SUCCESS",
+		Requested: 1, Additions: 86, Deletions: 12, Files: 4}),
+		pull(42, "Refund in the customer's currency", "ada", 2, 1, githubtest.Pull{Approved: true, Checks: "SUCCESS", Additions: 140, Deletions: 30, Files: 6}),
+		pull(39, "chore(deps): update jackson to 2.20", "renovate[bot]", 44, 3, githubtest.Pull{Checks: "SUCCESS", Additions: 2, Deletions: 2, Files: 1}))
+	gh.SetPulls(identity, pull(18, "Rotate the signing keys every 90 days", "chen", 5, 2, githubtest.Pull{Approved: true, Checks: "FAILURE",
+		Additions: 210, Deletions: 45, Files: 9}))
+	gh.SetPulls(sdk, pull(7, "chore(deps): update golang.org/x/oauth2", "renovate[bot]", 50, 20, githubtest.Pull{Checks: "SUCCESS",
+		Additions: 4, Deletions: 4, Files: 2}))
 	repo("ci-templates", "Shared CI workflows", "", []work{{"ada", 1, 110, 100}, {"github-actions[bot]", 24, 30, 0}}, true,
 		gogh.Repository{})
 	repo("handbook", "How the team works", "", []work{{"dana", 4, 45, 6}}, true, gogh.Repository{})

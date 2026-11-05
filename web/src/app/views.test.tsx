@@ -7,6 +7,7 @@ import { AllCommitsView } from "@/features/commits/view"
 import { DashboardView } from "@/features/dashboard/view"
 import { DocView } from "@/features/docs/view"
 import { GroupView } from "@/features/groups/view"
+import { PullsView } from "@/features/pulls/view"
 import { repoRoute } from "@/features/repos/route"
 import { RepoView } from "@/features/repos/view"
 import type { Ctx } from "@/lib/page"
@@ -31,6 +32,18 @@ function show(view: ReactNode, path = "/", qc = client()) {
 }
 
 describe("pages", () => {
+  it("lists the open pull requests whose turn first, the states as filters", async () => {
+    show(<PullsView defaultSize={50} />, "/pulls")
+    expect(await screen.findByRole("heading", { level: 1, name: "Pull requests" })).toBeInTheDocument()
+    const chips = within(await screen.findByRole("navigation", { name: "By whose turn" }))
+    expect(chips.getByRole("link", { name: /All open 2/ })).toHaveAttribute("aria-current", "page")
+    expect(chips.getByRole("link", { name: /Needs review 1/ })).toHaveAttribute("href", "/pulls?state=review")
+    expect(chips.getByRole("link", { name: /Ready to merge 1/ })).toBeInTheDocument()
+    expect(chips.queryByRole("link", { name: /Failing checks/ })).toBeNull()
+    expect(screen.getByRole("link", { name: "Change 1" })).toHaveAttribute("href", "https://github.com/acme/core/pull/1")
+    expect(screen.getByRole("form", { name: "Filter pull requests" })).toHaveAttribute("action", "/pulls")
+  })
+
   it("renders the dashboard with the fleet, the products' signals and the team's latest commits", async () => {
     show(<DashboardView work={["hand", "ai"]} />)
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()

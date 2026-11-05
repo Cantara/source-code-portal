@@ -28,6 +28,11 @@ export const kinds: { kind: Kind; label: string; about: string }[] = [
   },
   { kind: "products", label: "Products", about: "The products as distilled cards, one sortable table or compact tiles." },
   {
+    kind: "pulls",
+    label: "Pull requests",
+    about: "The open pull requests whose turn it is first, the ones waiting for a review at the top; all of them on /pulls.",
+  },
+  {
     kind: "latest-commits",
     label: "Latest commits",
     about: "The newest commits of the work that counts; automation on request.",
@@ -44,6 +49,8 @@ export function blank(kind: Kind): Element {
       return { kind, view: "cards" }
     case "latest-commits":
       return { kind, count: 10 }
+    case "pulls":
+      return { kind, count: 5 }
     case "heading":
       return { kind, text: "A heading" }
     default:
@@ -57,6 +64,7 @@ export const defaultLayout: Element[] = [
   { kind: "telemetry" },
   { kind: "fleet-map" },
   { kind: "products", view: "cards" },
+  { kind: "pulls", count: 5 },
   { kind: "latest-commits", count: 10 },
 ]
 
@@ -66,6 +74,7 @@ export const defaultPresent: Element[] = [
   { kind: "announcements" },
   { kind: "fleet-map", color: "health" },
   { kind: "products", view: "tiles" },
+  { kind: "pulls", count: 8 },
   { kind: "latest-commits", count: 30 },
 ]
 

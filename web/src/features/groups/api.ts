@@ -7,3 +7,6 @@ export const groupCommitsQuery = (api: Api, group: string) =>
     queryKey: keys.latestCommits(group),
     queryFn: ({ signal }) => unwrap(api.GET("/commits", { params: { query: { group, limit: 10 } }, signal })),
   })
+
+/** groupPulls is what the group's pull requests panel reads: the five whose turn it is first. */
+export const groupPulls = (group: string) => ({ group, size: 5 })

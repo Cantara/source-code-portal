@@ -1,5 +1,5 @@
-import { queryOptions } from "@tanstack/react-query"
-import { unwrap, type Api } from "./client"
+import { keepPreviousData, queryOptions } from "@tanstack/react-query"
+import { unwrap, type Api, type Schemas } from "./client"
 
 const lc = (s: string) => s.toLowerCase()
 
@@ -22,6 +22,18 @@ export const keys = {
   history: (owner: string, name: string, filter: Record<string, string | number | boolean | undefined>) =>
     ["commits", "history", lc(owner), lc(name), filter] as const,
   latestCommits: (group: string) => ["commits", "latest", group] as const,
+  pulls: (f: PullFilter) =>
+    [
+      "pulls",
+      f.group ?? "",
+      f.repo ?? "",
+      f.state ?? "",
+      f.by ?? "",
+      f.drafts ?? false,
+      f.sort ?? "waiting",
+      f.size ?? 50,
+      f.page ?? 1,
+    ] as const,
   page: (page: string) => ["page", page] as const,
   me: () => ["me"] as const,
   assistant: () => ["assistant"] as const,
@@ -67,4 +79,41 @@ export const groupQuery = (api: Api, group: string) =>
   queryOptions({
     queryKey: keys.group(group),
     queryFn: ({ signal }) => unwrap(api.GET("/groups/{group}", { params: { path: { group } }, signal })),
+  })
+
+/** PullFilter is a list of open pull requests (GET /pulls): its scope, state, whose and order, and the page. */
+export interface PullFilter {
+  group?: string
+  repo?: string
+  state?: Schemas["PullState"]
+  by?: "people" | "automation"
+  drafts?: boolean
+  sort?: "waiting" | "newest" | "updated"
+  page?: number
+  size?: number
+}
+
+/** pullsQuery is one page of open pull requests, whose turn first; the pages, the dashboard, groups and repositories read it. */
+export const pullsQuery = (api: Api, f: PullFilter) =>
+  queryOptions({
+    queryKey: keys.pulls(f),
+    queryFn: ({ signal }) =>
+      unwrap(
+        api.GET("/pulls", {
+          params: {
+            query: {
+              group: f.group,
+              repo: f.repo,
+              state: f.state,
+              by: f.by,
+              drafts: f.drafts,
+              sort: f.sort,
+              page: f.page,
+              limit: f.size,
+            },
+          },
+          signal,
+        }),
+      ),
+    placeholderData: keepPreviousData,
   })

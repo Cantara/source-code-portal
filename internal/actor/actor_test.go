@@ -12,3 +12,14 @@ func TestBot(t *testing.T) {
 		}
 	}
 }
+
+func TestBranch(t *testing.T) {
+	for s, want := range map[string]bool{
+		"renovate/lib-2.x": true, "dependabot/npm_and_yarn/x": true, "snyk-fix-0123abcd": true, "snyk-upgrade-2f1e": true,
+		"feature/snyk": false, "main": false,
+	} {
+		if got := Branch(s); got != want {
+			t.Errorf("Branch(%q) = %v, want %v", s, got, want)
+		}
+	}
+}

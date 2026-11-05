@@ -1,6 +1,6 @@
 # Open pull requests: whose turn it is (PR1 to PR3)
 
-Status: PR1 built, PR2 and PR3 in progress (plan.md section 4, P-68). Binding order: ../plan.md > this note > `layout.md`, `health.md`, `github.md`.
+Status: PR1 and PR2 built, PR3 in progress (plan.md section 4, P-68). Binding order: ../plan.md > this note > `layout.md`, `health.md`, `github.md`.
 
 Across many repositories the open pull requests are the work in flight: what waits for a reviewer, what waits for its author, what is
 ready and nobody merges, what dependency bots keep opening. GitHub shows them per repository or through a search one has to write.
@@ -66,8 +66,10 @@ Each pull request gets one **state**, the first that holds, and the party it wai
 | Checks running | the head's checks `PENDING` or `EXPECTED` | CI |
 | Ready | approved, or no review required, checks passing or none | a maintainer to merge |
 
-**Who opened it** is told as the commits tell it: a person, or automation (Dependabot, Renovate, any `[bot]` or bot-like login). The
-bot test moves from `commits` (`botLike`) into a core package `internal/actor` (`Bot(login, name)`), used by both features. The
+**Who opened it** is told as the commits tell it: a person, or automation (Dependabot, Renovate, any `[bot]` or bot-like login, or a
+dependency bot's branch: Snyk opens its pull requests under the account of the person who connected it, so on Cantara 195 of them
+named people until `snyk-fix-` and `snyk-upgrade-` told them). The tests live in the core package `internal/actor` (`Bot`,
+`Branch`), used by both features, and are applied again at every publish, so a change reaches the stored ones at a warm start. The
 reader's work lens (P-42) applies: bots' pull requests count only when automation is in the work that counts; a separate count says
 how many dependency updates wait either way.
 
@@ -102,11 +104,11 @@ live on their own page.
    state, a link to `/pulls?repo=` and to GitHub's list; the header's figures say issues and pull requests apart.
 6. **Commits navigator**: a branch that has an open pull request carries its `#123` and state beside its name (the job holds
    `headRefName`; the commits job already reads the ten newest branches).
-7. **The `pulls` element** ("Waiting for review", options: groups, states, by, how many): the pull requests that wait longest, each
-   one line with its state, `repo #123`, title, author and idle time, and a link to `/pulls`; nothing when none waits. In both
-   built-in layouts: on the dashboard after the products, beside the latest commits' column (5 by default); on `/present` the
-   strip's signal "Pull requests" (the telemetry's, P-61) and the element as a band below the products (as many as fit), so a team's
-   review queue is on the wall. An admin moves or removes it in design mode.
+7. **The `pulls` element** ("Pull requests", its one option how many): the pull requests that wait longest, each
+   two short lines with its state, `repo #123`, title, author and last activity, and "All N open" to `/pulls`; nothing when none is
+   open. In both built-in layouts: on the dashboard after the products, at the top of their side panel above the latest commits (5); on `/present` the
+   strip's signal "Pull requests" (the telemetry's, P-61) and the element as a band below the products (8, in two columns where there
+   is room; a single product named in the address, `?groups=`, gives its own), so a team's review queue is on the wall. An admin moves or removes it in design mode.
 8. **Agents and the rest**: the tool `pulls` in the catalogue (assistant, MCP, WebMCP), the search index's kind `pull` (titles),
    the badge `/badges/repos/{o}/{n}/pulls.svg` and the group's, a line per repository in `/llms.txt`, metrics for the job.
 

@@ -7,7 +7,9 @@ import { count, plural } from "@/lib/format"
 import { by, has, kinds, type WorkKind } from "@/lib/preferences"
 import { activityRule, kindOf, levelLabel, window, type Rules } from "@/lib/rules"
 import { useRules } from "@/lib/rules-context"
-import { CloudCheckIcon, CloudOffIcon, CommitIcon, FlagIcon, GridIcon, PulseIcon } from "@/components/ui/icons"
+import { useNow } from "@/lib/clock"
+import Link from "next/link"
+import { CloudCheckIcon, CloudOffIcon, CommitIcon, FlagIcon, GridIcon, PullIcon, PulseIcon } from "@/components/ui/icons"
 import { levels } from "@/entities/health/health"
 import { Hint, type HintRow } from "@/shared/hint"
 import { assistants } from "./work"
@@ -21,7 +23,7 @@ function percent(part: number, whole: number): string {
 
 /** Signal is one indicator of the fleet, the same on the dashboard (a tile) and on the presentation page (an icon in the strip). */
 export type Signal = {
-  key: WorkKind | "active" | "findings" | "products" | "sync"
+  key: WorkKind | "active" | "findings" | "pulls" | "products" | "sync"
   /** what it counts, in words: "Commits by hand" */
   label: string
   value: string
@@ -35,6 +37,8 @@ export type Signal = {
   tone?: string
   /** where a narrowing strip drops it (container queries); none: it always stays */
   drop?: string
+  /** the page that lists what it counts */
+  href?: string
 }
 
 /** tones are the kinds of work's colours, as the sparklines and the cards draw them (no inline style: the CSP forbids it). */
@@ -48,7 +52,7 @@ const commitsDrop = "@max-xl:hidden"
  * automation; each says whether Settings count it), the repositories the work that counts changed, what needs a look, the
  * products by their health, and whether the catalogue is current. The window and the names of the levels come from the server's rules, so they say what it does today.
  */
-export function signals(data: Schemas["Dashboard"], rules: Rules): Signal[] {
+export function signals(data: Schemas["Dashboard"], rules: Rules, now = Date.now()): Signal[] {
   const a = data.activity
   const f = data.freshness
   const checked = f.fresh + f.stale + f.error + f.unknown
@@ -119,6 +123,7 @@ export function signals(data: Schemas["Dashboard"], rules: Rules): Signal[] {
       })),
       level: h ? levels[h.level].className : undefined,
     },
+    pullsSignal(data, now),
     {
       key: "products",
       label: "Products",
@@ -151,6 +156,46 @@ export function signals(data: Schemas["Dashboard"], rules: Rules): Signal[] {
   ]
 }
 
+/**
+ * pullsSignal is the open pull requests of the work that counts (automation's only when it counts): how many, how many wait for a
+ * review and how long the oldest has been idle, and in its parts the ones ready to merge and the authors'. The health findings tell
+ * when one waits too long (reviews).
+ */
+function pullsSignal(data: Schemas["Dashboard"], now: number): Signal {
+  const p = data.pulls
+  const st = p.states
+  return {
+    key: "pulls",
+    label: "Pull requests",
+    value: count(p.open),
+    detail:
+      st.review > 0
+        ? `open, ${count(st.review)} waiting for a review${p.oldestReview ? `, the oldest idle ${idle(p.oldestReview, now)}` : ""}`
+        : p.open > 0
+          ? "open, none waiting for a review"
+          : "none open",
+    icon: <PullIcon />,
+    rows: [
+      { swatch: "bg-primary", label: "Need review", value: count(st.review) },
+      { swatch: "bg-[var(--active)]", label: "Ready to merge", value: count(st.ready) },
+      {
+        swatch: "bg-[var(--quiet)]",
+        label: "With their authors",
+        value: count(st.changes + st.failing + st.conflicts + st.draft),
+      },
+    ],
+    tone: "text-primary",
+    drop: "@max-2xl:hidden",
+    href: "/pulls",
+  }
+}
+
+/** idle is how long ago a time was, in whole days. */
+function idle(at: string, now: number): string {
+  const days = Math.floor((now - Date.parse(at)) / 86_400_000)
+  return days < 1 ? "less than a day" : plural(days, "day", "days")
+}
+
 /** SignalHint is a signal's depth the moment it is pointed at, focused or tapped: what it counts and its parts. */
 function SignalHint({ s, render }: { s: Signal; render: Parameters<typeof Hint>[0]["render"] }) {
   return (
@@ -169,10 +214,11 @@ const iconClass = (s: Signal) => (s.level ? "text-[var(--lvl)]" : s.tone)
  */
 export function Telemetry({ data }: { data: Schemas["Dashboard"] }) {
   const rules = useRules()
+  const now = useNow()
   return (
     <section aria-label="Telemetry">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
-        {signals(data, rules).map((s) => (
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        {signals(data, rules, now).map((s) => (
           <SignalHint
             key={s.key}
             s={s}
@@ -185,7 +231,15 @@ export function Telemetry({ data }: { data: Schemas["Dashboard"] }) {
                   s.level,
                 )}
               >
-                <dt className="text-[0.6875rem] font-medium tracking-widest text-muted-foreground uppercase">{s.label}</dt>
+                <dt className="text-[0.6875rem] font-medium tracking-widest text-muted-foreground uppercase">
+                  {s.href ? (
+                    <Link href={s.href} className="hover:text-foreground hover:underline">
+                      {s.label}
+                    </Link>
+                  ) : (
+                    s.label
+                  )}
+                </dt>
                 <dd className="flex items-center gap-2 font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
                   <span className={cn("[&_svg]:size-6", iconClass(s))}>{s.icon}</span>
                   {s.value}
@@ -208,11 +262,12 @@ export function Telemetry({ data }: { data: Schemas["Dashboard"] }) {
  */
 export function TelemetryStrip({ data, start, end }: { data: Schemas["Dashboard"]; start?: ReactNode; end?: ReactNode }) {
   const rules = useRules()
+  const now = useNow()
   return (
     <section aria-label="Telemetry" className="panel flex items-center gap-x-6 px-4 py-2">
       {start}
       <dl className="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-1">
-        {signals(data, rules).map((s) => (
+        {signals(data, rules, now).map((s) => (
           <SignalHint
             key={s.key}
             s={s}

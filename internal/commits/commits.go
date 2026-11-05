@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/actor"
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
@@ -65,16 +66,6 @@ type payload struct {
 // Spec is the per-repository refresh job.
 func (c *Commits) Spec() sync.Spec {
 	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: []sync.Event{sync.EventPush}, Run: c.run, Publish: publish}
-}
-
-// automationBranch reports whether a branch is a bot's update branch: those come and go with every dependency update.
-func automationBranch(name string) bool {
-	for _, p := range []string{"renovate/", "dependabot/", "snyk-fix-", "snyk-upgrade-"} {
-		if strings.HasPrefix(name, p) {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *Commits) run(ctx context.Context, j sync.Job) (sync.Result, error) {
@@ -252,7 +243,7 @@ func sides(ctx context.Context, f Fetcher, owner, name string, main []Commit, pr
 	reads := 0
 	for _, b := range branches {
 		sha := strings.ToLower(b.SHA)
-		if onMain[sha] || automationBranch(b.Name) || !shaPattern.MatchString(sha) {
+		if onMain[sha] || actor.Branch(b.Name) || !shaPattern.MatchString(sha) {
 			continue
 		}
 		if _, ok := held[sha]; !ok {

@@ -2,11 +2,12 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
 import { Alert } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api/client"
-import { repoQuery } from "@/lib/api/queries"
+import { pullsQuery, repoQuery } from "@/lib/api/queries"
+import { stateOf, type Pull } from "@/entities/pull/pull"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { count, exactUTC } from "@/lib/format"
 import { firstPageOf, rememberSize } from "@/lib/paging"
@@ -38,8 +39,10 @@ export function NavigatorView({ owner, name, defaultSize }: { owner: string; nam
   const st = historyState(Object.fromEntries(useSearchParams()), defaultSize)
   const detail = useQuery(repoQuery(api, owner, name)).data
   const repo = detail?.repo
+  const open = useQuery(pullsQuery(api, { repo: `${owner}/${name}`.toLowerCase(), drafts: true, size: 100 })).data
+  const heads = useMemo(() => new Map((open?.pulls ?? []).filter((p) => !p.fork).map((p) => [p.head, p])), [open])
   return (
-    <>
+    <PullHeads value={heads}>
       <PageHeader
         title={`Commits in ${repo ? `${repo.owner}/${repo.name}` : `${owner}/${name}`}`}
         trail={crumbs.repoCommits(repo?.owner ?? owner, repo?.name ?? name, detail?.group)}
@@ -52,9 +55,12 @@ export function NavigatorView({ owner, name, defaultSize }: { owner: string; nam
         defaultSize={defaultSize}
         github={repo?.htmlUrl}
       />
-    </>
+    </PullHeads>
   )
 }
+
+/** PullHeads are the repository's open pull requests by their branch, so a branch's label names its pull request. */
+const PullHeads = createContext<Map<string, Pull>>(new Map())
 
 function Navigator({
   owner,
@@ -431,13 +437,26 @@ function Labels({ labels, row = false }: { labels: Label[]; row?: boolean }) {
   )
 }
 
+/** Pill is a branch or a tag; a branch with an open pull request says its number and state. */
 function Pill({ label: l }: { label: Label }) {
+  const pull = useContext(PullHeads).get(l.name)
+  const open = l.kind === "branch" ? pull : undefined
   const tone = l.kind === "tag" ? "border-dashed" : l.default ? "border-primary font-semibold" : ""
   return (
-    <span className={`inline-flex max-w-48 shrink-0 items-center gap-1 rounded border border-border px-1 text-xs ${tone}`}>
+    <span
+      className={`inline-flex max-w-56 shrink-0 items-center gap-1 rounded border border-border px-1 text-xs ${tone}`}
+      title={open ? `Pull request #${open.number}: ${open.title} (${stateOf(open.state).label.toLowerCase()})` : undefined}
+    >
       {l.kind === "tag" ? <TagIcon /> : <BranchIcon />}
       <span className="sr-only">{l.kind === "tag" ? "tag" : l.default ? "default branch" : "branch"} </span>
       <span className="truncate">{l.name}</span>
+      {open && (
+        <span className="inline-flex shrink-0 items-center gap-1 border-l border-border pl-1 font-mono">
+          <span aria-hidden="true" className={`size-1.5 rounded-full ${stateOf(open.state).dot}`} />
+          <span className="sr-only">pull request </span>#{open.number}
+          <span className="sr-only">, {stateOf(open.state).label.toLowerCase()}</span>
+        </span>
+      )}
     </span>
   )
 }

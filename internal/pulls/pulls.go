@@ -236,7 +236,7 @@ func merge(prev *Set, listed []Listed, now time.Time) (*Set, []int) {
 	var ask []int
 	for _, l := range listed {
 		p := Pull{Number: l.Number, Title: untrusted.Text(l.Title, maxTitle), URL: l.URL, Author: untrusted.Text(l.Author, 100),
-			Bot: l.AuthorBot || actor.Bot(l.Author), Draft: l.Draft, Fork: l.Fork, Created: l.Created.UTC(), Updated: l.Updated.UTC(),
+			Bot: l.AuthorBot || actor.Bot(l.Author) || actor.Branch(l.Head), Draft: l.Draft, Fork: l.Fork, Created: l.Created.UTC(), Updated: l.Updated.UTC(),
 			Base: untrusted.Text(l.Base, 100), Head: untrusted.Text(l.Head, 100), HeadSHA: l.HeadSHA, Requested: l.Requested}
 		for _, lb := range l.Labels {
 			p.Labels = append(p.Labels, Label{Name: untrusted.Text(lb.Name, maxLabel), Color: hexColor(lb.Color)})
@@ -318,6 +318,12 @@ func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 		r = &Set{}
 		if json.Unmarshal(it.Payload, r) != nil {
 			r = nil
+		}
+	}
+	if r != nil { // automation told again at every publish, so a change of the rule reaches the stored ones at a warm start
+		for i := range r.Pulls {
+			p := &r.Pulls[i]
+			p.Bot = p.Bot || actor.Bot(p.Author) || actor.Branch(p.Head)
 		}
 	}
 	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, r, fresh) })
