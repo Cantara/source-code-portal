@@ -90,7 +90,8 @@ function Freshness() {
       </span>
       {data?.builtAt && (
         <span className="text-sm text-muted-foreground" suppressHydrationWarning>
-          data from {ago(data.builtAt, now) === "now" ? "just now" : `${ago(data.builtAt, now)} ago`}
+          <span className="sr-only">data from </span>
+          {ago(data.builtAt, now) === "now" ? "now" : `${ago(data.builtAt, now)} ago`}
         </span>
       )}
     </p>

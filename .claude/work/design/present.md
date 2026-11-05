@@ -89,7 +89,7 @@ fits from 1024 to 1920 pixels wide.
   the stream is closed (`features/status/sync.ts`).
 - **Freshness.** The strip ends with how current the page is: *Live* while the event stream is open, *Polling* while it is closed and
   the snapshot was read in the last 2 minutes, *Stale* past 2 and *Offline* past 10 or at once while the server fails (a retryable
-  error), with the data's age from the snapshot's time beside it ("data from 3m ago"). The colour and the word, never the colour alone.
+  error), with the data's age from the snapshot's time below it ("now", "3m ago"; "data from" for screen readers). The colour and the word, never the colour alone.
 - **Stays on.** The Screen Wake Lock API keeps the screen awake while the page is visible (asked again on `visibilitychange`; nothing
   where it is missing). A web app manifest (`display: standalone`, the portal's name and icon) lets "Add to Home Screen" open it full
   screen on an iPad.
