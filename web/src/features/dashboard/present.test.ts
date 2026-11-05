@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Schemas } from "@/lib/api/client"
 import { freshness } from "./present"
-import { byNeed, foldText, plan } from "./tiles"
+import { byNeed, choose, fits, foldText, plan, type Plan } from "./tiles"
 import { columnOf } from "@/lib/preferences"
 
 type Group = Schemas["DashboardGroup"]
@@ -62,19 +62,25 @@ describe("plan", () => {
     group("g1", "good", 90, "2026-11-04T00:00:00Z"),
     group("g2", "good", 90, "2026-11-01T00:00:00Z"),
   ])
-  const at = (steps: number) => {
-    const p = plan(ordered, steps)
-    return { tiles: p.tiles.map((t) => `${t.g.id}${t.wide ? "+" : ""}`), folded: p.folded.map((g) => g.id) }
-  }
-  it("folds the good first, then narrows and folds the mildest at watch, then narrows attention; attention never folds", () => {
-    expect(at(0)).toEqual({ tiles: ["a1+", "w1+", "w2+", "g1", "g2"], folded: [] })
-    expect(at(2)).toEqual({ tiles: ["a1+", "w1+", "w2+"], folded: ["g1", "g2"] })
-    expect(at(3)).toEqual({ tiles: ["a1+", "w1+", "w2"], folded: ["g1", "g2"] })
-    expect(at(5)).toEqual({ tiles: ["a1+", "w1"], folded: ["w2", "g1", "g2"] })
-    expect(at(99)).toEqual({ tiles: ["a1"], folded: ["w1", "w2", "g1", "g2"] })
+  const show = (p: Plan) => ({ tiles: p.tiles.map((t) => `${t.g.id}${t.wide ? "+" : ""}`), folded: p.folded.map((g) => g.id) })
+  it("narrows then folds the mildest at watch, then narrows attention; attention never folds; good ones as many as asked", () => {
+    expect(show(plan(ordered, 0, 2))).toEqual({ tiles: ["a1+", "w1+", "w2+", "g1", "g2"], folded: [] })
+    expect(show(plan(ordered, 0, 1))).toEqual({ tiles: ["a1+", "w1+", "w2+", "g1"], folded: ["g2"] })
+    expect(show(plan(ordered, 1, 0))).toEqual({ tiles: ["a1+", "w1+", "w2"], folded: ["g1", "g2"] })
+    expect(show(plan(ordered, 3, 2))).toEqual({ tiles: ["a1+", "w1", "g1", "g2"], folded: ["w2"] })
+    expect(show(plan(ordered, 99, 0))).toEqual({ tiles: ["a1"], folded: ["w1", "w2", "g1", "g2"] })
   })
   it("names what the last tile holds", () => {
-    expect(foldText(plan(ordered, 2).folded)).toBe("2 more good")
-    expect(foldText(plan(ordered, 5).folded)).toBe("1 more to watch, 2 good")
+    expect(foldText(plan(ordered, 0, 0).folded)).toBe("2 more good")
+    expect(foldText(plan(ordered, 3, 0).folded)).toBe("1 more to watch, 2 good")
+  })
+  it("places tiles as the dense grid does: wide tiles that cannot pair leave a column for the narrow ones", () => {
+    // 3 columns, 4 rows: two wide tiles stack in columns 1 and 2; column 3 holds the narrow ones and the fold.
+    const grid = { cols: 3, rows: 4 }
+    expect(fits(plan(ordered, 1, 2), grid)).toBe(true) // a1+ w1+ stacked, w2 g1 g2 in column 3, nothing folded
+    expect(fits(plan(ordered, 0, 0), grid)).toBe(false) // three wide tiles need six rows
+    expect(choose(ordered, grid)).toEqual({ steps: 1, good: 2 })
+    // 3×2: a1 wide, then column 3 holds w1 and the fold tile (w2, g1, g2 folded).
+    expect(choose(ordered, { cols: 3, rows: 2 })).toEqual({ steps: 3, good: 0 })
   })
 })

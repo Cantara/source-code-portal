@@ -106,47 +106,77 @@ function Narrow({ g, work: w, now }: { g: Group; work: Work; now: number }) {
   )
 }
 
-/**
- * capacity is how many grid cells the grid holds: its columns from the template the browser laid out, its rows from the height it
- * has and the fixed row height. A wide tile takes two columns (one on a single column) and two rows.
- */
-function capacity(grid: HTMLElement, box: HTMLElement): { cells: number; wide: number } {
+/** Grid is the tiles' grid as the browser laid it out: its columns, and the rows its box holds at the fixed row height. */
+type Grid = { cols: number; rows: number }
+
+function gridOf(grid: HTMLElement, box: HTMLElement): Grid {
   const style = getComputedStyle(grid)
   const cols = Math.max(1, style.gridTemplateColumns.split(" ").filter(Boolean).length)
-  const row = parseFloat(style.gridAutoRows) || 72
+  const row = parseFloat(style.gridAutoRows) || 68
   const gap = parseFloat(style.rowGap) || 0
-  const rows = Math.max(1, Math.floor((box.clientHeight + gap) / (row + gap)))
-  return { cells: cols * rows, wide: Math.min(2, cols) * 2 }
+  return { cols, rows: Math.max(1, Math.floor((box.clientHeight + gap) / (row + gap))) }
 }
 
 /** Plan is how the tiles are drawn: the products shown, each wide or not, and the ones folded into the last tile. */
 export type Plan = { tiles: { g: Group; wide: boolean }[]; folded: Group[] }
 
 /**
- * plan is the tiles after giving up steps of detail, the least important first, so what matters most stays (design/present.md):
- * the good products fold from the end; then the products at watch lose their wide tile from the mildest; then they fold, the mildest
- * first; then those at attention lose their wide tile. A product at attention never folds.
+ * plan is the tiles with steps given up by the products that need a look, the least important first: the mildest at watch lose
+ * their wide tile, then they fold, the mildest first, then those at attention lose theirs (a product at attention never folds);
+ * and the first good of the rest shown, the others folded.
  */
-export function plan(ordered: Group[], steps: number): Plan {
+export function plan(ordered: Group[], steps: number, good: number): Plan {
   const tiles = ordered.map((g) => ({ g, wide: needs(g), folded: false }))
-  const at = (level: string) => tiles.filter((t) => (t.g.health?.level ?? "none") === level).reverse()
-  const rest = tiles.filter((t) => !needs(t.g)).reverse()
+  const at = (level: string) => tiles.filter((t) => t.g.health?.level === level).reverse()
   const moves: (() => void)[] = [
-    ...rest.map((t) => () => (t.folded = true)),
     ...at("watch").map((t) => () => (t.wide = false)),
     ...at("watch").map((t) => () => (t.folded = true)),
     ...at("attention").map((t) => () => (t.wide = false)),
   ]
   for (const m of moves.slice(0, steps)) m()
+  tiles.filter((t) => !needs(t.g)).forEach((t, i) => (t.folded = i >= good))
   return { tiles: tiles.filter((t) => !t.folded), folded: tiles.filter((t) => t.folded).map((t) => t.g) }
 }
 
-/** steps is how many steps of plan there are: once each product could give up all it can. */
-const stepsOf = (ordered: Group[]) =>
-  ordered.reduce((n, g) => n + (g.health?.level === "watch" ? 2 : g.health?.level === "attention" ? 1 : 1), 0)
+/**
+ * fits says whether a plan's tiles, the fold tile last, fit the grid, placed as the browser places them (grid-auto-flow: row dense:
+ * each tile at the first free place from the top left): a wide tile takes two columns (one on a single column) and two rows.
+ */
+export function fits(p: Plan, grid: Grid): boolean {
+  const { cols, rows } = grid
+  const used = Array.from({ length: rows }, () => new Array<boolean>(cols).fill(false))
+  const spans = [...p.tiles.map((t) => (t.wide ? [Math.min(2, cols), 2] : [1, 1])), ...(p.folded.length > 0 ? [[1, 1]] : [])]
+  for (const [w = 1, h = 1] of spans) {
+    let placed = false
+    for (let r = 0; r + h <= rows && !placed; r++)
+      for (let c = 0; c + w <= cols && !placed; c++) {
+        let free = true
+        for (let y = r; y < r + h && free; y++) for (let x = c; x < c + w && free; x++) free = !used[y]?.[x]
+        if (!free) continue
+        for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) (used[y] as boolean[])[x] = true
+        placed = true
+      }
+    if (!placed) return false
+  }
+  return true
+}
 
-/** cost is the cells a plan takes, the fold tile included. */
-const cost = (p: Plan, wide: number) => p.tiles.reduce((n, t) => n + (t.wide ? wide : 1), 0) + (p.folded.length > 0 ? 1 : 0)
+/** Choice is a plan's two settings: the steps given up by the products that need a look, and how many good ones show. */
+type Choice = { steps: number; good: number }
+
+/**
+ * choose is what the grid shows: the fewest steps that let the products needing a look fit, then as many of the others as still
+ * fit beside them, so the space a narrowed or folded tile left is used again.
+ */
+export function choose(ordered: Group[], grid: Grid): Choice {
+  const rest = ordered.filter((g) => !needs(g)).length
+  const max = ordered.reduce((n, g) => n + (g.health?.level === "watch" ? 2 : g.health?.level === "attention" ? 1 : 0), 0)
+  let steps = 0
+  while (steps < max && !fits(plan(ordered, steps, 0), grid)) steps++
+  let good = rest
+  while (good > 0 && !fits(plan(ordered, steps, good), grid)) good--
+  return { steps, good }
+}
 
 /** foldText says what the last tile holds: "7 more good", "3 more to watch, 7 good". */
 export function foldText(folded: Group[]): string {
@@ -158,8 +188,9 @@ export function foldText(folded: Group[]): string {
 
 /**
  * ProductTiles are the products compact, for a glance (design/present.md): a product at watch or attention takes a wide tile with
- * its costliest findings, the others a one-line tile. With fold, the tiles keep to the height they are given, giving up detail in
- * order of importance (plan) until they fit, and measuring again after they are drawn; what folds is named in the last tile.
+ * its costliest findings, the others a one-line tile. With fold, the tiles keep to the height they are given: the page places them
+ * as the browser will (choose) and gives up detail in order of importance until they fit, then checks what it drew; what folds is
+ * named in the last tile.
  */
 export function ProductTiles({
   groups,
@@ -178,36 +209,34 @@ export function ProductTiles({
   const ordered = byNeed(groups)
   const box = useRef<HTMLDivElement>(null)
   const grid = useRef<HTMLUListElement>(null)
-  const [steps, setSteps] = useState(0)
-  const max = stepsOf(ordered)
+  const all = { steps: 0, good: ordered.length }
+  const [choice, setChoice] = useState<Choice>(all)
   const key = ordered.map((g) => `${g.id}:${g.health?.level ?? ""}`).join(",")
 
-  // From the box's size, the fewest steps whose plan fits.
   useLayoutEffect(() => {
     if (!fold || !box.current || !grid.current) return
     const b = box.current
     const g = grid.current
-    const measure = () => {
-      const c = capacity(g, b)
-      let s = 0
-      while (s < max && cost(plan(ordered, s), c.wide) > c.cells) s++
-      setSteps(s)
+    const measure = () => setChoice(choose(ordered, gridOf(g, b)))
+    // Drawn and still cut off (a font or a rounding the placement did not foresee): one good fewer, or one more step.
+    const check = () => {
+      if (g.scrollHeight > b.clientHeight + 1)
+        setChoice((c) => (c.good > 0 ? { ...c, good: c.good - 1 } : { ...c, steps: c.steps + 1 }))
     }
     measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(b)
-    return () => ro.disconnect()
+    const sized = new ResizeObserver(measure)
+    const drawn = new ResizeObserver(check)
+    sized.observe(b)
+    drawn.observe(g)
+    return () => {
+      sized.disconnect()
+      drawn.disconnect()
+    }
     // ordered is recomputed each render; key names what it holds.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fold, key, max])
+  }, [fold, key])
 
-  // The estimate counts cells; dense packing can leave a hole. Drawn and still too tall: one more step.
-  useLayoutEffect(() => {
-    if (!fold || !box.current || !grid.current) return
-    if (grid.current.scrollHeight > box.current.clientHeight + 1 && steps < max) setSteps(steps + 1)
-  }, [fold, steps, max])
-
-  const { tiles, folded } = fold ? plan(ordered, steps) : plan(ordered, 0)
+  const { tiles, folded } = fold ? plan(ordered, choice.steps, choice.good) : plan(ordered, 0, ordered.length)
   return (
     <section
       aria-labelledby={heading ? "products" : undefined}

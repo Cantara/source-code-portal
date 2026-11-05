@@ -59,8 +59,10 @@ fits from 1024 to 1920 pixels wide.
   the last change, the release and the 12-week sparkline of the work that counts; its one or two costliest findings as text). A good
   product takes a narrow tile of one line (name, last change, sparkline). When the tiles do not fit, they give up detail in order of
   importance: the good ones fold from the end into one tile, then the mildest at watch lose their wide tile, then they fold too
-  ("3 more to watch, 7 good"), then those at attention lose theirs; a product at attention never folds. The page estimates the cells
-  from the box and measures again after drawing, giving up one more step while anything is cut off.
+  ("3 more to watch, 7 good"), then those at attention lose theirs; a product at attention never folds. The page places the tiles as the
+  browser will (`fits`: the dense grid's placement, each tile at the first free place from the top left, a wide tile two columns and
+  two rows), takes the fewest steps that let the products needing a look fit, then shows as many good ones as fit beside them (so a
+  column a wide tile cannot use is filled), and checks what it drew, folding one more while anything is cut off.
 - **Latest commits**, the right column at full height: the author's avatar (initials) at the left while the column is at least
   17 rem wide, then the repository with the committer's alias and the time on the first line and the subject alone on the second,
   with the AI and automation marks of the commit lists; as many as fit. A new commit slides in at the top (no motion with
