@@ -24,6 +24,8 @@ export const keys = {
   page: (page: string) => ["page", page] as const,
   me: () => ["me"] as const,
   assistant: () => ["assistant"] as const,
+  search: (q: string, kind: string, page: number) => ["search", q, kind, page] as const,
+  suggest: (q: string) => ["search", "suggest", q] as const,
 }
 
 export const meQuery = (api: Api) =>

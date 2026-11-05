@@ -31,6 +31,11 @@ export const ld = {
     url: `${base}/`,
     name: "Source Code Portal",
     description: "Repositories, documentation and commits of the organisation.",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${base}/search?q={search_term_string}` },
+      "query-input": "required name=search_term_string",
+    },
   }),
 
   breadcrumbs: (base: string, trail: Crumb[]): Thing => ({

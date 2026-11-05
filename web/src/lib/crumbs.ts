@@ -15,6 +15,7 @@ type Parent = Schemas["GroupRef"] | null | undefined
 /** The trails of the pages: the dashboard, then each page above, the page itself last. The dashboard has none. */
 export const crumbs = {
   commits: (): Crumb[] => [dashboard, { name: "Commits", path: "/commits" }],
+  search: (): Crumb[] => [dashboard, { name: "Search", path: "/search" }],
   group: (id: string, name: string): Crumb[] => [dashboard, { name, path: groupPath(id) }],
   groupCommits: (id: string, name: string): Crumb[] => [
     ...crumbs.group(id, name),

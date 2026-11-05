@@ -29,6 +29,16 @@ export function MonitorIcon({ className }: { className?: string }) {
   )
 }
 
+/** SearchIcon is a magnifying glass. */
+export function SearchIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </Icon>
+  )
+}
+
 /** MoonIcon stands for dark. */
 export function MoonIcon({ className }: { className?: string }) {
   return (

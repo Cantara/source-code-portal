@@ -17,6 +17,8 @@ const pages = [
   ["/settings", "Settings"],
   ["/guide", "Read the portal in five minutes, run your own in thirty"],
   ["/admin", "Admin"],
+  ["/search", "Search"],
+  ["/search?q=whydah", "Search"],
 ] as const
 
 async function axe(page: Page) {

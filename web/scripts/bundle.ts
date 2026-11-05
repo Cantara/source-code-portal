@@ -1,5 +1,5 @@
 // Assembles web/bundle, the directory `scp serve` runs (web.dir): the standalone server of `next build` with its static files and
-// public/, and BUILD with the build id. Fails when the static files outgrow their budget (gzip): JavaScript 320 KB, CSS 25 KB, and no fonts.
+// public/, and BUILD with the build id. Fails when the static files outgrow their budget (gzip): JavaScript 330 KB, CSS 25 KB, and no fonts.
 import { cpSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { gzipSync } from "node:zlib"
@@ -21,7 +21,7 @@ const sum = (ext: string) => files.filter((f) => f.endsWith(ext)).reduce((n, f) 
 const js = sum(".js")
 const css = sum(".css")
 const failures: string[] = []
-if (js > 320 * kb) failures.push(`JavaScript ${js} B > 320 KB`)
+if (js > 330 * kb) failures.push(`JavaScript ${js} B > 330 KB`)
 if (css > 25 * kb) failures.push(`CSS ${css} B > 25 KB`)
 for (const f of files) if (/\.(woff2?|ttf|otf)$/.test(f)) failures.push(`font ${f}: the UI uses the system font stack`)
 console.log(`bundle: ${out}; JavaScript ${js} B, CSS ${css} B (gzip)`)

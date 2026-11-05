@@ -9,6 +9,7 @@ const titles: Record<string, string> = {
   network: "The portal could not be reached",
   unauthenticated: "Sign in first",
   forbidden: "Not allowed",
+  "bad-query": "The query cannot be searched",
 }
 
 /** problemTitle maps a problem code to its title. */

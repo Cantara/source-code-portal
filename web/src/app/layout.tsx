@@ -2,6 +2,7 @@ import { WebMCP } from "@/features/agents/agents"
 import type { Metadata, Viewport } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
+import { SearchBox } from "@/features/search/box"
 import { LiveIndicator, StatusBanners } from "@/features/status/banners"
 import { unwrap } from "@/lib/api/client"
 import { origin, privateViewer, renderedAt, serverApi } from "@/lib/api/server"
@@ -42,6 +43,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <head>
         {/* Sets the stored theme before the first paint. */}
         <script src="/theme-init.js" />
+        <link rel="search" type="application/opensearchdescription+xml" href="/opensearch.xml" title="Source Code Portal" />
       </head>
       <body className="cosmos">
         <Providers now={renderedAt()}>
@@ -67,6 +69,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <MainNav ask={!!assistant?.enabled && assistant.allowed} />
               <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
                 <LiveIndicator />
+                <SearchBox />
                 <PortalNav />
                 <ViewerMenu me={me} />
               </div>
