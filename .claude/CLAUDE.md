@@ -6,13 +6,13 @@ Guidance for Claude Code in this repository. The coding instructions are importe
 
 This repository (`git@github.com:Cantara/source-code-portal.git`, branch `main`, Go module `github.com/cantara/source-code-portal`, public)
 is Source Code Portal (SCP) in Go with a server-rendered Next.js web UI. The first release is `v2.0.0`, which the owner's team tags;
-**S1 (sign-in and admin)**, **A1 (assistant)**, **M13 (search engines)** and **H1 (hardened private instance)** are built; **L1 (landing page of signals)**, **L2 (layouts and design mode)**, **L3 (AI-assisted commits)**, **L4 (the work that counts and Settings)** and **G1 (the guide page and the operators' plugin)** are built; **R1 to R4 (published packages, `design/packages.md`: Maven with Gradle, npm, PyPI, Cargo, Go, Swift, CocoaPods, NuGet, RubyGems, Packagist; private registries with credentials)** are built; **W1 to W3 (agents: one tool catalogue for the assistant, MCP and WebMCP, `design/agents.md`)** are built; **E1 to E4 (embedding in other sites, `design/embed.md`)** are dequeued until the owner returns to them; **search** is next. Coding instructions for the repository itself are in
+**S1 (sign-in and admin)**, **A1 (assistant)**, **M13 (search engines)** and **H1 (hardened private instance)** are built; **L1 (landing page of signals)**, **L2 (layouts and design mode)**, **L3 (AI-assisted commits)**, **L4 (the work that counts and Settings)** and **G1 (the guide page and the operators' plugin)** are built; **R1 to R4 (published packages, `design/packages.md`: Maven with Gradle, npm, PyPI, Cargo, Go, Swift, CocoaPods, NuGet, RubyGems, Packagist; private registries with credentials)** are built; **W1 to W3 (agents: one tool catalogue for the assistant, MCP and WebMCP, `design/agents.md`)** are built; **E1 to E4 (embedding in other sites, `design/embed.md`)** are dequeued until the owner returns to them; **Q1 to Q3 (search over what the portal holds, `design/search.md`)** are next. Coding instructions for the repository itself are in
 the root `AGENTS.md` (imported above).
 
 - **`.claude/work/plan.md` is the binding plan**: what SCP is, architecture and rules, stack, the work in progress. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: one note per area, as built (GitHub, sync/snapshot/store, catalog, content, manifests, access, cluster,
-  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13), `hardening.md` (H1), `layout.md` (L1 to L4), `guide.md` (G1), `packages.md` (R1 to R4), `agents.md` (W1 to W3) and `embed.md` (E1 to E4, dequeued). Binding below `plan.md`.
+  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13), `hardening.md` (H1), `layout.md` (L1 to L4), `guide.md` (G1), `packages.md` (R1 to R4), `agents.md` (W1 to W3), `search.md` (Q1 to Q3, next) and `embed.md` (E1 to E4, dequeued). Binding below `plan.md`.
 - `.claude/work/decisions.md`: the decisions in force.
 - `.claude/skills/guide-page/`: the skill that keeps `/guide` current: the demo catalogue, the screenshots (Playwright MCP,
   `capture.js`, `publish.mjs`) and the design rules.
@@ -97,8 +97,8 @@ Test idioms: engine tests run in `testing/synctest` bubbles with a real store in
 
 ## Next
 
-Search: a local index of the portal's data and, when a reader chooses it, GitHub code search (its design note comes first). E1 to E4
-(`design/embed.md`) are dequeued: never start or propose them until the owner returns to them. The owner's cosmetic changes come first when given, and
+Q1 to Q3 (`design/search.md`) in order: an in-memory index of what the portal holds, no source code search and no external
+store (owner). E1 to E4 (`design/embed.md`) are dequeued: never start or propose them until the owner returns to them. The owner's cosmetic changes come first when given, and
 a release only on the owner's go. New work starts with its design note and a row in `plan.md` section 4.
 Local web commands: `npx -y pnpm@12.11.2 -C web <script>` when the global pnpm is older; `make e2e` needs
 `pnpm -C web exec playwright install chromium`; `rm -rf web/.next` after a `next dev` run before `pnpm build` (stale dev route types);
