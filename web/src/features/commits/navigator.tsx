@@ -91,11 +91,10 @@ function Navigator({
   const options = historyQuery(api, qc, owner, name, st.filter, st.size, r)
   const { data, error, isPlaceholderData, refetch } = useQuery(options)
   const version = useSnapshotVersion()
-  // The rows follow a deferred copy: React renders a page of up to 200 rows in slices that yield to input, not in one long task.
-  // What acts on a row (the keys, a move across a page's edge) waits until the rows have caught up (settled).
-  const live = useMemo(() => data?.commits ?? [], [data])
-  const commits = useDeferredValue(live)
-  const settled = commits === live
+  const commits = useMemo(() => data?.commits ?? [], [data])
+  // The rows are drawn from a deferred copy of the page, so React renders up to 200 of them in slices that yield to input instead
+  // of one long task; the keys and the selection act on the page itself, so no key is lost while the rows catch up.
+  const drawn = useDeferredValue(data)
   const index = useMemo(() => new Map(commits.map((c, i) => [c.sha, i])), [commits])
   const children = useMemo(() => {
     const m = new Map<string, string[]>()
@@ -171,7 +170,7 @@ function Navigator({
     if (!to) list.current?.scrollIntoView({ block: "start" })
   }
   useEffect(() => {
-    if (!edge.current || isPlaceholderData || !settled || commits.length === 0) return
+    if (!edge.current || isPlaceholderData || commits.length === 0) return
     const i = edge.current === "first" ? 0 : commits.length - 1
     edge.current = undefined
     select(i)
@@ -184,7 +183,7 @@ function Navigator({
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const n = commits.length
-    if (n === 0 || !data || !settled) return
+    if (n === 0 || !data) return
     const i = moving.current ?? selected ?? -1
     const down = e.key === "ArrowDown" || e.key === "j"
     const up = e.key === "ArrowUp" || e.key === "k"
@@ -204,6 +203,7 @@ function Navigator({
   if (error && !data) return <ProblemAlert error={error} />
   if (!data) return <p className="text-muted-foreground">Loading commits…</p>
   const current = selected === undefined ? undefined : commits[selected]
+  const drawnPage = drawn ?? data
   const currentRow = current?.graph
   const lane = currentRow ? { lane: Math.min(currentRow.lane, maxLanes - 1), color: currentRow.color } : undefined
   const missing = sha !== undefined && r.at !== undefined && !isPlaceholderData && data.at === null
@@ -275,16 +275,16 @@ function Navigator({
               onKeyDown={onKeyDown}
               className={`scroll-mt-4 rounded-md border border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${isPlaceholderData ? "opacity-60" : ""}`}
             >
-              {commits.map((c, i) => (
+              {drawnPage.commits.map((c, i) => (
                 <Row
                   key={c.sha}
                   commit={c}
-                  pos={(data.page.number - 1) * data.page.size + i + 1}
-                  size={data.page.total}
-                  lanes={data.lanes}
+                  pos={(drawnPage.page.number - 1) * drawnPage.page.size + i + 1}
+                  size={drawnPage.page.total}
+                  lanes={drawnPage.lanes}
                   lane={lane}
-                  selected={i === selected}
-                  onSelect={() => select(i, true)}
+                  selected={c.sha === current?.sha}
+                  onSelect={() => selectSha(c.sha)}
                 />
               ))}
             </div>
