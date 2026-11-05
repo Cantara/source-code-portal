@@ -56,7 +56,7 @@ fits from 1024 to 1920 pixels wide.
   repository, a screen reader hears each product's counts). The legend counts the levels on the title line. On Cantara's 134
   repositories in 13 products it is 106 px high where the labelled map took 240; 1,000 repositories take about 15 rows.
 - **Products as tiles**: a product at watch or attention takes a wide tile of three lines (name, level and the members at attention;
-  the last change, the release and the 12-week sparkline of the work that counts; its one or two costliest findings as text). A good
+  the last change, the release and the 12-week sparkline of the work that counts; its findings as the dashboard draws them: the kind's icon on its severity's tile and the repository, without the reason, which is the icon's hint and the screen reader's text; two lines of them, the most costly first). A good
   product takes a narrow tile of one line (name, last change, sparkline). When the tiles do not fit, they give up detail in order of
   importance: the good ones fold from the end into one tile, then the mildest at watch lose their wide tile, then they fold too
   ("3 more to watch, 7 good"), then those at attention lose theirs; a product at attention never folds. The page places the tiles as the
@@ -71,8 +71,7 @@ fits from 1024 to 1920 pixels wide.
   moved with the arrow keys, from 20% to 60% of the screen in steps of 5% (written grid classes: the CSP allows no style), a double
   tap back to 30%. The width is the reader's, in the cookie `scp-present-column`, so the server draws it. The left column is a
   container, and as it narrows its elements keep what matters most (container queries): the strip drops the people and the share
-  with AI first (below 48 rem), then the products (36 rem) and the repositories (28 rem); a wide tile keeps its costliest finding only
-  (36 rem); the good products fold sooner. The products at attention and at watch, their wide tiles and the data's age never go.
+  with AI first (below 48 rem), then the products (36 rem) and the repositories (28 rem); the good products fold sooner. The products at attention and at watch, their wide tiles and the data's age never go.
 - **Text**: 15 px for what is read (tiles, commits, the strip), numbers at 20 px; only the section labels and the fleet map's product
   names are smaller. Dark theme unless the reader chose (`theme-init.js` and `lib/theme.ts` treat the system choice as dark on
   `/present`); the theme's tokens only.

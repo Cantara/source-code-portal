@@ -7,14 +7,16 @@ import { cn } from "@/lib/cn"
 import { ago, count, plural } from "@/lib/format"
 import { groupPath } from "@/lib/paths"
 import { levels } from "@/entities/health/health"
+import { FindingIcon, findingKinds, severities, severity } from "@/entities/health/kinds"
+import { Hint } from "@/shared/hint"
 import { Sparkline } from "@/shared/sparkline"
 import { qualifier, type Work } from "@/lib/preferences"
 import { counted, noun, series, weekly } from "./work"
 
 type Group = Schemas["DashboardGroup"]
 
-/** tileFindings is how many findings a wide tile names; the product's page has the rest. */
-const tileFindings = 2
+/** tileFindings is how many findings a wide tile offers (the dashboard carries 5); two lines show as many as fit. */
+const tileFindings = 5
 
 const rank = { attention: 0, watch: 1, good: 2 } as const
 
@@ -68,14 +70,33 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
         <Sparkline parts={series(a, w)} label={weekly(a, w)} className="h-6 w-20 shrink-0" />
       </div>
       {h && h.findings.length > 0 && (
-        <ul className="flex flex-col text-[0.9375rem]">
-          {h.findings.slice(0, tileFindings).map((f, i) => (
-            // A narrow container keeps the costliest finding only.
-            <li key={f.repo + f.code} className={cn("truncate", i > 0 && "@max-xl:hidden")}>
-              <span className="font-medium">{f.repo.split("/")[1]}</span>{" "}
-              <span className="text-muted-foreground">{f.message}</span>
-            </li>
-          ))}
+        // The signal and the repository, as the dashboard draws a finding: its kind's icon on its severity's tile, what it means in
+        // the icon's hint and for screen readers. Two lines at most, the most costly first; the rest are on the product's page.
+        <ul className="flex max-h-[3.25rem] flex-wrap gap-x-3 gap-y-1 overflow-hidden text-[0.9375rem]">
+          {h.findings.slice(0, tileFindings).map((f) => {
+            const kind = findingKinds[f.code] ?? findingKinds.quiet
+            const sev = severities[severity(f.penalty)]
+            return (
+              <li key={f.repo + f.code} className="flex min-w-0 max-w-full items-center gap-1.5">
+                <Hint
+                  heading={kind.label}
+                  swatch={sev.className}
+                  meta={sev.label}
+                  rows={[{ swatch: sev.className, label: "Costs", value: `${f.penalty} of 100 points` }]}
+                  children={`${f.message}. ${kind.about}`}
+                  render={(t) => (
+                    <span {...t} className="shrink-0">
+                      <FindingIcon code={f.code} penalty={f.penalty} />
+                    </span>
+                  )}
+                />
+                <span className="sr-only">
+                  {kind.label}, {sev.label.toLowerCase()}: {f.message}:{" "}
+                </span>
+                <span className="truncate font-medium">{f.repo.split("/")[1]}</span>
+              </li>
+            )
+          })}
         </ul>
       )}
     </li>
