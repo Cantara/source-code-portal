@@ -124,7 +124,7 @@ Makefile (each target is one command that CI also runs; `PNPM`, `VERSION`, `CONF
 | `clean` | removes `bin/`, `dist/`, `web/.next`, `web/bundle`, the Playwright reports |
 
 CI (`ci.yml` on pull request, push and merge queue; `permissions: {}` with `contents: read` per job; actions pinned by SHA;
-`GOTOOLCHAIN=local`): job `go` (with a Hazelcast service: mod verify and tidy, `go generate` drift, golangci-lint action, vet,
+`GOTOOLCHAIN=local`): job `go` (no service containers: mod verify and tidy, `go generate` drift, golangci-lint action, vet,
 `go test -race`, govulncheck); job `web` (Node from `web/.node-version`, pinned pnpm, frozen install, `gen` drift, lint, typecheck,
 format, `vitest`, build); job `e2e` (Playwright Chromium, bundle build, `pnpm -C web e2e`); job `image` (`make image`, then
 `docker run --read-only --cap-drop=ALL scp:dev version` and a Node check for `/web/server.js`); job `gate` (`if: always()`, `needs` all

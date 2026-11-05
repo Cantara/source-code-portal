@@ -90,7 +90,7 @@ func (m *Member) Event(ctx context.Context, ev sync.Event, repo snapshot.RepoKey
   catalogue admits them and drops them when it does not; `Records` lists listings first.
 - Member over `clustertest`: one leader at a time, failover on close and on a lost connection, joining loads the map, reconnect reloads,
   seeding writes missing keys and deletes stale ones, coalescing queue, de-duplication, events reach every engine.
-- `Hazelcast` against a real server when `TEST_HAZELCAST` is set (CI runs `hazelcast/hazelcast:5.7` as a service on loopback).
+- `Hazelcast` against a real server when `TEST_HAZELCAST` is set (locally only; CI runs no service containers).
 - End to end (`cmd/scp/cluster_test.go`, over `clustertest`, and over the real server when it is set): two instances on one fake GitHub
   make each GitHub call once, a webhook to the follower updates both, its redelivery to the leader is a duplicate, response bodies and
   ETags are equal on both, and when the leader stops the other takes over and keeps the data fresh.
