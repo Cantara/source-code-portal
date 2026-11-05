@@ -61,6 +61,8 @@ func privatePortalAt(t *testing.T, extra string) (fetch, string) {
 	gh.SetFile(hidden, "go.mod", "module example.com/lib/q7\n\ngo 1.27\n")
 	gh.SetPulls(hidden, githubtest.Pull{Number: 1, Title: "zq hidden pull to the q7 vault", Author: "ann", Created: at, Updated: at,
 		Base: "main", Head: "zq-hidden-work", HeadSHA: strings.Repeat("c", 40)})
+	gh.SetIssues(hidden, githubtest.Issue{Number: 2, Title: "zq hidden issue in the q7 vault", Author: "ann", Created: at, Updated: at,
+		Labels: []string{"zq-hidden"}})
 
 	dir := t.TempDir()
 	token := filepath.Join(dir, "token")
@@ -197,7 +199,7 @@ func TestNoLeak(t *testing.T) {
 			}
 		}
 	}
-	for _, p := range []string{"/api/v1/pages/dashboard", "/api/v1/pages/present", "/api/v1/repos/acme/zq-hidden", "/api/v1/pulls", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests",
+	for _, p := range []string{"/api/v1/pages/dashboard", "/api/v1/pages/present", "/api/v1/repos/acme/zq-hidden", "/api/v1/pulls", "/api/v1/issues", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests",
 		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search/suggest?q=zq-hid"} {
 		if _, b, _ := get(p, staff...); !strings.Contains(b, "zq-hidden") {
 			t.Errorf("staff %s does not show the private repository:\n%s", p, b)

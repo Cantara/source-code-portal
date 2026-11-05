@@ -32,6 +32,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/issues"
 	"github.com/cantara/source-code-portal/internal/layout"
 	"github.com/cantara/source-code-portal/internal/llms"
 	"github.com/cantara/source-code-portal/internal/manifests"
@@ -84,6 +85,7 @@ type (
 	catalogAPI   = catalog.API
 	commitsAPI   = commits.API
 	pullsAPI     = pulls.API
+	issuesAPI    = issues.API
 	docsAPI      = docs.API
 	manifestsAPI = manifests.API
 	layoutAPI    = layout.API
@@ -93,6 +95,7 @@ type (
 		catalogAPI
 		commitsAPI
 		pullsAPI
+		issuesAPI
 		docsAPI
 		manifestsAPI
 		layoutAPI
@@ -145,16 +148,18 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	packageTrees := map[string]packages.GitHub{}
 	releases := map[string]badges.Releases{}
 	openPulls := map[string]pulls.Fetcher{}
+	openIssues := map[string]issues.Fetcher{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
 		src := gh.Source(s.ID)
 		sources[s.ID], trees[s.ID], manifestTrees[s.ID], packageTrees[s.ID] = src, src, src, src
 		fetchers[s.ID], releases[s.ID], openPulls[s.ID] = commits.FromGitHub(src), badges.FromGitHub(src), pulls.FromGitHub(src)
+		openIssues[s.ID] = issues.FromGitHub(src)
 		ids = append(ids, s.ID)
 	}
 
 	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log,
-		commits.Feeds(), pulls.Feeds(), manifests.Graph(), search.Indexer(searchOptions()))}
+		commits.Feeds(), pulls.Feeds(), issues.Feeds(), manifests.Graph(), search.Indexer(searchOptions()))}
 	if s.store, err = store.Open(ctx, cfg.Store.Path, log); err != nil {
 		return nil, err
 	}
@@ -188,7 +193,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
 		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec(),
-		pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec()} {
+		pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec(), issues.New(openIssues, issues.Options{Repo: catalogued}).Spec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
@@ -302,7 +307,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
-	features := api{catalogAPI, commitsAPI, pulls.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
+	features := api{catalogAPI, commitsAPI, pulls.API{Current: view}, issues.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{}}
 	if s.web != nil {

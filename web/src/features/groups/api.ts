@@ -10,3 +10,6 @@ export const groupCommitsQuery = (api: Api, group: string) =>
 
 /** groupPulls is what the group's pull requests panel reads: the five whose turn it is first. */
 export const groupPulls = (group: string) => ({ group, size: 5 })
+
+/** groupIssues is what the group's issues panel reads: the five that wait longest. */
+export const groupIssues = (group: string) => ({ group, size: 5 })

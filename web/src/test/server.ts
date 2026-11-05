@@ -61,6 +61,37 @@ export function pull(n: number, over: Partial<S["PullRequest"]> = {}): S["PullRe
   }
 }
 
+/** issueCounts are open issues by state, all of kind other. */
+export function issueCounts(
+  over: Partial<S["IssueCounts"]["states"]> = {},
+  oldestTriage: string | null = null,
+): S["IssueCounts"] {
+  const states = { triage: 0, unassigned: 0, assigned: 0, ...over }
+  const open = Object.values(states).reduce((a, b) => a + b, 0)
+  return { open, people: open, automation: 0, states, kinds: { bug: 0, feature: 0, question: 0, other: open }, oldestTriage }
+}
+
+/** issue is an open issue of acme/core. */
+export function issue(n: number, over: Partial<S["Issue"]> = {}): S["Issue"] {
+  return {
+    repo: "acme/core",
+    number: n,
+    title: `Problem ${n}`,
+    url: `https://github.com/acme/core/issues/${n}`,
+    author: "ada",
+    bot: false,
+    createdAt: at,
+    updatedAt: at,
+    labels: [],
+    assignees: [],
+    assigned: 0,
+    comments: 0,
+    state: "triage",
+    kind: "other",
+    ...over,
+  }
+}
+
 /** rules are the server's rules (GET /rules), held equal to internal/health by cmd/scp's TestRulesFixture. */
 export const rules = serverRules as S["Rules"]
 
@@ -232,6 +263,17 @@ export const defaults = [
     response(200).json({
       pulls: [pull(1), pull(2, { state: "ready", waitsFor: "maintainer" })],
       counts: pullCounts({ review: 1, ready: 1 }, at),
+      page: { number: 1, size: 50, total: 2, pages: 1 },
+      freshness: fresh,
+    }),
+  ),
+  http.get("/issues", ({ response }) =>
+    response(200).json({
+      issues: [
+        issue(1),
+        issue(2, { state: "assigned", assignees: ["bo"], assigned: 1, kind: "bug", labels: [{ name: "bug", color: "d73a4a" }] }),
+      ],
+      counts: issueCounts({ triage: 1, assigned: 1 }, at),
       page: { number: 1, size: 50, total: 2, pages: 1 },
       freshness: fresh,
     }),

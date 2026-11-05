@@ -211,6 +211,16 @@ export function FlagIcon({ className }: { className?: string }) {
   )
 }
 
+/** IssueIcon stands for an issue: a ring around a point. */
+export function IssueIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="1.5" />
+    </Icon>
+  )
+}
+
 /** PullIcon stands for a pull request: a branch that asks to merge back into another. */
 export function PullIcon({ className }: { className?: string }) {
   return (

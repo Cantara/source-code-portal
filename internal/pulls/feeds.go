@@ -213,10 +213,10 @@ func PullOf(r Ref) oapi.PullRequest {
 	p := r.Pull
 	out := oapi.PullRequest{Repo: string(r.Repo), Number: p.Number, Title: p.Title, Url: p.URL, Author: p.Author, Bot: p.Bot,
 		Draft: p.Draft, Fork: p.Fork, CreatedAt: p.Created, UpdatedAt: p.Updated, Base: p.Base, Head: p.Head,
-		Labels: make([]oapi.PullLabel, 0, len(p.Labels)), Requested: p.Requested, State: oapi.PullState(r.State),
+		Labels: make([]oapi.IssueLabel, 0, len(p.Labels)), Requested: p.Requested, State: oapi.PullState(r.State),
 		WaitsFor: oapi.PullRequestWaitsFor(r.State.Waits()), Checks: checksOf(p.Checks)}
 	for _, l := range p.Labels {
-		out.Labels = append(out.Labels, oapi.PullLabel{Name: l.Name, Color: l.Color})
+		out.Labels = append(out.Labels, oapi.IssueLabel{Name: l.Name, Color: l.Color})
 	}
 	if p.Stats != nil {
 		files := p.Stats.Files

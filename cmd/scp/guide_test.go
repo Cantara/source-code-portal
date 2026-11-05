@@ -139,6 +139,16 @@ func TestServeForGuide(t *testing.T) {
 		Additions: 210, Deletions: 45, Files: 9}))
 	gh.SetPulls(sdk, pull(7, "chore(deps): update golang.org/x/oauth2", "renovate[bot]", 50, 20, githubtest.Pull{Checks: "SUCCESS",
 		Additions: 4, Deletions: 4, Files: 2}))
+	// Open issues (design/issues.md): one nobody has looked at, a bug nobody took, a feature someone has, automation's dashboard.
+	issue := func(n int, title, who string, opened, updated float64, i githubtest.Issue) githubtest.Issue {
+		i.Number, i.Title, i.Author, i.Created, i.Updated, i.Bot = n, title, who, days(opened), days(updated), strings.HasSuffix(who, "[bot]")
+		return i
+	}
+	gh.SetIssues(api, issue(51, "Declined cards show no reason", "dana", 9, 8, githubtest.Issue{}),
+		issue(48, "Refunds fail for amounts over 10,000", "chen", 20, 2, githubtest.Issue{Labels: []string{"bug"}, Comments: 4}),
+		issue(45, "Pay by bank transfer", "ada", 60, 5, githubtest.Issue{Type: "Feature", Assignees: []string{"bo"}, Milestone: "Q1"}),
+		issue(3, "Dependency Dashboard", "renovate[bot]", 200, 1, githubtest.Issue{}))
+	gh.SetIssues(identity, issue(22, "Sessions end after a deploy", "bo", 3, 1, githubtest.Issue{Labels: []string{"bug"}, Assignees: []string{"chen"}}))
 	repo("ci-templates", "Shared CI workflows", "", []work{{"ada", 1, 110, 100}, {"github-actions[bot]", 24, 30, 0}}, true,
 		gogh.Repository{})
 	repo("handbook", "How the team works", "", []work{{"dana", 4, 45, 6}}, true, gogh.Repository{})

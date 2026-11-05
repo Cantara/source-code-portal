@@ -15,6 +15,7 @@ export const settingsRoute: Route<Record<string, never>> = {
         commits: pageSize(cookies[sizeCookie("commits")], 0),
         history: pageSize(cookies[sizeCookie("history")], 0),
         pulls: pageSize(cookies[sizeCookie("pulls")], 0),
+        issues: pageSize(cookies[sizeCookie("issues")], 0),
       }}
     />
   ),

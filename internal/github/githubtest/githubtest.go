@@ -50,7 +50,8 @@ type Server struct {
 	files    map[int64]map[string]string   // by repository id: path -> content
 	releases map[int64]*gh.RepositoryRelease
 	pulls    map[int64][]Pull // by repository id
-	treeMax  int              // entries of a recursive tree before it is truncated, as GitHub's 100,000; 0: never
+	issues   map[int64][]Issue
+	treeMax  int // entries of a recursive tree before it is truncated, as GitHub's 100,000; 0: never
 	nextID   int64
 	used     map[string]int // credential -> requests charged this window
 	reset    time.Time
@@ -75,7 +76,7 @@ func New(t testing.TB) *Server {
 	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
 		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
-		releases: map[int64]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, nextID: 1000, used: map[string]int{}}
+		releases: map[int64]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
 	mux.HandleFunc("POST /app/installations/{id}/access_tokens", s.accessToken)
@@ -93,6 +94,7 @@ func New(t testing.TB) *Server {
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/blobs/{sha}", s.getBlob)
 	mux.HandleFunc("GET /repos/{owner}/{name}/releases/latest", s.latestRelease)
 	mux.HandleFunc("GET /repos/{owner}/{name}/pulls", s.listPulls)
+	mux.HandleFunc("GET /repos/{owner}/{name}/issues", s.listIssues)
 	mux.HandleFunc("POST /graphql", s.graphQL)
 	s.Server = httptest.NewServer(s.wrap(mux))
 	t.Cleanup(s.Close)
@@ -1029,6 +1031,92 @@ func (s *Server) listPulls(w http.ResponseWriter, req *http.Request) {
 			"base":   map[string]any{"ref": p.Base, "repo": map[string]string{"full_name": full}},
 			"head":   map[string]any{"ref": p.Head, "sha": p.HeadSHA, "repo": map[string]string{"full_name": head}},
 			"labels": labels, "requested_reviewers": reviewers, "requested_teams": []any{}, "body": "not read"})
+	}
+	s.respond(w, req, cred, out)
+}
+
+// Issue is an open issue of the fake.
+type Issue struct {
+	Number           int
+	Title, Author    string
+	Bot              bool // the author's account type is Bot
+	Created, Updated time.Time
+	Labels           []string
+	Assignees        []string
+	Comments         int
+	Milestone, Type  string
+}
+
+// SetIssues replaces the open issues of the repository id.
+func (s *Server) SetIssues(id int64, is ...Issue) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.issues[id] = slices.Clone(is)
+}
+
+// listIssues is GitHub's listing of open issues: the issues and the open pull requests together, the most recently updated first,
+// in pages; a pull request carries `pull_request`.
+func (s *Server) listIssues(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
+	var items []map[string]any
+	var updated []time.Time
+	if r != nil {
+		full := r.GetOwner().GetLogin() + "/" + r.GetName()
+		user := func(login string, bot bool) map[string]string {
+			if bot {
+				return map[string]string{"login": login, "type": "Bot"}
+			}
+			return map[string]string{"login": login, "type": "User"}
+		}
+		for _, p := range s.pulls[r.GetID()] {
+			items = append(items, map[string]any{"number": p.Number, "title": p.Title, "user": user(p.Author, p.Bot),
+				"html_url": fmt.Sprintf("https://github.com/%s/pull/%d", full, p.Number), "labels": []any{}, "assignees": []any{},
+				"created_at": p.Created.UTC().Format(time.RFC3339), "updated_at": p.Updated.UTC().Format(time.RFC3339),
+				"pull_request": map[string]string{"url": "https://api.github.com/repos/" + full + "/pulls/" + strconv.Itoa(p.Number)}})
+			updated = append(updated, p.Updated)
+		}
+		for _, is := range s.issues[r.GetID()] {
+			labels := []map[string]string{}
+			for _, l := range is.Labels {
+				labels = append(labels, map[string]string{"name": l, "color": "d73a4a"})
+			}
+			assignees := []map[string]string{}
+			for _, a := range is.Assignees {
+				assignees = append(assignees, map[string]string{"login": a})
+			}
+			it := map[string]any{"number": is.Number, "title": is.Title, "user": user(is.Author, is.Bot),
+				"html_url": fmt.Sprintf("https://github.com/%s/issues/%d", full, is.Number), "labels": labels, "assignees": assignees,
+				"comments": is.Comments, "created_at": is.Created.UTC().Format(time.RFC3339), "updated_at": is.Updated.UTC().Format(time.RFC3339),
+				"body": "not read", "milestone": nil, "type": nil}
+			if is.Milestone != "" {
+				it["milestone"] = map[string]any{"title": is.Milestone, "number": 1}
+			}
+			if is.Type != "" {
+				it["type"] = map[string]any{"name": is.Type, "id": 1}
+			}
+			items = append(items, it)
+			updated = append(updated, is.Updated)
+		}
+	}
+	s.mu.Unlock()
+	if r == nil {
+		writeError(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	order := make([]int, len(items))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return updated[b].Compare(updated[a]) })
+	lo, hi := s.page(w, req, len(items))
+	out := make([]map[string]any, 0, hi-lo)
+	for _, i := range order[lo:hi] {
+		out = append(out, items[i])
 	}
 	s.respond(w, req, cred, out)
 }

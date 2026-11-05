@@ -115,6 +115,13 @@ func TestServeForPlaywright(t *testing.T) {
 			Base: "main", Head: "renovate/slf4j", HeadSHA: fmt.Sprintf("%040x", 0xc1), Checks: "SUCCESS", Additions: 1, Deletions: 1, Files: 1})
 	gh.SetPulls(sso, githubtest.Pull{Number: 3, Title: "Keep the session on refresh", Author: "bo", Created: start, Updated: start.Add(30 * time.Hour),
 		Base: "main", Head: "refresh", HeadSHA: fmt.Sprintf("%040x", 0xe1), Approved: true, Checks: "FAILURE", Additions: 30, Deletions: 12, Files: 2})
+	gh.SetIssues(core,
+		githubtest.Issue{Number: 21, Title: "Login loops after a password reset", Author: "cy", Created: start.Add(2 * time.Hour), Updated: start.Add(3 * time.Hour)},
+		githubtest.Issue{Number: 20, Title: "Tokens expire an hour early", Author: "ann", Created: start, Updated: start.Add(26 * time.Hour),
+			Labels: []string{"bug"}, Comments: 3},
+		githubtest.Issue{Number: 19, Title: "Support passkeys", Author: "bo", Created: start, Updated: start.Add(10 * time.Hour),
+			Type: "Feature", Assignees: []string{"ann"}, Milestone: "2.0"},
+		githubtest.Issue{Number: 2, Title: "Dependency Dashboard", Author: "renovate[bot]", Bot: true, Created: start, Updated: start.Add(29 * time.Hour)})
 
 	bundle, err := filepath.Abs("../../web/bundle")
 	if err != nil {

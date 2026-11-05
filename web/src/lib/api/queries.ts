@@ -34,6 +34,18 @@ export const keys = {
       f.size ?? 50,
       f.page ?? 1,
     ] as const,
+  issues: (f: IssueFilter) =>
+    [
+      "issues",
+      f.group ?? "",
+      f.repo ?? "",
+      f.state ?? "",
+      f.kind ?? "",
+      f.by ?? "",
+      f.sort ?? "waiting",
+      f.size ?? 50,
+      f.page ?? 1,
+    ] as const,
   page: (page: string) => ["page", page] as const,
   me: () => ["me"] as const,
   assistant: () => ["assistant"] as const,
@@ -88,10 +100,47 @@ export interface PullFilter {
   state?: Schemas["PullState"]
   by?: "people" | "automation"
   drafts?: boolean
-  sort?: "waiting" | "newest" | "updated"
+  sort?: Schemas["QueueSort"]
   page?: number
   size?: number
 }
+
+/** IssueFilter is a list of open issues (GET /issues): its scope, state, kind, whose and order, and the page. */
+export interface IssueFilter {
+  group?: string
+  repo?: string
+  state?: Schemas["IssueState"]
+  kind?: Schemas["IssueKind"]
+  by?: "people" | "automation"
+  sort?: Schemas["QueueSort"]
+  page?: number
+  size?: number
+}
+
+/** issuesQuery is one page of open issues, what waits first; /issues and the repository's panel read it. */
+export const issuesQuery = (api: Api, f: IssueFilter) =>
+  queryOptions({
+    queryKey: keys.issues(f),
+    queryFn: ({ signal }) =>
+      unwrap(
+        api.GET("/issues", {
+          params: {
+            query: {
+              group: f.group,
+              repo: f.repo,
+              state: f.state,
+              kind: f.kind,
+              by: f.by,
+              sort: f.sort,
+              page: f.page,
+              limit: f.size,
+            },
+          },
+          signal,
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  })
 
 /** pullsQuery is one page of open pull requests, whose turn first; the pages, the dashboard, groups and repositories read it. */
 export const pullsQuery = (api: Api, f: PullFilter) =>

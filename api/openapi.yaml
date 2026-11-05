@@ -63,7 +63,7 @@ paths:
         - { name: state, in: query, required: false, schema: { $ref: "#/components/schemas/PullState" } }
         - { name: by, in: query, required: false, description: "people or automation; absent: both", schema: { type: string, enum: [people, automation] } }
         - { name: drafts, in: query, required: false, schema: { type: boolean, default: false } }
-        - { name: sort, in: query, required: false, schema: { type: string, enum: [waiting, newest, updated], default: waiting } }
+        - { name: sort, in: query, required: false, schema: { $ref: "#/components/schemas/QueueSort" } }
         - { $ref: "#/components/parameters/PageNumber" }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
       responses:
@@ -73,6 +73,35 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/PullPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /issues:
+    get:
+      operationId: listIssues
+      summary: Open issues across repositories, where each stands, one page at a time
+      description: |
+        Every open issue of the viewer's view (design/issues.md), pull requests left out. Each has one state: assigned, triage (no
+        label, milestone or issue type) or unassigned, and a kind. The default order, `waiting`, puts people's issues before
+        automation's, those needing triage first, then unassigned, then assigned, then the longest idle. `group` and `repo`
+        intersect; `by` keeps people's or automation's. `counts` cover the scope and `by` whatever the state and kind filters, so they
+        can be offered as filters.
+      parameters:
+        - { name: group, in: query, required: false, schema: { type: string } }
+        - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
+        - { name: state, in: query, required: false, schema: { $ref: "#/components/schemas/IssueState" } }
+        - { name: kind, in: query, required: false, schema: { $ref: "#/components/schemas/IssueKind" } }
+        - { name: by, in: query, required: false, description: "people or automation; absent: both", schema: { type: string, enum: [people, automation] } }
+        - { name: sort, in: query, required: false, schema: { $ref: "#/components/schemas/QueueSort" } }
+        - { $ref: "#/components/parameters/PageNumber" }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: One page of issues
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IssuePage" }
         "304": { $ref: "#/components/responses/NotModified" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -814,6 +843,73 @@ components:
         at: { type: [string, "null"], description: "The commit `at` named, when it is on this page" }
         page: { $ref: "#/components/schemas/Page" }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    QueueSort:
+      type: string
+      enum: [waiting, newest, updated]
+      default: waiting
+      description: "The order of a list of open pull requests or issues: whose turn first (waiting), newest first, updated last first"
+    IssueState:
+      type: string
+      enum: [triage, unassigned, assigned]
+      description: >-
+        Where an issue stands, the first that holds: assigned (someone has it); triage (no label, milestone or issue type: a
+        maintainer has not looked at it); unassigned (triaged, nobody took it)
+    IssueKind:
+      type: string
+      enum: [bug, feature, question, other]
+      description: "GitHub's issue type when set, else read from the labels"
+    Issue:
+      type: object
+      required: [repo, number, title, url, author, bot, createdAt, updatedAt, labels, assignees, assigned, comments, state, kind]
+      properties:
+        repo: { type: string, description: Repository address }
+        number: { type: integer }
+        title: { type: string }
+        url: { type: string, description: The issue on GitHub }
+        author: { type: string, description: GitHub login }
+        bot: { type: boolean, description: "Opened by automation (Renovate's dependency dashboard, a [bot] or bot-like login)" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: The last activity }
+        labels: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/IssueLabel" } }
+        assignees: { type: array, maxItems: 3, items: { type: string }, description: The first assignees' logins }
+        assigned: { type: integer, description: Every assignee counted }
+        comments: { type: integer }
+        milestone: { type: string, description: "The milestone's title; absent when none" }
+        type: { type: string, description: "GitHub's issue type; absent when none" }
+        state: { $ref: "#/components/schemas/IssueState" }
+        kind: { $ref: "#/components/schemas/IssueKind" }
+    IssueCounts:
+      type: object
+      description: Open issues by state, kind and by whom
+      required: [open, people, automation, states, kinds, oldestTriage]
+      properties:
+        open: { type: integer }
+        people: { type: integer }
+        automation: { type: integer }
+        states:
+          type: object
+          required: [triage, unassigned, assigned]
+          properties:
+            triage: { type: integer }
+            unassigned: { type: integer }
+            assigned: { type: integer }
+        kinds:
+          type: object
+          required: [bug, feature, question, other]
+          properties:
+            bug: { type: integer }
+            feature: { type: integer }
+            question: { type: integer }
+            other: { type: integer }
+        oldestTriage: { type: [string, "null"], format: date-time, description: "When the person's issue waiting longest for triage was opened; null when none waits" }
+    IssuePage:
+      type: object
+      required: [issues, counts, page, freshness]
+      properties:
+        issues: { type: array, items: { $ref: "#/components/schemas/Issue" } }
+        counts: { $ref: "#/components/schemas/IssueCounts" }
+        page: { $ref: "#/components/schemas/Page" }
+        freshness: { $ref: "#/components/schemas/Freshness" }
     PullState:
       type: string
       enum: [draft, conflicts, failing, changes, review, checks, ready, unknown]
@@ -837,13 +933,13 @@ components:
         updatedAt: { type: string, format: date-time, description: The last activity }
         base: { type: string, description: The branch it merges into }
         head: { type: string, description: Its branch }
-        labels: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/PullLabel" } }
+        labels: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/IssueLabel" } }
         requested: { type: integer, description: Reviewers and teams asked for a review }
         state: { $ref: "#/components/schemas/PullState" }
         waitsFor: { type: string, enum: [author, reviewers, ci, maintainer, unknown] }
         checks: { type: string, enum: [passing, failing, running, none], description: "The head commit's checks" }
         stats: { $ref: "#/components/schemas/CommitStats" }
-    PullLabel:
+    IssueLabel:
       type: object
       required: [name, color]
       properties:

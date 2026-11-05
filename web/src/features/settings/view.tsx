@@ -8,7 +8,7 @@ import { forget, kinds, productsViews, remember, viewCookie, workCookie, type Pr
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import { PageHeader } from "@/shared/page-header"
 
-type Settings = { work: Work; view: ProductsView; commits: number; history: number; pulls: number }
+type Settings = { work: Work; view: ProductsView; commits: number; history: number; pulls: number; issues: number }
 
 /** Choices is one setting as a group of radio buttons, each with what it means. */
 function Choices<T extends string>({
@@ -159,10 +159,11 @@ export function SettingsView({ initial }: { initial: Settings }) {
             }}
           />
         </Section>
-        <Section title="Page sizes" about="How many commits or pull requests a page of a list shows.">
+        <Section title="Page sizes" about="How many commits, pull requests or issues a page of a list shows.">
           {size("commits", "Commit timelines")}
           {size("history", "Repository histories")}
           {size("pulls", "Pull requests")}
+          {size("issues", "Issues")}
         </Section>
         <Section title="Theme" about="As the system is set, dark or light.">
           <Choices

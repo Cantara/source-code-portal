@@ -7,6 +7,7 @@ import { AllCommitsView } from "@/features/commits/view"
 import { DashboardView } from "@/features/dashboard/view"
 import { DocView } from "@/features/docs/view"
 import { GroupView } from "@/features/groups/view"
+import { IssuesView } from "@/features/issues/view"
 import { PullsView } from "@/features/pulls/view"
 import { repoRoute } from "@/features/repos/route"
 import { RepoView } from "@/features/repos/view"
@@ -42,6 +43,20 @@ describe("pages", () => {
     expect(chips.queryByRole("link", { name: /Failing checks/ })).toBeNull()
     expect(screen.getByRole("link", { name: "Change 1" })).toHaveAttribute("href", "https://github.com/acme/core/pull/1")
     expect(screen.getByRole("form", { name: "Filter pull requests" })).toHaveAttribute("action", "/pulls")
+  })
+
+  it("lists the open issues what waits first, the states as filters", async () => {
+    show(<IssuesView defaultSize={50} />, "/issues")
+    expect(await screen.findByRole("heading", { level: 1, name: "Issues" })).toBeInTheDocument()
+    const chips = within(await screen.findByRole("navigation", { name: "By where they stand" }))
+    expect(chips.getByRole("link", { name: /All open 2/ })).toHaveAttribute("aria-current", "page")
+    expect(chips.getByRole("link", { name: /Needs triage 1/ })).toHaveAttribute("href", "/issues?state=triage")
+    expect(chips.queryByRole("link", { name: /Unassigned/ })).toBeNull()
+    const list = within(screen.getByRole("list", { name: "Issues" }))
+    expect(list.getByRole("link", { name: "Problem 1" })).toHaveAttribute("href", "https://github.com/acme/core/issues/1")
+    expect(list.getByText("for bo")).toBeInTheDocument()
+    expect(list.getByText("Bug")).toBeInTheDocument()
+    expect(screen.getByRole("form", { name: "Filter issues" })).toHaveAttribute("action", "/issues")
   })
 
   it("renders the dashboard with the fleet, the products' signals and the team's latest commits", async () => {
@@ -152,11 +167,14 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: /Repository/ }))
     await user.type(screen.getByRole("searchbox", { name: "Filter by name" }), "agent")
     expect(names()).toEqual(["Agent"])
-    // The row's facts link where they are kept: the licence at SPDX, the issues and the release on GitHub.
+    // The row's facts link where they are kept: the licence at SPDX, the issues on /issues, the release on GitHub.
     const [, row] = within(table).getAllByRole("row")
     if (!row) throw new Error("no row")
     expect(within(row).getByRole("link", { name: "APL2" })).toHaveAttribute("href", "https://spdx.org/licenses/Apache-2.0.html")
-    expect(within(row).getByRole("link", { name: /open issues$/ })).toHaveAttribute("href", expect.stringMatching(/\/issues$/))
+    expect(within(row).getByRole("link", { name: /open issues$/ })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/issues\?repo=/),
+    )
   })
 
   it("renders a repository with its descriptor, badges, README and documents", async () => {

@@ -18,16 +18,17 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { ActivityLight } from "@/entities/repo/activity-light"
 import { lastChange } from "@/entities/repo/health"
-import { issuesUrl, licence } from "@/entities/repo/licence"
+import { licence } from "@/entities/repo/licence"
 import { ecosystemLabel, newestPackage } from "@/entities/repo/packages"
 import { levels } from "@/entities/health/health"
 import { Hint } from "@/shared/hint"
 import { cn } from "@/lib/cn"
 import { FindingList, HealthScore } from "@/entities/health/findings"
 import { VisibilityBadge } from "@/entities/repo/visibility-badge"
-import { groupQuery, pullsQuery } from "@/lib/api/queries"
+import { groupQuery, issuesQuery, pullsQuery } from "@/lib/api/queries"
 import { PullList } from "@/entities/pull/pull"
-import { groupCommitsQuery, groupPulls } from "./api"
+import { IssueList } from "@/entities/issue/issue"
+import { groupCommitsQuery, groupIssues, groupPulls } from "./api"
 import { validateGroupSearch, type GroupSearch, type SortKey } from "./search"
 
 /** Column is one column of the repository table: its header, how it sorts and how a row draws it. */
@@ -246,10 +247,10 @@ export function GroupView({ group }: { group: string }) {
                             )}
                           </td>
                           <td className="px-3 py-2 text-center font-mono tabular-nums">
-                            <a href={issuesUrl(r.htmlUrl)} rel="noreferrer nofollow" className="hover:underline">
+                            <Link href={`/issues?repo=${encodeURIComponent(r.address)}`} className="hover:underline">
                               {count(r.openIssues)}
                               <span className="sr-only"> open issues</span>
-                            </a>
+                            </Link>
                           </td>
                           <td className="px-3 py-2 text-center font-mono tabular-nums">
                             {r.openPulls === null ? (
@@ -282,6 +283,9 @@ export function GroupView({ group }: { group: string }) {
             {data.health && <GroupHealth health={data.health} />}
             <PanelBoundary>
               <GroupPulls group={group} />
+            </PanelBoundary>
+            <PanelBoundary>
+              <GroupIssues group={group} />
             </PanelBoundary>
             <PanelBoundary>
               <LatestCommits group={group} />
@@ -327,6 +331,25 @@ function GroupPulls({ group }: { group: string }) {
       {data && <PullList pulls={data.pulls} compact />}
       <Link href={`/pulls?group=${encodeURIComponent(group)}`} className="mt-2 inline-block text-sm hover:underline">
         {data ? `All ${count(data.counts.open)} open` : "All open pull requests"}
+      </Link>
+    </Card>
+  )
+}
+
+/** GroupIssues is the group's open issues that wait longest, and the way to all of them on /issues; none: nothing. */
+function GroupIssues({ group }: { group: string }) {
+  const { data, error } = useQuery(issuesQuery(api, groupIssues(group)))
+  if (data && data.counts.open === 0) return null
+  return (
+    <Card aria-labelledby="issues">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <CardTitle id="issues">Issues</CardTitle>
+        {data && <span className="text-xs text-muted-foreground">{count(data.counts.states.triage)} needing triage</span>}
+      </div>
+      {error && !data && <ProblemAlert error={error} />}
+      {data && <IssueList issues={data.issues} compact />}
+      <Link href={`/issues?group=${encodeURIComponent(group)}`} className="mt-2 inline-block text-sm hover:underline">
+        {data ? `All ${count(data.counts.open)} open` : "All open issues"}
       </Link>
     </Card>
   )

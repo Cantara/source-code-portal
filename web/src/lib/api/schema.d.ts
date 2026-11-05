@@ -67,6 +67,30 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/issues": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Open issues across repositories, where each stands, one page at a time
+     * @description Every open issue of the viewer's view (design/issues.md), pull requests left out. Each has one state: assigned, triage (no
+     *     label, milestone or issue type) or unassigned, and a kind. The default order, `waiting`, puts people's issues before
+     *     automation's, those needing triage first, then unassigned, then assigned, then the longest idle. `group` and `repo`
+     *     intersect; `by` keeps people's or automation's. `counts` cover the scope and `by` whatever the state and kind filters, so they
+     *     can be offered as filters.
+     */
+    get: operations["listIssues"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/groups": {
     parameters: {
       query?: never
@@ -823,6 +847,81 @@ export interface components {
       freshness: components["schemas"]["Freshness"]
     }
     /**
+     * @description The order of a list of open pull requests or issues: whose turn first (waiting), newest first, updated last first
+     * @default waiting
+     * @enum {string}
+     */
+    QueueSort: "waiting" | "newest" | "updated"
+    /**
+     * @description Where an issue stands, the first that holds: assigned (someone has it); triage (no label, milestone or issue type: a maintainer has not looked at it); unassigned (triaged, nobody took it)
+     * @enum {string}
+     */
+    IssueState: "triage" | "unassigned" | "assigned"
+    /**
+     * @description GitHub's issue type when set, else read from the labels
+     * @enum {string}
+     */
+    IssueKind: "bug" | "feature" | "question" | "other"
+    Issue: {
+      /** @description Repository address */
+      repo: string
+      number: number
+      title: string
+      /** @description The issue on GitHub */
+      url: string
+      /** @description GitHub login */
+      author: string
+      /** @description Opened by automation (Renovate's dependency dashboard, a [bot] or bot-like login) */
+      bot: boolean
+      /** Format: date-time */
+      createdAt: string
+      /**
+       * Format: date-time
+       * @description The last activity
+       */
+      updatedAt: string
+      labels: components["schemas"]["IssueLabel"][]
+      /** @description The first assignees' logins */
+      assignees: string[]
+      /** @description Every assignee counted */
+      assigned: number
+      comments: number
+      /** @description The milestone's title; absent when none */
+      milestone?: string
+      /** @description GitHub's issue type; absent when none */
+      type?: string
+      state: components["schemas"]["IssueState"]
+      kind: components["schemas"]["IssueKind"]
+    }
+    /** @description Open issues by state, kind and by whom */
+    IssueCounts: {
+      open: number
+      people: number
+      automation: number
+      states: {
+        triage: number
+        unassigned: number
+        assigned: number
+      }
+      kinds: {
+        bug: number
+        feature: number
+        question: number
+        other: number
+      }
+      /**
+       * Format: date-time
+       * @description When the person's issue waiting longest for triage was opened; null when none waits
+       */
+      oldestTriage: string | null
+    }
+    IssuePage: {
+      issues: components["schemas"]["Issue"][]
+      counts: components["schemas"]["IssueCounts"]
+      page: components["schemas"]["Page"]
+      freshness: components["schemas"]["Freshness"]
+    }
+    /**
      * @description Whose turn a pull request is, the first that holds: draft, conflicts (it does not merge), failing (its checks) and changes (a reviewer asked) wait for the author; review (a review is required, or none approved yet) for reviewers; checks (running) for CI; ready (approved or no review required, checks passing) for a maintainer to merge; unknown until GitHub's state is read
      * @enum {string}
      */
@@ -852,7 +951,7 @@ export interface components {
       base: string
       /** @description Its branch */
       head: string
-      labels: components["schemas"]["PullLabel"][]
+      labels: components["schemas"]["IssueLabel"][]
       /** @description Reviewers and teams asked for a review */
       requested: number
       state: components["schemas"]["PullState"]
@@ -865,7 +964,7 @@ export interface components {
       checks: "passing" | "failing" | "running" | "none"
       stats?: components["schemas"]["CommitStats"]
     }
-    PullLabel: {
+    IssueLabel: {
       name: string
       /** @description Six hex digits; empty when unknown */
       color: string
@@ -1416,7 +1515,7 @@ export interface operations {
         /** @description people or automation; absent: both */
         by?: "people" | "automation"
         drafts?: boolean
-        sort?: "waiting" | "newest" | "updated"
+        sort?: components["schemas"]["QueueSort"]
         /** @description The page, from 1 */
         page?: components["parameters"]["PageNumber"]
         limit?: number
@@ -1435,6 +1534,42 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["PullPage"]
+        }
+      }
+      304: components["responses"]["NotModified"]
+      400: components["responses"]["BadRequest"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  listIssues: {
+    parameters: {
+      query?: {
+        group?: string
+        /** @description owner/name */
+        repo?: string
+        state?: components["schemas"]["IssueState"]
+        kind?: components["schemas"]["IssueKind"]
+        /** @description people or automation; absent: both */
+        by?: "people" | "automation"
+        sort?: components["schemas"]["QueueSort"]
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description One page of issues */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["IssuePage"]
         }
       }
       304: components["responses"]["NotModified"]

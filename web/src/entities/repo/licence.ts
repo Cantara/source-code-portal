@@ -32,8 +32,3 @@ export function licence(spdx: string): Licence | undefined {
   const base = spdx.replace(/-(only|or-later)$/, "")
   return { short: short[base] ?? spdx, spdx, url: `https://spdx.org/licenses/${encodeURIComponent(spdx)}.html` }
 }
-
-/** issuesUrl is where a repository's open issues are on GitHub. */
-export function issuesUrl(htmlUrl: string): string {
-  return `${htmlUrl.replace(/\/$/, "")}/issues`
-}

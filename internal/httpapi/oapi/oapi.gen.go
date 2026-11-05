@@ -359,6 +359,51 @@ func (e HistoryCommitKind) Valid() bool {
 	}
 }
 
+// Defines values for IssueKind.
+const (
+	Bug      IssueKind = "bug"
+	Feature  IssueKind = "feature"
+	Other    IssueKind = "other"
+	Question IssueKind = "question"
+)
+
+// Valid indicates whether the value is a known member of the IssueKind enum.
+func (e IssueKind) Valid() bool {
+	switch e {
+	case Bug:
+		return true
+	case Feature:
+		return true
+	case Other:
+		return true
+	case Question:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for IssueState.
+const (
+	Assigned   IssueState = "assigned"
+	Triage     IssueState = "triage"
+	Unassigned IssueState = "unassigned"
+)
+
+// Valid indicates whether the value is a known member of the IssueState enum.
+func (e IssueState) Valid() bool {
+	switch e {
+	case Assigned:
+		return true
+	case Triage:
+		return true
+	case Unassigned:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LabelKind.
 const (
 	Branch LabelKind = "branch"
@@ -587,6 +632,27 @@ func (e PullState) Valid() bool {
 	}
 }
 
+// Defines values for QueueSort.
+const (
+	Newest  QueueSort = "newest"
+	Updated QueueSort = "updated"
+	Waiting QueueSort = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the QueueSort enum.
+func (e QueueSort) Valid() bool {
+	switch e {
+	case Newest:
+		return true
+	case Updated:
+		return true
+	case Waiting:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SearchKind.
 const (
 	SearchKindCommit  SearchKind = "commit"
@@ -716,6 +782,24 @@ func (e WorkKind) Valid() bool {
 	}
 }
 
+// Defines values for ListIssuesParamsBy.
+const (
+	ListIssuesParamsByAutomation ListIssuesParamsBy = "automation"
+	ListIssuesParamsByPeople     ListIssuesParamsBy = "people"
+)
+
+// Valid indicates whether the value is a known member of the ListIssuesParamsBy enum.
+func (e ListIssuesParamsBy) Valid() bool {
+	switch e {
+	case ListIssuesParamsByAutomation:
+		return true
+	case ListIssuesParamsByPeople:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetPageParamsPage.
 const (
 	GetPageParamsPageDashboard GetPageParamsPage = "dashboard"
@@ -746,27 +830,6 @@ func (e ListPullsParamsBy) Valid() bool {
 	case ListPullsParamsByAutomation:
 		return true
 	case ListPullsParamsByPeople:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for ListPullsParamsSort.
-const (
-	Newest  ListPullsParamsSort = "newest"
-	Updated ListPullsParamsSort = "updated"
-	Waiting ListPullsParamsSort = "waiting"
-)
-
-// Valid indicates whether the value is a known member of the ListPullsParamsSort enum.
-func (e ListPullsParamsSort) Valid() bool {
-	switch e {
-	case Newest:
-		return true
-	case Updated:
-		return true
-	case Waiting:
 		return true
 	default:
 		return false
@@ -1319,6 +1382,90 @@ type HistoryPage struct {
 	Page  Page `json:"page"`
 }
 
+// Issue defines model for Issue.
+type Issue struct {
+	// Assigned Every assignee counted
+	Assigned int `json:"assigned"`
+
+	// Assignees The first assignees' logins
+	Assignees []string `json:"assignees"`
+
+	// Author GitHub login
+	Author string `json:"author"`
+
+	// Bot Opened by automation (Renovate's dependency dashboard, a [bot] or bot-like login)
+	Bot       bool      `json:"bot"`
+	Comments  int       `json:"comments"`
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Kind GitHub's issue type when set, else read from the labels
+	Kind   IssueKind    `json:"kind"`
+	Labels []IssueLabel `json:"labels"`
+
+	// Milestone The milestone's title; absent when none
+	Milestone *string `json:"milestone,omitempty"`
+	Number    int     `json:"number"`
+
+	// Repo Repository address
+	Repo string `json:"repo"`
+
+	// State Where an issue stands, the first that holds: assigned (someone has it); triage (no label, milestone or issue type: a maintainer has not looked at it); unassigned (triaged, nobody took it)
+	State IssueState `json:"state"`
+	Title string     `json:"title"`
+
+	// Type GitHub's issue type; absent when none
+	Type *string `json:"type,omitempty"`
+
+	// UpdatedAt The last activity
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	// Url The issue on GitHub
+	Url string `json:"url"`
+}
+
+// IssueCounts Open issues by state, kind and by whom
+type IssueCounts struct {
+	Automation int `json:"automation"`
+	Kinds      struct {
+		Bug      int `json:"bug"`
+		Feature  int `json:"feature"`
+		Other    int `json:"other"`
+		Question int `json:"question"`
+	} `json:"kinds"`
+
+	// OldestTriage When the person's issue waiting longest for triage was opened; null when none waits
+	OldestTriage *time.Time `json:"oldestTriage"`
+	Open         int        `json:"open"`
+	People       int        `json:"people"`
+	States       struct {
+		Assigned   int `json:"assigned"`
+		Triage     int `json:"triage"`
+		Unassigned int `json:"unassigned"`
+	} `json:"states"`
+}
+
+// IssueKind GitHub's issue type when set, else read from the labels
+type IssueKind string
+
+// IssueLabel defines model for IssueLabel.
+type IssueLabel struct {
+	// Color Six hex digits; empty when unknown
+	Color string `json:"color"`
+	Name  string `json:"name"`
+}
+
+// IssuePage defines model for IssuePage.
+type IssuePage struct {
+	// Counts Open issues by state, kind and by whom
+	Counts    IssueCounts `json:"counts"`
+	Freshness Freshness   `json:"freshness"`
+	Issues    []Issue     `json:"issues"`
+	Page      Page        `json:"page"`
+}
+
+// IssueState Where an issue stands, the first that holds: assigned (someone has it); triage (no label, milestone or issue type: a maintainer has not looked at it); unassigned (triaged, nobody took it)
+type IssueState string
+
 // Label defines model for Label.
 type Label struct {
 	// Default The default branch
@@ -1551,13 +1698,6 @@ type PullCounts struct {
 	} `json:"states"`
 }
 
-// PullLabel defines model for PullLabel.
-type PullLabel struct {
-	// Color Six hex digits; empty when unknown
-	Color string `json:"color"`
-	Name  string `json:"name"`
-}
-
 // PullPage defines model for PullPage.
 type PullPage struct {
 	// Counts Open pull requests by state and by whom
@@ -1587,9 +1727,9 @@ type PullRequest struct {
 	Fork bool `json:"fork"`
 
 	// Head Its branch
-	Head   string      `json:"head"`
-	Labels []PullLabel `json:"labels"`
-	Number int         `json:"number"`
+	Head   string       `json:"head"`
+	Labels []IssueLabel `json:"labels"`
+	Number int          `json:"number"`
 
 	// Repo Repository address
 	Repo string `json:"repo"`
@@ -1626,6 +1766,9 @@ type QRCode struct {
 	Path string `json:"path"`
 	Size int    `json:"size"`
 }
+
+// QueueSort The order of a list of open pull requests or issues: whose turn first (waiting), newest first, updated last first
+type QueueSort string
 
 // RecentRepo defines model for RecentRepo.
 type RecentRepo struct {
@@ -1938,6 +2081,27 @@ type GetDashboardParams struct {
 	Work *Work `form:"work,omitempty" json:"work,omitempty"`
 }
 
+// ListIssuesParams defines parameters for ListIssues.
+type ListIssuesParams struct {
+	Group *string `form:"group,omitempty" json:"group,omitempty"`
+
+	// Repo owner/name
+	Repo  *string     `form:"repo,omitempty" json:"repo,omitempty"`
+	State *IssueState `form:"state,omitempty" json:"state,omitempty"`
+	Kind  *IssueKind  `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// By people or automation; absent: both
+	By   *ListIssuesParamsBy `form:"by,omitempty" json:"by,omitempty"`
+	Sort *QueueSort          `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListIssuesParamsBy defines parameters for ListIssues.
+type ListIssuesParamsBy string
+
 // GetPageParamsPage defines parameters for GetPage.
 type GetPageParamsPage string
 
@@ -1950,9 +2114,9 @@ type ListPullsParams struct {
 	State *PullState `form:"state,omitempty" json:"state,omitempty"`
 
 	// By people or automation; absent: both
-	By     *ListPullsParamsBy   `form:"by,omitempty" json:"by,omitempty"`
-	Drafts *bool                `form:"drafts,omitempty" json:"drafts,omitempty"`
-	Sort   *ListPullsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	By     *ListPullsParamsBy `form:"by,omitempty" json:"by,omitempty"`
+	Drafts *bool              `form:"drafts,omitempty" json:"drafts,omitempty"`
+	Sort   *QueueSort         `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Page The page, from 1
 	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
@@ -1961,9 +2125,6 @@ type ListPullsParams struct {
 
 // ListPullsParamsBy defines parameters for ListPulls.
 type ListPullsParamsBy string
-
-// ListPullsParamsSort defines parameters for ListPulls.
-type ListPullsParamsSort string
 
 // ListReposParams defines parameters for ListRepos.
 type ListReposParams struct {
@@ -2026,6 +2187,9 @@ type ServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(w http.ResponseWriter, r *http.Request, group string)
+	// ListIssues Open issues across repositories, where each stands, one page at a time
+	// (GET /issues)
+	ListIssues(w http.ResponseWriter, r *http.Request, params ListIssuesParams)
 	// GetMe The viewer, its roles and how one signs in
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -2255,6 +2419,130 @@ func (siw *ServerInterfaceWrapper) GetGroup(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGroup(w, r, group)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListIssues operation middleware
+func (siw *ServerInterfaceWrapper) ListIssues(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListIssuesParams
+
+	// ------------- Optional query parameter "group" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group", r.URL.Query(), &params.Group, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "repo" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "repo", r.URL.Query(), &params.Repo, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "repo"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repo", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "by", r.URL.Query(), &params.By, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "by", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListIssues(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3009,6 +3297,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/dashboard", wrapper.GetDashboard)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commits", wrapper.ListCommits)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pulls", wrapper.ListPulls)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues", wrapper.ListIssues)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group}", wrapper.GetGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos", wrapper.ListRepos)
@@ -3256,6 +3545,77 @@ type GetGroup404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetGroup404ApplicationProblemPlusJSONResponse) VisitGetGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIssuesRequestObject struct {
+	Params ListIssuesParams
+}
+
+type ListIssuesResponseObject interface {
+	VisitListIssuesResponse(w http.ResponseWriter) error
+}
+
+type ListIssues200ResponseHeaders struct {
+	ETag *string
+}
+
+type ListIssues200JSONResponse struct {
+	Body    IssuePage
+	Headers ListIssues200ResponseHeaders
+}
+
+func (response ListIssues200JSONResponse) VisitListIssuesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIssues304Response = NotModifiedResponse
+
+func (response ListIssues304Response) VisitListIssuesResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type ListIssues400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListIssues400ApplicationProblemPlusJSONResponse) VisitListIssuesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIssues404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListIssues404ApplicationProblemPlusJSONResponse) VisitListIssuesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4031,6 +4391,9 @@ type StrictServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(ctx context.Context, request GetGroupRequestObject) (GetGroupResponseObject, error)
+	// ListIssues Open issues across repositories, where each stands, one page at a time
+	// (GET /issues)
+	ListIssues(ctx context.Context, request ListIssuesRequestObject) (ListIssuesResponseObject, error)
 	// GetMe The viewer, its roles and how one signs in
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -4233,6 +4596,32 @@ func (sh *strictHandler) GetGroup(w http.ResponseWriter, r *http.Request, group 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetGroupResponseObject); ok {
 		if err := validResponse.VisitGetGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListIssues operation middleware
+func (sh *strictHandler) ListIssues(w http.ResponseWriter, r *http.Request, params ListIssuesParams) {
+	var request ListIssuesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListIssues(ctx, request.(ListIssuesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListIssues")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListIssuesResponseObject); ok {
+		if err := validResponse.VisitListIssuesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
