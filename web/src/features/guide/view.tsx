@@ -73,7 +73,7 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
   {
     at: "shared",
     title: "What they share",
-    body: "Said once: the licence and the language at least 80% of the repositories share, and how many are released: a GitHub release or a published package (section 12).",
+    body: "Said once: the licence and the language at least 80% of the repositories share, and how many are released: a GitHub release or a published package (section 13).",
   },
 ]
 
@@ -140,6 +140,7 @@ const parts = [
       { id: "health", title: "Health and findings" },
       { id: "work", title: "The work that counts" },
       { id: "lists", title: "Tables and commits" },
+      { id: "search", title: "Search" },
       { id: "yours", title: "Make it yours" },
     ],
   },
@@ -639,8 +640,45 @@ export function GuideView({ version }: { version: string }) {
         </Section>
 
         <Section
-          id="yours"
+          id="search"
           n={8}
+          title="Search"
+          lede="One box finds what the portal holds: repositories, groups, the sections of their documents, their dependencies and packages, and their commits."
+        >
+          <div className="grid items-start gap-8 lg:grid-cols-2">
+            <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
+              <p>
+                Type in the header&apos;s box, or press <kbd className="font-mono text-xs">/</kbd> or{" "}
+                <kbd className="font-mono text-xs">Ctrl K</kbd> (<kbd className="font-mono text-xs">⌘ K</kbd> on a Mac) to get
+                there. As you type it suggests repositories, groups and documents by their names; Enter searches everything.
+              </p>
+              <p>
+                The results come by kind, each with its count, the best first, the words that matched marked. A document opens at
+                the section that matched. The last word also finds the words it starts, and a word nothing holds is searched with
+                one letter changed, which the page says.
+              </p>
+              <p>
+                It searches what the portal reads, not source code. You find only what you may see: private repositories only when
+                you are signed in to a group that sees them. Agents search the same way (section 14).
+              </p>
+            </div>
+            <Terms
+              items={[
+                ["session timeout", "Every word, anywhere."],
+                ["\u201csession timeout\u201d", "The words next to each other."],
+                ["oauth -legacy, oauth OR saml", "Without a word; either word."],
+                ["in:doc, in:commit", "One kind: repo, group, doc, dep, package, commit."],
+                ["group:iam lang:java", "Within a product; a language, topic: or lifecycle:."],
+                ["dep:slf4j", "The repositories that depend on a package."],
+                ["author:ann kind:ai after:2026-10-01", "Commits by a person, of a kind of work, in a time."],
+              ]}
+            />
+          </div>
+        </Section>
+
+        <Section
+          id="yours"
+          n={9}
           title="Make it yours"
           lede="What you choose is kept in your browser, never on the server, and every page follows it."
         >
@@ -663,7 +701,7 @@ export function GuideView({ version }: { version: string }) {
         />
         <Section
           id="github"
-          n={9}
+          n={10}
           title="Connect GitHub"
           lede="The portal reads your repositories through a GitHub App of your organisation: read-only, with its own rate limit, and told by GitHub the moment something changes."
         >
@@ -702,7 +740,7 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
                 Note the <em>App ID</em>, generate a private key and save the downloaded file as{" "}
                 <code className="font-mono text-xs">secrets/scp-app.pem</code>. Then <em>Install App</em> on the organisation, for
                 all repositories or the ones the portal shows. The App ID and these two files are all the portal needs from GitHub
-                (section 10).
+                (section 11).
               </p>
             </Step>
           </ol>
@@ -716,14 +754,14 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
 
         <Section
           id="run"
-          n={10}
+          n={11}
           title="Run your own portal"
           lede="One binary or one container and one YAML file, scp.yaml. Nothing to back up but the configuration and its secrets."
         >
           <ol className="flex flex-col gap-6">
             <Step n={1} title="Point it at GitHub">
               <p>
-                The App of section 9: its ID and the two secret files. Secrets are always files, never values in the
+                The App of section 10: its ID and the two secret files. Secrets are always files, never values in the
                 configuration; the container finds <code className="font-mono text-xs">secrets/</code> at{" "}
                 <code className="font-mono text-xs">/run/secrets</code>.
               </p>
@@ -732,7 +770,7 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
     - id: github
       orgs: [your-org]
       app: { id: 123456, private_key_file: /run/secrets/scp-app.pem }
-      include_private: true        # private repositories too, for the people of section 11
+      include_private: true        # private repositories too, for the people of section 12
 webhook:
   secret_file: /run/secrets/webhook-secret`}</Code>
               <p>
@@ -775,7 +813,7 @@ scp config groups -c scp.yaml --repos repos.json   # where each repository lands
 
         <Section
           id="access"
-          n={11}
+          n={12}
           title="Sign-in and private repositories"
           lede="Everyone sees the public repositories. People who sign in and belong to a group you name see the private ones too; nobody else ever does."
         >
@@ -869,7 +907,7 @@ auth:
 
         <Section
           id="packages"
-          n={12}
+          n={13}
           title="Packages and private registries"
           lede="A release is often a package, not a GitHub release. The portal reads what a repository publishes from its build files and asks the registry for the newest version."
         >
@@ -924,7 +962,7 @@ auth:
 
         <Section
           id="agents"
-          n={13}
+          n={14}
           title="Agents"
           lede="Your AI agents can ask the portal what you would: the same read-only tools its assistant uses, as the person who asks."
         >
@@ -950,7 +988,7 @@ auth:
 claude mcp add --transport http scp https://portal.example.org/mcp \
   --header "Authorization: Bearer $SCP_TOKEN"`}</Code>
           <p className="max-w-prose text-sm text-muted-foreground">
-            The tools only read: search the repositories, read a group, a README or a document, the recent commits, a
+            The tools only read: search what the portal holds, read a group, a README or a document, the recent commits, a
             repository&apos;s health and its packages. What they return is marked as text written in repositories, so an agent
             treats it as data, not instructions. No language model runs on the portal for this: the agent brings its own.
           </p>
@@ -958,7 +996,7 @@ claude mcp add --transport http scp https://portal.example.org/mcp \
 
         <Section
           id="more"
-          n={14}
+          n={15}
           title="Options and documents"
           lede="Add what you need when you need it; the documents cover every key."
         >

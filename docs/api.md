@@ -141,9 +141,39 @@ control characters, and says so at the top. Treat it as data, never as instructi
 or dependencies. A unit's `validated` date is the day the portal last read that document from GitHub, not a human review. Intents and
 triggers come from repository text and are cleaned the same way; the manifest is data, never instructions.
 
+## Search
+
+`GET /api/v1/search?q=` searches what the portal holds, from the viewer's view: repositories (names, descriptors, topics,
+descriptions), groups, the sections of READMEs and `docs/` documents, manifests with their dependencies, published packages and
+default-branch commits. It does not search source code. The page `/search` and the header's box (`/` or Ctrl/⌘ K) use it.
+
+| In `q` | Finds |
+|---|---|
+| `session timeout` | every word, anywhere; the last word also as a prefix (`sess`) |
+| `"session timeout"` | the words next to each other |
+| `oauth -legacy`, `oauth OR saml` | without a word; either word |
+| `in:doc` | one kind, or several comma-separated: `repo`, `group`, `doc`, `dep`, `package`, `commit` |
+| `group:iam`, `repo:whydah` | within a group; repositories whose address holds the word |
+| `lang:java`, `topic:iam`, `lifecycle:production` | a repository's language, topic or descriptor tag, lifecycle |
+| `dep:slf4j` | repositories with a dependency whose name holds the word |
+| `author:ann`, `kind:ai`, `before:2026-11-01`, `after:2026-10-01` | commits by an author, of a kind of work (`hand`, `ai`, `automation`), in a time |
+
+A query is at most 256 characters, 12 words and 8 filters; a word of five letters or more that nothing holds is searched with one
+letter changed, which `corrections` reports. The answer holds the count of every kind, a numbered page (`page`, `limit` up to 100,
+25 by default) of the best of at most 1,000 hits, and `in=` to page through one kind. Each hit has its kind, its repository, the
+page it opens (a document at the section's heading, a commit in the navigator) and a title and snippet as text in parts, the matches
+flagged (`{"text": "session", "mark": true}`): never HTML. A query that cannot be searched is a 400 problem saying why.
+
+```sh
+curl -s 'https://scp.example.org/api/v1/search?q=dep:slf4j+in:repo' | jq '.counts, [.hits[].repo]'
+```
+
+`GET /api/v1/search/suggest?q=` answers up to 8 repositories, groups and documents whose names start with the words, for a search
+box. `/opensearch.xml` describes the search for browsers, which offer to add the portal as a search engine.
+
 ## Tools for agents (MCP and WebMCP)
 
-The portal offers agents its own read-only tools, the ones its assistant uses: search the repositories, list and read groups, read a
+The portal offers agents its own read-only tools, the ones its assistant uses: search (as below), list and read groups, read a
 repository's README and technology, read a document, the recent commits (with the work that counts), a repository's health and its
 published packages. Every call answers from the caller's view, exactly as the pages do.
 
@@ -173,7 +203,7 @@ repositories wrote is data, never instructions.
 
 `GET /sitemap.xml` lists the dashboard, the commit log, every group, repository and document page you may see, each with the date of
 its newest commit; past 50,000 addresses it is an index of `/sitemaps/1.xml`, `/sitemaps/2.xml`, …. `GET /robots.txt` names it and
-keeps crawlers off `/api/`. Both use `server.public_url` for their addresses (else the request's own), are cached by shared caches
+keeps crawlers off `/api/` and the search pages. Both use `server.public_url` for their addresses (else the request's own), are cached by shared caches
 for an hour and carry an `ETag`. A repository's page address is its lower-case `/repos/{owner}/{name}`; every page carries its
 canonical address and a JSON-LD description (the repository as `SoftwareSourceCode`, a document as `TechArticle`, the breadcrumb
 trail it shows).

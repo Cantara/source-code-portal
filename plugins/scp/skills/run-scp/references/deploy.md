@@ -141,3 +141,15 @@ claude mcp add --transport http scp https://portal.example.org/mcp --header "Aut
 ```
 
 `/mcp` refuses an `Origin` other than `server.public_url`'s: set the public URL when the proxy serves another host name.
+
+## Search
+
+The search (`/search`, the header's box, `GET /api/v1/search?q=`) needs nothing configured: it is an index in memory of what the
+portal already reads, rebuilt as repositories change, never stored and never asked of GitHub. Check it after a deploy:
+
+```sh
+curl -s 'https://portal.example.org/api/v1/search?q=readme' | jq .counts    # hits by kind, from the public view
+curl -s http://127.0.0.1:9091/api/v1/status | jq .search                    # on the host: segments, terms, bytes, build time
+```
+
+`scp_search_requests_total` and `scp_search_duration_seconds` (by `op`: `search`, `suggest`) are on `/metrics`.

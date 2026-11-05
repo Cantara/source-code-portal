@@ -65,7 +65,7 @@ now, so the pictures read the same whenever they are taken. Never take pictures 
 - One h1 (the hero), then two parts (reading the portal, then running one), each of numbered sections (`01` ...) with an h2 and a
   one-sentence lede; the contents (chips on a phone, the sticky "On this page" beside the page) list every section by part.
 - Pictures at their own size, never enlarged: a figure fits its picture. The table is taken with the side panel folded.
-- Explain in the reader's words, short sentences, no key names before section 8. A rule is said once, where it is used.
+- Explain in the reader's words, short sentences, no configuration key names in the first part (for readers). A rule is said once, where it is used.
 - Every picture comes in both themes (`dark:hidden` / `hidden dark:block`), with a true alt text and a caption; its width and
   height come from `shots.json` so nothing shifts while it loads.
 - No inline styles anywhere (the CSP forbids them): positions are SVG attributes, colours are the theme's tokens (`primary`,

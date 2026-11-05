@@ -11,7 +11,8 @@ none of the operator duties below except the network layout.
   the public view unless its viewer is in `access.private_groups` or is an administrator. The decision is made once per request, by
   the server, from the viewer's identity.
 - **Every surface is the same.** Pages, the JSON API, badges, the image proxy, the Markdown answers, `/llms.txt`, `/llms-full.txt`,
-  `/knowledge.yaml`, the sitemap, the event stream, the assistant, the agents' tools (`/api/v1/tools`, `/mcp`, WebMCP) and the old
+  `/knowledge.yaml`, the sitemap, the event stream, the search (its hits, counts, corrections and suggestions: a view's index holds
+  only that view's repositories), the assistant, the agents' tools (`/api/v1/tools`, `/mcp`, WebMCP) and the old
   Java-portal addresses all read the viewer's view. A test
   (`cmd/scp/leak_test.go`) fetches every GET of the API contract and every other public route as the public, and fails if any answer
   carries a trace of a private repository; the assistant has its own (`cmd/scp/assistant_test.go`), and every tool is called as the public too (`TestNoLeakThroughTools`,

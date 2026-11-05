@@ -245,7 +245,7 @@ headers decide who the viewer is.
 
 The portal can answer questions about its catalogue in plain language on its *Ask* page (`/ask`): which repositories use a library,
 what a group holds, what changed lately, why a repository's health is low. A language model reads the catalogue through read-only
-tools (search the repositories, list and read groups, read a repository's README and technology, read a document, the recent commits,
+tools (search what the portal holds, list and read groups, read a repository's README and technology, read a document, the recent commits,
 a repository's health) and answers in Markdown with links into the portal. It sees exactly what the person asking may see: a private
 repository only for a viewer who sees private repositories.
 
@@ -545,6 +545,8 @@ Metrics:
 | `scp_cluster_leader` | | 1 on the instance that leads the cluster, 0 on the others (only with `cluster.addresses`) |
 | `scp_assistant_requests_total` | `outcome` | assistant questions: `answered`, `refused` (access, validation, busy), `budget`, `aborted` (the viewer left) or the provider's error (`auth`, `rate_limited`, `overloaded`, `bad_request`, `tools_unsupported`, `network`, `provider`) |
 | `scp_assistant_tokens_total` | `kind` | language model tokens the assistant used, `input` and `output` |
+| `scp_search_requests_total` | `op` | searches (`search`) and search-box suggestions (`suggest`) answered |
+| `scp_search_duration_seconds` | `op` | time a search took |
 | `scp_event_streams` | | open `/api/v1/events` streams (at most 1,000 per instance; beyond that browsers poll) |
 
 Useful alerts: `scp_github_rate_remaining_ratio < 0.1` for 15 minutes; `scp_items{freshness="error"}` above zero for an hour;

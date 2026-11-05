@@ -1,6 +1,6 @@
 # Search: one index of what the portal holds (Q1 to Q3)
 
-Status: Q1 and Q2 built, Q3 in progress (plan.md section 4). Binding order: ../plan.md > this note.
+Status: Q1 to Q3 built (plan.md section 4). Binding order: ../plan.md > this note.
 
 A reader looks for something the portal already knows: the repository that does OAuth, the document that explains the session
 timeout, who uses `slf4j-api`, the commit that rotated the keys. Today there is no search: the assistant's `search_repositories`
@@ -123,7 +123,7 @@ and repository text never becomes markup (as the assistant's answers, P-28).
 - `/opensearch.xml` and the dashboard's JSON-LD `WebSite` with a `SearchAction`, so a browser adds the portal as a search engine.
 - The Guide gets a section on searching (the query language, what is and is not searched); the API guide and the operator guide name
   it; the plugin follows `docs/`.
-- The header's box and the combobox count against the JavaScript budget (P-41); the new sum is recorded there when measured.
+- The header's box and the combobox count against the JavaScript budget (P-41): search brought the sum to 323.3 KB, and the budget to 330 KB.
 
 ## Done when
 
