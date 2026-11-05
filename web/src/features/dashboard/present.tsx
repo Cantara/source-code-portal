@@ -189,8 +189,11 @@ function Stream({
   useEffect(() => () => window.clearTimeout(idle.current), [])
   return (
     <section aria-labelledby="stream" className="panel flex min-h-0 flex-col overflow-hidden">
-      <div className="flex items-baseline justify-between gap-2 border-b border-border px-3 py-2">
-        <h2 id="stream" className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <h2
+          id="stream"
+          className="shrink-0 text-xs font-medium tracking-widest whitespace-nowrap text-muted-foreground uppercase"
+        >
           Latest commits
         </h2>
         {picker ?? <span className="text-xs text-muted-foreground">{by(work)}</span>}

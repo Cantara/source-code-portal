@@ -688,8 +688,10 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
             </Figure>
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
               <p>
-                The latest commits of the work that counts sit in a panel beside the products: fold it away with its button, or
-                drag its edge to make it wider. Commits made with AI carry a mark naming the assistant.
+                The latest commits sit in a panel beside the products: fold it away with its button, or drag its edge to make it
+                wider. Scroll to its end and older commits load. Its label says what it shows, the work that counts until you
+                choose: select it for a small dialog with the three kinds as checkboxes, each with its commits in the last {days}.
+                Commits made with AI carry a mark naming the assistant.
               </p>
               <p>
                 <strong className="text-foreground">Commits</strong> in the header holds every commit of every repository, to
@@ -763,9 +765,15 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                   looks calm by mistake.
                 </p>
                 <p>
+                  It knows the screen it is on: a tablet held upright or on its side, a monitor at a desk, where the commits take
+                  most of the width, or a screen on a wall. Each keeps its own width of the commits, which scroll on their own and
+                  go back to the newest after a minute untouched. A finding on a tile opens its repository, where its next step
+                  is.
+                </p>
+                <p>
                   It keeps the screen awake, is dark unless you chose otherwise, reloads itself for a new release and moves a
-                  pixel now and then so nothing burns in. A tap shows its controls for a few seconds; an administrator designs
-                  this page from there, as the dashboard.
+                  pixel now and then so nothing burns in. A tap shows its controls for a few seconds, with the screen&apos;s kind
+                  and size; an administrator designs this page from there, as the dashboard.
                 </p>
               </div>
               <Terms
@@ -776,7 +784,11 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                   ["Signed in", "Where the portal needs sign-in, sign in once on the tablet: the page keeps the session."],
                   [
                     "A wider column",
-                    "Drag the commits' edge, up to 60% of the screen; the products that need a look and the page's freshness always stay.",
+                    "Drag the commits' edge, up to 60% of the screen, for this kind of screen alone; the products that need a look and the page's freshness always stay.",
+                  ],
+                  [
+                    "/present?profile=wall",
+                    "A screen read from across a room: tell it once, it remembers; ?profile=auto forgets.",
                   ],
                 ]}
               />
@@ -795,6 +807,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
               ["The work that counts", "By hand, with AI, by automation: any of them (section 6)."],
               ["Cards or a table", "The products' view, switched above them."],
               ["The side panel", "The latest commits folded away or as wide as you dragged them."],
+              ["What the latest commits show", "Any of the three kinds, apart from the work that counts."],
               ["Page sizes", "How many commits a list shows at a time."],
               ["Theme", "System, dark or light, from the header's theme menu."],
               ["Sign in", "Where the portal has sign-in, private repositories show for the groups allowed to see them."],

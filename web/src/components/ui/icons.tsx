@@ -70,6 +70,16 @@ export function SlidersIcon({ className }: { className?: string }) {
   )
 }
 
+/** PresentIcon stands for the presentation page: a screen on its stand, for a tablet, a desk or a wall. */
+export function PresentIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="4" width="18" height="12" rx="1.5" />
+      <path d="M12 16v4M8 20h8M7 12l3-3 2 2 4-4" />
+    </Icon>
+  )
+}
+
 /** BookIcon stands for the guide. */
 export function BookIcon({ className }: { className?: string }) {
   return (

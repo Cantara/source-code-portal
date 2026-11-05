@@ -180,7 +180,8 @@ test("the theme menu switches light and dark, and system follows the system pref
   await page.goto("/")
   const html = page.locator("html")
   const portal = page.getByRole("banner").getByRole("navigation", { name: "Portal" })
-  await expect(portal.locator("a, button")).toHaveText(["Guide", "", "Settings"]) // Guide, the theme, Settings
+  await expect(portal.locator("a, button")).toHaveText(["Guide", "Present", "", "Settings"]) // Guide, Present, the theme, Settings
+  await expect(portal.getByRole("link", { name: "Present" })).toHaveAttribute("href", "/present")
   const button = portal.getByRole("button", { name: /^Theme/ })
   const choose = async (name: string) => {
     await button.click()

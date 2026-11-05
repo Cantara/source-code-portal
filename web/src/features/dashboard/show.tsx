@@ -79,7 +79,7 @@ export function ShowPicker({
     if (next.length > 0) onChange(next)
   }
   return (
-    <div ref={root} className={cn("relative", className)}>
+    <div ref={root} className={cn("relative min-w-0", className)}>
       <button
         ref={button}
         type="button"
@@ -88,17 +88,17 @@ export function ShowPicker({
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="flex max-w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
-        <span className="flex items-center gap-1" aria-hidden="true">
+        <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
           {kinds
             .filter((k) => shown.includes(k.value))
             .map((k) => (
               <span key={k.value} className={cn("size-1.5 rounded-full", dots[k.value])} />
             ))}
         </span>
-        {by(shown)}
-        <ChevronDownIcon className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+        <span className="truncate">{by(shown)}</span>
+        <ChevronDownIcon className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
         <div

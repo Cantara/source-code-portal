@@ -14,6 +14,7 @@ import {
   ShieldIcon,
   SlidersIcon,
   SunIcon,
+  PresentIcon,
 } from "@/components/ui/icons"
 import { cn } from "@/lib/cn"
 import type { Schemas } from "@/lib/api/client"
@@ -143,6 +144,11 @@ export function PortalNav() {
         <BookIcon className="size-[1.125rem]" />
         <span className="sr-only">Guide</span>
       </Link>
+      {/* A whole page load: the presentation page draws its own screen, dark unless the reader chose. */}
+      <a href="/present" className={tool} title="Present">
+        <PresentIcon className="size-[1.125rem]" />
+        <span className="sr-only">Present</span>
+      </a>
       <ThemeMenu />
       <Link href="/settings" className={tool} title="Settings" aria-current={path === "/settings" ? "page" : undefined}>
         <SlidersIcon className="size-[1.125rem]" />
