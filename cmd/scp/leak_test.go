@@ -10,11 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	gogh "github.com/google/go-github/v92/github"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	contract "github.com/cantara/source-code-portal/api"
 	"github.com/cantara/source-code-portal/internal/config"
@@ -33,6 +35,9 @@ type fetch func(path string, headers ...string) (int, string, http.Header)
 // botSecret is the secret of the token "bot" a configuration may name ($DIR/bot).
 const botSecret = "bot-secret-0123456789abcdef0123456789"
 
+// outsiderSecret is the secret of a token a configuration may name ($DIR/outsider) without a private group: it reads as the public.
+const outsiderSecret = "outsider-secret-0123456789abcdef01234"
+
 var staff = []string{"X-Forwarded-User", "ann", "X-Forwarded-Groups", "staff"} //nolint:gochecknoglobals // test value
 
 // privatePortal runs a portal over acme/open and the private acme/zq-hidden (README, a document, a go.mod that open depends on),
@@ -45,6 +50,18 @@ func privatePortal(t *testing.T, extra string) fetch {
 
 // privatePortalAt is privatePortal with the portal's base URL; setup changes the fake GitHub before the portal starts.
 func privatePortalAt(t *testing.T, extra string, setup ...func(*githubtest.Server)) (fetch, string) {
+	t.Helper()
+	return portalAt(t, extra, true, setup...)
+}
+
+// publicTwin is privatePortal's twin without the private repository: the same GitHub and configuration, the private repository
+// left out of the listing. Whatever the public reads of privatePortal it must read of the twin word for word.
+func publicTwin(t *testing.T, extra string) (fetch, string) {
+	t.Helper()
+	return portalAt(t, extra, false)
+}
+
+func portalAt(t *testing.T, extra string, private bool, setup ...func(*githubtest.Server)) (fetch, string) {
 	t.Helper()
 	gh := githubtest.New(t)
 	gh.AddToken("ghp_test")
@@ -72,15 +89,17 @@ func privatePortalAt(t *testing.T, extra string, setup ...func(*githubtest.Serve
 	if err := os.WriteFile(token, []byte("ghp_test"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "bot"), []byte(botSecret), 0o600); err != nil {
-		t.Fatal(err)
+	for name, secret := range map[string]string{"bot": botSecret, "outsider": outsiderSecret} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(secret), 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 	path := filepath.Join(dir, "scp.yaml")
 	body := `store: {path: ` + filepath.Join(dir, "scp.db") + `}
 server: {trusted_proxies: [127.0.0.1/32], public_url: "https://scp.example"}
 github:
   sources:
-    - {id: gh, base_url: "` + gh.BaseURL() + `", orgs: [acme], token_file: ` + token + `, include_private: true}
+    - {id: gh, base_url: "` + gh.BaseURL() + `", orgs: [acme], token_file: ` + token + `, include_private: ` + strconv.FormatBool(private) + `}
 catalog:
   groups:
     - {id: all, name: All, default_repo: zq-hidden, match: [{catch_all: true}]}
@@ -140,6 +159,9 @@ announcements:
 		_, b, _ := get("/api/v1/dashboard", staff...)
 		_, docs, _ := get("/api/v1/repos/acme/zq-hidden/docs", staff...)
 		_, mf, _ := get("/api/v1/repos/acme/open/manifests", staff...)
+		if !private && json.Unmarshal([]byte(b), &d) == nil && d.Freshness.Fresh == 1 && len(d.Latest) == 1 && strings.Contains(mf, "example.com/lib/q7") {
+			return get, base
+		}
 		if json.Unmarshal([]byte(b), &d) == nil && d.Freshness.Fresh == 2 && len(d.Latest) == 2 && strings.Contains(docs, "guide") &&
 			strings.Contains(mf, "zq-hidden") {
 			return get, base
@@ -265,9 +287,15 @@ func TestNoLeakThroughTools(t *testing.T) {
 // TestRequireAuth: with access.require_auth there is no public view. Every public path refuses an anonymous request (401, or a
 // browser's page request goes to sign-in); robots.txt keeps crawlers out; a token, or the proxy's identity, gets its answer.
 func TestRequireAuth(t *testing.T) {
-	get := privatePortal(t, `access: {private_groups: [staff], require_auth: true}
+	get, base := privatePortalAt(t, `access: {private_groups: [staff], require_auth: true}
 auth: {tokens: [{name: bot, secret_file: $DIR/bot, groups: [staff]}]}
 `)
+	if _, err := mcpConnect(t, base, nil); err == nil || !strings.Contains(err.Error(), "Unauthorized") {
+		t.Errorf("anonymous MCP: %v", err)
+	}
+	if r, err := mcpSession(t, base, botSecret).CallTool(t.Context(), &mcp.CallToolParams{Name: "list_groups", Arguments: map[string]any{}}); err != nil || r.IsError {
+		t.Errorf("a token's MCP: %v %+v", err, r)
+	}
 	for _, p := range append(publicPaths(t), "/", "/repos/acme/open", "/groups/all") {
 		if p == "/api/v1/me" { // the sign-in page reads the methods
 			continue

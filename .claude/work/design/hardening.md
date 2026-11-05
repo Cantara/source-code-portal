@@ -11,6 +11,12 @@ its GitHub App is installed on the repositories that audience may see, and `acce
   and every route outside it, fetched as the public (HTML and Markdown) must carry no trace of a private repository (name,
   description, topics, README, documents, commit subjects, dependency edges), and every address naming it must answer word for word
   as an address that does not exist. A new route goes on its list.
+- The public twin (`cmd/scp/twin_test.go`, P-76): the same portal without the private repository must read word for word the same to
+  the public (request ids, times, nonces and the snapshot version normalised) by every route of the leak test, the edge addresses
+  (`edgePaths`: the name's variants, filters, misspellings, prefixes, the admin routes), every tool over `/api/v1/tools` and `/mcp`,
+  anonymous and with a token of no private group. It catches what a name search cannot: counts, scores, totals, orders. A private
+  push moves neither the public version nor its event stream (`TestPrivateChangeUnseen`). A group's private default reads as a
+  default that does not exist (`DefaultMissing` in the public view): every group names one, so an empty "ok" told it was private.
 - `access.require_auth: true` closes the public view: the public listener's middleware refuses a request with no identity (401 with
   `WWW-Authenticate`; a browser's page request, `Accept: text/html`, gets 303 to `/signin?return_to=`). Open: `/auth/`, `/signin`,
   `/_next/static/`, the favicon and theme script, `/api/v1/me` (the sign-in methods), `/webhooks/` (signed by GitHub) and `robots.txt`,

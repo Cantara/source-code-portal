@@ -17,7 +17,13 @@ none of the operator duties below except the network layout.
   (`cmd/scp/leak_test.go`) fetches every GET of the API contract and every other public route as the public, and fails if any answer
   carries a trace of a private repository; the assistant has its own (`cmd/scp/assistant_test.go`), and every tool is called as the public too (`TestNoLeakThroughTools`,
   `cmd/scp/mcp_test.go`). It also fails if an address naming a private repository answers differently from one that does not
-  exist: the public cannot tell that a private repository exists.
+  exist: the public cannot tell that a private repository exists. A second test (`cmd/scp/twin_test.go`) runs the same portal
+  twice, once without the private repository, and fails unless the public reads both word for word, through every route, every
+  tool and MCP, anonymous or with a token of no private group: no count, score, total or order may move with a private repository.
+  It also tries the private name's variants (case, escapes, a trailing slash), filters, misspellings and prefixes the search could
+  correct or complete, a staff member's ETag replayed, and the admin routes on the public port; a push to a private repository must
+  not move the public snapshot's version or its event stream. A group whose default repository is private reads to the public as a
+  group whose default does not exist.
 - **No public view at all, if you want.** With `access.require_auth: true`, every request without an identity gets 401, and a browser
   is sent to sign in. Only sign-in, `/api/v1/me` (the sign-in methods), `/webhooks/` (signed by GitHub) and `robots.txt` (which then
   disallows everything) stay open.

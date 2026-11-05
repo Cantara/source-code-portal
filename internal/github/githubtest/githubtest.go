@@ -671,6 +671,13 @@ func (s *Server) latestRelease(w http.ResponseWriter, req *http.Request) {
 }
 
 // lookup returns the repository at owner/name. Callers hold s.mu.
+// ID is the id of the repository owner/name, 0 when there is none.
+func (s *Server) ID(owner, name string) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lookup(owner, name).GetID()
+}
+
 func (s *Server) lookup(owner, name string) *gh.Repository {
 	for _, r := range s.orgs[strings.ToLower(owner)] {
 		if strings.EqualFold(r.GetName(), name) {
