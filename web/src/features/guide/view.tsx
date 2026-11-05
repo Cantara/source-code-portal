@@ -869,8 +869,8 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
                 <em>Issues</em>, <em>Pull requests</em>, <em>Checks</em> and <em>Commit statuses</em>. Webhook URL{" "}
                 <code className="font-mono text-xs">https://your-portal/webhooks/github</code> with the text of{" "}
                 <code className="font-mono text-xs">secrets/webhook-secret</code> as its secret; events <em>Push</em>,{" "}
-                <em>Release</em>, <em>Repository</em>, <em>Issues</em>, <em>Issue comment</em>, <em>Pull request</em>,{" "}
-                <em>Pull request review</em>, <em>Check suite</em> and <em>Status</em>. Install it only on this account.
+                <em>Release</em>, <em>Repository</em>, <em>Issues</em>, <em>Pull request</em> and <em>Pull request review</em>.
+                Install it only on this account.
               </p>
               <p>
                 Each permission serves a part of the portal: <em>Contents</em> and <em>Metadata</em> the repositories, documents

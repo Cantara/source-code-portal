@@ -23,8 +23,8 @@ sync:
 #   The catalogue: repositories, README  Contents, Metadata                      Push, Release, Repository
 #     and documents, manifests, commits,
 #     releases, packages
-#   Pull requests (/pulls)               Pull requests, Checks, Commit statuses  Pull request, Pull request review, Check suite, Status
-#   Issues (/issues)                     Issues                                  Issues, Issue comment
+#   Pull requests (/pulls)               Pull requests, Checks, Commit statuses  Pull request, Pull request review
+#   Issues (/issues)                     Issues                                  Issues
 #
 # A GitHub App: set them in the App's settings, "Permissions & events", then have an organisation owner accept them on each
 # installation (Organization settings, GitHub Apps, "Review request"); until then the installation keeps the old ones. Check with

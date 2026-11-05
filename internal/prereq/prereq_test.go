@@ -10,7 +10,7 @@ import (
 
 func TestCheck(t *testing.T) {
 	all := map[string]string{"contents": "read", "metadata": "read", "issues": "read", "pull_requests": "read", "checks": "read", "statuses": "read"}
-	events := []string{"push", "release", "repository", "issues", "issue_comment", "pull_request", "pull_request_review", "check_suite", "status"}
+	events := []string{"push", "release", "repository", "issues", "pull_request", "pull_request_review"}
 	if got := Check([]Source{{ID: "gh", App: true, Known: true, Grants: []github.Grant{{Owner: "acme", Permissions: all, Events: events}}}}, true); len(got) != 0 {
 		t.Errorf("every prerequisite holds: %+v", got)
 	}
@@ -22,12 +22,12 @@ func TestCheck(t *testing.T) {
 	if len(got) != 2 || got[0].Feature != Pulls || got[1].Feature != Issues {
 		t.Fatalf("unmet: %+v", got)
 	}
-	if u := got[1]; !slices.Equal(u.Permissions, []string{"issues"}) || !slices.Equal(u.Events, []string{"issues", "issue_comment"}) ||
+	if u := got[1]; !slices.Equal(u.Permissions, []string{"issues"}) || !slices.Equal(u.Events, []string{"issues"}) ||
 		!slices.Equal(u.Owners, []string{"cantara", "acme"}) || u.Refused {
 		t.Errorf("issues: %+v", u)
 	}
-	if fix := got[1].Fix(); fix != "In the GitHub App's settings, Permissions & events: set Issues to Read-only, and subscribe to Issues and "+
-		"Issue comment; then accept the new permissions on the installation of cantara, acme." {
+	if fix := got[1].Fix(); fix != "In the GitHub App's settings, Permissions & events: set Issues to Read-only, and subscribe to "+
+		"Issues; then accept the new permissions on the installation of cantara, acme." {
 		t.Errorf("fix: %s", fix)
 	}
 	if !strings.Contains(got[0].Fix(), "Pull requests, Checks and Commit statuses to Read-only") {
@@ -43,9 +43,9 @@ func TestCheck(t *testing.T) {
 	}
 
 	// Permissions granted, an event missing: told as updates on the schedule only.
-	late := github.Grant{Owner: "acme", Permissions: all, Events: []string{"push", "release", "repository", "pull_request", "pull_request_review", "check_suite", "status"}}
+	late := github.Grant{Owner: "acme", Permissions: all, Events: []string{"push", "release", "repository", "pull_request", "pull_request_review"}}
 	if got := Check([]Source{{ID: "gh", App: true, Known: true, Grants: []github.Grant{late}}}, true); len(got) != 1 || len(got[0].Permissions) != 0 ||
-		!strings.Contains(got[0].Effect, "on their schedule") || !strings.Contains(got[0].Fix(), "subscribe to Issues and Issue comment") {
+		!strings.Contains(got[0].Effect, "on their schedule") || !strings.Contains(got[0].Fix(), "subscribe to Issues") {
 		t.Errorf("events only: %+v", got)
 	}
 

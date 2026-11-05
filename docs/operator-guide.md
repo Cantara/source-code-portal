@@ -20,8 +20,8 @@ refreshes on its schedule).
 | Feature | Read permissions | Webhook events |
 |---|---|---|
 | The catalogue: repositories, README and documents, manifests, commits, releases, packages | Contents, Metadata | Push, Release, Repository |
-| Pull requests | Pull requests, Checks, Commit statuses | Pull request, Pull request review, Check suite, Status |
-| Issues | Issues | Issues, Issue comment |
+| Pull requests | Pull requests, Checks, Commit statuses | Pull request, Pull request review |
+| Issues | Issues | Issues |
 <!-- /prerequisites -->
 
 **When something is missing, the portal says so.** It reads the App's grants from its installations at every listing and warns where
@@ -40,7 +40,8 @@ it with `gh api /orgs/<org>/installations --jq '.installations[] | {app_slug, pe
    else. *Issues* lists the open issues; the last three show the open pull requests and whose turn each is; without them the portal
    shows none.
 2. Webhook: active, URL `https://<portal>/webhooks/github`, a random secret (for example `openssl rand -hex 32`), and subscribe to the
-   events *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*, *Check suite* and *Status*. Installation events
+   events *Push*, *Release*, *Repository*, *Issues*, *Pull request* and *Pull request review*. Leave out *Issue comment*, *Check suite*
+   and *Status*: they fire on every comment and every CI update, and the portal does not need them. Installation events
    are sent to Apps without subscribing.
 3. Generate a private key (a `.pem` file) and note the App ID.
 4. Install the App on each organisation or user account, on all repositories (or the ones to show). An App that may be installed only on
@@ -49,16 +50,16 @@ it with `gh api /orgs/<org>/installations --jq '.installations[] | {app_slug, pe
 **Token.** A fine-grained token with public repository read access, or a classic token without scopes, in a file. Listed with a token, a
 user account shows its public repositories, or all of them, private ones included, when it is the token's own account (the token needs
 read access to them). For updates within seconds, add an organisation webhook (for a user account, a webhook on each repository) (Settings, Webhooks) with content type `application/json`, the same secret and the events *Pushes*,
-*Releases*, *Repositories*, *Issues*, *Issue comments*, *Pull requests*, *Pull request reviews*, *Check suites* and *Statuses*.
+*Releases*, *Repositories*, *Issues*, *Pull requests* and *Pull request reviews*.
 
 Each recent commit's diff stats (lines added and removed, files changed) come from GitHub's GraphQL API with the same credential and no other permission: up to 100 commits a query, only commits of the last 90 days, each asked once; GraphQL has its own rate limit, apart from the REST one.
 
-The open pull requests are read per repository every 15 minutes, and at once on a pull request, review, check suite or status
+The open pull requests are read per repository every 15 minutes, and at once on a pull request or review
 webhook: the listing is a conditional request, free when nothing changed (GitHub does not count a 304), and only a changed
 repository costs one GraphQL query for the reviews, checks and mergeability of the pull requests that changed. Running checks are asked
 again after 5, 10, 20 and then 60 minutes; every pull request once an hour; an archived repository once.
 
-The open issues are read per repository every 15 minutes, and at once on an issue or issue comment webhook: GitHub's issues listing,
+The open issues are read per repository every 15 minutes, and at once on an issue webhook (opened, edited, labelled, assigned, closed; a comment waits for the next read): GitHub's issues listing,
 the most recently updated first, as conditional requests (an unchanged page is free), up to 3 pages and 100 issues per repository; the
 pull requests in that listing are left out. No GraphQL.
 

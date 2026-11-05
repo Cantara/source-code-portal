@@ -28,7 +28,8 @@ const (
 )
 
 // Events are the webhook deliveries that re-read a repository's issues (webhook.Normalise passes them by their names).
-var Events = []sync.Event{"issues", "issue_comment"} //nolint:gochecknoglobals // a constant list
+// Not issue_comment: anyone may comment, and a comment changes an issue's idle time and count, not where it stands.
+var Events = []sync.Event{"issues"} //nolint:gochecknoglobals // a constant list
 
 // Label is an issue's label.
 type Label struct {

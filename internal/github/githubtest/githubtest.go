@@ -298,8 +298,7 @@ type grant struct {
 var (
 	AllPermissions = map[string]string{"contents": "read", "metadata": "read", "issues": "read", "pull_requests": "read", //nolint:gochecknoglobals // test data
 		"checks": "read", "statuses": "read"}
-	AllEvents = []string{"push", "release", "repository", "issues", "issue_comment", "pull_request", "pull_request_review", //nolint:gochecknoglobals // test data
-		"check_suite", "status"}
+	AllEvents = []string{"push", "release", "repository", "issues", "pull_request", "pull_request_review"} //nolint:gochecknoglobals // test data
 )
 
 // SetGrants sets what the App's installation on login may read and which events it is sent.

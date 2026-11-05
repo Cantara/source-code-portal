@@ -33,7 +33,8 @@ const (
 var pendingSteps = []time.Duration{5 * time.Minute, 10 * time.Minute, 20 * time.Minute, time.Hour} //nolint:gochecknoglobals // a constant table
 
 // Events are the webhook deliveries that re-read a repository's pull requests (webhook.Normalise passes them by their names).
-var Events = []sync.Event{sync.EventPush, "pull_request", "pull_request_review", "check_suite", "status"} //nolint:gochecknoglobals // a constant list
+// Not check_suite or status: they fire on every CI update of every commit; running checks are asked again on their own steps.
+var Events = []sync.Event{sync.EventPush, "pull_request", "pull_request_review"} //nolint:gochecknoglobals // a constant list
 
 // Label is a pull request's label.
 type Label struct {
