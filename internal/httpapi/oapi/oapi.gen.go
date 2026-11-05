@@ -659,6 +659,7 @@ const (
 	SearchKindDep     SearchKind = "dep"
 	SearchKindDoc     SearchKind = "doc"
 	SearchKindGroup   SearchKind = "group"
+	SearchKindIssue   SearchKind = "issue"
 	SearchKindPackage SearchKind = "package"
 	SearchKindPull    SearchKind = "pull"
 	SearchKindRepo    SearchKind = "repo"
@@ -674,6 +675,8 @@ func (e SearchKind) Valid() bool {
 	case SearchKindDoc:
 		return true
 	case SearchKindGroup:
+		return true
+	case SearchKindIssue:
 		return true
 	case SearchKindPackage:
 		return true
@@ -1900,10 +1903,13 @@ type SearchCorrection struct {
 
 // SearchCounts defines model for SearchCounts.
 type SearchCounts struct {
-	Commit  int `json:"commit"`
-	Dep     int `json:"dep"`
-	Doc     int `json:"doc"`
-	Group   int `json:"group"`
+	Commit int `json:"commit"`
+	Dep    int `json:"dep"`
+	Doc    int `json:"doc"`
+	Group  int `json:"group"`
+
+	// Issue Open issues
+	Issue   int `json:"issue"`
 	Package int `json:"package"`
 
 	// Pull Open pull requests

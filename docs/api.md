@@ -30,6 +30,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/commits[?group=][&repo=owner/name][&automation=false][&page=][&limit=]` | commits newest first, in numbered pages; `automation=false` leaves out bots and release-plugin commits; `work=` keeps only the kinds it names (`hand`, `ai`, `automation`, comma-separated); each commit says its `kind` (`person`, `assisted`, `agent`, `automation`), the `assistant` it names and, for a commit of the last 90 days, its `stats` (`additions`, `deletions`, `files`) |
 | `GET /api/v1/repos/{owner}/{name}/history[?ref=][&author=][&q=][&automation=false][&page=][&limit=][&at=]` | the stored history (500 default-branch commits, the newest 10 other branches, the newest 100 tags) in graph order with branch and tag labels; `ref` keeps what a branch or tag reaches, `author`, `q` (subject, body, SHA prefix) and `automation` filter and set `filtered`; each commit carries its row of the git graph (`graph`, `null` on a filtered page) and `lanes` is the page's width |
 | `GET /api/v1/pulls[?group=][&repo=owner/name][&state=][&by=people\|automation][&drafts=true][&sort=waiting\|newest\|updated][&page=][&limit=]` | open pull requests, whose turn first (people's before automation's, those waiting for a review first, then the longest idle), in numbered pages; each its `state` (`draft`, `conflicts`, `failing`, `changes`, `review`, `checks`, `ready`, `unknown`), whom it `waitsFor` (`author`, `reviewers`, `ci`, `maintainer`), `bot` (Dependabot, Renovate, Snyk, any `[bot]`), `checks`, `labels` and `stats`; `counts` gives every state over the scope and `by`, so the states can be offered as filters. Drafts are left out unless `drafts=true` or `state=draft`. Repository summaries carry `openPulls`, and `openIssues` counts issues only once the pull requests are read; the dashboard and its groups carry `pulls`, the counts of the work that counts |
+| `GET /api/v1/issues[?group=][&repo=owner/name][&state=triage\|unassigned\|assigned][&kind=bug\|feature\|question\|other][&by=people\|automation][&sort=waiting\|newest\|updated][&page=][&limit=]` | open issues, pull requests left out, what waits first (people's before automation's, those needing triage first, then unassigned, then assigned, the longest idle first), in numbered pages; each its `state`, `kind` (GitHub's issue type, else from its labels), `bot`, `labels`, `assignees` (the first three; `assigned` counts them all), `comments`, `milestone` and `type`; `counts` gives every state and kind over the scope and `by` |
 | `GET /api/v1/me` | the viewer: signed in or not, name, how identified (`proxy`, `oidc`, `token`), whether it sees private repositories and is an administrator, and the ways to sign in |
 | `GET /api/v1/assistant` | whether the assistant is set up, whether this viewer may ask, who may (`signed-in`, `admin`, `everyone`), the provider and model |
 | `POST /api/v1/assistant/chat` | asks the assistant (below); answers server-sent events |
@@ -149,14 +150,14 @@ triggers come from repository text and are cleaned the same way; the manifest is
 
 `GET /api/v1/search?q=` searches what the portal holds, from the viewer's view: repositories (names, descriptors, topics,
 descriptions), groups, the sections of READMEs and `docs/` documents, manifests with their dependencies, published packages and
-default-branch commits and open pull requests (by title, author and branch; `in:pull`). It does not search source code. The page `/search` and the header's box (`/` or Ctrl/⌘ K) use it.
+default-branch commits, open pull requests (by title, author and branch; `in:pull`) and open issues (by title, labels and author; `in:issue`). It does not search source code. The page `/search` and the header's box (`/` or Ctrl/⌘ K) use it.
 
 | In `q` | Finds |
 |---|---|
 | `session timeout` | every word, anywhere; the last word also as a prefix (`sess`) |
 | `"session timeout"` | the words next to each other |
 | `oauth -legacy`, `oauth OR saml` | without a word; either word |
-| `in:doc` | one kind, or several comma-separated: `repo`, `group`, `doc`, `dep`, `package`, `commit` |
+| `in:doc` | one kind, or several comma-separated: `repo`, `group`, `doc`, `dep`, `package`, `commit`, `pull`, `issue` |
 | `group:iam`, `repo:whydah` | within a group; repositories whose address holds the word |
 | `lang:java`, `topic:iam`, `lifecycle:production` | a repository's language, topic or descriptor tag, lifecycle |
 | `dep:slf4j` | repositories with a dependency whose name holds the word |
@@ -179,7 +180,7 @@ box. `/opensearch.xml` describes the search for browsers, which offer to add the
 
 The portal offers agents its own read-only tools, the ones its assistant uses: search (as below), list and read groups, read a
 repository's README and technology, read a document, the recent commits (with the work that counts), the open pull requests and whose
-turn each is, a repository's health and its published packages. Every call answers from the caller's view, exactly as the pages do.
+turn each is, the open issues and where each stands, a repository's health and its published packages. Every call answers from the caller's view, exactly as the pages do.
 
 **MCP.** `/mcp` speaks the [Model Context Protocol](https://modelcontextprotocol.io) over Streamable HTTP (stateless, JSON answers,
 the newest protocol version and the earlier ones). Without a token it answers from the public view; with an access token of

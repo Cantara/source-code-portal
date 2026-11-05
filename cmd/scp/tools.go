@@ -22,6 +22,7 @@ type toolReads struct {
 	catalog          catalogAPI
 	commits          commitsAPI
 	pulls            pullsAPI
+	issues           issuesAPI
 	repo, doc, group http.Handler
 }
 
@@ -75,11 +76,11 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 	return tools.New(
 		tool("search", "Search the portal",
 			"Searches what the portal holds: repositories, groups, document sections (README and docs/), manifests and their dependencies, "+
-				"published packages, default-branch commits and open pull requests; not source code. The query is words (all required), \"phrases\", "+
-				"-exclusions, OR between two words, and filters: in:repo|group|doc|dep|package|commit|pull, group:, repo:, lang:, topic:, "+
+				"published packages, default-branch commits, open pull requests and open issues; not source code. The query is words (all required), \"phrases\", "+
+				"-exclusions, OR between two words, and filters: in:repo|group|doc|dep|package|commit|pull|issue, group:, repo:, lang:, topic:, "+
 				"lifecycle:, author:, kind:hand|ai|automation, dep: (a dependency's name), before: and after: (dates, 2026-11-05). Best first.",
 			schema([]string{"query"}, map[string]any{"query": prop("string", "The query, up to 256 characters"),
-				"in": map[string]any{"type": "string", "enum": []string{"repo", "group", "doc", "dep", "package", "commit", "pull"},
+				"in": map[string]any{"type": "string", "enum": []string{"repo", "group", "doc", "dep", "package", "commit", "pull", "issue"},
 					"description": "Only hits of this kind; the counts stay every kind's"}, "limit": limit}),
 			func(in map[string]any) string { return "Searching for " + arg(in, "query") }, r.search),
 		tool("list_groups", "List groups", "Lists the groups of repositories with their ids, names and sizes.", schema(nil, map[string]any{}),
@@ -116,12 +117,80 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 				}
 				return "Reading the open pull requests"
 			}, r.openPulls),
+		tool("open_issues", "Open issues",
+			"Lists the open issues (pull requests left out) that wait longest first, of everything, a group or one repository: each where it "+
+				"stands (needs triage: no label, milestone or type; unassigned: triaged, nobody took it; assigned), its kind (bug, feature, "+
+				"question, other), who opened it (a person or automation such as Renovate's dependency dashboard), who has it, its labels, "+
+				"when it was opened and last updated, and the counts by state and kind.",
+			schema(nil, map[string]any{"group": prop("string", "A group id"), "repo": prop("string", "A repository as owner/name"),
+				"state": map[string]any{"type": "string", "enum": []string{"triage", "unassigned", "assigned"}, "description": "Only issues where they stand so"},
+				"kind":  map[string]any{"type": "string", "enum": []string{"bug", "feature", "question", "other"}, "description": "Only issues of this kind"},
+				"by":    map[string]any{"type": "string", "enum": []string{"people", "automation"}, "description": "Only people's or automation's; default both"},
+				"limit": limit}),
+			func(in map[string]any) string {
+				if s := arg(in, "repo") + arg(in, "group"); s != "" {
+					return "Reading the issues of " + s
+				}
+				return "Reading the open issues"
+			}, r.openIssues),
 		repoTool("repository_health", "Repository health", "Reads a repository's health score, level and findings, its latest release, packages and activity.", "Checking the health of", r.health),
 		repoTool("repository_packages", "Repository packages", "Lists what a repository publishes to package registries (Maven, npm, PyPI, crates.io, Go, NuGet, ...) with the newest release of each.", "Reading the packages of", r.packages),
 	)
 }
 
 var errNotFound = errors.New("not found in the catalogue")
+
+// openIssues lists open issues what waits first (design/issues.md) with the counts by state and kind.
+func (r toolReads) openIssues(ctx context.Context, in map[string]any) (tools.Result, error) {
+	limit := intArg(in, "limit", 20, 50)
+	params := oapi.ListIssuesParams{Limit: &limit}
+	if g := arg(in, "group"); g != "" {
+		params.Group = &g
+	}
+	if p := strings.ToLower(arg(in, "repo")); p != "" {
+		params.Repo = &p
+	}
+	if st := arg(in, "state"); st != "" {
+		v := oapi.IssueState(st)
+		params.State = &v
+	}
+	if k := arg(in, "kind"); k != "" {
+		v := oapi.IssueKind(k)
+		params.Kind = &v
+	}
+	if by := arg(in, "by"); by != "" {
+		v := oapi.ListIssuesParamsBy(by)
+		params.By = &v
+	}
+	res, err := r.issues.ListIssues(ctx, oapi.ListIssuesRequestObject{Params: params})
+	if err != nil {
+		return tools.Result{}, err
+	}
+	ok, isOK := res.(oapi.ListIssues200JSONResponse)
+	if !isOK {
+		return tools.Result{}, fmt.Errorf("the group or repository is %w", errNotFound)
+	}
+	c := ok.Body.Counts
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d open (%d by people, %d by automation): %d need triage, %d unassigned, %d assigned; %d bugs, %d features, "+
+		"%d questions, %d other.\n\n", c.Open, c.People, c.Automation, c.States.Triage, c.States.Unassigned, c.States.Assigned,
+		c.Kinds.Bug, c.Kinds.Feature, c.Kinds.Question, c.Kinds.Other)
+	for _, i := range ok.Body.Issues {
+		who := i.Author
+		if i.Bot {
+			who += " (automation)"
+		}
+		fmt.Fprintf(&b, "- [%s #%d](%s) %s, %s: %s, by %s", i.Repo, i.Number, i.Url, i.State, i.Kind, i.Title, who)
+		if len(i.Assignees) > 0 {
+			fmt.Fprintf(&b, ", for %s", strings.Join(i.Assignees, ", "))
+		}
+		fmt.Fprintf(&b, ", opened %s, updated %s\n", i.CreatedAt.UTC().Format("2006-01-02"), i.UpdatedAt.UTC().Format("2006-01-02"))
+	}
+	if len(ok.Body.Issues) == 0 {
+		b.WriteString("No open issues.\n")
+	}
+	return tools.Result{Source: "/issues", Text: b.String()}, nil
+}
 
 // openPulls lists open pull requests whose turn first (design/pulls.md) with the counts by state.
 func (r toolReads) openPulls(ctx context.Context, in map[string]any) (tools.Result, error) {

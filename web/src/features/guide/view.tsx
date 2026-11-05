@@ -146,7 +146,7 @@ const parts = [
       { id: "card", title: "A product card" },
       { id: "health", title: "Health and findings" },
       { id: "work", title: "The work that counts" },
-      { id: "lists", title: "Tables, commits and pull requests" },
+      { id: "lists", title: "Tables, commits, pull requests and issues" },
       { id: "search", title: "Search" },
       { id: "present", title: "On a wall" },
       { id: "yours", title: "Make it yours" },
@@ -670,8 +670,8 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
         <Section
           id="lists"
           n={7}
-          title="Tables, commits and pull requests"
-          lede="Many products compare better in one table; the latest commits show what just happened, the pull requests what waits for whom."
+          title="Tables, commits, pull requests and issues"
+          lede="Many products compare better in one table; the latest commits show what just happened, the pull requests and issues what waits for whom."
         >
           <Figure caption="The products as a table: every column sorts. The choice of cards or table is remembered.">
             <Shot
@@ -707,6 +707,12 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                 above the latest commits, and a pull request a person has left waiting for a review for more than a week costs its
                 repository points.
               </p>
+              <p>
+                <strong className="text-foreground">Issues</strong>, beside it, holds every open issue and says where each stands:
+                it needs triage (no label, milestone or type yet), nobody took it, or someone has it. Its kind, a bug, a feature
+                or a question, comes from GitHub&apos;s issue type or its labels. What nobody has looked at comes first; a
+                group&apos;s and a repository&apos;s page show the ones waiting longest.
+              </p>
             </div>
           </div>
         </Section>
@@ -715,7 +721,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
           id="search"
           n={8}
           title="Search"
-          lede="One box finds what the portal holds: repositories, groups, the sections of their documents, their dependencies and packages, their commits and open pull requests."
+          lede="One box finds what the portal holds: repositories, groups, the sections of their documents, their dependencies and packages, their commits, open pull requests and issues."
         >
           <div className="grid items-start gap-8 lg:grid-cols-2">
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
@@ -739,7 +745,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                 ["session timeout", "Every word, anywhere."],
                 ["\u201csession timeout\u201d", "The words next to each other."],
                 ["oauth -legacy, oauth OR saml", "Without a word; either word."],
-                ["in:doc, in:pull", "One kind: repo, group, doc, dep, package, commit, pull."],
+                ["in:doc, in:issue", "One kind: repo, group, doc, dep, package, commit, pull, issue."],
                 ["group:iam lang:java", "Within a product; a language, topic: or lifecycle:."],
                 ["dep:slf4j", "The repositories that depend on a package."],
                 ["author:ann kind:ai after:2026-10-01", "Commits by a person, of a kind of work, in a time."],
@@ -837,7 +843,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
         >
           <div className="grid gap-4 md:grid-cols-3">
             {[
-              ["Read-only", "Contents, Metadata and the pull requests' state, read. The portal never writes to GitHub."],
+              ["Read-only", "Contents, Metadata, issues and the pull requests' state, read. The portal never writes to GitHub."],
               ["Your organisation's", "Not a person's account: nothing breaks when someone leaves."],
               ["Updates within seconds", "GitHub sends a webhook on every push, release and repository change."],
             ].map(([t, d]) => (
@@ -860,11 +866,11 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
               <p>
                 In your organisation&apos;s <em>Settings</em>, <em>Developer settings</em>, <em>GitHub Apps</em>,{" "}
                 <em>New GitHub App</em>. Repository permissions, read-only, nothing else: <em>Contents</em>, <em>Metadata</em>,{" "}
-                <em>Pull requests</em>, <em>Checks</em> and <em>Commit statuses</em>. Webhook URL{" "}
+                <em>Issues</em>, <em>Pull requests</em>, <em>Checks</em> and <em>Commit statuses</em>. Webhook URL{" "}
                 <code className="font-mono text-xs">https://your-portal/webhooks/github</code> with the text of{" "}
                 <code className="font-mono text-xs">secrets/webhook-secret</code> as its secret; events <em>Push</em>,{" "}
-                <em>Release</em>, <em>Repository</em>, <em>Pull request</em>, <em>Pull request review</em>, <em>Check suite</em>{" "}
-                and <em>Status</em>. Install it only on this account.
+                <em>Release</em>, <em>Repository</em>, <em>Issues</em>, <em>Issue comment</em>, <em>Pull request</em>,{" "}
+                <em>Pull request review</em>, <em>Check suite</em> and <em>Status</em>. Install it only on this account.
               </p>
             </Step>
             <Step n={3} title="Keep its key and install it">

@@ -104,7 +104,7 @@ func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
 			newest = t
 		}
 	}
-	out := []entry{{"/", newest}, {"/commits", newest}, {"/pulls", newest}}
+	out := []entry{{"/", newest}, {"/commits", newest}, {"/pulls", newest}, {"/issues", newest}}
 	for _, g := range s.Groups {
 		var t time.Time
 		for _, k := range g.Members {

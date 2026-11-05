@@ -42,6 +42,8 @@ type Options struct {
 	LastCommit func(*snapshot.RepoEntry) time.Time          // the newest commit: the sitemap's lastmod; zero when unknown
 	// Pulls is a repository's open pull requests and how many wait for a review (open -1 when not read); nil: not said.
 	Pulls func(*snapshot.RepoEntry) (open, review int)
+	// Issues is a repository's open issues and how many need triage (open -1 when not read); nil: not said.
+	Issues func(*snapshot.RepoEntry) (open, triage int)
 	// Origin is the request's public origin, for the sitemap's absolute URLs when there is no server.public_url.
 	Origin func(*http.Request) string
 }
@@ -153,6 +155,7 @@ func (l *LLMs) Repo() http.Handler {
 		}
 		b.WriteString(l.technology(l.current(r.Context()), e))
 		b.WriteString(l.pulls(e))
+		b.WriteString(l.issues(e))
 		serve(w, r, "text/markdown; charset=utf-8", b.Bytes())
 	})
 }
@@ -198,6 +201,19 @@ func (l *LLMs) pulls(e *snapshot.RepoEntry) string {
 	}
 	return fmt.Sprintf("\n## Pull requests\n\n%d open, %d waiting for a review: [whose turn each is](%s).\n", open, review,
 		l.url("/pulls?repo="+url.QueryEscape(string(e.Repo.Key()))+"&drafts=true"))
+}
+
+// issues is the portal's line on a repository's open issues; empty when they are not read or Options.Issues is unset.
+func (l *LLMs) issues(e *snapshot.RepoEntry) string {
+	if l.opts.Issues == nil {
+		return ""
+	}
+	open, triage := l.opts.Issues(e)
+	if open < 0 {
+		return ""
+	}
+	return fmt.Sprintf("\n## Issues\n\n%d open, %d needing triage: [where each stands](%s).\n", open, triage,
+		l.url("/issues?repo="+url.QueryEscape(string(e.Repo.Key()))))
 }
 
 // Doc serves /repos/{owner}/{name}/docs/{path...}: the document whose path without its extension is path (an .md suffix on the

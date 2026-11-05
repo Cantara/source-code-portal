@@ -28,8 +28,8 @@ In GitHub, the organisation's *Settings*, *Developer settings*, *GitHub Apps*, *
 
 - Name: `Example Source Code Portal`; homepage `https://scp.example.org`.
 - Webhook: active, URL `https://scp.example.org/webhooks/github`, secret: the contents of `webhook-secret`.
-- Repository permissions, all read-only: *Contents*, *Metadata*, *Pull requests*, *Checks*, *Commit statuses*. Nothing else.
-- Subscribe to events: *Push*, *Release*, *Repository*, *Pull request*, *Pull request review*, *Check suite*, *Status*.
+- Repository permissions, all read-only: *Contents*, *Metadata*, *Issues*, *Pull requests*, *Checks*, *Commit statuses*. Nothing else.
+- Subscribe to events: *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*, *Check suite*, *Status*.
 - Where can it be installed: *Only on this account*.
 
 Create it, note the *App ID*, generate a private key and store it as `/srv/scp/secrets/scp-app.pem` (group 65532, mode 0640). Then

@@ -170,7 +170,7 @@ func publicPaths(t *testing.T) []string {
 		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events", "/api/v1/admin/layouts/dashboard",
 		"/api/v1/pages/present", "/api/v1/pages/dashboard", "/api/v1/admin/layouts/present", "/api/v1/admin/announcements",
 		// The search, by the private repository's name, its README's and commit's words, a filter and a prefix.
-		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=repo:zq-hidden",
+		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=vault+in:issue", "/api/v1/search?q=repo:zq-hidden",
 		"/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search?q=zq-hidden&in=repo", "/api/v1/search/suggest?q=zq-hidden",
 		"/api/v1/search/suggest?q=zq-hid", "/opensearch.xml")
 }
@@ -200,7 +200,7 @@ func TestNoLeak(t *testing.T) {
 		}
 	}
 	for _, p := range []string{"/api/v1/pages/dashboard", "/api/v1/pages/present", "/api/v1/repos/acme/zq-hidden", "/api/v1/pulls", "/api/v1/issues", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests",
-		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search/suggest?q=zq-hid"} {
+		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=vault+in:issue", "/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search/suggest?q=zq-hid"} {
 		if _, b, _ := get(p, staff...); !strings.Contains(b, "zq-hidden") {
 			t.Errorf("staff %s does not show the private repository:\n%s", p, b)
 		}
@@ -222,6 +222,7 @@ func TestNoLeakThroughTools(t *testing.T) {
 			"get_document":       `{"input":{"owner":"acme","name":"` + repo + `","path":"docs/guide.md"}}`,
 			"recent_commits":     `{"input":{"repo":"acme/` + repo + `","work":["hand","ai","automation"]}}`,
 			"open_pull_requests": `{"input":{"repo":"acme/` + repo + `"}}`,
+			"open_issues":        `{"input":{"repo":"acme/` + repo + `"}}`,
 		}[name]
 	}
 	nonce := regexp.MustCompile(`id=\\"[0-9a-f]+\\"`)

@@ -1,6 +1,6 @@
 # Open issues: what waits to be triaged and taken (IS1, IS2)
 
-Status: IS1 built, IS2 in progress (plan.md section 4, P-69). Binding order: ../plan.md > this note > `pulls.md`, `layout.md`, `github.md`.
+Status: IS1 and IS2 built (plan.md section 4, P-69). Binding order: ../plan.md > this note > `pulls.md`, `layout.md`, `github.md`.
 
 The portal counts open issues per repository (GitHub's `open_issues_count` less the open pull requests, `pulls.md`) but does not
 hold them. Across many repositories the open issues are the work asked for: what nobody has looked at, what is looked at but nobody

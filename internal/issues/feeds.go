@@ -158,6 +158,20 @@ func OfRepo(s *snapshot.Snapshot, k snapshot.RepoKey) []Ref { return feedIndex.G
 // All is every open issue of s, what waits first.
 func All(s *snapshot.Snapshot) []Ref { return feedIndex.Get(s).all }
 
+// Summary is a repository's open issues and how many need triage (open -1 when not read yet), for its Markdown.
+func Summary(e *snapshot.RepoEntry) (open, triage int) {
+	s, _ := Of(e)
+	if s == nil {
+		return -1, 0
+	}
+	for i := range s.Issues {
+		if StateOf(&s.Issues[i]) == StateTriage {
+			triage++
+		}
+	}
+	return s.Total, triage
+}
+
 // IssueOf is an issue in its API form.
 func IssueOf(r Ref) oapi.Issue {
 	is := r.Issue

@@ -59,8 +59,9 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    (yes, when the portal has a public address). Offer the defaults: a GitHub App, one host with Docker Compose and Caddy, public
    repositories only, webhooks on.
 2. **Access to GitHub.** A GitHub App is best (its own rate limit, webhooks, private repositories by installation): *Contents*,
-   *Metadata*, *Pull requests*, *Checks* and *Commit statuses* read-only, webhook URL `<public_url>/webhooks/github` with a random
-   secret, events *Push*, *Release*, *Repository*, *Pull request*, *Pull request review*, *Check suite*, *Status*, installed on the
+   *Metadata*, *Issues*, *Pull requests*, *Checks* and *Commit statuses* read-only, webhook URL `<public_url>/webhooks/github` with a
+   random secret, events *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*, *Check
+   suite*, *Status*, installed on the
    accounts. A token (fine-grained, public repositories read; or a classic one without scopes) is fine to start.
    Walk them through the GitHub pages; they create it.
 3. **Secrets.** In a directory only root and UID 65532 read:

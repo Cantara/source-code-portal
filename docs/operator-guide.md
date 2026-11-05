@@ -13,10 +13,11 @@ SCP needs read access to the repositories of the organisations and user accounts
 requests an hour per installation) or a personal access token (5,000 an hour).
 
 **GitHub App.** Create an App in the organisation's settings, or for a user account in your own (Developer settings, GitHub Apps):
-1. Repository permissions, all read-only: *Contents*, *Metadata*, *Pull requests*, *Checks* and *Commit statuses*. Nothing else. The
-   last three show the open pull requests and whose turn each is; without them the portal shows none.
+1. Repository permissions, all read-only: *Contents*, *Metadata*, *Issues*, *Pull requests*, *Checks* and *Commit statuses*. Nothing
+   else. *Issues* lists the open issues; the last three show the open pull requests and whose turn each is; without them the portal
+   shows none.
 2. Webhook: active, URL `https://<portal>/webhooks/github`, a random secret (for example `openssl rand -hex 32`), and subscribe to the
-   events *Push*, *Release*, *Repository*, *Pull request*, *Pull request review*, *Check suite* and *Status*. Installation events
+   events *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*, *Check suite* and *Status*. Installation events
    are sent to Apps without subscribing.
 3. Generate a private key (a `.pem` file) and note the App ID.
 4. Install the App on each organisation or user account, on all repositories (or the ones to show). An App that may be installed only on
@@ -25,7 +26,7 @@ requests an hour per installation) or a personal access token (5,000 an hour).
 **Token.** A fine-grained token with public repository read access, or a classic token without scopes, in a file. Listed with a token, a
 user account shows its public repositories, or all of them, private ones included, when it is the token's own account (the token needs
 read access to them). For updates within seconds, add an organisation webhook (for a user account, a webhook on each repository) (Settings, Webhooks) with content type `application/json`, the same secret and the events *Pushes*,
-*Releases*, *Repositories*, *Pull requests*, *Pull request reviews*, *Check suites* and *Statuses*.
+*Releases*, *Repositories*, *Issues*, *Issue comments*, *Pull requests*, *Pull request reviews*, *Check suites* and *Statuses*.
 
 Each recent commit's diff stats (lines added and removed, files changed) come from GitHub's GraphQL API with the same credential and no other permission: up to 100 commits a query, only commits of the last 90 days, each asked once; GraphQL has its own rate limit, apart from the REST one.
 
@@ -33,6 +34,10 @@ The open pull requests are read per repository every 15 minutes, and at once on 
 webhook: the listing is a conditional request, free when nothing changed (GitHub does not count a 304), and only a changed
 repository costs one GraphQL query for the reviews, checks and mergeability of the pull requests that changed. Running checks are asked
 again after 5, 10, 20 and then 60 minutes; every pull request once an hour; an archived repository once.
+
+The open issues are read per repository every 15 minutes, and at once on an issue or issue comment webhook: GitHub's issues listing,
+the most recently updated first, as conditional requests (an unchanged page is free), up to 3 pages and 100 issues per repository; the
+pull requests in that listing are left out. No GraphQL.
 
 Without a webhook the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
 commits, documents, descriptors and manifests are also re-read on their own schedule.
@@ -256,7 +261,7 @@ headers decide who the viewer is.
 The portal can answer questions about its catalogue in plain language on its *Ask* page (`/ask`): which repositories use a library,
 what a group holds, what changed lately, why a repository's health is low. A language model reads the catalogue through read-only
 tools (search what the portal holds, list and read groups, read a repository's README and technology, read a document, the recent commits,
-the open pull requests, a repository's health) and answers in Markdown with links into the portal. It sees exactly what the person asking may see: a private
+the open pull requests, the open issues, a repository's health) and answers in Markdown with links into the portal. It sees exactly what the person asking may see: a private
 repository only for a viewer who sees private repositories.
 
 Nothing is stored: the conversation lives in the browser's page and is sent with each question. What the tools read is sent to the
@@ -393,6 +398,17 @@ The dashboard's telemetry and the presentation page's strip count them, the dash
 repository's open issues no longer count its pull requests, and two findings cost points: a person's pull request idle while waiting
 for a review (more than 7 days, more than 30), and automation's left open for more than 30 days. They need the App's *Pull requests*,
 *Checks* and *Commit statuses* read permissions (section 1); without them GitHub refuses the listing and `/pulls` stays empty.
+
+### 2.4.3 Issues
+
+**Issues** in the header (`/issues`) lists every open issue a reader may see, pull requests left out, and says for each where it
+stands: *needs triage* (no label, milestone or issue type: nobody has looked at it), *unassigned* (looked at, nobody took it) or
+*assigned*. Its kind is GitHub's issue type when set, else read from its labels: a bug (bug, defect, regression, crash), a feature
+(enhancement, feature, improvement), a question (question, support) or other. People's come before automation's (Renovate's
+dependency dashboard is automation), those needing triage first, then the longest idle; the states are filters, and the kind, the
+product, the repository, whose and the order are a form that works without JavaScript. A group's and a repository's page have a panel
+with the ones that wait longest, and the group table's issue counts link to them. The dashboard keeps its signal, the *backlog*
+finding. They need the App's *Issues* read permission (section 1); without it GitHub refuses the listing and `/issues` stays empty.
 
 ### 2.5 Published packages
 

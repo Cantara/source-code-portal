@@ -9,6 +9,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/docs"
+	"github.com/cantara/source-code-portal/internal/issues"
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/pulls"
@@ -113,6 +114,25 @@ func searchRead(e *snapshot.RepoEntry) search.Repository {
 			pd.Fields[search.FieldTitle], pd.Fields[search.FieldMeta] = p.Title, p.Head+" "+string(pulls.StateOf(&p))
 			pd.Fields[search.FieldAuthor] = p.Author
 			out.Documents = append(out.Documents, pd)
+		}
+	}
+
+	if set, _ := issues.Of(e); set != nil { // open issues by title, labels, author and where they stand; a hit opens them on /issues
+		at := "/issues?repo=" + url.QueryEscape(string(r.Key()))
+		for i := range set.Issues {
+			is := &set.Issues[i]
+			id := search.Document{Kind: search.KindIssue, Title: is.Title, URL: at, At: is.Updated}
+			labels := make([]string, 0, len(is.Labels)+1)
+			for _, l := range is.Labels {
+				labels = append(labels, l.Name)
+			}
+			if is.Type != "" {
+				labels = append(labels, is.Type)
+			}
+			id.Fields[search.FieldTitle], id.Fields[search.FieldTags] = is.Title, strings.Join(labels, " ")
+			id.Fields[search.FieldMeta] = string(issues.StateOf(is)) + " " + string(issues.KindOf(is)) + " " + is.Milestone
+			id.Fields[search.FieldAuthor] = is.Author
+			out.Documents = append(out.Documents, id)
 		}
 	}
 

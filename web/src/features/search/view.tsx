@@ -168,7 +168,7 @@ function Help() {
     ['"session timeout"', "the words next to each other"],
     ["oauth -legacy", "without a word"],
     ["oauth OR saml", "either word"],
-    ["in:doc, in:pull", "one kind: repo, group, doc, dep, package, commit, pull"],
+    ["in:doc, in:issue", "one kind: repo, group, doc, dep, package, commit, pull, issue"],
     ["group:iam repo:whydah", "within a group, or repositories whose name holds a word"],
     ["lang:java topic:iam lifecycle:production", "a repository's language, topic or lifecycle"],
     ["dep:slf4j", "repositories that depend on a package"],

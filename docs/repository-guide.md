@@ -7,7 +7,7 @@ from a repository and how to describe it.
 
 | Shown | Read from |
 |---|---|
-| Name, description, homepage, topics, licence, stars, open issues and pull requests, last push | the repository on GitHub |
+| Name, description, homepage, topics, licence, stars, open issues, open pull requests, last push | the repository on GitHub |
 | README | a `README` file (any case and extension, `README.md` preferred) in `.github/`, else the root, else `docs/` |
 | Documentation | up to 50 Markdown files (`.md`, `.markdown`) under `docs/`, in path order |
 | Latest commits | the 30 newest commits of the default branch |
@@ -78,7 +78,9 @@ points for each finding, and the portal shows the findings beside the score:
 | quiet | 10 | no change by a person for 6 months |
 | unreleased changes | 20 | commits landed after the latest release, and that release is older than 90 days |
 | no licence | 20 | a public repository where GitHub detects no licence |
-| open issues and pull requests | 10 or 20 | more than 20, or more than 50 |
+| backlog | 10 or 20 | more than 20 open issues, or more than 50 (pull requests are not counted) |
+| waiting for review | 5 or 15 | a person's pull request idle for more than 7 days waiting for a review, or more than 30 |
+| old updates | 5 | a pull request by automation open for more than 30 days |
 
 Commits by automation do not count as change: authors ending in `[bot]` or named like a bot (Renovate, Dependabot, GitHub Actions,
 `snyk-bot`), a bot's pull request merged by a person (a bot `Co-authored-by` trailer) and `[maven-release-plugin]` commits. Commits by
