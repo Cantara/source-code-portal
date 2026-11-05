@@ -22,6 +22,7 @@ const Kind = "pulls"
 const (
 	ttl       = 15 * time.Minute // webhooks notify the job; the listing is a free 304 when nothing changed
 	fullEvery = time.Hour        // checks change without touching the listing: every pull request is asked again this often
+	eventGap  = time.Minute      // anyone may open a pull request or review one on a public repository: one read a minute at most
 	failAgain = 10 * time.Minute // a failed GraphQL query is asked again this soon
 	maxTitle  = 200
 	maxLabel  = 50
@@ -167,7 +168,7 @@ func New(sources map[string]Fetcher, o Options) *Pulls {
 
 // Spec is the per-repository pull requests job.
 func (p *Pulls) Spec() sync.Spec {
-	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: Events, Run: p.run, Publish: publish}
+	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: Events, Settle: eventGap, Run: p.run, Publish: publish}
 }
 
 func (p *Pulls) run(ctx context.Context, j sync.Job) (sync.Result, error) {

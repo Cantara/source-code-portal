@@ -555,3 +555,27 @@ func TestObserveDepthAlive(t *testing.T) {
 		r.stop()
 	})
 }
+
+// TestSettleBoundsEventRuns: a stream of events for a job that settles runs it once a Settle, not once each; a scheduled run is
+// not held back.
+func TestSettleBoundsEventRuns(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var runs atomic.Int32
+		list := &counter{result: Result{Catalogue: []store.Repo{{Key: "acme/a", ID: snapshot.RepoID{Source: "gh", GitHubID: 1}}}}}
+		r := newRig(t, t.TempDir(), nil, 4, sourceSpec(list, time.Hour),
+			Spec{Kind: "issues", Prio: PrioScheduled, TTL: 15 * time.Minute, On: []Event{"issue_comment"}, Settle: time.Minute,
+				Run: func(context.Context, Job) (Result, error) { runs.Add(1); return Result{}, nil }})
+		r.run()
+		time.Sleep(time.Second)
+		base := runs.Load()
+		for range 120 { // a comment every second for two minutes
+			r.eng.Notify("issue_comment", "acme/a")
+			time.Sleep(time.Second)
+		}
+		time.Sleep(time.Second)
+		if got := runs.Load() - base; got < 2 || got > 3 {
+			t.Errorf("120 comments in two minutes gave %d runs, want 2 or 3 (one a minute)", got)
+		}
+		r.stop()
+	})
+}

@@ -10,7 +10,8 @@ budget, retries and pauses.
 ## Decisions (bullets, each with a one-line reason)
 - Own small engine in `sync` with its own retry loop: one entry per key with a due time, in-process, in one file.
 - Level-triggered: the due time per item is the state of record; events only make an entry due earlier, so a lost event is repaired by
-  the TTL.
+  the TTL. A spec's `Settle` (P-70) is the least time from one run's start to the next that an event may cause: `pulls` and `issues`
+  settle a minute, since anyone may comment on a public repository, so a stream of events costs one run a minute.
 - `sync` is the SQLite writer: a job returns a `Result` and `sync` writes the item row and schedule in one transaction, giving one write path.
 - One `Publish` function per job kind serves both warm start (from rows) and live results: the snapshot is built the same way in both cases.
 - Shared value types (`Repo`, `Group`, `Descriptor`, `Commit`, `Doc`, `Release`, `Manifest`, `Freshness`) live in `internal/snapshot`:
@@ -76,6 +77,7 @@ type Result struct { State snapshot.State; Unchanged bool; ContentSHA string; Pa
 type Spec struct {
 	Kind string; PerSource, Lists bool; Prio Priority; TTL, Timeout time.Duration // Timeout default 2 m
 	On      []Event                                                        // events that make this kind due for the repository or source
+	Settle  time.Duration                                                  // the least gap between runs an event causes; 0: none
 	Run     func(ctx context.Context, j Job) (Result, error)
 	Publish func(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) // warm start and live
 }

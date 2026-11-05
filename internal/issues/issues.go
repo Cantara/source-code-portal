@@ -20,6 +20,7 @@ const Kind = "issues"
 
 const (
 	ttl       = 15 * time.Minute // webhooks notify the job; an unchanged page is a free 304
+	settle    = time.Minute      // anyone may comment on a public repository's issue: a stream of comments costs one read a minute
 	maxTitle  = 200
 	maxLabel  = 50
 	maxName   = 100
@@ -150,7 +151,7 @@ func New(sources map[string]Fetcher, o Options) *Issues { return &Issues{sources
 
 // Spec is the per-repository issues job.
 func (f *Issues) Spec() sync.Spec {
-	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: Events, Run: f.run, Publish: publish}
+	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: Events, Settle: settle, Run: f.run, Publish: publish}
 }
 
 func (f *Issues) run(ctx context.Context, j sync.Job) (sync.Result, error) {

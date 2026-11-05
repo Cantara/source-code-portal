@@ -97,7 +97,10 @@ type Spec struct {
 	TTL       time.Duration
 	Timeout   time.Duration // default 2m
 	On        []Event
-	Run       func(ctx context.Context, j Job) (Result, error)
+	// Settle is the least time from one run's start to the next that an event may cause; 0: none. A job whose events anyone can
+	// send (a comment on a public repository's issue) settles, so a stream of them costs one run a Settle, not one each.
+	Settle time.Duration
+	Run    func(ctx context.Context, j Job) (Result, error)
 	// Publish puts a stored item into the snapshot. It runs for live results and at the warm start, in registration order.
 	Publish func(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness)
 }
@@ -163,8 +166,9 @@ type entry struct {
 	prio    Priority
 	backoff bool // due is a retry time that events do not pull earlier
 	running bool
-	dirty   bool  // an event arrived while running: run once more
-	rev     int64 // revision of item when it was shared or received
+	started time.Time // when the last run started
+	dirty   bool      // an event arrived while running: run once more
+	rev     int64     // revision of item when it was shared or received
 }
 
 type pause struct {
@@ -282,12 +286,21 @@ func (e *Engine) Notify(ev Event, repo snapshot.RepoKey) {
 // event makes the entry due now at event priority; a running job runs once more, a retry keeps its time. Callers hold e.mu.
 func (en *entry) event(now time.Time) {
 	en.prio = PrioEvent
+	at := en.settled(now)
 	switch {
 	case en.running:
 		en.dirty = true
-	case !en.backoff && en.due.After(now):
-		en.due = now
+	case !en.backoff && en.due.After(at):
+		en.due = at
 	}
+}
+
+// settled is the earliest an event may run the entry again: now, or Spec.Settle after the last run started.
+func (en *entry) settled(now time.Time) time.Time {
+	if at := en.started.Add(en.spec.Settle); en.spec.Settle > 0 && at.After(now) {
+		return at
+	}
+	return now
 }
 
 // NotifySource runs every per-source spec listening for ev for source soon, for events about repositories the engine may not know yet
@@ -389,7 +402,7 @@ func (e *Engine) next(now time.Time) (*entry, time.Time) {
 		}
 	}
 	if best != nil {
-		best.running, best.dirty = true, false
+		best.running, best.dirty, best.started = true, false, now
 	}
 	return best, at
 }
@@ -458,7 +471,7 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 		en.due, en.backoff = now.Add(backoff(en.item.Attempts)), true
 	}
 	if en.dirty && !en.backoff {
-		en.due, en.prio = now, PrioEvent
+		en.due, en.prio = en.settled(now), PrioEvent
 	}
 	en.dirty = false
 	if class == classRate || class == classAuth {
