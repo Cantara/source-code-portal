@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query"
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query"
 import { get, unwrap, type Api } from "@/lib/api/client"
 import { keys } from "@/lib/api/queries"
 import type { Work } from "@/lib/preferences"
@@ -28,11 +28,17 @@ export const workQuery = (api: Api, work: Work, limit: number) =>
     queryFn: ({ signal }) => unwrap(api.GET("/commits", { params: { query: { work, limit } }, signal })),
   })
 
-/** latestAllQuery is the newest commits of every kind, automation and sweeps included, for the dashboard's "include automation". */
-export const latestAllQuery = (api: Api, limit: number) =>
-  queryOptions({
-    queryKey: keys.commitLog("", "", true, limit, 1),
-    queryFn: ({ signal }) => unwrap(api.GET("/commits", { params: { query: { limit } }, signal })),
+/** morePages is how many pages the latest commits read as the reader scrolls; past them "All commits" has the rest. */
+export const morePages = 10
+
+/** moreQuery is the newest commits of a lens, page after page of 50, for the latest commits that go on as they are scrolled. */
+export const moreQuery = (api: Api, work: Work) =>
+  infiniteQueryOptions({
+    queryKey: ["commits", "more", work.join(",")] as const,
+    queryFn: ({ signal, pageParam }) =>
+      unwrap(api.GET("/commits", { params: { query: { work, limit: 50, page: pageParam } }, signal })),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
   })
 
 /** StoredLayout is the admin's layout of a page as the design mode edits it (out of the contract, behind the admin role). */

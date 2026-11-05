@@ -235,7 +235,7 @@ test("a product shows its weighed health and what costs it points", async ({ pag
   await expect(health.getByText(/repositories weighed/)).toBeVisible()
   await expect(health.getByRole("listitem").filter({ hasText: "No licence detected" })).toBeVisible()
   // The repository and the finding's mark open the finding on the repository's page, where its next step is.
-  await expect(health.getByRole("link", { name: "whydah-sso", exact: true })).toHaveAttribute(
+  await expect(health.getByRole("link", { name: "whydah-sso: No licence detected" })).toHaveAttribute(
     "href",
     "/repos/acme/whydah-sso#finding-no-licence",
   )

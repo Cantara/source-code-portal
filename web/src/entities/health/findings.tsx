@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import type { ReactNode } from "react"
 import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { addressPath } from "@/lib/paths"
@@ -22,7 +23,18 @@ export const findingPath = (repo: string, code: string) => `${addressPath(repo)}
  * finding on the repository's page, where its next step is (a tap shows the hint first, a second tap follows it, as the fleet's
  * tiles do), so a glance at a card can start the fix.
  */
-export function FindingMark({ finding: f, repo, className }: { finding: Finding; repo?: string; className?: string }) {
+export function FindingMark({
+  finding: f,
+  repo,
+  label,
+  className,
+}: {
+  finding: Finding
+  repo?: string
+  /** a label beside the icon, in the same link and hint (a tile's repository name) */
+  label?: ReactNode
+  className?: string
+}) {
   const rules = useRules()
   const kind = kindOf(f.code, rules)
   const sev = severityOf(f.penalty, rules)
@@ -43,13 +55,19 @@ export function FindingMark({ finding: f, repo, className }: { finding: Finding;
             {...t}
             href={findingPath(at, f.code)}
             aria-label={`${kind.label} in ${at.split("/")[1] ?? at}, ${sevLabel.toLowerCase()}: ${f.message}`}
-            className={cn("shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring", className)}
+            className={cn(
+              "rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              label ? "flex min-w-0 items-center gap-1.5 hover:underline" : "shrink-0",
+              className,
+            )}
           >
             <FindingIcon code={f.code} severity={sev} />
+            {label}
           </Link>
         ) : (
-          <span {...t} className={cn("shrink-0 cursor-help", className)}>
+          <span {...t} className={cn("cursor-help", label ? "flex min-w-0 items-center gap-1.5" : "shrink-0", className)}>
             <FindingIcon code={f.code} severity={sev} />
+            {label}
           </span>
         )
       }
@@ -87,15 +105,14 @@ export function FindingList({ findings, github, className }: { findings: Finding
               <span className="sr-only">
                 {kind.label}, {sevLabel.toLowerCase()}, costs {f.penalty} points:{" "}
               </span>
-              {"repo" in f && (
-                <>
-                  <Link href={findingPath(f.repo, f.code)} className="font-medium hover:underline">
-                    {f.repo.split("/")[1]}
-                  </Link>
-                  {": "}
-                </>
+              {"repo" in f ? (
+                // The repository and what was found, one link to the finding on its repository's page.
+                <Link href={findingPath(f.repo, f.code)} className="hover:underline">
+                  <span className="font-medium">{f.repo.split("/")[1]}</span>: {f.message}
+                </Link>
+              ) : (
+                f.message
               )}
-              {f.message}
               {github && kind.action.label && (
                 <>
                   {" "}

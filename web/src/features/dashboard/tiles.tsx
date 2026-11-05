@@ -92,10 +92,7 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
         <ul className="flex max-h-[3.25rem] flex-wrap gap-x-3 gap-y-1 overflow-hidden text-[0.9375rem]">
           {h.findings.slice(0, tileFindings).map((f) => (
             <li key={f.repo + f.code} className="flex min-w-0 max-w-full items-center gap-1.5">
-              <FindingMark finding={f} />
-              <span aria-hidden="true" className="truncate font-medium">
-                {f.repo.split("/")[1]}
-              </span>
+              <FindingMark finding={f} label={<span className="truncate font-medium">{f.repo.split("/")[1]}</span>} />
             </li>
           ))}
         </ul>

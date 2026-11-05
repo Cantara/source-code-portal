@@ -81,7 +81,10 @@ describe("health", () => {
     expect(screen.getByText("Watch")).toBeInTheDocument()
     render(<FindingList findings={product.findings} />)
     // The repository and the finding's mark open the finding on the repository's page, where its next step is.
-    expect(screen.getByRole("link", { name: "agent" })).toHaveAttribute("href", "/repos/acme/agent#finding-dormant")
+    expect(screen.getByRole("link", { name: /^agent: No change for 3 years/ })).toHaveAttribute(
+      "href",
+      "/repos/acme/agent#finding-dormant",
+    )
     expect(screen.getByRole("link", { name: /^Dormant in agent, high/ })).toHaveAttribute(
       "href",
       "/repos/acme/agent#finding-dormant",
