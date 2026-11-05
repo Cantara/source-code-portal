@@ -1056,9 +1056,9 @@ auth:
             ))}
           </div>
           <p className="max-w-prose text-sm text-muted-foreground">
-            The newest stable version shows on the release chip, such as <code className="font-mono text-xs">3.0.21 · Maven</code>
-            , and in the repository page&apos;s Packages panel, and it counts as a release for health. Public registries need no
-            setup. A private repository&apos;s package names are never sent to a public registry, only to yours.
+            The newest stable version shows as the release, with the registry it came from (Maven, npm, ...) beside it, and in the
+            repository page&apos;s Packages panel, and it counts as a release for health. Public registries need no setup. A
+            private repository&apos;s package names are never sent to a public registry, only to yours.
           </p>
           <Code label="Private registries in scp.yaml">{`packages:
   registries:

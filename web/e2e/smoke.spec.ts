@@ -286,7 +286,9 @@ for (const path of ["/groups/whydah"]) {
 
 test("a published package shows where there is no GitHub release, and on the repository page", async ({ page }) => {
   await page.goto("/groups/whydah")
-  await expect(page.getByRole("link", { name: /^1\.4\.0 · Maven, published package no\.acme:whydah-sso/ })).toBeVisible()
+  const row = page.getByRole("row").filter({ has: page.getByRole("link", { name: "whydah-sso", exact: true }) })
+  await expect(row.getByRole("link", { name: "1.4.0, published package no.acme:whydah-sso on Maven" })).toBeVisible()
+  await expect(row.getByRole("cell", { name: "Maven", exact: true })).toBeVisible()
   await page.goto("/repos/acme/whydah-core")
   const card = page.getByRole("region", { name: "Packages" }).or(page.locator("[aria-labelledby=packages]"))
   await expect(card).toContainText("no.acme:whydah-core")

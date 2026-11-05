@@ -34,8 +34,14 @@ type Column = {
   key: SortKey
   label: string
   numeric?: boolean
+  /** a count read on its own: centred under its header */
+  center?: boolean
   value: (r: Repo) => string | number
 }
+
+/** from is where a repository's release is published: GitHub for a GitHub release, else its newest package's registry. */
+const from = (r: Repo) =>
+  r.release ? "GitHub" : newestPackage(r) ? ecosystemLabel(newestPackage(r)?.ecosystem ?? "") : undefined
 
 const released = (r: Repo) => r.release?.publishedAt ?? newestPackage(r)?.publishedAt ?? ""
 
@@ -43,10 +49,11 @@ const released = (r: Repo) => r.release?.publishedAt ?? newestPackage(r)?.publis
 const columns: Column[] = [
   { key: "name", label: "Repository", value: (r) => r.name.toLowerCase() },
   { key: "release", label: "Release", value: released },
+  { key: "from", label: "From", value: (r) => from(r) ?? "" },
   { key: "licence", label: "Licence", value: (r) => r.license },
-  { key: "issues", label: "Issues", numeric: true, value: (r) => r.openIssues },
+  { key: "issues", label: "Issues", numeric: true, center: true, value: (r) => r.openIssues },
   { key: "last", label: "Last change", value: (r) => lastChange(r) },
-  { key: "findings", label: "Findings", numeric: true, value: (r) => r.health?.findings.length ?? -1 },
+  { key: "findings", label: "Findings", numeric: true, center: true, value: (r) => r.health?.findings.length ?? -1 },
   { key: "health", label: "Health", numeric: true, value: (r) => r.health?.score ?? -1 },
 ]
 
@@ -86,20 +93,19 @@ function Release({ r }: { r: Repo }) {
       </a>
     )
   if (!pkg) return <span className="text-muted-foreground">none</span>
-  const text = `${pkg.version} · ${ecosystemLabel(pkg.ecosystem)}`
   return pkg.url ? (
     <a
       href={pkg.url}
       rel="noreferrer nofollow"
-      aria-label={`${text}, published package ${pkg.name}`}
+      aria-label={`${pkg.version}, published package ${pkg.name} on ${ecosystemLabel(pkg.ecosystem)}`}
       title={pkg.name}
       className="block max-w-36 truncate hover:underline"
     >
-      {text}
+      {pkg.version}
     </a>
   ) : (
     <span className="block max-w-36 truncate" title={pkg.name}>
-      {text}
+      {pkg.version}
     </span>
   )
 }
@@ -147,7 +153,10 @@ export function GroupView({ group }: { group: string }) {
         key={c.key}
         scope="col"
         aria-sort={active ? (desc ? "descending" : "ascending") : undefined}
-        className={cn("px-3 py-2 font-medium whitespace-nowrap", c.numeric ? "text-right" : "text-left")}
+        className={cn(
+          "px-3 py-2 font-medium whitespace-nowrap",
+          c.center ? "text-center" : c.numeric ? "text-right" : "text-left",
+        )}
       >
         <button
           type="button"
@@ -224,6 +233,7 @@ export function GroupView({ group }: { group: string }) {
                           <td className="px-3 py-2 font-mono text-xs whitespace-nowrap tabular-nums">
                             <Release r={r} />
                           </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{from(r) ?? none}</td>
                           <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">
                             {lic ? (
                               <a href={lic.url} rel="noreferrer nofollow" title={lic.spdx} className="hover:underline">
@@ -233,7 +243,7 @@ export function GroupView({ group }: { group: string }) {
                               <span className="text-muted-foreground">no licence</span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          <td className="px-3 py-2 text-center font-mono tabular-nums">
                             <a href={issuesUrl(r.htmlUrl)} rel="noreferrer nofollow" className="hover:underline">
                               {count(r.openIssues)}
                               <span className="sr-only"> open issues</span>
@@ -242,7 +252,7 @@ export function GroupView({ group }: { group: string }) {
                           <td className="px-3 py-2 font-mono whitespace-nowrap">
                             <RelativeTime at={lastChange(r)} />
                           </td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          <td className="px-3 py-2 text-center font-mono tabular-nums">
                             <Findings r={r} />
                           </td>
                           <td className="px-3 py-2 text-right">

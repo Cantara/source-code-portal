@@ -1,5 +1,5 @@
 /** SortKey is a column of the group's repository table. */
-export const sortKeys = ["name", "release", "licence", "issues", "last", "findings", "health"] as const
+export const sortKeys = ["name", "release", "from", "licence", "issues", "last", "findings", "health"] as const
 export type SortKey = (typeof sortKeys)[number]
 
 export interface GroupSearch {

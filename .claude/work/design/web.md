@@ -68,7 +68,7 @@ web/
 | Path | Feature | Shows |
 |---|---|---|
 | `/` | dashboard | telemetry strip (repositories, active, released, licensed, open issues, in sync; activity legend), one card per group holding every member repository with its activity light and health badges, newest change first (large groups span columns), the repositories in no group, latest commits in a side rail |
-| `/groups/{group}` | groups | group header, the repository table drawn as the dashboard's product table (a panel, small muted headers, numbers right in mono, every column sortable through the URL: repository with its activity light, language and description on one line each, release or package, licence, issues, last change, findings with their hint, health ring and level; the status only when not up to date), the group's health and latest commits beside it in a 22 rem column |
+| `/groups/{group}` | groups | group header, the repository table drawn as the dashboard's product table (a panel, small muted headers, numbers right in mono, every column sortable through the URL: repository with its activity light, language and description on one line each, release (the version alone) and where it is from (GitHub, Maven, npm, ...), licence, issues, last change, findings with their hint, health ring and level; the status only when not up to date), the group's health and latest commits beside it in a 22 rem column |
 | `/groups/{group}/commits` | commits | the group's timeline: its commits by day |
 | `/repos/{owner}/{name}` | repos (+ manifests panels) | descriptor, SVG badges, rendered README, technology (uses, used by), dependencies per manifest, latest commits |
 | `/repos/{owner}/{name}/commits` | commits | the navigator of the repository's history (`design/commits-navigator.md`) |

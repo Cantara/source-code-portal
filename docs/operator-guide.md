@@ -372,7 +372,7 @@ announcements:
 
 A repository's release is often a package, not a GitHub release: a Java library published to a Maven repository by a CI server, a
 TypeScript one to npm. The portal reads the repository's build files and asks the registries for the newest release, which then shows
-where a GitHub release would: on the release chip (`3.0.21 · Maven`), in the repository page's *Packages* panel, in the group's
+where a GitHub release would: as the release, with its registry (`3.0.21`, from Maven), in the repository page's *Packages* panel, in the group's
 released count and in the health's unreleased check.
 
 - **Maven** (`pom.xml`, up to two directories deep): the package is the POM's `groupId:artifactId`. It is looked up where the POM
