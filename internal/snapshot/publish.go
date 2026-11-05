@@ -157,7 +157,9 @@ func (s *Snapshot) publicView() *Snapshot {
 	for _, g := range s.Groups {
 		g.Members = slices.DeleteFunc(slices.Clone(g.Members), func(k RepoKey) bool { return p.Repos[k] == nil })
 		if g.DefaultRepo != "" && p.Repos[g.DefaultRepo] == nil {
-			g.DefaultRepo = "" // private: not shown, and not reported missing either
+			// Private: told as a default that does not exist. An empty "ok" would tell that it exists and is private, since every
+			// group names a default.
+			g.DefaultRepo, g.DefaultMissing = "", true
 		}
 		p.Groups = append(p.Groups, g)
 	}

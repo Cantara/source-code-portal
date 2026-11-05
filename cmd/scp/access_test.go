@@ -124,8 +124,8 @@ catalog:
 		t.Errorf("staff detail: %d %s", code, b)
 	}
 	var g oapi.Group
-	if _, b, _ := get("/api/v1/groups/all", false); json.Unmarshal([]byte(b), &g) != nil || g.DefaultRepo != nil || g.DefaultRepoState != oapi.GroupDefaultRepoStateOk {
-		t.Errorf("public group shows the private default or reports it missing: %s", b)
+	if _, b, _ := get("/api/v1/groups/all", false); json.Unmarshal([]byte(b), &g) != nil || g.DefaultRepo != nil || g.DefaultRepoState != oapi.GroupDefaultRepoStateMissing {
+		t.Errorf("public group shows the private default, or tells it exists: %s", b)
 	}
 	if _, _, h := get("/api/v1/repos", false); !strings.Contains(h.Get("Vary"), "X-Forwarded-Groups") {
 		t.Errorf("Vary = %q", h.Get("Vary"))

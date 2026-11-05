@@ -1,16 +1,14 @@
 import type { Page } from "@playwright/test"
-import { expect, test } from "./fixtures"
+import { expect, hydrated, test } from "./fixtures"
 
 // cmd/scp/e2e_test.go: the fake provider signs in Ada Lovelace, an admin in staff; staff sees the private repository vault.
 const token = "e2e-token-0123456789abcdef0123456789abcdef"
 
-/** openAccount opens the account menu, pressing again while the page is not yet hydrated (a busy run renders it before its script runs). */
+/** openAccount opens the account menu once the page answers to clicks. */
 async function openAccount(page: Page) {
-  const menu = page.getByRole("menu", { name: "Account" })
-  await expect(async () => {
-    if (!(await menu.isVisible())) await page.getByRole("button", { name: "Ada Lovelace" }).click()
-    await expect(menu).toBeVisible({ timeout: 1000 })
-  }).toPass()
+  await hydrated(page)
+  await page.getByRole("button", { name: "Ada Lovelace" }).click()
+  await expect(page.getByRole("menu", { name: "Account" })).toBeVisible()
 }
 
 test("signing in through the provider returns to the page and shows the private repositories", async ({ page }) => {
@@ -49,6 +47,7 @@ test("a token signs in a person without the provider; a wrong one is explained",
   await expect(page).toHaveURL(/\/groups\/other$/)
   await expect(page.getByRole("button", { name: "e2e" })).toBeVisible()
   await expect(page.getByRole("link", { name: "vault", exact: true })).toBeVisible()
+  await hydrated(page)
   await page.getByRole("button", { name: "e2e" }).click()
   await expect(page.getByText("Signed in as e2e through a token.")).toBeVisible()
   await expect(page.getByRole("menuitem", { name: "Admin" })).toHaveCount(0)

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright"
-import { expect, test } from "./fixtures"
+import { expect, hydrated, test } from "./fixtures"
 import { screens } from "./screens"
 
 // design/present.md: the presentation page fits the screen it is on, without the header, every product a tile or in the fold.
@@ -54,10 +54,9 @@ test("/present follows the system on a tablet, is dark on a wall unless the read
   const bar = page.getByRole("navigation", { name: "Presentation" })
   await expect(bar).toHaveCSS("opacity", "0")
   await expect(bar.getByRole("button", { name: "Design this page" })).toHaveCount(0)
-  await expect(async () => {
-    await page.mouse.click(10, 10)
-    await expect(bar).toHaveCSS("opacity", "1", { timeout: 1000 })
-  }).toPass()
+  await hydrated(page)
+  await page.mouse.click(10, 10)
+  await expect(bar).toHaveCSS("opacity", "1")
   await bar.getByRole("button", { name: /^Theme/ }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await bar.getByRole("button", { name: /^Theme/ }).click()

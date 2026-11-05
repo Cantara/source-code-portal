@@ -259,7 +259,7 @@ func TestPublicView(t *testing.T) {
 	}
 	g, _ := v.Group("all")
 	if len(v.Repos) != 1 || v.Repos["acme/open"] == nil || len(v.Aliases) != 1 || v.Aliases["acme/was-open"] != "acme/open" ||
-		!slices.Equal(g.Members, []RepoKey{"acme/open"}) || g.DefaultRepo != "" || g.DefaultMissing || v.Sources[0].Repos != 1 {
+		!slices.Equal(g.Members, []RepoKey{"acme/open"}) || g.DefaultRepo != "" || !g.DefaultMissing || v.Sources[0].Repos != 1 {
 		t.Errorf("public view: repos %v, aliases %v, group %+v, sources %+v", v.Repos, v.Aliases, g, v.Sources)
 	}
 	if noteCount.Get(v) != 1 {
