@@ -73,7 +73,7 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
   {
     at: "shared",
     title: "What they share",
-    body: "Said once: the licence and the language at least 80% of the repositories share, and how many are released: a GitHub release or a published package (section 13).",
+    body: "Said once: the licence and the language at least 80% of the repositories share, and how many are released: a GitHub release or a published package (section 14).",
   },
 ]
 
@@ -141,6 +141,7 @@ const parts = [
       { id: "work", title: "The work that counts" },
       { id: "lists", title: "Tables and commits" },
       { id: "search", title: "Search" },
+      { id: "present", title: "On a wall" },
       { id: "yours", title: "Make it yours" },
     ],
   },
@@ -659,7 +660,7 @@ export function GuideView({ version }: { version: string }) {
               </p>
               <p>
                 It searches what the portal reads, not source code. You find only what you may see: private repositories only when
-                you are signed in to a group that sees them. Agents search the same way (section 14).
+                you are signed in to a group that sees them. Agents search the same way (section 15).
               </p>
             </div>
             <Terms
@@ -677,8 +678,51 @@ export function GuideView({ version }: { version: string }) {
         </Section>
 
         <Section
-          id="yours"
+          id="present"
           n={9}
+          title="On a wall"
+          lede="A tablet or a screen beside the team shows the fleet on one screen, all day, without anyone touching it."
+        >
+          <div className="flex flex-col gap-6">
+            <Figure caption="The presentation page on an iPad in landscape: the fleet's numbers and how current they are, every repository's health, a wide tile for the product to watch, one line for each good one, and the newest commits at the right.">
+              <Shot
+                name="present"
+                alt="The presentation page: 13 repositories, 3 products, 1 to watch, live; the fleet health with 3 to watch and 9 good; Developer tools as a wide tile at watch with its two findings, Payments and Identity as small tiles; the latest commits in a column at the right."
+              />
+            </Figure>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
+                <p>
+                  Open <span className="font-mono text-foreground">/present</span>. It never scrolls: a product that needs a look
+                  gets a wide tile with what to look at, the good ones one line each, and those that do not fit fold into &ldquo;N
+                  more good&rdquo;. Nothing rotates, so what you need is always there.
+                </p>
+                <p>
+                  The word at the top says how current it is: <em>Live</em> while new data arrives within seconds, <em>Stale</em>{" "}
+                  after two minutes without, <em>Offline</em> when the portal cannot be reached. A screen that went quiet never
+                  looks calm by mistake.
+                </p>
+                <p>
+                  It keeps the screen awake, is dark unless you chose otherwise, reloads itself for a new release and moves a
+                  pixel now and then so nothing burns in. A tap shows its controls for a few seconds; an administrator designs
+                  this page from there, as the dashboard.
+                </p>
+              </div>
+              <Terms
+                items={[
+                  ["/present?groups=payments,identity", "Only these products: one screen per team."],
+                  ["/present?work=hand,ai", "The work that counts on this screen, whatever its browser chose."],
+                  ["Add to Home Screen", "On an iPad, Share › Add to Home Screen opens it full screen, without the browser."],
+                  ["Signed in", "Where the portal needs sign-in, sign in once on the tablet: the page keeps the session."],
+                ]}
+              />
+            </div>
+          </div>
+        </Section>
+
+        <Section
+          id="yours"
+          n={10}
           title="Make it yours"
           lede="What you choose is kept in your browser, never on the server, and every page follows it."
         >
@@ -701,7 +745,7 @@ export function GuideView({ version }: { version: string }) {
         />
         <Section
           id="github"
-          n={10}
+          n={11}
           title="Connect GitHub"
           lede="The portal reads your repositories through a GitHub App of your organisation: read-only, with its own rate limit, and told by GitHub the moment something changes."
         >
@@ -740,7 +784,7 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
                 Note the <em>App ID</em>, generate a private key and save the downloaded file as{" "}
                 <code className="font-mono text-xs">secrets/scp-app.pem</code>. Then <em>Install App</em> on the organisation, for
                 all repositories or the ones the portal shows. The App ID and these two files are all the portal needs from GitHub
-                (section 11).
+                (section 12).
               </p>
             </Step>
           </ol>
@@ -754,14 +798,14 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
 
         <Section
           id="run"
-          n={11}
+          n={12}
           title="Run your own portal"
           lede="One binary or one container and one YAML file, scp.yaml. Nothing to back up but the configuration and its secrets."
         >
           <ol className="flex flex-col gap-6">
             <Step n={1} title="Point it at GitHub">
               <p>
-                The App of section 10: its ID and the two secret files. Secrets are always files, never values in the
+                The App of section 11: its ID and the two secret files. Secrets are always files, never values in the
                 configuration; the container finds <code className="font-mono text-xs">secrets/</code> at{" "}
                 <code className="font-mono text-xs">/run/secrets</code>.
               </p>
@@ -770,7 +814,7 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
     - id: github
       orgs: [your-org]
       app: { id: 123456, private_key_file: /run/secrets/scp-app.pem }
-      include_private: true        # private repositories too, for the people of section 12
+      include_private: true        # private repositories too, for the people of section 13
 webhook:
   secret_file: /run/secrets/webhook-secret`}</Code>
               <p>
@@ -813,7 +857,7 @@ scp config groups -c scp.yaml --repos repos.json   # where each repository lands
 
         <Section
           id="access"
-          n={12}
+          n={13}
           title="Sign-in and private repositories"
           lede="Everyone sees the public repositories. People who sign in and belong to a group you name see the private ones too; nobody else ever does."
         >
@@ -907,7 +951,7 @@ auth:
 
         <Section
           id="packages"
-          n={13}
+          n={14}
           title="Packages and private registries"
           lede="A release is often a package, not a GitHub release. The portal reads what a repository publishes from its build files and asks the registry for the newest version."
         >
@@ -962,7 +1006,7 @@ auth:
 
         <Section
           id="agents"
-          n={14}
+          n={15}
           title="Agents"
           lede="Your AI agents can ask the portal what you would: the same read-only tools its assistant uses, as the person who asks."
         >
@@ -996,7 +1040,7 @@ claude mcp add --transport http scp https://portal.example.org/mcp \
 
         <Section
           id="more"
-          n={15}
+          n={16}
           title="Options and documents"
           lede="Add what you need when you need it; the documents cover every key."
         >
@@ -1008,7 +1052,7 @@ claude mcp add --transport http scp https://portal.example.org/mcp \
               ["Private registries", "the newest version of your packages from Nexus, Artifactory or GitHub Packages"],
               ["The assistant", "questions about the catalogue in plain language, with your model provider"],
               ["Agents", "Claude Code and browser agents read the catalogue through /mcp and WebMCP"],
-              ["The design mode", "administrators arrange the dashboard for everyone"],
+              ["The design mode", "administrators arrange the dashboard and the presentation page for everyone"],
               ["Several instances", "one portal served together through Hazelcast"],
             ].map(([t, d]) => (
               <li key={t} className="rounded-lg border border-border p-3">

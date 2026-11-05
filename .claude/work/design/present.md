@@ -1,6 +1,6 @@
 # Presentation mode: the fleet on a wall (K1 to K2)
 
-Status: K1 built, K2 in progress (plan.md section 4). Binding order: ../plan.md > this note > `layout.md`.
+Status: K1 and K2 built (plan.md section 4). Binding order: ../plan.md > this note > `layout.md`.
 
 A tablet or a screen on the wall shows the portal all day: an iPad in landscape beside the team, a TV in the corridor. The dashboard is
 built for a reader who scrolls, hovers and clicks; on a wall nobody does. K1 and K2 give the portal one page made for being looked at
@@ -59,7 +59,9 @@ fits from 1024 to 1920 pixels wide.
 - **Latest commits**, the right column at full height: repository, time, author and subject on two lines, the AI and automation marks
   of the commit lists; as many as fit. A new commit slides in at the top (no motion with `prefers-reduced-motion`). It follows the
   work that counts.
-- **Text**: nothing below 15 px, numbers at 20 px and up; dark theme unless the reader chose; the theme's tokens only.
+- **Text**: 15 px for what is read (tiles, commits, the strip), numbers at 20 px; only the section labels and the fleet map's product
+  names are smaller. Dark theme unless the reader chose (`theme-init.js` and `lib/theme.ts` treat the system choice as dark on
+  `/present`); the theme's tokens only.
 
 ## Behaviour
 

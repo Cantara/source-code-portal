@@ -142,6 +142,14 @@ claude mcp add --transport http scp https://portal.example.org/mcp --header "Aut
 
 `/mcp` refuses an `Origin` other than `server.public_url`'s: set the public URL when the proxy serves another host name.
 
+## A screen on a wall
+
+`/present` is the presentation page for a tablet or a TV: one screen, no scrolling, live, nothing to configure. Bookmark one per team
+(`/present?groups=payments,identity`, `?work=hand,ai`); on an iPad add it to the home screen. Behind `access.require_auth` sign in
+once on the device, with single sign-on or a token of its own from `auth.tokens` (only the groups it shows): the page's hourly reload
+renews the session. An administrator arranges it like the dashboard; with `layout.dir`
+the layout is `present.json` beside `dashboard.json`.
+
 ## Search
 
 The search (`/search`, the header's box, `GET /api/v1/search?q=`) needs nothing configured: it is an index in memory of what the

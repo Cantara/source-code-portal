@@ -98,8 +98,8 @@ flat object per element whose kind reads only its own fields):
   list (move with the arrow buttons or by dragging, remove, the options of each), a new element from the catalogue with what it shows,
   and the draft drawn live beside it. *Save*, *Discard changes*, *Back to the built-in layout*, *Done* (asks before dropping unsaved
   changes). A refused save offers to load the newer layout. The reader's products view (the cookie) wins over a layout's `view`.
-- **Pages**: `dashboard`. The page is in the address, so further pages (a product's page, named dashboards) come without a format
-  change.
+- **Pages**: `dashboard` and `present` (the presentation page, `design/present.md`). The page is in the address, so further pages
+  (a product's page, named dashboards) come without a format change.
 
 ## The work that counts and Settings (L4)
 

@@ -55,6 +55,13 @@ async (page) => {
     await shot(p.getByRole("table"), "table")
     await p.goto(BASE + "/settings")
     await shot(p.locator("[aria-labelledby]").filter({ has: p.getByText("Work that counts", { exact: true }) }), "settings")
+    // The presentation page as an iPad in landscape shows it, the whole screen.
+    await p.setViewportSize({ width: 1180, height: 820 })
+    await p.goto(BASE + "/present")
+    await p.getByRole("region", { name: "Latest commits" }).getByRole("listitem").first().waitFor()
+    await p.waitForTimeout(500)
+    await p.screenshot({ path: `${OUT}/present-${theme}.png`, animations: "disabled" })
+    await p.setViewportSize({ width: 1280, height: 900 })
   }
   await ctx.clearCookies()
   if (browser) await ctx.close()

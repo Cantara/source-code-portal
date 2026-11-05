@@ -309,6 +309,20 @@ layout:
   layout stays, and `/api/v1/status` and the design mode say why.
 - A layout names groups, never repositories; a viewer sees only the groups with repositories they may see.
 
+**On a wall.** `/present` is the presentation page for a tablet or a screen beside the team: the fleet's numbers, every repository's
+health, the products as tiles and the newest commits on one screen that never scrolls. A product at watch or attention gets a wide
+tile with its findings; the good ones take a line each and fold into "N more good" when they do not fit. It says at all times how
+current it is (*Live*, *Polling*, *Stale* after 2 minutes without new data, *Offline* after 10 or while the portal cannot be reached),
+keeps the screen awake, is dark unless the reader chose, reloads for a new release and once an hour, and shifts a pixel now and then
+against burn-in. A tap shows its controls; an administrator designs it as the dashboard (`present.json` in `layout.dir`).
+
+- One screen per team: `/present?groups=payments,identity` keeps to those products, `?work=hand,ai` fixes the work that counts.
+- On an iPad, *Share › Add to Home Screen* opens it full screen without the browser (the page's web app manifest starts at
+  `/present`). Turn off auto-lock or rely on the page's wake lock, which Safari grants after the first tap.
+- With `access.require_auth`, sign in once on the tablet: through single sign-on, or on `/signin` with a token of its own from
+  `auth.tokens` (a screen is not a person: give it a name such as `wall-payments` and only the groups it should show). The page
+  reloads every hour, which renews the session within `auth.session_ttl`.
+
 ### 2.5 Published packages
 
 A repository's release is often a package, not a GitHub release: a Java library published to a Maven repository by a CI server, a

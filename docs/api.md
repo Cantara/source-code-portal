@@ -19,7 +19,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | Request | Returns |
 |---|---|
 | `GET /api/v1/dashboard[?work=hand,ai,automation]` | every group with its activity (the team's commits by hand and with AI, by automation and in sweeps over 30 days, 12 weekly counts of each kind, the AI assistants, and of the work that counts: the people, the last change, the repositories it changed last), its members' last change of that work, what most members share, its health; the fleet's activity; the latest commits of that work; repositories by freshness. `work` is the lens, one or more kinds comma-separated: `hand`, `ai` and `automation` (bots and sweeps); without it, every kind |
-| `GET /api/v1/pages/dashboard` | the landing page's layout: its elements in order, as an administrator designed it or built in |
+| `GET /api/v1/pages/{dashboard,present}` | a page's layout, the landing page's or the presentation page's: its elements in order, as an administrator designed it or built in |
 | `GET /api/v1/groups` | groups in configuration order |
 | `GET /api/v1/groups/{group}` | one group with its repositories |
 | `GET /api/v1/repos[?group=]` | every repository sorted by address, optionally of one group |
