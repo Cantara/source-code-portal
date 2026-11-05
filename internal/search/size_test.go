@@ -69,6 +69,9 @@ func TestIndexSize(t *testing.T) {
 	if testing.Short() {
 		t.Skip("the size check builds a large index")
 	}
+	if race {
+		t.Skip("the size check measures time: it runs without the race detector (make test)")
+	}
 	const repos = 1000
 	fs := corpus(repos)
 	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Indexer(testOptions()))
@@ -93,8 +96,8 @@ func TestIndexSize(t *testing.T) {
 	if st.Bytes > 96<<20 {
 		t.Errorf("the index holds %.1f MB, over 96 MB", float64(st.Bytes)/(1<<20))
 	}
-	if cold > 3*time.Second*slowdown {
-		t.Errorf("cold build %v, over %v", cold, 3*time.Second*slowdown)
+	if cold > 3*time.Second*slack() {
+		t.Errorf("cold build %v, over %v", cold, 3*time.Second*slack())
 	}
 
 	start = time.Now()
@@ -108,8 +111,8 @@ func TestIndexSize(t *testing.T) {
 		b.Mark("fixture/acme/service-0007", "acme/service-0007", 9999, 9999)
 	})
 	p.Flush()
-	if one := time.Since(start); one > 20*time.Millisecond*slowdown {
-		t.Errorf("a publish of one changed repository took %v, over %v", one, 20*time.Millisecond*slowdown)
+	if one := time.Since(start); one > 20*time.Millisecond*slack() {
+		t.Errorf("a publish of one changed repository took %v, over %v", one, 20*time.Millisecond*slack())
 	}
 
 	ix := Of(p.Current())
@@ -130,7 +133,7 @@ func TestIndexSize(t *testing.T) {
 	slices.Sort(took)
 	p99 := took[len(took)*99/100]
 	t.Logf("query p99 %v, median %v", p99, took[len(took)/2])
-	if p99 > 50*time.Millisecond*slowdown {
-		t.Errorf("query p99 %v, over %v", p99, 50*time.Millisecond*slowdown)
+	if p99 > 50*time.Millisecond*slack() {
+		t.Errorf("query p99 %v, over %v", p99, 50*time.Millisecond*slack())
 	}
 }

@@ -2,5 +2,5 @@
 
 package main
 
-// slowdown scales time bounds in tests: the race detector makes serving about ten times slower.
-const slowdown = 10
+// race is whether the race detector is on: the checks that measure time and size skip under it and run once without it (make test).
+const race = true

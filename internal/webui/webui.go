@@ -39,6 +39,9 @@ type Server struct {
 	addr      string // 127.0.0.1:port the child listens on
 	ready     atomic.Bool
 	served    atomic.Pointer[string] // the build id of the bundle the running server was started from
+
+	minBackoff, buildEvery, probeEvery time.Duration      // the constants; a test shortens them
+	observe                            func(event string) // a test's view of each step: "exited", "replaced", "ready"
 }
 
 // New picks a free loopback port for the server in dir (server.js), run with node; version is the portal's release the pages show.
@@ -49,7 +52,8 @@ func New(dir, node, version string, log *slog.Logger) (*Server, error) {
 	}
 	addr := ln.Addr().String()
 	_ = ln.Close()
-	return &Server{dir: dir, node: node, version: version, log: log.With("component", "web"), addr: addr}, nil
+	return &Server{dir: dir, node: node, version: version, log: log.With("component", "web"), addr: addr,
+		minBackoff: minBackoff, buildEvery: buildEvery, probeEvery: probeEvery}, nil
 }
 
 // URL is the address the pages are proxied to.
@@ -67,11 +71,17 @@ func (s *Server) Build() string {
 // Ready reports whether the server accepts connections.
 func (s *Server) Ready() bool { return s.ready.Load() }
 
+func (s *Server) note(event string) {
+	if s.observe != nil {
+		s.observe(event)
+	}
+}
+
 // Run starts the server and restarts it after every exit (1 s doubling to 30 s), and at once when the bundle is replaced (its BUILD
 // file is rewritten: a running server cannot load the files of another build), until ctx ends, then stops it: SIGTERM, and
 // SIGKILL after 5 s. api is the portal's API base the server calls (SCP_API, for example http://127.0.0.1:9090).
 func (s *Server) Run(ctx context.Context, api string) error {
-	backoff := minBackoff
+	backoff := s.minBackoff
 	for {
 		start := time.Now()
 		err := s.once(ctx, api)
@@ -80,13 +90,15 @@ func (s *Server) Run(ctx context.Context, api string) error {
 		}
 		if errors.Is(err, errReplaced) {
 			s.log.Info("web UI bundle replaced; restarting")
-			backoff = minBackoff
+			s.note("replaced")
+			backoff = s.minBackoff
 			continue
 		}
 		if time.Since(start) > steady {
-			backoff = minBackoff
+			backoff = s.minBackoff
 		}
 		s.log.Error("web UI server exited; restarting", "err", err, "in", backoff.String())
+		s.note("exited")
 		select {
 		case <-ctx.Done():
 			return nil
@@ -151,7 +163,7 @@ func (s *Server) read(name string) string {
 
 // watch ends the run when the bundle's stamp changes (a new bundle has been written in place).
 func (s *Server) watch(stamp string, done <-chan struct{}, stop context.CancelCauseFunc) {
-	t := time.NewTicker(buildEvery)
+	t := time.NewTicker(s.buildEvery)
 	defer t.Stop()
 	for {
 		select {
@@ -168,7 +180,7 @@ func (s *Server) watch(stamp string, done <-chan struct{}, stop context.CancelCa
 
 // probe marks the server ready once it accepts a connection.
 func (s *Server) probe(ctx context.Context, done <-chan struct{}) {
-	t := time.NewTicker(probeEvery)
+	t := time.NewTicker(s.probeEvery)
 	defer t.Stop()
 	d := net.Dialer{Timeout: time.Second}
 	for {
@@ -181,6 +193,7 @@ func (s *Server) probe(ctx context.Context, done <-chan struct{}) {
 			_ = c.Close()
 			s.ready.Store(true)
 			s.log.Info("web UI server ready")
+			s.note("ready")
 			return
 		}
 	}

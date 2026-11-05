@@ -2,5 +2,5 @@
 
 package main
 
-// slowdown scales time bounds in tests.
-const slowdown = 1
+// race is whether the race detector is on.
+const race = false
