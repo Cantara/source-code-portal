@@ -55,7 +55,7 @@ fits from 1024 to 1920 pixels wide.
   its order with a gap between runs and no label line (the products' names are on their tiles; a tap on a square names its
   repository, a screen reader hears each product's counts). The legend counts the levels on the title line. On Cantara's 134
   repositories in 13 products it is 106 px high where the labelled map took 240; 1,000 repositories take about 15 rows.
-- **Products as tiles**: a product at watch or attention takes a wide tile of three lines (name, level and the members at attention;
+- **Products as tiles**: a product at watch or attention takes a wide tile of three lines (name, then the level as the fleet map draws it, round for watch and outlined for attention, with how many repositories are at it, "● 6", the words in its hint;
   the last change, the release and the 12-week sparkline of the work that counts; its findings as the dashboard draws them: the kind's icon on its severity's tile and the repository, without the reason, which is the icon's hint and the screen reader's text; two lines of them, the most costly first). A good
   product takes a narrow tile of one line (name, last change, sparkline). When the tiles do not fit, they give up detail in order of
   importance: the good ones fold from the end into one tile, then the mildest at watch lose their wide tile, then they fold too

@@ -9,6 +9,7 @@ import { groupPath } from "@/lib/paths"
 import { levels } from "@/entities/health/health"
 import { FindingIcon, findingKinds, severities, severity } from "@/entities/health/kinds"
 import { Hint } from "@/shared/hint"
+import { healthCell } from "./fleet-map"
 import { Sparkline } from "@/shared/sparkline"
 import { qualifier, type Work } from "@/lib/preferences"
 import { counted, noun, series, weekly } from "./work"
@@ -56,10 +57,22 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
           </Link>
         </h3>
         {h && (
-          <span className="chip shrink-0 text-xs">
-            {levels[h.level].label}
-            {at > 0 && ` · ${plural(at, "repository", "repositories")}`}
-          </span>
+          // The level as the fleet map draws it (watch round, attention outlined) and how many repositories are at it.
+          <Hint
+            heading={levels[h.level].label}
+            swatch={levels[h.level].className}
+            meta={at > 0 ? plural(at, "repository", "repositories") : undefined}
+            render={(t) => (
+              <span {...t} className="flex shrink-0 cursor-help items-center gap-1.5 font-mono text-sm text-(--lvl-fg)">
+                <span aria-hidden="true" className={`cell ${healthCell(h.level)}`} />
+                {at > 0 && <span aria-hidden="true">{count(at)}</span>}
+                <span className="sr-only">
+                  {levels[h.level].label}
+                  {at > 0 && `: ${plural(at, "repository", "repositories")}`}
+                </span>
+              </span>
+            )}
+          />
         )}
       </div>
       <div className="flex items-end justify-between gap-3 text-[0.9375rem] text-muted-foreground">
