@@ -33,6 +33,11 @@ Not counted: archived repositories and `lifecycle: deprecated` (on its way out; 
 
 The score is 100 minus the penalties, at least 0. Levels: `good` from 80, `watch` from 50, `attention` below.
 
+Every threshold and penalty is a constant of `rules.go`, and `Describe()` tells them in words built from the same values: `GET
+/api/v1/rules` (P-62), which the pages explain from, so a changed rule changes every word that names it. Each kind of finding
+carries its next step on GitHub (`Action`: a label and a path below the repository's page). `TestDescribeTellsWhatAssessDoes` holds
+the telling to the doing; `cmd/scp` `TestRulesFixture` holds the web tests' copy (`web/src/test/rules.json`) to the answer.
+
 A product weighs its counted members: weight 2 for a repository changed in the last 6 months (work in progress matters most), 1
 otherwise, times 3 for the group's default repository. The product score is the weighted mean, rounded; its level is the mean's level,
 at least `watch` while any member is at `attention`, so one neglected repository is never averaged away. The product's findings are its

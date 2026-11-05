@@ -21,12 +21,12 @@ const (
 	Attention Level = "attention"
 )
 
-// LevelOf is the level of a score: good from 80, watch from 50, attention below.
+// LevelOf is the level of a score: good from goodFrom, watch from watchFrom, attention below (rules.go).
 func LevelOf(score int) Level {
 	switch {
-	case score >= 80:
+	case score >= goodFrom:
 		return Good
-	case score >= 50:
+	case score >= watchFrom:
 		return Watch
 	}
 	return Attention
@@ -74,7 +74,7 @@ func Assess(s Signals, now time.Time) Repo {
 		fs = append(fs, Finding{Code: code, Penalty: penalty, Message: fmt.Sprintf(format, args...)})
 	}
 	if s.Failing {
-		add("failing", 25, "SCP cannot update it from GitHub")
+		add("failing", penalties["failing"][0], "SCP cannot update it from GitHub")
 	}
 	age := now.Sub(s.LastChange)
 	by, more := "", ""
@@ -85,29 +85,29 @@ func Assess(s Signals, now time.Time) Repo {
 		}
 	}
 	switch {
-	case age > 730*day:
-		add("dormant", 30, "No change%s for %s%s: archive it or revive it", by, more, span(age))
-	case age > 182*day:
-		add("quiet", 10, "No change%s for %s%s", by, more, span(age))
+	case age > dormantAfter:
+		add("dormant", penalties["dormant"][0], "No change%s for %s%s: archive it or revive it", by, more, span(age))
+	case age > recentFor:
+		add("quiet", penalties["quiet"][0], "No change%s for %s%s", by, more, span(age))
 	}
-	if s.Release != "" && !s.LastCommit.IsZero() && s.LastCommit.After(s.Released) && now.Sub(s.Released) > 90*day {
-		add("unreleased", 20, "Unreleased changes since %s, released %s ago", s.Release, span(now.Sub(s.Released)))
+	if s.Release != "" && !s.LastCommit.IsZero() && s.LastCommit.After(s.Released) && now.Sub(s.Released) > unreleasedAfter {
+		add("unreleased", penalties["unreleased"][0], "Unreleased changes since %s, released %s ago", s.Release, span(now.Sub(s.Released)))
 	}
 	if s.Public && s.License == "" {
-		add("no-licence", 20, "No licence detected")
+		add("no-licence", penalties["no-licence"][0], "No licence detected")
 	}
 	switch {
-	case s.OpenIssues > 50:
-		add("issues", 20, "%d open issues and pull requests", s.OpenIssues)
-	case s.OpenIssues > 20:
-		add("issues", 10, "%d open issues and pull requests", s.OpenIssues)
+	case s.OpenIssues > issuesTooMany:
+		add("issues", penalties["issues"][0], "%d open issues and pull requests", s.OpenIssues)
+	case s.OpenIssues > issuesMany:
+		add("issues", penalties["issues"][1], "%d open issues and pull requests", s.OpenIssues)
 	}
 	score := 100
 	for _, f := range fs {
 		score -= f.Penalty
 	}
 	score = max(score, 0)
-	return Repo{Counted: true, Score: score, Level: LevelOf(score), Recent: age <= 182*day, Findings: fs}
+	return Repo{Counted: true, Score: score, Level: LevelOf(score), Recent: age <= recentFor, Findings: fs}
 }
 
 // span is a duration in whole days, months or years.

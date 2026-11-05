@@ -8,6 +8,7 @@ const lc = (s: string) => s.toLowerCase()
  * cache and the browser's always agree on a key.
  */
 export const keys = {
+  rules: () => ["rules"] as const,
   dashboard: (work: readonly string[]) => ["dashboard", work.join(",")] as const,
   repos: () => ["repos"] as const,
   repo: (owner: string, name: string) => ["repo", lc(owner), lc(name)] as const,
@@ -30,6 +31,9 @@ export const keys = {
 
 export const meQuery = (api: Api) =>
   queryOptions({ queryKey: keys.me(), queryFn: ({ signal }) => unwrap(api.GET("/me", { signal })) })
+
+export const rulesQuery = (api: Api) =>
+  queryOptions({ queryKey: keys.rules(), queryFn: ({ signal }) => unwrap(api.GET("/rules", { signal })) })
 
 export const assistantQuery = (api: Api) =>
   queryOptions({ queryKey: keys.assistant(), queryFn: ({ signal }) => unwrap(api.GET("/assistant", { signal })) })

@@ -189,13 +189,7 @@ function Screen({
     switch (el.kind) {
       case "telemetry":
         left.push(
-          <TelemetryStrip
-            key={i}
-            data={scope}
-            now={now}
-            start={strip ? undefined : <Brand />}
-            end={strip ? undefined : <Freshness />}
-          />,
+          <TelemetryStrip key={i} data={scope} start={strip ? undefined : <Brand />} end={strip ? undefined : <Freshness />} />,
         )
         strip = true
         break

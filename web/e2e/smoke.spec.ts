@@ -147,7 +147,7 @@ test("a fleet tile and a legend level name their signals at once, on hover or a 
   await page.keyboard.press("Escape")
   await expect(tip).toHaveCount(0)
   await fleet.getByRole("list", { name: "Activity of every repository" }).getByRole("listitem").first().focus()
-  await expect(tip).toContainText(/^Active.*Last change.* within 30 days$/)
+  await expect(tip).toContainText(/^Active.*Changed in the last 30 days$/)
 })
 
 test("the latest commits sit beside the products, fold away and widen, and the page remembers both", async ({
@@ -234,7 +234,15 @@ test("a product shows its weighed health and what costs it points", async ({ pag
   const health = page.getByRole("region", { name: "Health" })
   await expect(health.getByText(/repositories weighed/)).toBeVisible()
   await expect(health.getByRole("listitem").filter({ hasText: "No licence detected" })).toBeVisible()
-  await expect(health.getByRole("link", { name: "whydah-sso" })).toHaveAttribute("href", "/repos/acme/whydah-sso")
+  // The repository and the finding's mark open the finding on the repository's page, where its next step is.
+  await expect(health.getByRole("link", { name: "whydah-sso", exact: true })).toHaveAttribute(
+    "href",
+    "/repos/acme/whydah-sso#finding-no-licence",
+  )
+  await expect(health.getByRole("link", { name: /^No licence in whydah-sso/ })).toHaveAttribute(
+    "href",
+    "/repos/acme/whydah-sso#finding-no-licence",
+  )
 })
 
 test("the header shows the portal's release", async ({ page }) => {

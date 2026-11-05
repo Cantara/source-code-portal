@@ -8,7 +8,8 @@ import { by, every, qualifier, type Work } from "@/lib/preferences"
 import { Hint } from "@/shared/hint"
 import { Toggletip } from "@/shared/toggletip"
 import { levels } from "@/entities/health/health"
-import { activities, activityAt, type Activity } from "@/entities/repo/health"
+import { activityRule, levelLabel, span, type ActivityLevel, type Rules } from "@/lib/rules"
+import { useRules } from "@/lib/rules-context"
 
 type Group = Schemas["DashboardGroup"]
 type Member = Group["members"][number]
@@ -31,50 +32,34 @@ function healthTally(members: Member[]): Record<Level | "none", number> {
   return t
 }
 
-function healthSummary(members: Member[]): string {
+function healthSummary(members: Member[], rules: Rules): string {
   const t = healthTally(members)
   return (
-    [...healthLevels.map((l) => [t[l], levels[l].label.toLowerCase()] as const), [t.none, "not scored"] as const]
+    [...healthLevels.map((l) => [t[l], levelLabel(l, rules).toLowerCase()] as const), [t.none, "not scored"] as const]
       .filter(([n]) => n > 0)
       .map(([n, l]) => `${count(n)} ${l}`)
       .join(", ") || "no repositories"
   )
 }
 
-const label = Object.fromEntries(activities.map((a) => [a.level, a.label])) as Record<Activity, string>
-
-function tally(members: Group["members"], now: number): Record<Activity, number> {
-  const t: Record<Activity, number> = { active: 0, recent: 0, quiet: 0, dormant: 0, archived: 0 }
-  for (const m of members) t[activityAt(m.lastAuthoredAt, m.archived, now)]++
+/** tally counts the members at each activity the server gave them. */
+function tally(members: Member[]): Record<ActivityLevel, number> {
+  const t: Record<ActivityLevel, number> = { active: 0, recent: 0, quiet: 0, dormant: 0, archived: 0 }
+  for (const m of members) t[m.activity]++
   return t
 }
 
-/** ages say what each level means, of the last change of the work that counts. */
-const ages: Record<Activity, string> = {
-  active: "in the last 30 days",
-  recent: "in the last 6 months",
-  quiet: "in the last 2 years",
-  dormant: "more than 2 years ago, or none among the commits read",
-  archived: "archived on GitHub, whatever its age",
-}
-
-/** short is each level's range in a few words, for its hint. */
-const short: Record<Activity, string> = {
-  active: "within 30 days",
-  recent: "within 6 months",
-  quiet: "within 2 years",
-  dormant: "over 2 years ago, or none read",
-  archived: "",
-}
+/** sentence is a rule's words as a sentence: "Changed in the last 30 days". */
+const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** plural is a count of repositories in words. */
 function plural(n: number): string {
   return `${count(n)} ${n === 1 ? "repository" : "repositories"}`
 }
 
-function summary(t: Record<Activity, number>): string {
+function summary(t: Record<ActivityLevel, number>, rules: Rules): string {
   return (
-    activities
+    rules.activity
       .filter((a) => t[a.level] > 0)
       .map((a) => `${count(t[a.level])} ${a.label.toLowerCase()}`)
       .join(", ") || "no repositories"
@@ -101,10 +86,11 @@ export function FleetMap({
   /** one strip of tiles without the products' names, for the presentation page (by health only) */
   dense?: boolean
 }) {
+  const rules = useRules()
   const all = new Map<string, Member>()
   for (const g of groups) for (const m of g.members) all.set(m.address, m)
   if (color === "health") return <HealthMap groups={groups} members={[...all.values()]} work={work} now={now} dense={dense} />
-  const total = tally([...all.values()], now)
+  const total = tally([...all.values()])
   return (
     <section aria-labelledby="fleet" className="panel relative z-10 flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -119,11 +105,11 @@ export function FleetMap({
               on one day) never count.
             </p>
             <ul className="mt-2 flex flex-col gap-0.5">
-              {activities.map((a) => (
+              {rules.activity.map((a) => (
                 <li key={a.level} className={`lvl-${a.level} flex items-center gap-1.5`}>
                   <span aria-hidden="true" className="cell" />
                   <span>
-                    <span className="font-medium">{a.label}</span>: {ages[a.level]}
+                    <span className="font-medium">{a.label}</span>: {a.about}
                   </span>
                 </li>
               ))}
@@ -134,7 +120,7 @@ export function FleetMap({
           </Toggletip>
         </div>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Activity of every repository">
-          {activities.map((a) => (
+          {rules.activity.map((a) => (
             <Hint
               key={a.level}
               heading={a.label}
@@ -148,12 +134,12 @@ export function FleetMap({
                 >
                   <span aria-hidden="true" className="cell" />
                   {a.label}
-                  {a.span && <span>{a.span}</span>}
+                  {span(a.level, rules) && <span>{span(a.level, rules)}</span>}
                   <span className="font-mono text-foreground">{count(total[a.level])}</span>
                 </li>
               )}
             >
-              {a.level === "archived" ? "Archived on GitHub" : `Last change${qualifier(work)} ${short[a.level]}`}
+              {a.level === "archived" ? sentence(a.about) : `${sentence(a.about)}${qualifier(work)}`}
             </Hint>
           ))}
         </ul>
@@ -165,10 +151,10 @@ export function FleetMap({
               <span className="truncate font-medium">{g.name}</span>
               <span className="font-mono text-muted-foreground tabular-nums">{count(g.members.length)}</span>
             </p>
-            <p className="sr-only">{summary(tally(g.members, now))}</p>
+            <p className="sr-only">{summary(tally(g.members), rules)}</p>
             <div aria-hidden="true" className="mt-1 flex flex-wrap gap-0.5">
               {g.members.map((m) => {
-                const level = activityAt(m.lastAuthoredAt, m.archived, now)
+                const level = m.activity
                 return (
                   <Hint
                     key={m.address}
@@ -176,10 +162,12 @@ export function FleetMap({
                     rows={[
                       {
                         swatch: `lvl-${level}`,
-                        label: label[level],
+                        label: activityRule(level, rules).label,
                         value: m.lastAuthoredAt ? `${ago(m.lastAuthoredAt, now)} ago` : "none read",
                       },
-                      ...(m.level ? [{ swatch: levels[m.level].className, label: "Health", value: levels[m.level].label }] : []),
+                      ...(m.level
+                        ? [{ swatch: levels[m.level].className, label: "Health", value: levelLabel(m.level, rules) }]
+                        : []),
                     ]}
                     render={(t) => (
                       <Link
@@ -218,6 +206,7 @@ function HealthMap({
   now: number
   dense: boolean
 }) {
+  const rules = useRules()
   const total = healthTally(members)
   const tile = (m: Member) => (
     <Hint
@@ -225,10 +214,10 @@ function HealthMap({
       heading={m.name}
       rows={[
         ...(m.level
-          ? [{ swatch: levels[m.level].className, label: "Health", value: levels[m.level].label }]
+          ? [{ swatch: levels[m.level].className, label: "Health", value: levelLabel(m.level, rules) }]
           : [{ swatch: "lvl-dormant", label: "Health", value: "not scored" }]),
         {
-          swatch: `lvl-${activityAt(m.lastAuthoredAt, m.archived, now)}`,
+          swatch: `lvl-${m.activity}`,
           label: `Last change${qualifier(work)}`,
           value: m.lastAuthoredAt ? `${ago(m.lastAuthoredAt, now)} ago` : "none read",
         },
@@ -246,26 +235,43 @@ function HealthMap({
           {healthLevels.map((l) => (
             <li key={l} className={`${levels[l].className} flex items-center gap-1.5`}>
               <span aria-hidden="true" className={`cell ${healthCell(l)}`} />
-              {levels[l].label}
+              {levelLabel(l, rules)}
               <span className="font-mono text-foreground tabular-nums">{count(total[l])}</span>
             </li>
           ))}
         </ul>
       </div>
       {dense ? (
-        // One strip: each product a run of tiles in its order, a gap between runs; the products' names are on their tiles below.
+        // One strip of clusters: each product its tiles in a hairline box under its name (cut to the tiles' width, whole in its
+        // hint), so the fleet reads as its products at a glance.
         <>
           <ul className="sr-only">
             {groups.map((g) => (
               <li key={g.id}>
-                {g.name}: {healthSummary(g.members)}
+                {g.name}: {healthSummary(g.members, rules)}
               </li>
             ))}
           </ul>
-          <div aria-hidden="true" className="flex flex-wrap gap-x-3 gap-y-1">
+          <div aria-hidden="true" className="flex flex-wrap gap-1.5">
             {groups.map((g) => (
-              <span key={g.id} title={g.name} className="flex flex-wrap gap-1">
-                {g.members.map(tile)}
+              <span key={g.id} className="flex flex-col gap-0.5 rounded-sm border border-border/70 px-1 pt-0.5 pb-1">
+                <Hint
+                  heading={g.name}
+                  meta={`${count(g.members.length)} ${g.members.length === 1 ? "repository" : "repositories"}`}
+                  rows={healthLevels
+                    .map((l) => ({ l, n: g.members.filter((m) => m.level === l).length }))
+                    .filter(({ n }) => n > 0)
+                    .map(({ l, n }) => ({ swatch: levels[l].className, label: levelLabel(l, rules), value: count(n) }))}
+                  render={(t) => (
+                    <span
+                      {...t}
+                      className="w-0 min-w-full cursor-help truncate text-[0.625rem] leading-none text-muted-foreground"
+                    >
+                      {g.name}
+                    </span>
+                  )}
+                />
+                <span className="flex flex-wrap gap-1">{g.members.map(tile)}</span>
               </span>
             ))}
           </div>
@@ -278,7 +284,7 @@ function HealthMap({
                 <span className="truncate font-medium">{g.name}</span>
                 <span className="font-mono text-muted-foreground tabular-nums">{count(g.members.length)}</span>
               </p>
-              <p className="sr-only">{healthSummary(g.members)}</p>
+              <p className="sr-only">{healthSummary(g.members, rules)}</p>
               <div aria-hidden="true" className="mt-1 flex max-w-[20rem] flex-wrap gap-1">
                 {g.members.map(tile)}
               </div>

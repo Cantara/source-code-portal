@@ -31,7 +31,7 @@ export function Elements({
   const draw = (el: Element, i: number, fold?: ReactNode) => {
     switch (el.kind) {
       case "telemetry":
-        return <Telemetry key={i} data={data} now={now} />
+        return <Telemetry key={i} data={data} />
       case "fleet-map":
         return <FleetMap key={i} groups={pick(data.groups, el.groups)} work={data.work} now={now} color={el.color} />
       case "products":

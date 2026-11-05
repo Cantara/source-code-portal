@@ -1,7 +1,13 @@
 import "@testing-library/jest-dom/vitest"
 import { cleanup } from "@testing-library/react"
-import { afterAll, afterEach, beforeAll } from "vitest"
-import { server } from "./server"
+import { afterAll, afterEach, beforeAll, vi } from "vitest"
+import { rules, server } from "./server"
+
+// Components read the rules the root layout passes down; a test renders them without it, so they read the server's (rules.json).
+vi.mock("@/lib/rules-context", async (actual) => ({
+  ...(await actual<typeof import("@/lib/rules-context")>()),
+  useRules: () => rules,
+}))
 
 // jsdom has no layout; the router calls scrollTo on navigation.
 window.scrollTo = () => {}

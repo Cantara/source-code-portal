@@ -2,6 +2,7 @@ import { setupServer } from "msw/node"
 import { createOpenApiHttp } from "openapi-msw"
 import type { components, paths } from "@/lib/api/schema"
 import { workOf } from "@/lib/preferences"
+import serverRules from "./rules.json"
 
 type S = components["schemas"]
 
@@ -25,6 +26,9 @@ export function commit(i: number, repo = "acme/core"): S["Commit"] {
     assistant: "",
   }
 }
+
+/** rules are the server's rules (GET /rules), held equal to internal/health by cmd/scp's TestRulesFixture. */
+export const rules = serverRules as S["Rules"]
 
 export const healthy: S["Health"] = { score: 100, level: "good", findings: [] }
 
@@ -117,6 +121,7 @@ export const defaults = [
   http.get("/assistant", ({ response }) =>
     response(200).json({ enabled: false, allowed: false, access: "signed-in", provider: "", model: "" }),
   ),
+  http.get("/rules", ({ response }) => response(200).json(rules)),
   http.get("/snapshot", ({ response }) => response(200).json(snapshot(1))),
   http.get("/pages/{page}", ({ response }) =>
     response(200).json({
@@ -156,8 +161,15 @@ export const defaults = [
             recent: [{ repo: "acme/whydah-core", at }],
           }),
           members: [
-            { address: "acme/whydah", name: "Whydah", archived: false, lastAuthoredAt: at, level: "good" },
-            { address: "acme/whydah-core", name: "Whydah-Core", archived: false, lastAuthoredAt: at, level: "watch" },
+            { address: "acme/whydah", name: "Whydah", archived: false, lastAuthoredAt: at, level: "good", activity: "active" },
+            {
+              address: "acme/whydah-core",
+              name: "Whydah-Core",
+              archived: false,
+              lastAuthoredAt: at,
+              level: "watch",
+              activity: "active",
+            },
           ],
           summary: { license: "Apache-2.0", language: "Java", released: 1 },
         },

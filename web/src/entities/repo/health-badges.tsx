@@ -2,14 +2,14 @@
 
 import type { Repo } from "@/lib/api/client"
 import { ago, count } from "@/lib/format"
-import { activities, activity, lastChange, type Activity, type Pulse } from "./health"
+import { activityRule, levelLabel, span } from "@/lib/rules"
+import { useRules } from "@/lib/rules-context"
+import { activity, lastChange } from "./health"
 import { issuesUrl, licence } from "./licence"
 import { ecosystemLabel, newestPackage } from "./packages"
 import { cn } from "@/lib/cn"
 import { levels } from "@/entities/health/health"
 import { Hint } from "@/shared/hint"
-
-const label = Object.fromEntries(activities.map((a) => [a.level, a])) as Record<Activity, (typeof activities)[number]>
 
 // The components take the view's instant (useNow, read once per view): one clock subscription per page, not one per repository.
 
@@ -28,15 +28,17 @@ export function ActivityLight({
   decorative?: boolean
   className?: string
 }) {
-  const level = activity(repo, now)
+  const rules = useRules()
+  const level = activity(repo, now, rules)
+  const name = activityRule(level, rules).label
   return (
     <Hint
-      heading={label[level].label}
+      heading={name}
       swatch={`lvl-${level}`}
       meta={`${ago(lastChange(repo), now)} ago`}
       render={(t) => (
         <span {...t} className={cn(`lvl-${level} led led-live cursor-help`, className)} aria-hidden={decorative || undefined}>
-          {!decorative && <span className="sr-only">{label[level].label}</span>}
+          {!decorative && <span className="sr-only">{name}</span>}
         </span>
       )}
     />
@@ -48,7 +50,9 @@ export function ActivityLight({
  * latest release, licence, open issues and language. Every badge carries its meaning in text, so colour is never the only signal.
  */
 export function HealthBadges({ repo, now, className }: { repo: Repo; now: number; className?: string }) {
-  const level = activity(repo, now)
+  const rules = useRules()
+  const level = activity(repo, now, rules)
+  const rule = activityRule(level, rules)
   const lic = licence(repo.license)
   const pkg = newestPackage(repo)
   const health = repo.health
@@ -63,24 +67,25 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
             value: `−${f.penalty}`,
           }))}
           swatch={levels[health.level].className}
-          meta={levels[health.level].label}
+          meta={levelLabel(health.level, rules)}
           render={(t) => (
             <span {...t} className={cn(levels[health.level].className, "chip cursor-help")}>
               <span className="sr-only">Health </span>
-              {health.score} {levels[health.level].label.toLowerCase()}
+              {health.score} {levelLabel(health.level, rules).toLowerCase()}
               <span className="sr-only">: {health.findings.map((f) => f.message).join("; ")}</span>
             </span>
           )}
         />
       )}
       <Hint
-        heading={label[level].label}
+        heading={rule.label}
         swatch={`lvl-${level}`}
-        meta={label[level].span}
+        meta={span(level, rules)}
+        children={rule.about || undefined}
         render={(t) => (
           <span {...t} className={`lvl-${level} chip cursor-help`}>
             <span aria-hidden="true" className="led size-1.5" />
-            <span className="sr-only">{label[level].label}, last change</span>
+            <span className="sr-only">{rule.label}, last change</span>
             <time dateTime={lastChange(repo)} suppressHydrationWarning>
               {ago(lastChange(repo), now)}
             </time>
@@ -184,56 +189,5 @@ export function HealthBadges({ repo, now, className }: { repo: Repo; now: number
       />
       {repo.language && <span className="chip">{repo.language}</span>}
     </span>
-  )
-}
-
-/** HealthStrip is one cell per repository, coloured by activity, newest change first; the label says the counts. */
-export function HealthStrip({ repos, pulse, now, className }: { repos: Repo[]; pulse: Pulse; now: number; className?: string }) {
-  const summary = activities
-    .filter((a) => pulse.levels[a.level] > 0)
-    .map((a) => `${pulse.levels[a.level]} ${a.label.toLowerCase()}`)
-    .join(", ")
-  return (
-    <span role="img" aria-label={`Activity: ${summary || "no repositories"}`} className={cn("flex flex-wrap gap-0.5", className)}>
-      {repos.map((r) => {
-        const level = activity(r, now)
-        return (
-          <Hint
-            key={r.address}
-            heading={r.name}
-            swatch={`lvl-${level}`}
-            meta={`${label[level].label} · ${ago(lastChange(r), now)} ago`}
-            render={(t) => <span {...t} className={`lvl-${level} cell cursor-help`} />}
-          />
-        )
-      })}
-    </span>
-  )
-}
-
-/** ActivityLegend explains the activity colours. */
-export function ActivityLegend({ pulse }: { pulse?: Pulse }) {
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Activity legend">
-      {activities.map((a) => (
-        <Hint
-          key={a.level}
-          heading={a.label}
-          swatch={`lvl-${a.level}`}
-          meta={a.span}
-          render={(t) => (
-            <li
-              {...t}
-              tabIndex={0}
-              className={`lvl-${a.level} flex cursor-help items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-            >
-              <span aria-hidden="true" className="cell" />
-              {a.label}
-              {pulse && <span className="font-mono text-foreground">{count(pulse.levels[a.level])}</span>}
-            </li>
-          )}
-        />
-      ))}
-    </ul>
   )
 }

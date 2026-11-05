@@ -18,6 +18,7 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { SafeHtml } from "@/shared/safe-html"
 import { VisibilityBadge } from "@/entities/repo/visibility-badge"
+import { FindingList, HealthScore } from "@/entities/health/findings"
 import { docListQuery, docQuery, repoQuery } from "@/lib/api/queries"
 import { RepoBadges } from "./badges"
 import { readmeOf } from "./readme"
@@ -70,6 +71,7 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
             {main}
           </div>
           <div className="flex min-w-0 flex-col gap-6">
+            {repo?.health && <HealthCard health={repo.health} github={repo.htmlUrl} />}
             {data.descriptor.present && <DescriptorCard d={data.descriptor} />}
             {side}
             <PanelBoundary>
@@ -79,6 +81,26 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * HealthCard is the repository's score and what costs it points, each finding with its next step on GitHub: the place every mark
+ * of this repository's findings links to (#finding-<code>), so a finding seen on a card can be resolved from here.
+ */
+function HealthCard({ health, github }: { health: Schemas["Health"]; github: string }) {
+  return (
+    <Card aria-labelledby="health-title" id="health" className="scroll-mt-24">
+      <div className="flex items-center justify-between gap-2">
+        <CardTitle id="health-title">Health</CardTitle>
+        <HealthScore health={health} />
+      </div>
+      {health.findings.length > 0 ? (
+        <FindingList findings={health.findings} github={github} className="mt-3" />
+      ) : (
+        <p className="mt-2 text-sm text-muted-foreground">Nothing costs it points.</p>
+      )}
+    </Card>
   )
 }
 

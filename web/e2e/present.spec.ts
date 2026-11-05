@@ -77,14 +77,14 @@ test("the commit column widens by its edge, is remembered, and the left keeps wh
   const edge = page.getByRole("separator", { name: "Resize latest commits" })
   await expect(edge).toHaveAttribute("aria-valuenow", "30")
   const strip = page.getByRole("region", { name: "Telemetry" })
-  await expect(strip.getByText("People", { exact: true })).toBeVisible()
+  await expect(strip.getByText("Commits by hand", { exact: true })).toBeVisible()
   await edge.focus()
   for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowLeft")
   await expect(edge).toHaveAttribute("aria-valuenow", "60")
   await page.reload()
   await expect(edge).toHaveAttribute("aria-valuenow", "60")
-  // Narrow, the strip drops the people and the products but keeps the data's age; the fleet keeps its counts, not its tiles.
-  await expect(strip.getByText("People", { exact: true })).toBeHidden()
+  // Narrow, the strip drops the commits by hand and the products but keeps the data's age; the fleet keeps its counts, not its tiles.
+  await expect(strip.getByText("Commits by hand", { exact: true })).toBeHidden()
   await expect(strip.getByText("Findings", { exact: true })).toBeVisible()
   await expect(strip.getByRole("status")).toBeVisible()
   await expect(page.getByRole("list", { name: "Health of every repository" })).toBeVisible()

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -334,12 +335,12 @@ func LastAuthored(s *snapshot.Snapshot, k snapshot.RepoKey, w Work) (at time.Tim
 }
 
 const (
-	dashboardCommits   = 10 // how many of the latest commits by people the dashboard shows
-	activityDays       = 30 // the window of the activity counts and authors
-	activityWeeks      = 12 // the weekly counts
-	activityAuthors    = 5  // the authors named
-	activityRecent     = 3  // the repositories people changed last
-	activityAssistants = 3  // the AI assistants named
+	dashboardCommits   = 10                // how many of the latest commits by people the dashboard shows
+	activityDays       = health.WindowDays // the window of the activity counts and authors
+	activityWeeks      = 12                // the weekly counts
+	activityAuthors    = 5                 // the authors named
+	activityRecent     = 3                 // the repositories people changed last
+	activityAssistants = 3                 // the AI assistants named
 )
 
 // Dashboard adds the commits to the dashboard through its lens (d.Work): the latest commits of the work that counts, the activity of

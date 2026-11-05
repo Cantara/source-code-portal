@@ -211,6 +211,22 @@ paths:
               schema: { $ref: "#/components/schemas/PageLayout" }
         "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /rules:
+    get:
+      operationId: getRules
+      summary: The rules the portal judges by, in their current terms
+      description: |
+        What the pages need to explain the signals as the server applies them: the window of the activity counts, the health levels
+        and the scores they start at, the severities of findings, the activities and the ages they cover, and every kind of finding
+        with its name, why it matters and when it costs how much. A page names a kind it does not know by these.
+      responses:
+        "200":
+          description: The rules
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Rules" }
+        "304": { $ref: "#/components/responses/NotModified" }
   /snapshot:
     get:
       operationId: getSnapshot
@@ -533,12 +549,68 @@ components:
         groups: { type: array, items: { type: string }, description: Group ids in configuration order }
         health: { oneOf: [{ $ref: "#/components/schemas/Health" }, { type: "null" }], description: Null for an archived or deprecated repository }
         freshness: { $ref: "#/components/schemas/Freshness" }
-    HealthLevel: { type: string, enum: [good, watch, attention], description: "good from 80, watch from 50, attention below" }
+    HealthLevel: { type: string, enum: [good, watch, attention], description: "Where each starts is in /rules" }
+    ActivityLevel: { type: string, enum: [active, recent, quiet, dormant, archived], description: "How recently the work that counts changed a repository; the ages are in /rules" }
+    Rules:
+      type: object
+      required: [windowDays, levels, severities, activity, findings]
+      properties:
+        windowDays: { type: integer, description: The days the activity counts cover }
+        levels: { type: array, items: { $ref: "#/components/schemas/LevelRule" } }
+        severities: { type: array, items: { $ref: "#/components/schemas/SeverityRule" } }
+        activity: { type: array, items: { $ref: "#/components/schemas/ActivityRule" } }
+        findings:
+          type: array
+          items: { $ref: "#/components/schemas/FindingKind" }
+    LevelRule:
+      type: object
+      required: [level, label, from]
+      properties:
+        level: { $ref: "#/components/schemas/HealthLevel" }
+        label: { type: string }
+        from: { type: integer, description: The score it starts at }
+    SeverityRule:
+      type: object
+      required: [severity, label, from]
+      properties:
+        severity: { type: string, enum: [high, medium, low] }
+        label: { type: string }
+        from: { type: integer, description: The penalty it starts at }
+    ActivityRule:
+      type: object
+      required: [level, label, about, withinDays]
+      properties:
+        level: { $ref: "#/components/schemas/ActivityLevel" }
+        label: { type: string }
+        about: { type: string }
+        withinDays: { type: [integer, "null"], description: "The age of the last change it covers; null: no bound" }
+    Penalty:
+      type: object
+      required: [points, when]
+      properties:
+        points: { type: integer }
+        when: { type: string }
+    FindingKind:
+      type: object
+      required: [code, label, about, penalties, action]
+      properties:
+        code: { type: string }
+        label: { type: string }
+        about: { type: string }
+        penalties: { type: array, items: { $ref: "#/components/schemas/Penalty" }, description: "When it costs how much, the most costly first" }
+        action: { $ref: "#/components/schemas/FindingAction" }
+    FindingAction:
+      type: object
+      description: The next step on a finding of this kind, on the repository's GitHub page
+      required: [label, path]
+      properties:
+        label: { type: string, description: "What to do: Draft a release" }
+        path: { type: string, description: "Below the repository's GitHub page (releases/new); empty: the page itself" }
     Finding:
       type: object
       required: [code, penalty, message]
       properties:
-        code: { type: string, enum: [failing, dormant, quiet, unreleased, no-licence, issues] }
+        code: { type: string, description: "The kind of finding; /rules names and explains every kind, so a new one needs no change here" }
         penalty: { type: integer, description: Points the finding costs }
         message: { type: string }
     Health:
@@ -778,8 +850,9 @@ components:
         at: { type: string, format: date-time }
     DashboardMember:
       type: object
-      required: [address, name, archived, lastAuthoredAt, level]
+      required: [address, name, archived, lastAuthoredAt, level, activity]
       properties:
+        activity: { $ref: "#/components/schemas/ActivityLevel" }
         address: { type: string }
         name: { type: string }
         archived: { type: boolean }

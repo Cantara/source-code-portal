@@ -17,6 +17,33 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for ActivityLevel.
+const (
+	Active   ActivityLevel = "active"
+	Archived ActivityLevel = "archived"
+	Dormant  ActivityLevel = "dormant"
+	Quiet    ActivityLevel = "quiet"
+	Recent   ActivityLevel = "recent"
+)
+
+// Valid indicates whether the value is a known member of the ActivityLevel enum.
+func (e ActivityLevel) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Archived:
+		return true
+	case Dormant:
+		return true
+	case Quiet:
+		return true
+	case Recent:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AssistantStatusAccess.
 const (
 	Admin    AssistantStatusAccess = "admin"
@@ -200,36 +227,6 @@ func (e DocSummaryState) Valid() bool {
 	case DocSummaryStateTooLarge:
 		return true
 	case DocSummaryStateUnsupported:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for FindingCode.
-const (
-	FindingCodeDormant    FindingCode = "dormant"
-	FindingCodeFailing    FindingCode = "failing"
-	FindingCodeIssues     FindingCode = "issues"
-	FindingCodeNoLicence  FindingCode = "no-licence"
-	FindingCodeQuiet      FindingCode = "quiet"
-	FindingCodeUnreleased FindingCode = "unreleased"
-)
-
-// Valid indicates whether the value is a known member of the FindingCode enum.
-func (e FindingCode) Valid() bool {
-	switch e {
-	case FindingCodeDormant:
-		return true
-	case FindingCodeFailing:
-		return true
-	case FindingCodeIssues:
-		return true
-	case FindingCodeNoLicence:
-		return true
-	case FindingCodeQuiet:
-		return true
-	case FindingCodeUnreleased:
 		return true
 	default:
 		return false
@@ -476,36 +473,6 @@ func (e MeVia) Valid() bool {
 	}
 }
 
-// Defines values for RepoFindingCode.
-const (
-	RepoFindingCodeDormant    RepoFindingCode = "dormant"
-	RepoFindingCodeFailing    RepoFindingCode = "failing"
-	RepoFindingCodeIssues     RepoFindingCode = "issues"
-	RepoFindingCodeNoLicence  RepoFindingCode = "no-licence"
-	RepoFindingCodeQuiet      RepoFindingCode = "quiet"
-	RepoFindingCodeUnreleased RepoFindingCode = "unreleased"
-)
-
-// Valid indicates whether the value is a known member of the RepoFindingCode enum.
-func (e RepoFindingCode) Valid() bool {
-	switch e {
-	case RepoFindingCodeDormant:
-		return true
-	case RepoFindingCodeFailing:
-		return true
-	case RepoFindingCodeIssues:
-		return true
-	case RepoFindingCodeNoLicence:
-		return true
-	case RepoFindingCodeQuiet:
-		return true
-	case RepoFindingCodeUnreleased:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for SearchKind.
 const (
 	SearchKindCommit  SearchKind = "commit"
@@ -530,6 +497,27 @@ func (e SearchKind) Valid() bool {
 	case SearchKindPackage:
 		return true
 	case SearchKindRepo:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SeverityRuleSeverity.
+const (
+	High   SeverityRuleSeverity = "high"
+	Low    SeverityRuleSeverity = "low"
+	Medium SeverityRuleSeverity = "medium"
+)
+
+// Valid indicates whether the value is a known member of the SeverityRuleSeverity enum.
+func (e SeverityRuleSeverity) Valid() bool {
+	switch e {
+	case High:
+		return true
+	case Low:
+		return true
+	case Medium:
 		return true
 	default:
 		return false
@@ -668,6 +656,21 @@ type Activity struct {
 	WeeklyHand []int `json:"weeklyHand"`
 }
 
+// ActivityLevel How recently the work that counts changed a repository; the ages are in /rules
+type ActivityLevel string
+
+// ActivityRule defines model for ActivityRule.
+type ActivityRule struct {
+	About string `json:"about"`
+	Label string `json:"label"`
+
+	// Level How recently the work that counts changed a repository; the ages are in /rules
+	Level ActivityLevel `json:"level"`
+
+	// WithinDays The age of the last change it covers; null: no bound
+	WithinDays *int `json:"withinDays"`
+}
+
 // AssistantStatus defines model for AssistantStatus.
 type AssistantStatus struct {
 	// Access Who may ask
@@ -776,8 +779,10 @@ type DashboardGroup struct {
 
 // DashboardMember defines model for DashboardMember.
 type DashboardMember struct {
-	Address  string `json:"address"`
-	Archived bool   `json:"archived"`
+	// Activity How recently the work that counts changed a repository; the ages are in /rules
+	Activity ActivityLevel `json:"activity"`
+	Address  string        `json:"address"`
+	Archived bool          `json:"archived"`
 
 	// LastAuthoredAt As Repo.lastAuthoredAt, of the work that counts (Dashboard.work)
 	LastAuthoredAt *time.Time `json:"lastAuthoredAt"`
@@ -891,15 +896,35 @@ type FileProblem struct {
 
 // Finding defines model for Finding.
 type Finding struct {
-	Code    FindingCode `json:"code"`
-	Message string      `json:"message"`
+	// Code The kind of finding; /rules names and explains every kind, so a new one needs no change here
+	Code    string `json:"code"`
+	Message string `json:"message"`
 
 	// Penalty Points the finding costs
 	Penalty int `json:"penalty"`
 }
 
-// FindingCode defines model for Finding.Code.
-type FindingCode string
+// FindingAction The next step on a finding of this kind, on the repository's GitHub page
+type FindingAction struct {
+	// Label What to do: Draft a release
+	Label string `json:"label"`
+
+	// Path Below the repository's GitHub page (releases/new); empty: the page itself
+	Path string `json:"path"`
+}
+
+// FindingKind defines model for FindingKind.
+type FindingKind struct {
+	About string `json:"about"`
+
+	// Action The next step on a finding of this kind, on the repository's GitHub page
+	Action FindingAction `json:"action"`
+	Code   string        `json:"code"`
+	Label  string        `json:"label"`
+
+	// Penalties When it costs how much, the most costly first
+	Penalties []Penalty `json:"penalties"`
+}
 
 // Freshness defines model for Freshness.
 type Freshness struct {
@@ -1009,12 +1034,12 @@ type Heading struct {
 type Health struct {
 	Findings []Finding `json:"findings"`
 
-	// Level good from 80, watch from 50, attention below
+	// Level Where each starts is in /rules
 	Level HealthLevel `json:"level"`
 	Score int         `json:"score"`
 }
 
-// HealthLevel good from 80, watch from 50, attention below
+// HealthLevel Where each starts is in /rules
 type HealthLevel string
 
 // HistoryCommit defines model for HistoryCommit.
@@ -1121,6 +1146,16 @@ type LayoutElementKind string
 
 // LayoutElementView How products are drawn until the reader switches; tiles: compact, for the presentation page
 type LayoutElementView string
+
+// LevelRule defines model for LevelRule.
+type LevelRule struct {
+	// From The score it starts at
+	From  int    `json:"from"`
+	Label string `json:"label"`
+
+	// Level Where each starts is in /rules
+	Level HealthLevel `json:"level"`
+}
 
 // Link defines model for Link.
 type Link struct {
@@ -1232,6 +1267,12 @@ type PageLayout struct {
 	Stored bool `json:"stored"`
 }
 
+// Penalty defines model for Penalty.
+type Penalty struct {
+	Points int    `json:"points"`
+	When   string `json:"when"`
+}
+
 // Person defines model for Person.
 type Person struct {
 	// Login The GitHub login, when GitHub links the commits to an account; the short form to show
@@ -1265,7 +1306,7 @@ type ProductHealth struct {
 	// Findings Most costly first; the dashboard carries the first 5
 	Findings []RepoFinding `json:"findings"`
 
-	// Level good from 80, watch from 50, attention below
+	// Level Where each starts is in /rules
 	Level HealthLevel `json:"level"`
 	Score int         `json:"score"`
 
@@ -1355,8 +1396,9 @@ type RepoDetail struct {
 
 // RepoFinding defines model for RepoFinding.
 type RepoFinding struct {
-	Code    RepoFindingCode `json:"code"`
-	Message string          `json:"message"`
+	// Code The kind of finding; /rules names and explains every kind, so a new one needs no change here
+	Code    string `json:"code"`
+	Message string `json:"message"`
 
 	// Penalty Points the finding costs
 	Penalty int `json:"penalty"`
@@ -1364,9 +1406,6 @@ type RepoFinding struct {
 	// Repo Address of the repository
 	Repo string `json:"repo"`
 }
-
-// RepoFindingCode defines model for RepoFinding.Code.
-type RepoFindingCode string
 
 // RepoLink defines model for RepoLink.
 type RepoLink struct {
@@ -1381,6 +1420,17 @@ type RepoLink struct {
 // RepoList defines model for RepoList.
 type RepoList struct {
 	Repos []Repo `json:"repos"`
+}
+
+// Rules defines model for Rules.
+type Rules struct {
+	Activity   []ActivityRule `json:"activity"`
+	Findings   []FindingKind  `json:"findings"`
+	Levels     []LevelRule    `json:"levels"`
+	Severities []SeverityRule `json:"severities"`
+
+	// WindowDays The days the activity counts cover
+	WindowDays int `json:"windowDays"`
 }
 
 // SearchCorrection defines model for SearchCorrection.
@@ -1429,6 +1479,17 @@ type SearchResult struct {
 	// Query The query as searched
 	Query string `json:"query"`
 }
+
+// SeverityRule defines model for SeverityRule.
+type SeverityRule struct {
+	// From The penalty it starts at
+	From     int                  `json:"from"`
+	Label    string               `json:"label"`
+	Severity SeverityRuleSeverity `json:"severity"`
+}
+
+// SeverityRuleSeverity defines model for SeverityRule.Severity.
+type SeverityRuleSeverity string
 
 // SnapshotInfo defines model for SnapshotInfo.
 type SnapshotInfo struct {
@@ -1646,6 +1707,9 @@ type ServerInterface interface {
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(w http.ResponseWriter, r *http.Request, owner string, name string)
+	// GetRules The rules the portal judges by, in their current terms
+	// (GET /rules)
+	GetRules(w http.ResponseWriter, r *http.Request)
 	// Search Search what the portal holds, best first, one page at a time
 	// (GET /search)
 	Search(w http.ResponseWriter, r *http.Request, params SearchParams)
@@ -2205,6 +2269,20 @@ func (siw *ServerInterfaceWrapper) GetManifests(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetRules operation middleware
+func (siw *ServerInterfaceWrapper) GetRules(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRules(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Search operation middleware
 func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request) {
 
@@ -2469,6 +2547,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/manifests", wrapper.GetManifests)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos/{owner}/{name}/history", wrapper.GetHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pages/{page}", wrapper.GetPage)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/rules", wrapper.GetRules)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assistant", wrapper.GetAssistant)
@@ -3186,6 +3265,44 @@ func (response GetManifests404ApplicationProblemPlusJSONResponse) VisitGetManife
 	return err
 }
 
+type GetRulesRequestObject struct {
+}
+
+type GetRulesResponseObject interface {
+	VisitGetRulesResponse(w http.ResponseWriter) error
+}
+
+type GetRules200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetRules200JSONResponse struct {
+	Body    Rules
+	Headers GetRules200ResponseHeaders
+}
+
+func (response GetRules200JSONResponse) VisitGetRulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRules304Response = NotModifiedResponse
+
+func (response GetRules304Response) VisitGetRulesResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
 type SearchRequestObject struct {
 	Params SearchParams
 }
@@ -3396,6 +3513,9 @@ type StrictServerInterface interface {
 	// GetManifests The repository's package manifests, the technology they state and its internal dependencies
 	// (GET /repos/{owner}/{name}/manifests)
 	GetManifests(ctx context.Context, request GetManifestsRequestObject) (GetManifestsResponseObject, error)
+	// GetRules The rules the portal judges by, in their current terms
+	// (GET /rules)
+	GetRules(ctx context.Context, request GetRulesRequestObject) (GetRulesResponseObject, error)
 	// Search Search what the portal holds, best first, one page at a time
 	// (GET /search)
 	Search(ctx context.Context, request SearchRequestObject) (SearchResponseObject, error)
@@ -3781,6 +3901,30 @@ func (sh *strictHandler) GetManifests(w http.ResponseWriter, r *http.Request, ow
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetManifestsResponseObject); ok {
 		if err := validResponse.VisitGetManifestsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRules operation middleware
+func (sh *strictHandler) GetRules(w http.ResponseWriter, r *http.Request) {
+	var request GetRulesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRules(ctx, request.(GetRulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRulesResponseObject); ok {
+		if err := validResponse.VisitGetRulesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

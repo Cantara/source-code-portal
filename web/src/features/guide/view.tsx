@@ -2,9 +2,10 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 import { cn } from "@/lib/cn"
 import { kinds } from "@/lib/preferences"
+import { CommitIcon, FlagIcon, PulseIcon, RefreshIcon } from "@/components/ui/icons"
 import { levels } from "@/entities/health/health"
-import { FindingIcon, findingKinds, ScoreRing, severities } from "@/entities/health/kinds"
-import { activities } from "@/entities/repo/health"
+import { FindingIcon, ScoreRing, severities } from "@/entities/health/kinds"
+import { activityRule, levelRanges, severityOf, span, window, type Rules } from "@/lib/rules"
 import shots from "./shots.json"
 
 /**
@@ -18,18 +19,11 @@ type Callout = keyof typeof shots.callouts
 
 const docs = "https://github.com/Cantara/source-code-portal/blob/main/docs"
 
-/** findings are when each health finding is found and what it costs a repository (internal/health/health.go), the most costly first. */
-const findings: { code: keyof typeof findingKinds; when: string; points: number; also?: string }[] = [
-  { code: "dormant", when: "No change by the team for more than 2 years.", points: 30 },
-  { code: "failing", when: "The portal cannot update it from GitHub.", points: 25 },
-  { code: "unreleased", when: "Changes since the latest release, which is more than 90 days old.", points: 20 },
-  { code: "no-licence", when: "A public repository without a licence GitHub detects.", points: 20 },
-  { code: "issues", when: "More than 50 open issues and pull requests.", points: 20, also: "more than 20: 10 points" },
-  { code: "quiet", when: "No change by the team for more than 6 months.", points: 10 },
-]
+/** none are no rules: the API could not be read, and the page names nothing it cannot know. */
+const none: Rules = { windowDays: 0, levels: [], severities: [], activity: [], findings: [] }
 
-/** card is the product card's rows, in the order of their callouts. */
-const card: { at: Callout; title: string; body: ReactNode }[] = [
+/** cardRows are the product card's rows, in the order of their callouts. */
+const cardRows = (rules: Rules): { at: Callout; title: string; body: ReactNode }[] => [
   {
     at: "name",
     title: "The product",
@@ -45,8 +39,8 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
     title: "The work",
     body: (
       <>
-        The commits of the work that counts in the last 30 days, then every kind: by hand, with AI (and the assistants it names),
-        by automation and in sweeps. A coloured square marks each kind that counts.
+        The commits of the work that counts in the last {window(rules)}, then every kind: by hand, with AI (and the assistants it
+        names), by automation and in sweeps. A coloured square marks each kind that counts.
       </>
     ),
   },
@@ -58,7 +52,7 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
   {
     at: "people",
     title: "Who, and when",
-    body: "The people behind the work, by GitHub login (the full name on hover), most commits first. The light is on while someone worked in the last 30 days; below it, the last change.",
+    body: `The people behind the work, by GitHub login (the full name on hover), most commits first. The light is on while someone worked in the last ${window(rules)}; below it, the last change.`,
   },
   {
     at: "recent",
@@ -68,7 +62,7 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
   {
     at: "findings",
     title: "The exceptions",
-    body: "The findings that cost the most points, each with its kind's icon on a tile of its severity (section 5). Point at an icon for what it means and what it costs. Nothing to see says “No exceptions.”",
+    body: "The findings that cost the most points, each with its kind's icon on a tile of its severity (section 5). Point at an icon, or tap it, for what was found, what it costs and its next step; select it to open the finding on its repository's page. Nothing to see says “No exceptions.”",
   },
   {
     at: "shared",
@@ -76,6 +70,19 @@ const card: { at: Callout; title: string; body: ReactNode }[] = [
     body: "Said once: the licence and the language at least 80% of the repositories share, and how many are released: a GitHub release or a published package (section 14).",
   },
 ]
+
+/** levelNotes say how a card shows each level. */
+const levelNotes = {
+  good: "The ring alone: nothing to do.",
+  watch: "The ring and the word: worth a look.",
+  attention: "Also when any repository of the product is.",
+} as const
+
+/** sample is a score inside a range "80–100", for its ring. */
+function sample(range: string): number {
+  const [lo = 0, hi = 100] = range.split("–").map(Number)
+  return Math.round((lo + hi) / 2)
+}
 
 function Shot({ name, alt, className }: { name: Shot; alt: string; className?: string }) {
   const { width, height } = shots.sizes[name]
@@ -231,12 +238,12 @@ function Section({
   )
 }
 
-function Terms({ items }: { items: [string, ReactNode][] }) {
+function Terms({ items }: { items: [ReactNode, ReactNode][] }) {
   return (
     <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map(([t, d]) => (
-        <div key={t} className="border-l-2 border-primary/40 pl-3">
-          <dt className="text-sm font-semibold">{t}</dt>
+      {items.map(([t, d], i) => (
+        <div key={i} className="border-l-2 border-primary/40 pl-3">
+          <dt className="flex items-center gap-1.5 text-sm font-semibold">{t}</dt>
           <dd className="mt-0.5 text-sm text-muted-foreground">{d}</dd>
         </div>
       ))}
@@ -261,7 +268,7 @@ function Code({ children, label }: { children: string; label: string }) {
  * scale with it and never cover the card): a number in the gutter with a leader to its row, or beside the row when it sits on the
  * right. The positions are measured by capture.js. No inline style: the CSP forbids it.
  */
-function AnnotatedCard({ alt }: { alt: string }) {
+function AnnotatedCard({ alt, card }: { alt: string; card: { at: Callout }[] }) {
   const { width, height } = shots.sizes.card
   const gutter = 44
   return (
@@ -314,7 +321,16 @@ function AnnotatedCard({ alt }: { alt: string }) {
 const dots = { hand: "bg-primary", ai: "bg-[var(--ai)]", automation: "bg-muted-foreground" } as const
 
 /** GuideView is the guide; version is the portal's release, for the commands (a placeholder on a development build). */
-export function GuideView({ version }: { version: string }) {
+export function GuideView({ version, rules = none }: { version: string; rules?: Rules }) {
+  const card = cardRows(rules)
+  const days = window(rules)
+  const dormant = rules.findings.find((k) => k.code === "dormant")?.penalties[0]?.points
+  const severityRanges = [...rules.severities]
+    .sort((a, b) => b.from - a.from)
+    .map((v, i, all) => ({
+      ...v,
+      note: i < all.length - 1 ? `${v.from} points or more` : `less than ${all[i - 1]?.from ?? 0} points`,
+    }))
   const tag = /^v?\d+\.\d+\.\d+$/.test(version) ? version.replace(/^v/, "") : "<version>"
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-x-12 xl:grid-cols-[minmax(0,1fr)_15rem]">
@@ -393,22 +409,58 @@ export function GuideView({ version }: { version: string }) {
           id="telemetry"
           n={2}
           title="The fleet at a glance"
-          lede="The row of tiles at the top of the dashboard, and the line at the top of the presentation page: the same six signals. A light shows a state worth knowing; a coloured square, the kind of work."
+          lede="The row of tiles at the top of the dashboard, and the line at the top of the presentation page: the same six signals, each with its icon. A commit with a badge counts commits of one kind of work; the others are coloured by their state. Point at one, or tap it, for its parts."
         >
           <Figure caption="The telemetry of a portal with three products and thirteen repositories.">
             <Shot
               name="telemetry"
-              alt="Six tiles: People 16 commits by hand by 5 people, AI 36, Automation 69, Active 12 of 13 repositories, Findings 8 with 1 of 3 products to watch, In sync 100%."
+              alt="Six tiles: 16 commits by hand by 5 people, 36 commits with AI, 69 commits by automation with 12 in sweeps, 12 active of 13 repositories, 8 findings with 1 of 3 products to watch, 100% in sync."
             />
           </Figure>
           <Terms
             items={[
-              ["People", "Commits by hand in the last 30 days, and by how many people."],
-              ["AI", "Commits with an AI or by a coding agent in 30 days, and the assistants they name."],
-              ["Automation", "Commits by CI, dependency and release bots in 30 days, and the commits of sweeps."],
-              ["Active", "Repositories the work that counts changed in the last 30 days, of all of them; those in no product."],
-              ["Findings", "Everything the health checks found, and how many of the products need a look."],
-              ["In sync", "The share of repositories whose data is current; a red light when updates from GitHub fail."],
+              [
+                <>
+                  <CommitIcon kind="hand" className="size-4 text-primary" />
+                  Commits by hand
+                </>,
+                `People's own commits in the last ${days}, and by how many people. A count of commits, not of people.`,
+              ],
+              [
+                <>
+                  <CommitIcon kind="ai" className="size-4 text-[var(--ai)]" />
+                  Commits with AI
+                </>,
+                `Commits with an AI co-author or by a coding agent in the last ${days}, and the assistants they name.`,
+              ],
+              [
+                <>
+                  <CommitIcon kind="automation" className="size-4 text-muted-foreground" />
+                  Commits by automation
+                </>,
+                `Commits by CI, dependency and release bots in the last ${days}, and the commits of sweeps.`,
+              ],
+              [
+                <>
+                  <PulseIcon className="size-4 text-primary" />
+                  Active repositories
+                </>,
+                `Repositories the work that counts changed in the last ${days}, of all of them; those in no product.`,
+              ],
+              [
+                <>
+                  <FlagIcon className="size-4 text-primary" />
+                  Findings
+                </>,
+                "Everything the health checks found, and how many of the products need a look.",
+              ],
+              [
+                <>
+                  <RefreshIcon className="size-4 text-primary" />
+                  In sync
+                </>,
+                "The share of repositories whose data is current; red when updates from GitHub fail.",
+              ],
             ]}
           />
         </Section>
@@ -423,11 +475,11 @@ export function GuideView({ version }: { version: string }) {
             <Shot name="fleet" alt="The fleet map: a row of coloured tiles per product." />
           </Figure>
           <ul aria-label="The colours of the fleet map" className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
-            {activities.map((a) => (
+            {rules.activity.map((a) => (
               <li key={a.level} className={cn(`lvl-${a.level}`, "flex items-center gap-2")}>
                 <span aria-hidden="true" className="cell" />
                 <span className="font-medium">{a.label}</span>
-                <span className="font-mono text-xs text-muted-foreground">{a.span || "on GitHub"}</span>
+                <span className="font-mono text-xs text-muted-foreground">{span(a.level, rules) || "on GitHub"}</span>
               </li>
             ))}
           </ul>
@@ -445,7 +497,10 @@ export function GuideView({ version }: { version: string }) {
         >
           <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,27rem)_1fr]">
             <Figure className="xl:sticky xl:top-20">
-              <AnnotatedCard alt="The Payments card, its rows numbered 1 to 8: 53 commits, 6 by hand, 20 with AI, 22 by automation and 5 in sweeps, its people, its recent repositories and three findings." />
+              <AnnotatedCard
+                card={card}
+                alt="The Payments card, its rows numbered 1 to 8: 53 commits, 6 by hand, 20 with AI, 22 by automation and 5 in sweeps, its people, its recent repositories and three findings."
+              />
             </Figure>
             <ol className="flex max-w-prose flex-col gap-4">
               {card.map((c, i) => (
@@ -468,19 +523,13 @@ export function GuideView({ version }: { version: string }) {
           lede="Each repository starts at 100 and loses the points of its findings. A product weighs its repositories into one score."
         >
           <ul aria-label="Health levels" className="grid gap-3 sm:grid-cols-3">
-            {(
-              [
-                ["good", 92, "80 to 100", "The ring alone: nothing to do."],
-                ["watch", 68, "50 to 79", "The ring and the word: worth a look."],
-                ["attention", 38, "below 50", "Also when any repository of the product is."],
-              ] as const
-            ).map(([l, score, range, note]) => (
+            {levelRanges(rules).map(({ level: l, label, range }) => (
               <li key={l} className={cn(levels[l].className, "panel flex items-center gap-3 p-3")}>
-                <ScoreRing score={score} large />
+                <ScoreRing score={sample(range)} large />
                 <span className="flex flex-col">
-                  <span className="text-sm font-semibold">{levels[l].label}</span>
+                  <span className="text-sm font-semibold">{label}</span>
                   <span className="font-mono text-xs">{range}</span>
-                  <span className="text-xs text-muted-foreground">{note}</span>
+                  <span className="text-xs text-muted-foreground">{levelNotes[l]}</span>
                 </span>
               </li>
             ))}
@@ -507,41 +556,41 @@ export function GuideView({ version }: { version: string }) {
                 </tr>
               </thead>
               <tbody>
-                {findings.map((f) => (
-                  <tr key={f.code} className="border-b border-border/60 align-top last:border-b-0">
-                    <td className="px-4 py-3">
-                      <FindingIcon code={f.code} penalty={f.points} />
-                    </td>
-                    <th scope="row" className="px-2 py-3 text-left font-normal">
-                      <span className="block font-semibold">{findingKinds[f.code].label}</span>
-                      <span className="block text-muted-foreground">{findingKinds[f.code].about}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground sm:hidden">
-                        {f.when}
-                        {f.also && ` (${f.also})`}
-                      </span>
-                    </th>
-                    <td className="hidden px-2 py-3 text-muted-foreground sm:table-cell">
-                      {f.when}
-                      {f.also && <span className="block text-xs">{f.also}</span>}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono whitespace-nowrap tabular-nums">−{f.points}</td>
-                  </tr>
-                ))}
+                {rules.findings.map((k) => {
+                  const [first, ...more] = k.penalties
+                  const points = first?.points ?? 0
+                  const also = more.map((p) => `${p.when.replace(/\.$/, "")}: ${p.points} points`).join("; ")
+                  return (
+                    <tr key={k.code} className="border-b border-border/60 align-top last:border-b-0">
+                      <td className="px-4 py-3">
+                        <FindingIcon code={k.code} severity={severityOf(points, rules)} />
+                      </td>
+                      <th scope="row" className="px-2 py-3 text-left font-normal">
+                        <span className="block font-semibold">{k.label}</span>
+                        <span className="block text-muted-foreground">{k.about}</span>
+                        <span className="mt-1 block text-xs text-muted-foreground sm:hidden">
+                          {first?.when}
+                          {also && ` (${also})`}
+                        </span>
+                        {k.action.label && <span className="mt-1 block text-xs">Next step: {k.action.label.toLowerCase()}</span>}
+                      </th>
+                      <td className="hidden px-2 py-3 text-muted-foreground sm:table-cell">
+                        {first?.when}
+                        {also && <span className="block text-xs">{also}</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono whitespace-nowrap tabular-nums">−{points}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
           <ul aria-label="Severity" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            {(
-              [
-                ["high", 30, "25 points or more"],
-                ["medium", 20, "20 points"],
-                ["low", 10, "10 points"],
-              ] as const
-            ).map(([sev, , note]) => (
-              <li key={sev} className="flex items-center gap-2">
-                <span aria-hidden="true" className={cn("finding-icon", severities[sev].className)} />
-                <span className="font-medium">{severities[sev].label}</span>
-                <span className="text-xs text-muted-foreground">{note}</span>
+            {severityRanges.map((v) => (
+              <li key={v.severity} className="flex items-center gap-2">
+                <span aria-hidden="true" className={cn("finding-icon", severities[v.severity])} />
+                <span className="font-medium">{v.label}</span>
+                <span className="text-xs text-muted-foreground">{v.note}</span>
               </li>
             ))}
           </ul>
@@ -549,13 +598,14 @@ export function GuideView({ version }: { version: string }) {
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
               <p>
                 The icon says what a finding is, the colour of its tile how much it weighs: red is high, amber medium, grey low.
-                On a card, point at an icon or tap it for its name, what it costs and why it matters.
+                On a card, point at an icon or tap it for its name, what it costs and why it matters; select it to open the
+                finding on its repository&apos;s page, with its next step on GitHub.
               </p>
               <p>
-                The age picks a penalty, it does not grow with it: four years and ten cost the same 30 points. The product&apos;s
-                score is the weighted mean of its repositories: one changed in the last 6 months counts twice, the product&apos;s
-                main repository three times more. So a forgotten side repository costs a product little, and a neglected main one
-                costs it a lot. Archived and deprecated repositories are not scored.
+                The age picks a penalty, it does not grow with it: four years and ten cost the same {dormant} points. The
+                product&apos;s score is the weighted mean of its repositories: one {activityRule("recent", rules).about} counts
+                twice, the product&apos;s main repository three times more. So a forgotten side repository costs a product little,
+                and a neglected main one costs it a lot. Archived and deprecated repositories are not scored.
               </p>
             </div>
             <Figure caption="A product to watch: its main repository has 56 open issues and unreleased changes.">
@@ -690,7 +740,7 @@ export function GuideView({ version }: { version: string }) {
             <Figure caption="The presentation page on an iPad in landscape: the fleet's numbers and how current they are, every repository's health, a wide tile for the product to watch, one line for each good one, and the newest commits at the right.">
               <Shot
                 name="present"
-                alt="The presentation page: SCP and the six signals in one line, live; the fleet health as one strip, 3 to watch and 9 good; Developer tools as a wide tile at watch with its findings as icons, Payments and Identity as small tiles; the latest commits in a column at the right."
+                alt="The presentation page: SCP and the six signals as icons and values in one line, live; the fleet health as one cluster per product, 3 to watch and 9 good; Developer tools as a wide tile at watch with its findings as icons, Payments and Identity as small tiles; the latest commits in a column at the right."
               />
             </Figure>
             <div className="grid gap-6 lg:grid-cols-2">

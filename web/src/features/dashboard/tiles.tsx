@@ -7,7 +7,9 @@ import { cn } from "@/lib/cn"
 import { ago, count, plural } from "@/lib/format"
 import { groupPath } from "@/lib/paths"
 import { levels } from "@/entities/health/health"
-import { FindingIcon, findingKinds, severities, severity } from "@/entities/health/kinds"
+import { FindingMark } from "@/entities/health/findings"
+import { levelLabel } from "@/lib/rules"
+import { useRules } from "@/lib/rules-context"
 import { Hint } from "@/shared/hint"
 import { healthCell } from "./fleet-map"
 import { Sparkline } from "@/shared/sparkline"
@@ -39,6 +41,7 @@ export function byNeed(groups: Group[]): Group[] {
 }
 
 function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
+  const rules = useRules()
   const h = g.health
   const a = g.activity
   const at = h ? (h.level === "attention" ? h.attention : h.watch) : 0
@@ -59,7 +62,7 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
         {h && (
           // The level as the fleet map draws it (watch round, attention outlined) and how many repositories are at it.
           <Hint
-            heading={levels[h.level].label}
+            heading={levelLabel(h.level, rules)}
             swatch={levels[h.level].className}
             meta={at > 0 ? plural(at, "repository", "repositories") : undefined}
             render={(t) => (
@@ -67,7 +70,7 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
                 <span aria-hidden="true" className={`cell ${healthCell(h.level)}`} />
                 {at > 0 && <span aria-hidden="true">{count(at)}</span>}
                 <span className="sr-only">
-                  {levels[h.level].label}
+                  {levelLabel(h.level, rules)}
                   {at > 0 && `: ${plural(at, "repository", "repositories")}`}
                 </span>
               </span>
@@ -83,33 +86,18 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
         <Sparkline parts={series(a, w)} label={weekly(a, w)} className="h-6 w-20 shrink-0" />
       </div>
       {h && h.findings.length > 0 && (
-        // The signal and the repository, as the dashboard draws a finding: its kind's icon on its severity's tile, what it means in
-        // the icon's hint and for screen readers. Two lines at most, the most costly first; the rest are on the product's page.
+        // The signal and the repository, as the dashboard draws a finding: its mark (the kind's icon on its severity's tile, the
+        // whole story in its hint, a link to the finding and its next step on the repository's page) and the repository's name.
+        // Two lines at most, the most costly first; the rest are on the product's page.
         <ul className="flex max-h-[3.25rem] flex-wrap gap-x-3 gap-y-1 overflow-hidden text-[0.9375rem]">
-          {h.findings.slice(0, tileFindings).map((f) => {
-            const kind = findingKinds[f.code] ?? findingKinds.quiet
-            const sev = severities[severity(f.penalty)]
-            return (
-              <li key={f.repo + f.code} className="flex min-w-0 max-w-full items-center gap-1.5">
-                <Hint
-                  heading={kind.label}
-                  swatch={sev.className}
-                  meta={sev.label}
-                  rows={[{ swatch: sev.className, label: "Costs", value: `${f.penalty} of 100 points` }]}
-                  children={`${f.message}. ${kind.about}`}
-                  render={(t) => (
-                    <span {...t} className="shrink-0">
-                      <FindingIcon code={f.code} penalty={f.penalty} />
-                    </span>
-                  )}
-                />
-                <span className="sr-only">
-                  {kind.label}, {sev.label.toLowerCase()}: {f.message}:{" "}
-                </span>
-                <span className="truncate font-medium">{f.repo.split("/")[1]}</span>
-              </li>
-            )
-          })}
+          {h.findings.slice(0, tileFindings).map((f) => (
+            <li key={f.repo + f.code} className="flex min-w-0 max-w-full items-center gap-1.5">
+              <FindingMark finding={f} />
+              <span aria-hidden="true" className="truncate font-medium">
+                {f.repo.split("/")[1]}
+              </span>
+            </li>
+          ))}
         </ul>
       )}
     </li>
@@ -117,6 +105,7 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
 }
 
 function Narrow({ g, work: w, now }: { g: Group; work: Work; now: number }) {
+  const rules = useRules()
   const a = g.activity
   return (
     <li
@@ -130,7 +119,9 @@ function Narrow({ g, work: w, now }: { g: Group; work: Work; now: number }) {
       </h3>
       <p className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
         <span className="truncate">
-          {g.health && g.health.level !== "good" && <span className="text-(--lvl-fg)">{levels[g.health.level].label} · </span>}
+          {g.health && g.health.level !== "good" && (
+            <span className="text-(--lvl-fg)">{levelLabel(g.health.level, rules)} · </span>
+          )}
           {a.lastAuthoredAt ? `${ago(a.lastAuthoredAt, now)} ago` : "no change read"}
           {g.health ? "" : " · not scored"}
         </span>

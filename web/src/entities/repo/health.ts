@@ -1,67 +1,21 @@
 import type { Repo } from "@/lib/api/client"
+import { activityOf, type ActivityLevel, type Rules } from "@/lib/rules"
 
-const day = 24 * 3600 * 1000
-
-/** Activity is how recently a person changed a repository: by its newest commit not made by automation, else its last push. */
-export type Activity = "active" | "recent" | "quiet" | "dormant" | "archived"
-
-/** activities in display order, with their labels and the age of the last change by a person each covers (span, short). */
-export const activities: { level: Activity; label: string; span: string; within: string }[] = [
-  { level: "active", label: "Active", span: "≤30d", within: "a commit by a person in the last 30 days" },
-  { level: "recent", label: "Recent", span: "≤6mo", within: "a commit by a person in the last 6 months" },
-  { level: "quiet", label: "Quiet", span: "≤2y", within: "a commit by a person in the last 2 years" },
-  { level: "dormant", label: "Dormant", span: ">2y", within: "no commit by a person for 2 years" },
-  { level: "archived", label: "Archived", span: "", within: "archived on GitHub" },
-]
+/** Activity is how recently the work that counts changed a repository; the rules (lib/rules.ts) say the ages each covers. */
+export type Activity = ActivityLevel
 
 /** lastChange is the instant activity is measured from. */
 export function lastChange(r: Repo): string {
   return r.lastAuthoredAt ?? r.lastCommitAt ?? r.pushedAt
 }
 
-/** activity classifies a repository relative to now. */
-export function activity(r: Repo, now: number): Activity {
-  return activityAt(lastChange(r), r.archived, now)
-}
-
-/** activityAt classifies a last change by a person (null: none read) relative to now. */
-export function activityAt(at: string | null, archived: boolean, now: number): Activity {
-  if (archived) return "archived"
-  if (at === null) return "dormant"
-  const age = now - new Date(at).getTime()
-  if (age <= 30 * day) return "active"
-  if (age <= 182 * day) return "recent"
-  if (age <= 730 * day) return "quiet"
-  return "dormant"
+/** activity classifies a repository relative to now by the server's rules. */
+export function activity(r: Repo, now: number, rules: Rules): Activity {
+  return activityOf(lastChange(r), r.archived, now, rules)
 }
 
 /** byActivity orders repositories newest change first, archived last. */
 export function byActivity(a: Repo, b: Repo): number {
   if (a.archived !== b.archived) return a.archived ? 1 : -1
   return new Date(lastChange(b)).getTime() - new Date(lastChange(a)).getTime()
-}
-
-/** Pulse is the fleet summary the telemetry strip shows. */
-export type Pulse = {
-  repos: number
-  active: number
-  released: number
-  licensed: number
-  issues: number
-  levels: Record<Activity, number>
-}
-
-/** pulse summarises repositories. */
-export function pulse(repos: Repo[], now: number): Pulse {
-  const levels: Record<Activity, number> = { active: 0, recent: 0, quiet: 0, dormant: 0, archived: 0 }
-  let released = 0
-  let licensed = 0
-  let issues = 0
-  for (const r of repos) {
-    levels[activity(r, now)]++
-    if (r.release) released++
-    if (r.license && r.license !== "NOASSERTION") licensed++
-    issues += r.openIssues
-  }
-  return { repos: repos.length, active: levels.active, released, licensed, issues, levels }
 }

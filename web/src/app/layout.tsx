@@ -35,9 +35,10 @@ function release(): string {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Without the API the header leaves the viewer out; the page shows the problem.
   const server = await serverApi()
-  const [me, assistant] = await Promise.all([
+  const [me, assistant, rules] = await Promise.all([
     unwrap(server.GET("/me")).catch(() => undefined),
     unwrap(server.GET("/assistant")).catch(() => undefined),
+    unwrap(server.GET("/rules")).catch(() => undefined),
   ])
   return (
     <html lang="en" suppressHydrationWarning>
@@ -47,7 +48,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link rel="search" type="application/opensearchdescription+xml" href="/opensearch.xml" title="Source Code Portal" />
       </head>
       <body className="cosmos">
-        <Providers now={renderedAt()}>
+        <Providers now={renderedAt()} rules={rules}>
           <FocusOnNavigation />
           <WebMCP />
           <Chrome>

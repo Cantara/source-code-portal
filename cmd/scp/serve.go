@@ -97,6 +97,7 @@ type (
 		*assistant.Assistant
 		toolsAPI
 		searchAPI
+		rulesAPI
 	}
 )
 
@@ -291,7 +292,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view}, layout.API{Current: view, Store: s.layouts},
-		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI}
+		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{}}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}

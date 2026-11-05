@@ -191,3 +191,64 @@ export function InboxIcon({ className }: { className?: string }) {
     </Icon>
   )
 }
+
+/** FlagIcon stands for a finding: a kind of finding the portal has no drawing of, and the findings in all. */
+export function FlagIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
+    </Icon>
+  )
+}
+
+// The kinds of work, each a commit's badge (CommitIcon).
+const person = (
+  <>
+    <circle cx="12" cy="8" r="3.5" />
+    <path d="M5 20a7 7 0 0 1 14 0" />
+  </>
+)
+const sparkles = (
+  <path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6ZM18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8Z" />
+)
+const bot = (
+  <>
+    <rect x="4" y="8" width="16" height="11" rx="2" />
+    <path d="M12 4v4M9 13h.01M15 13h.01M2 13v2M22 13v2" />
+  </>
+)
+const badges = { hand: person, ai: sparkles, automation: bot } as const
+
+/**
+ * CommitIcon stands for commits of one kind of work: a commit on its line (the history's own mark) with the kind as a badge at its
+ * top right, so a count beside it reads as commits, not as people or bots.
+ */
+export function CommitIcon({ kind, className }: { kind: keyof typeof badges; className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="8" cy="16" r="3.5" />
+      <path d="M1.5 16h3M11.5 16H15" />
+      <g transform="translate(12.5 0.5) scale(0.46)" strokeWidth="3.6">
+        {badges[kind]}
+      </g>
+    </Icon>
+  )
+}
+
+/** PulseIcon stands for activity: repositories changed in the window. */
+export function PulseIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M3 12h4l2-6 4 12 2-6h6" />
+    </Icon>
+  )
+}
+
+/** RefreshIcon stands for the catalogue in sync with GitHub. */
+export function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <path d="M20 11a8 8 0 0 0-13.7-4.7L4 8.5M4 13a8 8 0 0 0 13.7 4.7L20 15.5M4 4v4.5h4.5M20 20v-4.5h-4.5" />
+    </Icon>
+  )
+}

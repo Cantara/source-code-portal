@@ -1,0 +1,165 @@
+{
+  "activity": [
+    {
+      "about": "changed in the last 30 days",
+      "label": "Active",
+      "level": "active",
+      "withinDays": 30
+    },
+    {
+      "about": "changed in the last 6 months",
+      "label": "Recent",
+      "level": "recent",
+      "withinDays": 182
+    },
+    {
+      "about": "changed in the last 2 years",
+      "label": "Quiet",
+      "level": "quiet",
+      "withinDays": 730
+    },
+    {
+      "about": "no change for 2 years, or none read",
+      "label": "Dormant",
+      "level": "dormant",
+      "withinDays": null
+    },
+    {
+      "about": "archived on GitHub",
+      "label": "Archived",
+      "level": "archived",
+      "withinDays": null
+    }
+  ],
+  "findings": [
+    {
+      "about": "No one has worked on it for 2 years: archive it, or bring it back to life.",
+      "action": {
+        "label": "Archive it in its settings",
+        "path": "settings"
+      },
+      "code": "dormant",
+      "label": "Dormant",
+      "penalties": [
+        {
+          "points": 30,
+          "when": "No change by the team for more than 2 years."
+        }
+      ]
+    },
+    {
+      "about": "The portal cannot read it from GitHub, so what it shows may be old.",
+      "action": {
+        "label": "Check that it is still on GitHub",
+        "path": ""
+      },
+      "code": "failing",
+      "label": "Not updating",
+      "penalties": [
+        {
+          "points": 25,
+          "when": "The portal cannot update it from GitHub."
+        }
+      ]
+    },
+    {
+      "about": "Changes since its last release, 3 months or more ago, wait to be released.",
+      "action": {
+        "label": "Draft a release",
+        "path": "releases/new"
+      },
+      "code": "unreleased",
+      "label": "Unreleased",
+      "penalties": [
+        {
+          "points": 20,
+          "when": "Changes since the latest release, which is more than 3 months old."
+        }
+      ]
+    },
+    {
+      "about": "A public repository without a licence cannot safely be used by others.",
+      "action": {
+        "label": "Add a licence",
+        "path": "community/license/new"
+      },
+      "code": "no-licence",
+      "label": "No licence",
+      "penalties": [
+        {
+          "points": 20,
+          "when": "A public repository without a licence GitHub detects."
+        }
+      ]
+    },
+    {
+      "about": "Many open issues and pull requests wait for an answer.",
+      "action": {
+        "label": "Triage the open issues",
+        "path": "issues"
+      },
+      "code": "issues",
+      "label": "Backlog",
+      "penalties": [
+        {
+          "points": 20,
+          "when": "More than 50 open issues and pull requests."
+        },
+        {
+          "points": 10,
+          "when": "More than 20 open issues and pull requests."
+        }
+      ]
+    },
+    {
+      "about": "No one has changed it for 6 months: is it done, or forgotten?",
+      "action": {
+        "label": "Look at its last changes",
+        "path": "commits"
+      },
+      "code": "quiet",
+      "label": "Quiet",
+      "penalties": [
+        {
+          "points": 10,
+          "when": "No change by the team for more than 6 months."
+        }
+      ]
+    }
+  ],
+  "levels": [
+    {
+      "from": 80,
+      "label": "Good",
+      "level": "good"
+    },
+    {
+      "from": 50,
+      "label": "Watch",
+      "level": "watch"
+    },
+    {
+      "from": 0,
+      "label": "Needs attention",
+      "level": "attention"
+    }
+  ],
+  "severities": [
+    {
+      "from": 25,
+      "label": "High",
+      "severity": "high"
+    },
+    {
+      "from": 20,
+      "label": "Medium",
+      "severity": "medium"
+    },
+    {
+      "from": 0,
+      "label": "Low",
+      "severity": "low"
+    }
+  ],
+  "windowDays": 30
+}

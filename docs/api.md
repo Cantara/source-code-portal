@@ -32,6 +32,7 @@ The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and
 | `GET /api/v1/me` | the viewer: signed in or not, name, how identified (`proxy`, `oidc`, `token`), whether it sees private repositories and is an administrator, and the ways to sign in |
 | `GET /api/v1/assistant` | whether the assistant is set up, whether this viewer may ask, who may (`signed-in`, `admin`, `everyone`), the provider and model |
 | `POST /api/v1/assistant/chat` | asks the assistant (below); answers server-sent events |
+| `GET /api/v1/rules` | the rules the portal judges by, as it applies them: the window of the activity counts, the health levels and the scores they start at, the severities of findings and the penalties they start at, the activities and the ages of the last change they cover, and every kind of finding (its code, name, why it matters, what it costs and when, and its next step: a label and a path below the repository's GitHub page). A finding's `code` names one of these kinds; a client explains findings, levels and ages from here and holds no thresholds of its own |
 | `GET /api/v1/snapshot` | the version and time of the data being served, and readiness |
 | `GET /api/v1/events` | server-sent events: `event: snapshot` with the same JSON as `/api/v1/snapshot`, when the stream opens and whenever the data changes |
 

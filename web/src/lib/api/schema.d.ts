@@ -210,6 +210,28 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/rules": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The rules the portal judges by, in their current terms
+     * @description What the pages need to explain the signals as the server applies them: the window of the activity counts, the health levels
+     *     and the scores they start at, the severities of findings, the activities and the ages they cover, and every kind of finding
+     *     with its name, why it matters and when it costs how much. A page names a kind it does not know by these.
+     */
+    get: operations["getRules"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/snapshot": {
     parameters: {
       query?: never
@@ -537,13 +559,65 @@ export interface components {
       freshness: components["schemas"]["Freshness"]
     }
     /**
-     * @description good from 80, watch from 50, attention below
+     * @description Where each starts is in /rules
      * @enum {string}
      */
     HealthLevel: "good" | "watch" | "attention"
-    Finding: {
+    /**
+     * @description How recently the work that counts changed a repository; the ages are in /rules
+     * @enum {string}
+     */
+    ActivityLevel: "active" | "recent" | "quiet" | "dormant" | "archived"
+    Rules: {
+      /** @description The days the activity counts cover */
+      windowDays: number
+      levels: components["schemas"]["LevelRule"][]
+      severities: components["schemas"]["SeverityRule"][]
+      activity: components["schemas"]["ActivityRule"][]
+      findings: components["schemas"]["FindingKind"][]
+    }
+    LevelRule: {
+      level: components["schemas"]["HealthLevel"]
+      label: string
+      /** @description The score it starts at */
+      from: number
+    }
+    SeverityRule: {
       /** @enum {string} */
-      code: "failing" | "dormant" | "quiet" | "unreleased" | "no-licence" | "issues"
+      severity: "high" | "medium" | "low"
+      label: string
+      /** @description The penalty it starts at */
+      from: number
+    }
+    ActivityRule: {
+      level: components["schemas"]["ActivityLevel"]
+      label: string
+      about: string
+      /** @description The age of the last change it covers; null: no bound */
+      withinDays: number | null
+    }
+    Penalty: {
+      points: number
+      when: string
+    }
+    FindingKind: {
+      code: string
+      label: string
+      about: string
+      /** @description When it costs how much, the most costly first */
+      penalties: components["schemas"]["Penalty"][]
+      action: components["schemas"]["FindingAction"]
+    }
+    /** @description The next step on a finding of this kind, on the repository's GitHub page */
+    FindingAction: {
+      /** @description What to do: Draft a release */
+      label: string
+      /** @description Below the repository's GitHub page (releases/new); empty: the page itself */
+      path: string
+    }
+    Finding: {
+      /** @description The kind of finding; /rules names and explains every kind, so a new one needs no change here */
+      code: string
       /** @description Points the finding costs */
       penalty: number
       message: string
@@ -795,6 +869,7 @@ export interface components {
       at: string
     }
     DashboardMember: {
+      activity: components["schemas"]["ActivityLevel"]
       address: string
       name: string
       archived: boolean
@@ -1425,6 +1500,28 @@ export interface operations {
       }
       304: components["responses"]["NotModified"]
       404: components["responses"]["NotFound"]
+    }
+  }
+  getRules: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The rules */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Rules"]
+        }
+      }
+      304: components["responses"]["NotModified"]
     }
   }
   getSnapshot: {

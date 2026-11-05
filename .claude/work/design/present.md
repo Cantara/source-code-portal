@@ -49,16 +49,18 @@ fits from 1024 to 1920 pixels wide.
 ```
 
 - **Status strip**, one line: the brand at its start (the mark and SCP, a link to the dashboard; the mark alone in a narrow column),
-  then the dashboard's six signals in the same order and words (`signals` in `telemetry.tsx`, one list for both pages): People
-  (commits by hand), AI (with an AI or by an agent), Automation (bots and sweeps), each with its kind's colour as the sparklines draw
-  it, then Active, Findings and In sync with their lights; what each counts in its hint. The freshness indicator closes it.
+  then the dashboard's six signals in the same order (`signals` in `telemetry.tsx`, one list for both pages), each its icon and value
+  alone: the commits by hand, with AI and by automation (a commit with the kind's badge, in the kind's colour as the sparklines draw
+  it: commits, not people or bots, P-62), then the active repositories, the findings and the sync in their levels' colours; the name,
+  what it counts and its parts (the people, the assistants, the bots and sweeps, the activities, the products by level, the
+  repositories by freshness) in its hint. The freshness indicator closes it.
 - **Fleet health**: the `fleet-map` coloured by health level instead of activity (one square per repository, the level's colour and
-  a shape, attention outlined and watch round, so colour is never alone), drawn dense: one strip, each product a run of squares in
-  its order with a gap between runs and no label line (the products' names are on their tiles; a tap on a square names its
-  repository, a screen reader hears each product's counts). The legend counts the levels on the title line. On Cantara's 134
+  a shape, attention outlined and watch round, so colour is never alone), drawn dense: one strip of clusters, each product its squares in
+  a hairline box under its name in small type (cut to the squares' width, whole with its counts by level in the name's hint; a tap on
+  a square names its repository, a screen reader hears each product's counts), so the fleet reads as its products (P-62). The legend counts the levels on the title line. On Cantara's 134
   repositories in 13 products it is 106 px high where the labelled map took 240; 1,000 repositories take about 15 rows.
 - **Products as tiles**: a product at watch or attention takes a wide tile of three lines (name, then the level as the fleet map draws it, round for watch and outlined for attention, with how many repositories are at it, "● 6", the words in its hint;
-  the last change, the release and the 12-week sparkline of the work that counts; its findings as the dashboard draws them: the kind's icon on its severity's tile and the repository, without the reason, which is the icon's hint and the screen reader's text; two lines of them, the most costly first). A good
+  the last change, the release and the 12-week sparkline of the work that counts; its findings as the dashboard draws them: the finding's mark (the kind's icon on its severity's tile) and the repository, without the reason; the mark's hint tells the kind, severity, cost, what was found and the next step, and the mark opens the finding on its repository's page; two lines of them, the most costly first). A good
   product takes a narrow tile of one line (name, last change, sparkline). When the tiles do not fit, they give up detail in order of
   importance: the good ones fold from the end into one tile, then the mildest at watch lose their wide tile, then they fold too
   ("3 more to watch, 7 good"), then those at attention lose theirs; a product at attention never folds. The page places the tiles as the
@@ -115,7 +117,7 @@ fits from 1024 to 1920 pixels wide.
   as a tile or in the fold, axe clean, the CSP unchanged.
 - A fake stream that closes: the indicator reaches watch and attention on fake time; a new build reloads.
 - The leak test walks `/present` and `/api/v1/pages/present` as the public.
-- The JavaScript budget (P-41) holds: the page reuses the dashboard's elements.
+- The JavaScript budget (P-41): the page reuses the dashboard's elements; it brought the sum to 329.6 KB.
 
 ## Work
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/badges"
@@ -73,7 +74,7 @@ func repoHealthAPI(s *snapshot.Snapshot, e *snapshot.RepoEntry, out *oapi.Repo) 
 	}
 	h := &oapi.Health{Score: r.Score, Level: oapi.HealthLevel(r.Level), Findings: make([]oapi.Finding, 0, len(r.Findings))}
 	for _, f := range r.Findings {
-		h.Findings = append(h.Findings, oapi.Finding{Code: oapi.FindingCode(f.Code), Penalty: f.Penalty, Message: f.Message})
+		h.Findings = append(h.Findings, oapi.Finding{Code: f.Code, Penalty: f.Penalty, Message: f.Message})
 	}
 	out.Health = h
 }
@@ -90,18 +91,25 @@ func productAPI(p health.Product, limit int) *oapi.ProductHealth {
 	out := &oapi.ProductHealth{Score: p.Score, Level: oapi.HealthLevel(p.Level), Counted: p.Counted, Attention: p.Attention, Watch: p.Watch,
 		FindingCount: len(p.Findings), Findings: make([]oapi.RepoFinding, 0, len(fs))}
 	for _, f := range fs {
-		out.Findings = append(out.Findings, oapi.RepoFinding{Repo: f.Repo, Code: oapi.RepoFindingCode(f.Code), Penalty: f.Penalty,
+		out.Findings = append(out.Findings, oapi.RepoFinding{Repo: f.Repo, Code: f.Code, Penalty: f.Penalty,
 			Message: f.Message})
 	}
 	return out
 }
 
+// dashboardHealthAPI adds the health of the products, their members and the fleet, each member's activity (by the last change of
+// the work that counts, which the commits hook filled).
 func dashboardHealthAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
 	now := time.Now()
 	for i, g := range s.Groups {
 		out.Groups[i].Health = productAPI(groupHealth(s, g, now), dashboardFindings)
 		for j := range out.Groups[i].Members {
 			m := &out.Groups[i].Members[j]
+			var last time.Time
+			if m.LastAuthoredAt != nil {
+				last = *m.LastAuthoredAt
+			}
+			m.Activity = oapi.ActivityLevel(health.ActivityOf(last, m.Archived, now))
 			if e := s.Repos[snapshot.RepoKey(m.Address)]; e != nil {
 				if r := assess(s, e, now); r.Counted {
 					m.Level = new(oapi.HealthLevel(r.Level))
@@ -118,4 +126,39 @@ func dashboardHealthAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
 
 func groupHealthAPI(s *snapshot.Snapshot, g snapshot.Group, out *oapi.Group) {
 	out.Health = productAPI(groupHealth(s, g, time.Now()), 0)
+}
+
+// rulesAPI serves the rules the portal judges by (health.Describe), so every page explains the signals in the server's terms.
+type rulesAPI struct{}
+
+func (rulesAPI) GetRules(context.Context, oapi.GetRulesRequestObject) (oapi.GetRulesResponseObject, error) {
+	return oapi.GetRules200JSONResponse{Body: rulesOf(health.Describe())}, nil
+}
+
+// rulesOf is the rules in the contract's terms.
+func rulesOf(r health.Rules) oapi.Rules {
+	out := oapi.Rules{WindowDays: r.WindowDays, Levels: []oapi.LevelRule{}, Severities: []oapi.SeverityRule{},
+		Activity: []oapi.ActivityRule{}, Findings: []oapi.FindingKind{}}
+	for _, l := range r.Levels {
+		out.Levels = append(out.Levels, oapi.LevelRule{Level: oapi.HealthLevel(l.Level), Label: l.Label, From: l.From})
+	}
+	for _, v := range r.Severities {
+		out.Severities = append(out.Severities, oapi.SeverityRule{Severity: oapi.SeverityRuleSeverity(v.Severity), Label: v.Label, From: v.From})
+	}
+	for _, a := range r.Activity {
+		rule := oapi.ActivityRule{Level: oapi.ActivityLevel(a.Activity), Label: a.Label, About: a.About}
+		if a.WithinDays > 0 {
+			rule.WithinDays = new(a.WithinDays)
+		}
+		out.Activity = append(out.Activity, rule)
+	}
+	for _, k := range r.Findings {
+		kind := oapi.FindingKind{Code: k.Code, Label: k.Label, About: k.About, Penalties: make([]oapi.Penalty, 0, len(k.Penalties)),
+			Action: oapi.FindingAction{Label: k.Action.Label, Path: k.Action.Path}}
+		for _, p := range k.Penalties {
+			kind.Penalties = append(kind.Penalties, oapi.Penalty{Points: p.Points, When: p.When})
+		}
+		out.Findings = append(out.Findings, kind)
+	}
+	return out
 }
