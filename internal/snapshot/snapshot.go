@@ -98,12 +98,14 @@ type Snapshot struct {
 	public     *Snapshot      // the view without private and internal repositories; s itself when there are none
 	marks      map[string]mark
 	sum        uint64
+	digests    map[RepoKey]uint64 // per repository: the sum of its items' content digests
 }
 
 // mark is the digest of one published item and the repository it belongs to ("" for a source's items).
 type mark struct {
-	repo   RepoKey
-	digest uint64
+	repo    RepoKey
+	digest  uint64
+	content uint64 // what the item holds, without when it was checked
 }
 
 // Public returns the view of s without its private and internal repositories: s itself when it has none.
@@ -113,6 +115,11 @@ func (s *Snapshot) Public() *Snapshot {
 	}
 	return s.public
 }
+
+// Digest returns the content digest of the repository at key: the sum of its items' content digests (Builder.Mark), which changes
+// when what any of its items holds changes and not when an item is only checked again; 0 when it has no items. It is what a derived
+// index per repository is keyed by; the listing's fields are not in it.
+func (s *Snapshot) Digest(key RepoKey) uint64 { return s.digests[key] }
 
 // Repo returns the entry at key, following an alias. moved is true when key is an old address.
 func (s *Snapshot) Repo(key RepoKey) (e *RepoEntry, moved bool) {

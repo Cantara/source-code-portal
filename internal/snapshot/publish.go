@@ -85,9 +85,9 @@ func (b *Builder) UpdateRepo(key RepoKey, fn func(*RepoEntry)) bool {
 // Sources returns the builder's source statuses. Callers must not modify the slice.
 func (b *Builder) Sources() []SourceStatus { return b.s.Sources }
 
-// Mark records the digest of the published item at key, of the repository repo ("" for a source's items), 0 when it is gone; the
-// version is the sum of the digests.
-func (b *Builder) Mark(key string, repo RepoKey, digest uint64) {
+// Mark records the digests of the published item at key, of the repository repo ("" for a source's items), 0 when it is gone: digest
+// is what its publish shows (the version is the sum of them), content what it holds (Snapshot.Digest).
+func (b *Builder) Mark(key string, repo RepoKey, digest, content uint64) {
 	if b.s.marks == nil {
 		b.s.marks = map[string]mark{}
 	}
@@ -95,7 +95,7 @@ func (b *Builder) Mark(key string, repo RepoKey, digest uint64) {
 	if digest == 0 {
 		delete(b.s.marks, key)
 	} else {
-		b.s.marks[key] = mark{repo: repo, digest: digest}
+		b.s.marks[key] = mark{repo: repo, digest: digest, content: content}
 	}
 	b.s.sum += digest
 }
@@ -110,6 +110,12 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 	s := b.s
 	s.Version = s.sum & (1<<53 - 1)
 	s.BuiltAt = now
+	s.digests = make(map[RepoKey]uint64, len(s.Repos))
+	for _, m := range s.marks {
+		if m.repo != "" {
+			s.digests[m.repo] += m.content
+		}
+	}
 	s.index()
 	s.public = s.publicView()
 	return s
@@ -166,6 +172,7 @@ func (s *Snapshot) publicView() *Snapshot {
 		}
 	}
 	p.Version = sum & (1<<53 - 1)
+	p.digests = s.digests
 	p.index()
 	p.public = p
 	return p

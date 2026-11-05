@@ -496,10 +496,22 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 // publish sets an item in the snapshot with its digest and drops the digests of the items that left.
 func publish(b *snapshot.Builder, spec *Spec, it store.Item, fresh snapshot.Freshness, removed []string) {
 	spec.Publish(b, it, fresh)
-	b.Mark(it.Key, it.Repo, digest(it))
+	b.Mark(it.Key, it.Repo, digest(it), content(it))
 	for _, k := range removed {
-		b.Mark(k, "", 0)
+		b.Mark(k, "", 0, 0)
 	}
+}
+
+// content is the digest of what the item holds: its state, content and payload, not when it was fetched or checked, so a check that
+// found nothing new leaves it as it was (Snapshot.Digest).
+func content(it store.Item) uint64 {
+	h := fnv.New64a()
+	for _, s := range []string{it.Key, string(it.State), it.ErrCode, it.ContentSHA} {
+		_, _ = h.Write([]byte(s))
+		_, _ = h.Write([]byte{0})
+	}
+	_, _ = h.Write(it.Payload)
+	return max(h.Sum64(), 1)
 }
 
 // digest is the item's contribution to the snapshot version: what its publish shows, in the precision the store keeps.

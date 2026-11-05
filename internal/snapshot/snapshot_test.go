@@ -88,23 +88,23 @@ func TestVersionFollowsTheItems(t *testing.T) {
 	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	defer p.Close()
 	publish := func(fn func(*Builder)) uint64 { p.Update(fn); p.Flush(); return p.Current().Version }
-	ab := publish(func(b *Builder) { b.Mark("a", "", 1<<60|7); b.Mark("b", "", 9) })
+	ab := publish(func(b *Builder) { b.Mark("a", "", 1<<60|7, 1<<60|7); b.Mark("b", "", 9, 9) })
 	if ab == 0 || ab >= 1<<53 {
 		t.Fatalf("version %d, want nonzero within 53 bits", ab)
 	}
-	if v := publish(func(b *Builder) { b.Mark("b", "", 10) }); v == ab {
+	if v := publish(func(b *Builder) { b.Mark("b", "", 10, 10) }); v == ab {
 		t.Error("a changed item kept the version")
 	}
-	if v := publish(func(b *Builder) { b.Mark("b", "", 9) }); v != ab {
+	if v := publish(func(b *Builder) { b.Mark("b", "", 9, 9) }); v != ab {
 		t.Errorf("the same items give %d, want %d", v, ab)
 	}
-	if v := publish(func(b *Builder) { b.Mark("b", "", 0) }); v == ab {
+	if v := publish(func(b *Builder) { b.Mark("b", "", 0, 0) }); v == ab {
 		t.Error("a dropped item kept the version")
 	}
 	q := NewPublisher(time.Hour, time.Hour, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	defer q.Close()
-	q.Update(func(b *Builder) { b.Mark("b", "", 9) })
-	q.Update(func(b *Builder) { b.Mark("a", "", 3); b.Mark("a", "", 1<<60|7) })
+	q.Update(func(b *Builder) { b.Mark("b", "", 9, 9) })
+	q.Update(func(b *Builder) { b.Mark("a", "", 3, 3); b.Mark("a", "", 1<<60|7, 1<<60|7) })
 	q.Flush()
 	if v := q.Current().Version; v != ab {
 		t.Errorf("the same items in another order give %d, want %d", v, ab)
@@ -248,8 +248,8 @@ func TestPublicView(t *testing.T) {
 		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/secret", Members: []RepoKey{"acme/inner", "acme/open", "acme/secret"}}})
 		b.UpdateRepo("acme/open", func(e *RepoEntry) { notes.Set(e, []string{"o"}, Freshness{}) })
 		b.UpdateRepo("acme/secret", func(e *RepoEntry) { notes.Set(e, []string{"s"}, Freshness{}) })
-		b.Mark("notes/acme/open", "acme/open", 5)
-		b.Mark("notes/acme/secret", "acme/secret", 7)
+		b.Mark("notes/acme/open", "acme/open", 5, 5)
+		b.Mark("notes/acme/secret", "acme/secret", 7, 7)
 	})
 	p.Flush()
 	full := p.Current()
@@ -273,15 +273,47 @@ func TestPublicView(t *testing.T) {
 	}
 
 	// A private item moves the full version only.
-	p.Update(func(b *Builder) { b.Mark("notes/acme/secret", "acme/secret", 8) })
+	p.Update(func(b *Builder) { b.Mark("notes/acme/secret", "acme/secret", 8, 8) })
 	p.Flush()
 	if next := p.Current(); next.Version == full.Version || next.Public().Version != v.Version {
 		t.Errorf("after a private change: full %d (was %d), public %d (was %d)", next.Version, full.Version, next.Public().Version, v.Version)
 	}
-	p.Update(func(b *Builder) { b.Mark("notes/acme/open", "acme/open", 6) })
+	p.Update(func(b *Builder) { b.Mark("notes/acme/open", "acme/open", 6, 6) })
 	p.Flush()
 	if next := p.Current(); next.Public().Version == v.Version {
 		t.Error("a public change kept the public version")
+	}
+}
+
+func TestDigestFollowsContentNotChecks(t *testing.T) {
+	p := NewPublisher(time.Microsecond, time.Microsecond, slog.New(slog.DiscardHandler))
+	defer p.Close()
+	open, secret := repo("gh", 1, "acme", "open"), repo("gh", 2, "acme", "secret")
+	secret.Repo.Visibility = "private"
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{open, secret}, nil, SourceStatus{ID: "gh", Repos: 2})
+		b.Mark("docs/acme/open", "acme/open", 1, 10)
+		b.Mark("commits/acme/open", "acme/open", 2, 20)
+		b.Mark("docs/acme/secret", "acme/secret", 3, 30)
+		b.Mark("listing/gh", "", 4, 40)
+	})
+	p.Flush()
+	s := p.Current()
+	if s.Digest("acme/open") != 30 || s.Digest("acme/secret") != 30 || s.Digest("acme/none") != 0 {
+		t.Fatalf("digests: open %d, secret %d, none %d", s.Digest("acme/open"), s.Digest("acme/secret"), s.Digest("acme/none"))
+	}
+	if s.Public().Digest("acme/open") != 30 {
+		t.Errorf("the public view's digest of a public repository: %d", s.Public().Digest("acme/open"))
+	}
+	p.Update(func(b *Builder) { b.Mark("docs/acme/open", "acme/open", 5, 10) }) // checked again, nothing new
+	p.Flush()
+	if next := p.Current(); next.Digest("acme/open") != 30 || next.Version == s.Version {
+		t.Errorf("a check alone: digest %d, version moved %v", next.Digest("acme/open"), next.Version != s.Version)
+	}
+	p.Update(func(b *Builder) { b.Mark("docs/acme/open", "acme/open", 6, 11); b.Mark("commits/acme/open", "", 0, 0) })
+	p.Flush()
+	if next := p.Current(); next.Digest("acme/open") != 11 {
+		t.Errorf("after a change and a removal: %d, want 11", next.Digest("acme/open"))
 	}
 }
 
