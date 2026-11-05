@@ -42,6 +42,12 @@ const lens = (search: Search, cookies: Record<string, string>) => workOf(search.
 export const presentRoute: Route<object> = {
   load: ({ api, qc, cookies, search }) =>
     Promise.all([load(qc, dashboardQuery(api, lens(search, cookies))), prefetch(qc, pageQuery(api, "present"))]),
-  metadata: () => ({ title: "Presentation", robots: { index: false, follow: false } }),
+  metadata: () => ({
+    title: "Presentation",
+    robots: { index: false, follow: false },
+    // Added to the home screen, it opens full screen at /present (app/manifest.ts).
+    manifest: "/manifest.webmanifest",
+    appleWebApp: { capable: true, title: "SCP", statusBarStyle: "black-translucent" },
+  }),
   render: ({ cookies, search }) => <PresentView work={lens(search, cookies)} only={only(search)} />,
 }

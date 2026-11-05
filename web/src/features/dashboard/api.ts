@@ -45,11 +45,12 @@ export type StoredLayout = {
   problem: string
 }
 
-export const layoutPath = "/admin/layouts/dashboard"
+/** layoutPath is the admin's address of a page's stored layout. */
+export const layoutPath = (page: Page) => `/admin/layouts/${page}`
 
-export const storedLayoutQuery = () =>
+export const storedLayoutQuery = (page: Page) =>
   queryOptions({
-    queryKey: ["admin", "layout", "dashboard"] as const,
-    queryFn: ({ signal }) => get<StoredLayout>(layoutPath, signal),
+    queryKey: ["admin", "layout", page] as const,
+    queryFn: ({ signal }) => get<StoredLayout>(layoutPath(page), signal),
     staleTime: 0,
   })

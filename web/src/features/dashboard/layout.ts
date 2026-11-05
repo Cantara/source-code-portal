@@ -19,9 +19,9 @@ export const kinds: { kind: Kind; label: string; about: string }[] = [
   {
     kind: "fleet-map",
     label: "Fleet map",
-    about: "Every repository as a tile by product, coloured by its last change by a person.",
+    about: "Every repository as a tile by product, coloured by its last change or by its health.",
   },
-  { kind: "products", label: "Products", about: "The products as distilled cards or one sortable table." },
+  { kind: "products", label: "Products", about: "The products as distilled cards, one sortable table or compact tiles." },
   {
     kind: "latest-commits",
     label: "Latest commits",

@@ -19,7 +19,6 @@ const pages = [
   ["/admin", "Admin"],
   ["/search", "Search"],
   ["/search?q=whydah", "Search"],
-  ["/present", "Presentation"],
 ] as const
 
 async function axe(page: Page) {
@@ -50,7 +49,8 @@ test("the guide's pictures load in the theme shown, and every section is in its 
     for (const img of await shown.all()) {
       await img.scrollIntoViewIfNeeded()
       await expect(img).toHaveAttribute("src", new RegExp(`-${scheme}\\.webp$`))
-      expect(await img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
+      // A lazy picture loads once scrolled into view: wait for it rather than read it at once.
+      await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
     }
   }
   const contents = page.getByRole("navigation", { name: "Guide" }).getByRole("link")

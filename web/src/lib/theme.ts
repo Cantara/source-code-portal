@@ -42,9 +42,13 @@ export function apply(choice: Choice) {
   for (const l of listeners) l()
 }
 
-/** paint sets the dark class and colour scheme on the document from the current choice and the system preference. */
+/**
+ * paint sets the dark class and colour scheme on the document from the current choice and the system preference; the presentation
+ * page is dark unless the reader chose, as public/theme-init.js paints it.
+ */
 function paint() {
-  const dark = isDark(current ?? stored(), window.matchMedia(systemQuery).matches)
+  const wall = window.location.pathname === "/present"
+  const dark = isDark(current ?? stored(), wall || window.matchMedia(systemQuery).matches)
   document.documentElement.classList.toggle("dark", dark)
   document.documentElement.style.colorScheme = dark ? "dark" : "light"
 }

@@ -46,7 +46,12 @@ export function DashboardView({ work = every, view, side }: { work?: Work; view?
       {error && !data && <ProblemAlert error={error} />}
       {data &&
         (designing ? (
-          <Designer data={data} groups={data.groups} onClose={() => setDesigning(false)} />
+          <Designer
+            page="dashboard"
+            groups={data.groups}
+            preview={(draft) => <Elements layout={draft} data={data} />}
+            onClose={() => setDesigning(false)}
+          />
         ) : (
           <Elements layout={layout} data={data} view={view} side={side} />
         ))}

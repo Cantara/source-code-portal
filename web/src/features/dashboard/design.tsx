@@ -1,15 +1,14 @@
 "use client"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useId, useState } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { Alert } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { ProblemError, send, type Schemas } from "@/lib/api/client"
 import { keys } from "@/lib/api/queries"
 import { cn } from "@/lib/cn"
-import { layoutPath, storedLayoutQuery, type StoredLayout } from "./api"
+import { layoutPath, storedLayoutQuery, type Page, type StoredLayout } from "./api"
 import { blank, kindLabel, kinds, type Element, type Kind } from "./layout"
-import { Elements } from "./elements"
 
 type Group = Schemas["DashboardGroup"]
 
@@ -81,10 +80,24 @@ function Options({ el, groups, onChange }: { el: Element; groups: Group[]; onCha
           <select
             className={field}
             value={el.view ?? "cards"}
-            onChange={(e) => onChange({ ...el, view: e.target.value as "cards" | "table" })}
+            onChange={(e) => onChange({ ...el, view: e.target.value as Element["view"] })}
           >
             <option value="cards">Cards</option>
             <option value="table">Table</option>
+            <option value="tiles">Tiles</option>
+          </select>
+        </label>
+      )}
+      {el.kind === "fleet-map" && (
+        <label className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">Colour by</span>
+          <select
+            className={field}
+            value={el.color ?? "activity"}
+            onChange={(e) => onChange({ ...el, color: e.target.value as Element["color"] })}
+          >
+            <option value="activity">Last change</option>
+            <option value="health">Health</option>
           </select>
         </label>
       )}
@@ -128,13 +141,23 @@ function Options({ el, groups, onChange }: { el: Element; groups: Group[]; onCha
 }
 
 /**
- * Designer is the design mode of the landing page, for admins: the page's elements in a list to add, move (buttons, or by dragging),
- * set up and remove, beside a live preview of the draft. Save keeps it in the layout store for every viewer; a save that another
- * admin's overtook is refused, never overwritten.
+ * Designer is the design mode of a page with a layout (the landing page, the presentation page), for admins: the page's elements in a
+ * list to add, move (buttons, or by dragging), set up and remove, beside a live preview of the draft, drawn as the page draws it.
+ * Save keeps it in the layout store for every viewer; a save that another admin's overtook is refused, never overwritten.
  */
-export function Designer({ data, groups, onClose }: { data: Schemas["Dashboard"]; groups: Group[]; onClose: () => void }) {
+export function Designer({
+  page,
+  groups,
+  preview,
+  onClose,
+}: {
+  page: Page
+  groups: Group[]
+  preview: (draft: Element[]) => ReactNode
+  onClose: () => void
+}) {
   const qc = useQueryClient()
-  const { data: stored, error: loadError, refetch } = useQuery(storedLayoutQuery())
+  const { data: stored, error: loadError, refetch } = useQuery(storedLayoutQuery(page))
   const [edited, setDraft] = useState<Element[] | null>(null)
   const [adding, setAdding] = useState<Kind>("heading")
   const [dragging, setDragging] = useState<number | null>(null)
@@ -153,18 +176,19 @@ export function Designer({ data, groups, onClose }: { data: Schemas["Dashboard"]
     setError(null)
     try {
       const next = await w()
-      qc.setQueryData(storedLayoutQuery().queryKey, next)
+      qc.setQueryData(storedLayoutQuery(page).queryKey, next)
       setDraft(next.elements)
       setSaved(next.stored)
-      await qc.invalidateQueries({ queryKey: keys.page("dashboard") })
+      await qc.invalidateQueries({ queryKey: keys.page(page) })
     } catch (e) {
       setError(e instanceof ProblemError ? e : new ProblemError(0, "network", String(e)))
     } finally {
       setBusy(false)
     }
   }
-  const save = () => write(() => send<StoredLayout>("PUT", layoutPath, { revision: stored.revision, elements: draft }))
-  const reset = () => write(() => send<StoredLayout>("DELETE", `${layoutPath}?revision=${encodeURIComponent(stored.revision)}`))
+  const save = () => write(() => send<StoredLayout>("PUT", layoutPath(page), { revision: stored.revision, elements: draft }))
+  const reset = () =>
+    write(() => send<StoredLayout>("DELETE", `${layoutPath(page)}?revision=${encodeURIComponent(stored.revision)}`))
   const reload = async () => {
     const r = await refetch()
     if (r.data) setDraft(r.data.elements)
@@ -310,7 +334,7 @@ export function Designer({ data, groups, onClose }: { data: Schemas["Dashboard"]
           </div>
         </section>
         <section aria-label="Preview" className="min-w-0 rounded-lg border border-dashed border-border p-3">
-          <Elements layout={draft} data={data} />
+          {preview(draft)}
         </section>
       </div>
     </div>

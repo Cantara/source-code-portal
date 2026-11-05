@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react"
 import { api, type Commit, type Schemas } from "@/lib/api/client"
 import { snapshotQuery } from "@/lib/api/snapshot"
 import { useNow } from "@/lib/clock"
@@ -13,7 +13,11 @@ import { addressPath } from "@/lib/paths"
 import { by, type Work } from "@/lib/preferences"
 import { AiMark } from "@/entities/commit/ai-mark"
 import { ProblemAlert } from "@/shared/problem-alert"
+import { meQuery } from "@/lib/api/queries"
+import { apply, useTheme, type Choice } from "@/lib/theme"
 import { dashboardQuery, pageQuery, workQuery } from "./api"
+import { Designer } from "./design"
+import { useShift, useWall } from "./wall"
 import { FleetMap } from "./fleet-map"
 import { defaultPresent, pick, type Element } from "./layout"
 import { TelemetryStrip } from "./telemetry"
@@ -22,6 +26,11 @@ import { ProductTiles } from "./tiles"
 /** stale and offline are how long since the data was last known current before the page says so (design/present.md). */
 const stale = 2 * 60_000
 const offline = 10 * 60_000
+
+/** barFor is how long a tap shows the controls. */
+const barFor = 5_000
+
+const themes: Choice[] = ["dark", "light", "system"]
 
 /** A commit list asks for at most this many when the page shows only some products, and keeps theirs. */
 const scoped = 200
@@ -114,24 +123,25 @@ function within(all: Schemas["DashboardGroup"][], ids: string[] | undefined, onl
 }
 
 /**
- * PresentView is the presentation page (design/present.md): the layout's elements on one screen that never scrolls, for a tablet
- * or a screen on a wall. The latest commits take the right column at full height (below the rest in portrait); the other elements
- * stack at the left in their order, the products filling what is left and folding the good ones that do not fit. only is the
- * groups the address names.
+ * Screen draws a layout's elements on the presentation page's grid within frame (the whole viewport, or the design mode's preview).
+ * The latest commits take the right column at full height (below the rest in portrait); the other elements stack at the left in
+ * their order, the products filling what is left and folding the good ones that do not fit. only is the groups the address names.
  */
-export function PresentView({ work, only }: { work: Work; only?: string[] }) {
+function Screen({
+  layout,
+  data,
+  commits,
+  only,
+  frame,
+}: {
+  layout: Element[]
+  data: Schemas["Dashboard"]
+  commits: Commit[]
+  only?: string[]
+  frame: string
+}) {
   const now = useNow()
-  const { data, error } = useQuery(dashboardQuery(api, work))
-  const { data: page } = useQuery(pageQuery(api, "present"))
-  const layout = page?.elements ?? defaultPresent
-  const stream = layout.find((e) => e.kind === "latest-commits")
-  const count = stream?.count ?? 30
-  const { data: log } = useQuery({ ...workQuery(api, work, only ? scoped : count), enabled: !!stream })
-  if (!data) return <div className="p-4">{error && <ProblemAlert error={error} />}</div>
-
   const scope = only ? { ...data, groups: within(data.groups, undefined, only) } : data
-  const members = new Set(scope.groups.flatMap((g) => g.members.map((m) => m.address)))
-  const commits = (log?.commits ?? data.latest).filter((c) => !only || members.has(c.repo)).slice(0, count)
   const groups = (el: Element) => within(data.groups, el.groups, only)
   const left: ReactNode[] = []
   let strip = false
@@ -159,9 +169,14 @@ export function PresentView({ work, only }: { work: Work; only?: string[] }) {
         break
     }
   })
+  const stream = layout.find((e) => e.kind === "latest-commits")
   return (
-    <div className="present fixed inset-0 grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] landscape:grid-cols-[minmax(0,1fr)_minmax(18rem,30%)] landscape:grid-rows-1">
-      <h1 className="sr-only">Presentation</h1>
+    <div
+      className={cn(
+        "grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] landscape:grid-cols-[minmax(0,1fr)_minmax(18rem,30%)] landscape:grid-rows-1",
+        frame,
+      )}
+    >
       <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
         {!strip && (
           <div className="flex justify-end">
@@ -170,7 +185,117 @@ export function PresentView({ work, only }: { work: Work; only?: string[] }) {
         )}
         {left}
       </div>
-      {stream && <Stream commits={commits} work={data.work} />}
+      {stream && <Stream commits={commits.slice(0, stream.count ?? 30)} work={data.work} />}
     </div>
+  )
+}
+
+/** Bar is the controls a tap or a key shows for a few seconds: back to the dashboard, the theme, full screen, the design mode. */
+function Bar({ onDesign }: { onDesign?: () => void }) {
+  const [shown, setShown] = useState(false)
+  const [within, setWithin] = useState(false)
+  const choice = useTheme()
+  const [full, setFull] = useState(false)
+  // Full screen where the browser has it (not the iPhone), known only in the browser: the server renders without it.
+  const canFull = useSyncExternalStore(
+    () => () => undefined,
+    () => document.fullscreenEnabled,
+    () => false,
+  )
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const wake = () => {
+      setShown(true)
+      clearTimeout(timer)
+      timer = setTimeout(() => setShown(false), barFor)
+    }
+    const screen = () => setFull(!!document.fullscreenElement)
+    document.addEventListener("pointerdown", wake)
+    document.addEventListener("keydown", wake)
+    document.addEventListener("fullscreenchange", screen)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener("pointerdown", wake)
+      document.removeEventListener("keydown", wake)
+      document.removeEventListener("fullscreenchange", screen)
+    }
+  }, [])
+  const next = themes[(themes.indexOf(choice) + 1) % themes.length] ?? "system"
+  const button = "rounded-md px-2.5 py-1.5 text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring outline-none"
+  return (
+    <nav
+      aria-label="Presentation"
+      onFocus={() => setWithin(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setWithin(false)
+      }}
+      className={cn(
+        "fixed top-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-xl backdrop-blur-md transition-opacity motion-reduce:transition-none",
+        shown || within ? "opacity-100" : "pointer-events-none opacity-0",
+      )}
+    >
+      {/* A whole page load: the dashboard draws its own theme and header. */}
+      <a href="/" className={button}>
+        Dashboard
+      </a>
+      <button type="button" className={button} onClick={() => apply(next)}>
+        Theme: {choice === "system" ? "auto" : choice}
+      </button>
+      {canFull && (
+        <button
+          type="button"
+          className={button}
+          onClick={() => void (full ? document.exitFullscreen() : document.documentElement.requestFullscreen())}
+        >
+          {full ? "Leave full screen" : "Full screen"}
+        </button>
+      )}
+      {onDesign && (
+        <button type="button" className={button} onClick={onDesign}>
+          Design this page
+        </button>
+      )}
+    </nav>
+  )
+}
+
+/**
+ * PresentView is the presentation page (design/present.md): the layout's elements on one screen that never scrolls, for a tablet
+ * or a screen on a wall. It keeps the screen awake, reloads on a new release and once an hour, and shifts by a pixel or two now and
+ * then against burn-in; a tap shows its controls. only is the groups the address names.
+ */
+export function PresentView({ work, only }: { work: Work; only?: string[] }) {
+  const { data, error } = useQuery(dashboardQuery(api, work))
+  const { data: page } = useQuery(pageQuery(api, "present"))
+  const { data: me } = useQuery(meQuery(api))
+  const [designing, setDesigning] = useState(false)
+  const layout = page?.elements ?? defaultPresent
+  const count = Math.max(30, ...layout.map((e) => (e.kind === "latest-commits" ? (e.count ?? 30) : 0)))
+  const { data: log } = useQuery(workQuery(api, work, only ? scoped : count))
+  useWall()
+  const shift = useShift()
+  if (!data) return <div className="p-4">{error && <ProblemAlert error={error} />}</div>
+
+  const members = new Set(within(data.groups, undefined, only).flatMap((g) => g.members.map((m) => m.address)))
+  const commits = (log?.commits ?? data.latest).filter((c) => !only || members.has(c.repo))
+  return (
+    <>
+      <h1 className="sr-only">Presentation</h1>
+      {designing ? (
+        <div className="fixed inset-0 overflow-auto bg-background p-4">
+          <Designer
+            page="present"
+            groups={data.groups}
+            preview={(draft) => <Screen layout={draft} data={data} commits={commits} only={only} frame="relative h-[40rem]" />}
+            onClose={() => setDesigning(false)}
+          />
+        </div>
+      ) : (
+        <>
+          <Screen layout={layout} data={data} commits={commits} only={only} frame={cn("fixed inset-0", shift)} />
+          <Bar onDesign={me?.admin ? () => setDesigning(true) : undefined} />
+        </>
+      )}
+    </>
   )
 }
