@@ -4,6 +4,25 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.3
+
+Search across what the portal holds. No configuration change is needed to upgrade: the index is built in memory from what the portal
+already reads, never stored and never asked of GitHub.
+
+- Search repositories, groups, the sections of READMEs and `docs/` documents, manifests with their dependencies, published packages
+  and default-branch commits, best first, from the viewer's view: a public reader never finds a private repository. Not source code.
+- The query: every word (the last one also as a prefix), "phrases", -exclusions, OR, and the filters `in:`, `group:`, `repo:`,
+  `lang:`, `topic:`, `lifecycle:`, `author:`, `kind:` (hand, ai, automation), `dep:`, `before:` and `after:`; a word nothing holds is
+  searched with one letter changed, and the page says so.
+- `/search` (rendered on the server, so it works without JavaScript) shows the hits by kind with their counts and snippets, the
+  matches marked; a document opens at the section that matched. The header has a search box: `/` or Ctrl/⌘ K, and it suggests
+  repositories, groups and documents by name as you type.
+- `GET /api/v1/search` and `/api/v1/search/suggest`; agents get the tool `search` (the assistant, MCP and WebMCP) in place of
+  `search_repositories`. `/opensearch.xml` lets a browser add the portal as a search engine; robots.txt keeps crawlers off `/search`.
+- The admin status shows the index (`search`: segments, terms, bytes, build time); `scp_search_requests_total` and
+  `scp_search_duration_seconds` are new metrics.
+- The Guide has a section on searching; the API guide, the operator guide, the security model and the operators' plugin cover it.
+
 ## 2.2.2
 
 AI agents can ask the portal what a person would, through the portal's own read-only tools. No configuration change is needed to
