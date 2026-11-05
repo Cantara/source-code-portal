@@ -25,11 +25,18 @@ activity first, with the exact total.**
   first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { totalCount nodes { number title url isDraft createdAt updatedAt author
   { login __typename } baseRefName headRefName isCrossRepository reviewDecision mergeable additions deletions changedFiles
   reviewRequests { totalCount } labels(first: 5) { nodes { name color } } commits(last: 1) { nodes { commit { oid statusCheckRollup
-  { state } } } } } } }`: about one point, only when the listing changed, when a held pull request's checks are pending or its
+  { state } } } } } } }`, its `first` sized to the listing's count (GitHub prices a query by its `first` arguments, so a repository
+  with 3 open pull requests costs 1 point and one with 100 about 3), only when the listing changed, when a held pull request's checks are pending or its
   mergeability unknown (GitHub computes it lazily), or once an hour (checks change without touching the listing).
 - **Triggers.** The job runs on the webhook events `pull_request`, `pull_request_review`, `check_suite` and `status` (already passed
   through by `webhook.Normalise` under their own names), on `EventPush` (a new branch is often a new pull request), and on its TTL:
-  15 minutes for the listing, `Result.Again` in 5 minutes while checks are pending.
+  15 minutes for the listing, `Result.Again` while checks are pending or mergeability unknown, at 5, 10, 20 then 60 minutes (a
+  required check that never reports cannot keep a repository at 12 queries an hour). An archived repository is read once and again
+  only when the listing says it was unarchived: its pull requests cannot change.
+- **Measured on Cantara (2026-11-05)**: 180 repositories (12 archived), 888 open pull requests in 116 of them, 525 by bots, 386
+  updated in the last 30 days across 100 repositories (Renovate and Dependabot rebasing). So most listings are not `[]` and many
+  change daily; the cost is still bounded by the TTL: at most 4 listings and 4 queries of at most 3 points per repository an hour,
+  about 700 REST requests and 1,600 points in the worst hour against at least 10,000 of each, and far less in practice.
 - **Cost at 1,000 repositories.** 4,000 conditional REST requests an hour, nearly all 304 (free); GraphQL only for changed
   repositories, a few hundred points an hour against a budget of 5,000 or more. The first read is 1,000 listings and one query per
   repository that has open pull requests.
@@ -95,9 +102,11 @@ live on their own page.
    state, a link to `/pulls?repo=` and to GitHub's list; the header's figures say issues and pull requests apart.
 6. **Commits navigator**: a branch that has an open pull request carries its `#123` and state beside its name (the job holds
    `headRefName`; the commits job already reads the ten newest branches).
-7. **`/present`**: the strip's signal "Pull requests" (the telemetry's, P-61); a `pulls` layout element ("Waiting for review", its
-   options: groups, states, how many) for an admin's design mode, not in the built-in layout, so a team can put its review queue on
-   a wall.
+7. **The `pulls` element** ("Waiting for review", options: groups, states, by, how many): the pull requests that wait longest, each
+   one line with its state, `repo #123`, title, author and idle time, and a link to `/pulls`; nothing when none waits. In both
+   built-in layouts: on the dashboard after the products, beside the latest commits' column (5 by default); on `/present` the
+   strip's signal "Pull requests" (the telemetry's, P-61) and the element as a band below the products (as many as fit), so a team's
+   review queue is on the wall. An admin moves or removes it in design mode.
 8. **Agents and the rest**: the tool `pulls` in the catalogue (assistant, MCP, WebMCP), the search index's kind `pull` (titles),
    the badge `/badges/repos/{o}/{n}/pulls.svg` and the group's, a line per repository in `/llms.txt`, metrics for the job.
 
@@ -122,7 +131,8 @@ and the badges.
 - **PR1, the data**: `internal/actor`, `github.GraphQL`, the `pulls` job and facet, the issue count split, the health findings, the
   contract and `/api/v1/pulls`, the fake, the leak test. Done when: an unchanged repository costs one 304 and no GraphQL; a review
   webhook re-reads one repository; pending checks are asked again; a private repository's pull requests never reach the public.
-- **PR2, the pages**: `/pulls`, the telemetry tile, the PRs columns, the group's panel, the repository's panel, the navigator's
+- **PR2, the pages**: `/pulls` (the header's "Pull requests"), the telemetry tile and the strip's signal, the `pulls` element on the
+  dashboard and `/present`, the PRs columns, the group's panel, the repository's panel, the navigator's
   branch chip. Done when: Playwright filters `/pulls` by state with and without JavaScript, each page shows the fake's pull requests,
   axe clean in both themes.
-- **PR3, the rest**: the `pulls` element for `/present`, the tool, search, badges, llms, docs, the Guide, the plugin.
+- **PR3, the rest**: the tool, search, badges, llms, docs, the Guide, the plugin.
