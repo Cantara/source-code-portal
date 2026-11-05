@@ -10,7 +10,8 @@ test("README images load from the portal", async ({ page }) => {
   await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(1)
 })
 
-test("a push reaches an open page without polling", async ({ page, request }, info) => {
+// @writes: the push changes every page's numbers, so it runs after the readers (playwright.config.ts).
+test("a push reaches an open page without polling", { tag: "@writes" }, async ({ page, request }) => {
   const snapshots: string[] = []
   page.on("request", (r) => {
     if (new URL(r.url()).pathname === "/api/v1/snapshot") snapshots.push(r.url())
@@ -20,7 +21,7 @@ test("a push reaches an open page without polling", async ({ page, request }, in
   await expect(page.getByText("Change 30 of repository 1")).toBeVisible()
   expect((await stream).headers()["content-type"]).toBe("text/event-stream")
   const before = snapshots.length
-  const message = `Pushed from ${info.project.name} ${Date.now()}`
+  const message = `Pushed from the e2e ${Date.now()}`
   const res = await request.post(`${control}/push?repo=whydah-sso&message=${encodeURIComponent(message)}`)
   expect(res.status()).toBe(204)
   // The snapshot is read every 30 s without the stream; the commit shows within a few seconds through it.

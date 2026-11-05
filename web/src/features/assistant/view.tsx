@@ -42,7 +42,13 @@ export function AskView() {
   const [refused, setRefused] = useState<unknown>()
   const abort = useRef<AbortController | null>(null)
   const [busy, setBusy] = useState(false)
+  const box = useRef<HTMLTextAreaElement>(null)
   useEffect(() => () => abort.current?.abort(), [])
+  // A question typed before the page hydrated is in the box but not in the state: take it, or Ask stays disabled.
+  useEffect(() => {
+    const typed = box.current?.value
+    if (typed) setQuestion(typed)
+  }, [])
 
   const update = (fn: (a: Shown) => Shown) =>
     setShown((s) => [...s.slice(0, -1), fn(s.at(-1) ?? { role: "assistant", content: "" })])
@@ -159,6 +165,7 @@ export function AskView() {
         </label>
         <textarea
           id="question"
+          ref={box}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={onKey}
