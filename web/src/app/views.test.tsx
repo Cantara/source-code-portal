@@ -53,8 +53,11 @@ describe("pages", () => {
     expect(within(card).getByRole("link", { name: "whydah-core" })).toHaveAttribute("href", "/repos/acme/whydah-core")
     // The fleet map counts every member by its last change by a person.
     expect(screen.getByRole("region", { name: "Fleet" })).toHaveTextContent("2 active")
-    expect(screen.getByText("People").nextElementSibling).toHaveTextContent("2")
-    expect(screen.getByText("1 by hand, 3 with AI (Claude, Copilot) in 30 days")).toBeInTheDocument()
+    expect(screen.getByText("People").nextElementSibling).toHaveTextContent("1")
+    expect(screen.getByText("commits by hand in 30 days, by 2 people")).toBeInTheDocument()
+    const telemetry = within(screen.getByRole("region", { name: "Telemetry" }))
+    expect(telemetry.getByText("AI").nextElementSibling).toHaveTextContent("3")
+    expect(screen.getByText("commits with AI or by an agent in 30 days (Claude, Copilot)")).toBeInTheDocument()
     // The latest commits mark the one made with an AI, naming it.
     expect(screen.getByText("with Claude Opus 5")).toBeInTheDocument()
   })

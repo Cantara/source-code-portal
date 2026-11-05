@@ -393,18 +393,21 @@ export function GuideView({ version }: { version: string }) {
           id="telemetry"
           n={2}
           title="The fleet at a glance"
-          lede="The row of tiles at the top of the dashboard: every repository of the portal, summed up. A light shows a state worth knowing."
+          lede="The row of tiles at the top of the dashboard, and the line at the top of the presentation page: the same six signals. A light shows a state worth knowing; a coloured square, the kind of work."
         >
           <Figure caption="The telemetry of a portal with three products and thirteen repositories.">
-            <Shot name="telemetry" alt="Six tiles: People 5, Active 12, Automation 57, Findings 8, Products 3, In sync 100%." />
+            <Shot
+              name="telemetry"
+              alt="Six tiles: People 16 commits by hand by 5 people, AI 36, Automation 69, Active 12 of 13 repositories, Findings 8 with 1 of 3 products to watch, In sync 100%."
+            />
           </Figure>
           <Terms
             items={[
-              ["People", "Who made the work that counts in the last 30 days, and how many commits were by hand and with AI."],
-              ["Active", "Repositories the work that counts changed in the last 30 days, of all of them."],
+              ["People", "Commits by hand in the last 30 days, and by how many people."],
+              ["AI", "Commits with an AI or by a coding agent in 30 days, and the assistants they name."],
               ["Automation", "Commits by CI, dependency and release bots in 30 days, and the commits of sweeps."],
-              ["Findings", "Everything the health checks found, and how many products need a look."],
-              ["Products", "The groups of the configuration, and the repositories in none."],
+              ["Active", "Repositories the work that counts changed in the last 30 days, of all of them; those in no product."],
+              ["Findings", "Everything the health checks found, and how many of the products need a look."],
               ["In sync", "The share of repositories whose data is current; a red light when updates from GitHub fail."],
             ]}
           />
@@ -687,7 +690,7 @@ export function GuideView({ version }: { version: string }) {
             <Figure caption="The presentation page on an iPad in landscape: the fleet's numbers and how current they are, every repository's health, a wide tile for the product to watch, one line for each good one, and the newest commits at the right.">
               <Shot
                 name="present"
-                alt="The presentation page: 13 repositories, 3 products, 1 to watch, live; the fleet health with 3 to watch and 9 good; Developer tools as a wide tile at watch with its two findings, Payments and Identity as small tiles; the latest commits in a column at the right."
+                alt="The presentation page: SCP and the six signals in one line, live; the fleet health as one strip, 3 to watch and 9 good; Developer tools as a wide tile at watch with its findings as icons, Payments and Identity as small tiles; the latest commits in a column at the right."
               />
             </Figure>
             <div className="grid gap-6 lg:grid-cols-2">

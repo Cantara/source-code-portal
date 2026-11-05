@@ -48,8 +48,10 @@ fits from 1024 to 1920 pixels wide.
 └──────────────┴──────────────┴──────────────┴──────────────┴────────────────────────┘
 ```
 
-- **Status strip**, one line: the telemetry tiles as numbers (repositories, products, the count at attention and at watch, people this
-  month, the share with AI) and the freshness indicator at its end.
+- **Status strip**, one line: the brand at its start (the mark and SCP, a link to the dashboard; the mark alone in a narrow column),
+  then the dashboard's six signals in the same order and words (`signals` in `telemetry.tsx`, one list for both pages): People
+  (commits by hand), AI (with an AI or by an agent), Automation (bots and sweeps), each with its kind's colour as the sparklines draw
+  it, then Active, Findings and In sync with their lights; what each counts in its hint. The freshness indicator closes it.
 - **Fleet health**: the `fleet-map` coloured by health level instead of activity (one square per repository, the level's colour and
   a shape, attention outlined and watch round, so colour is never alone), drawn dense: one strip, each product a run of squares in
   its order with a gap between runs and no label line (the products' names are on their tiles; a tap on a square names its
@@ -78,7 +80,7 @@ fits from 1024 to 1920 pixels wide.
 
 ## Behaviour
 
-- **No chrome.** No header, search box, Settings or design mode. A tap or a key shows a small bar for 5 s: back to the dashboard,
+- **No chrome.** No header, search box, Settings or design mode. A tap or a key shows a small bar at the bottom for 5 s (clear of the strip): back to the dashboard,
   the theme, full screen where the browser has it. Nothing needs a hover: `Hint` cards are not used; what a hint would say is written.
 - **Live.** The page follows `/api/v1/events` as the dashboard does and refreshes its data on each new snapshot; it polls only while
   the stream is closed (`features/status/sync.ts`).

@@ -274,8 +274,9 @@ cost with `scp_assistant_tokens_total` (section 5).
 
 ### 2.4 The landing page and the design mode
 
-The dashboard shows signals, not every attribute of every repository: a telemetry row (who committed in the last 30 days, the
-repositories a person changed, what automation did, the findings, whether the catalogue is current), a fleet map with every repository
+The dashboard shows signals, not every attribute of every repository: a telemetry row (the commits by hand, with AI and by
+automation in the last 30 days, the repositories changed, the findings, whether the catalogue is current; the presentation page's
+strip shows the same six), a fleet map with every repository
 as one tile coloured by its last change by a person, the products as cards or a sortable table, and the latest commits by people. A
 commit by a bot or a release plugin is automation; a commit whose subject landed in more than 10 repositories on one day is a sweep.
 Neither counts as a person's work. A person's commit with an AI `Co-authored-by` trailer (as Claude Code, Copilot and Cursor write

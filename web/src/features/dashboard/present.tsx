@@ -11,6 +11,7 @@ import { useConnectionFailing, useLive } from "@/lib/connection"
 import { ago } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
 import { by, columnCookie, columnWidths, remember, type Work } from "@/lib/preferences"
+import { Mark } from "@/components/ui/mark"
 import { AiMark } from "@/entities/commit/ai-mark"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -52,6 +53,26 @@ export function freshness(live: boolean, failing: boolean, checked: number, now:
     : { level: "lvl-recent", word: "Polling", about: "Checking for new data every 30 seconds." }
 }
 
+/**
+ * Brand is the portal's mark and name at the top left, the header being left out: the name gives way to the mark alone as the
+ * left column narrows. A whole page load to the dashboard, as the bar's link.
+ */
+function Brand() {
+  return (
+    <a
+      href="/"
+      title="Source Code Portal: the dashboard"
+      className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
+    >
+      <Mark />
+      <span aria-hidden="true" className="font-mono tracking-widest @max-md:hidden">
+        SCP
+      </span>
+      <span className="sr-only">Source Code Portal, the dashboard</span>
+    </a>
+  )
+}
+
 /** Freshness says at all times how old the page's data is, so a screen on a wall is never silently wrong. */
 function Freshness() {
   const now = useNow()
@@ -61,11 +82,14 @@ function Freshness() {
   const checked = live ? now : dataUpdatedAt || now
   const s = freshness(live, failing, checked, now)
   return (
-    <p role="status" className={cn(s.level, "flex items-center gap-2 text-[0.9375rem]")} title={s.about}>
-      <span aria-hidden="true" className="led led-live" />
-      <span className="font-mono font-semibold tracking-widest text-(--lvl-fg) uppercase">{s.word}</span>
+    // Two short lines at the strip's end: the word, then the data's age.
+    <p role="status" className={cn(s.level, "flex shrink-0 flex-col items-end leading-tight")} title={s.about}>
+      <span className="flex items-center gap-2">
+        <span aria-hidden="true" className="led led-live" />
+        <span className="font-mono font-semibold tracking-widest text-(--lvl-fg) uppercase">{s.word}</span>
+      </span>
       {data?.builtAt && (
-        <span className="text-muted-foreground" suppressHydrationWarning>
+        <span className="text-sm text-muted-foreground" suppressHydrationWarning>
           data from {ago(data.builtAt, now) === "now" ? "just now" : `${ago(data.builtAt, now)} ago`}
         </span>
       )}
@@ -164,7 +188,15 @@ function Screen({
   layout.forEach((el, i) => {
     switch (el.kind) {
       case "telemetry":
-        left.push(<TelemetryStrip key={i} data={scope} end={strip ? undefined : <Freshness />} />)
+        left.push(
+          <TelemetryStrip
+            key={i}
+            data={scope}
+            now={now}
+            start={strip ? undefined : <Brand />}
+            end={strip ? undefined : <Freshness />}
+          />,
+        )
         strip = true
         break
       case "fleet-map":
@@ -197,7 +229,8 @@ function Screen({
       {/* A container: as the commit column widens, the elements keep the signals that matter most (container queries). */}
       <div className="@container flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
         {!strip && (
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-4">
+            <Brand />
             <Freshness />
           </div>
         )}
@@ -340,7 +373,7 @@ function Bar({ onDesign }: { onDesign?: () => void }) {
         if (!e.currentTarget.contains(e.relatedTarget)) setWithin(false)
       }}
       className={cn(
-        "fixed top-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-xl backdrop-blur-md transition-opacity motion-reduce:transition-none",
+        "fixed bottom-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-xl backdrop-blur-md transition-opacity motion-reduce:transition-none",
         shown || within ? "opacity-100" : "pointer-events-none opacity-0",
       )}
     >

@@ -60,8 +60,8 @@ The landing page is a list of elements, each a component of `web/src/features/da
 
 `groups` selects products: all, or a list of group ids, in that order. Elements select groups, never repositories, so a layout never
 names a repository. The default landing page is a `telemetry` row, the `fleet-map` band, `products` as cards, then `latest-commits`.
-Per-repository rows leave the landing page for the group page. The telemetry tiles: people (who committed in 30 days), active
-repositories, automation (and sweeps), findings, products (and the repositories in no group), in sync.
+Per-repository rows leave the landing page for the group page. The telemetry tiles (P-61, the same signals as the presentation page's strip): people (commits by hand), AI (with an AI or by an
+agent), automation (and sweeps), active repositories (and those in no group), findings (of how many products), in sync.
 
 ## Layouts (L2)
 A layout is a page's elements and their options, as data; the file is the API's element list (`LayoutElement` in the contract, one
