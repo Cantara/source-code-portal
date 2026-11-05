@@ -731,6 +731,16 @@ export interface components {
       kind: "person" | "assisted" | "agent" | "automation"
       /** @description The AI named by the commit, as named ("Claude Opus 5", "Copilot"); empty for none */
       assistant: string
+      stats?: components["schemas"]["CommitStats"]
+    }
+    /** @description What a commit changed (design/diffstat.md); absent on a commit older than 90 days or not asked yet */
+    CommitStats: {
+      /** @description Lines added */
+      additions: number
+      /** @description Lines removed */
+      deletions: number
+      /** @description Files changed; absent when GitHub does not say */
+      files?: number
     }
     Label: {
       name: string

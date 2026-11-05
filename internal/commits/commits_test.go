@@ -76,6 +76,66 @@ func (f fetcher) Commits(context.Context, string, string, string, int) ([]Commit
 
 func (f fetcher) Branches(context.Context, string, string) ([]RefInfo, error) { return nil, nil }
 func (f fetcher) Tags(context.Context, string, string) ([]RefInfo, error)     { return nil, nil }
+func (f fetcher) Stats(context.Context, string, string, []string) (map[string]Stats, error) {
+	return nil, nil
+}
+
+// counting is a fetcher that answers stats for every SHA it is asked, or fails, and keeps what it was asked.
+type counting struct {
+	fetcher
+	asked *[][]string
+	fail  bool
+}
+
+func (f counting) Stats(_ context.Context, _, _ string, shas []string) (map[string]Stats, error) {
+	*f.asked = append(*f.asked, shas)
+	if f.fail {
+		return nil, &github.Error{Kind: github.Transient, Code: "graphql", Err: errors.New("502")}
+	}
+	out := map[string]Stats{}
+	for _, s := range shas {
+		out[s] = Stats{Additions: 12, Deletions: 3, Files: 2}
+	}
+	return out, nil
+}
+
+// TestRunAsksStats: the job asks the stats of the recent commits it holds without them, keeps them across reads (a SHA is asked
+// once), never asks a commit older than the window, and a failed query keeps the history and runs again soon.
+func TestRunAsksStats(t *testing.T) {
+	now := time.Now()
+	cs := []CommitInfo{
+		{SHA: sha('a'), Message: "new", Date: now.Add(-time.Hour)},
+		{SHA: sha('b'), Message: "old", Date: now.Add(-100 * 24 * time.Hour)},
+	}
+	var asked [][]string
+	job := sync.Job{Key: Kind + "/acme/x", Source: "gh", Repo: "acme/x"}
+	spec := New(map[string]Fetcher{"gh": counting{fetcher: fetcher{cs: cs}, asked: &asked}}).Spec()
+	res, err := spec.Run(t.Context(), job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p payload
+	if err := json.Unmarshal(res.Payload, &p); err != nil {
+		t.Fatal(err)
+	}
+	if len(asked) != 1 || !slices.Equal(asked[0], []string{sha('a')}) || res.Again != 0 {
+		t.Fatalf("asked %v, again %v: the recent commit alone, once", asked, res.Again)
+	}
+	if s := p.Main[0].Stats; s == nil || *s != (Stats{Additions: 12, Deletions: 3, Files: 2}) || p.Main[1].Stats != nil {
+		t.Errorf("stats = %+v, %+v", p.Main[0].Stats, p.Main[1].Stats)
+	}
+	job.Prev = store.Item{State: res.State, Payload: res.Payload}
+	again, err := spec.Run(t.Context(), job)
+	if err != nil || len(asked) != 1 || !again.Unchanged {
+		t.Errorf("a second read asks again (%v) or changes (%v): %v", asked, again.Unchanged, err)
+	}
+	failing := New(map[string]Fetcher{"gh": counting{fetcher: fetcher{cs: cs}, asked: &asked, fail: true}}).Spec()
+	job.Prev = store.Item{}
+	res, err = failing.Run(t.Context(), job)
+	if err != nil || res.Again != cutAgain || res.State != snapshot.StateOK {
+		t.Errorf("a failed query: %v, again %v, state %v; want the history kept and asked again soon", err, res.Again, res.State)
+	}
+}
 
 func TestRunStates(t *testing.T) {
 	ok := fetcher{cs: []CommitInfo{{SHA: sha('a'), Message: "m", Date: time.Now()}}}
@@ -337,6 +397,9 @@ func (f paged) Branches(context.Context, string, string) ([]RefInfo, error) {
 	return f.branches, f.branchesErr
 }
 func (f paged) Tags(context.Context, string, string) ([]RefInfo, error) { return nil, f.tagsErr }
+func (f paged) Stats(context.Context, string, string, []string) (map[string]Stats, error) {
+	return nil, nil
+}
 
 func TestRunKeepsWhatAFailureCut(t *testing.T) {
 	at := time.Now().Add(-time.Hour)

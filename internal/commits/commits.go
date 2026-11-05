@@ -34,7 +34,9 @@ const (
 	maxBody       = 4096             // runes
 	maxLabel      = 100              // runes of a branch or tag name
 	futureClamp   = 24 * time.Hour
-	maxParents    = 8 // an octopus merge beyond this keeps its first eight
+	maxParents    = 8                   // an octopus merge beyond this keeps its first eight
+	statsWindow   = 90 * 24 * time.Hour // commits older than this are never asked their stats (design/diffstat.md)
+	maxStats      = 3 * statsBatch      // stats asked per run; the rest at the next
 	payloadSchema = 3
 )
 
@@ -124,6 +126,9 @@ func (c *Commits) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		cut = cut || sideCut
 	}
 	res := sync.Result{State: state}
+	if state == snapshot.StateOK && !askStats(ctx, f, owner, name, &out, now) {
+		res.Again = cutAgain // stats are an extra: what is left or failed is asked again soon, the history kept
+	}
 	if cut {
 		// What a failure cut is read again soon and in full, so no gap stays between what was read and what was held.
 		out.Full, res.Again = time.Time{}, cutAgain
@@ -353,8 +358,13 @@ func decode(b []byte) *payload {
 // A date more than a day ahead is clamped to the time the commit was first seen, which prev remembers.
 func normalise(in []CommitInfo, prev []Commit, now time.Time) []Commit {
 	firstSeen := map[string]time.Time{}
+	stats, none := map[string]*Stats{}, map[string]bool{} // a commit never changes: its stats carry over by SHA
 	for _, c := range prev {
 		firstSeen[c.SHA] = c.CommittedAt
+		if c.Stats != nil {
+			stats[c.SHA] = c.Stats
+		}
+		none[c.SHA] = c.NoStats
 	}
 	seen := map[string]bool{}
 	out := make([]Commit, 0, len(in))
@@ -381,7 +391,7 @@ func normalise(in []CommitInfo, prev []Commit, now time.Time) []Commit {
 		}
 		out = append(out, Commit{SHA: sha, Subject: untrusted.Text(untrusted.FirstLine(c.Message), maxSubject), Body: body(c.Message),
 			AuthorName: untrusted.Text(c.AuthorName, maxAuthor), AuthorLogin: login, CommitterName: untrusted.Text(c.CommitterName, maxAuthor),
-			URL: url, CommittedAt: at, Parents: parents(c.Parents)})
+			URL: url, CommittedAt: at, Parents: parents(c.Parents), Stats: stats[sha], NoStats: none[sha]})
 	}
 	slices.SortStableFunc(out, newestFirst)
 	return out
@@ -449,4 +459,38 @@ func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 		}
 		facet.Set(e, h, fresh)
 	})
+}
+
+// askStats asks the diff stats of the commits of out that have none and are within statsWindow, newest first and at most maxStats,
+// and sets them in place. It reports whether nothing is left to ask: false after a failed query or with more waiting.
+func askStats(ctx context.Context, f Fetcher, owner, name string, out *payload, now time.Time) bool {
+	var want []*Commit
+	for _, list := range [][]Commit{out.Main, out.Side} {
+		for i := range list {
+			if c := &list[i]; c.Stats == nil && !c.NoStats && now.Sub(c.CommittedAt) < statsWindow {
+				want = append(want, c)
+			}
+		}
+	}
+	slices.SortStableFunc(want, func(a, b *Commit) int { return newestFirst(*a, *b) })
+	done := len(want) <= maxStats
+	want = want[:min(len(want), maxStats)]
+	for batch := range slices.Chunk(want, statsBatch) {
+		shas := make([]string, len(batch))
+		for i, c := range batch {
+			shas[i] = c.SHA
+		}
+		got, err := f.Stats(ctx, owner, name, shas)
+		if err != nil {
+			return false
+		}
+		for _, c := range batch {
+			if s, ok := got[c.SHA]; ok {
+				c.Stats = &s
+			} else {
+				c.NoStats = true // GitHub answered, without it: a commit it does not have (a force push dropped it)
+			}
+		}
+	}
+	return done
 }

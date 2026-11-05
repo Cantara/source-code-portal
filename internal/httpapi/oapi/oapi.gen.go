@@ -769,6 +769,9 @@ type Commit struct {
 	Repo string `json:"repo"`
 	Sha  string `json:"sha"`
 
+	// Stats What a commit changed (design/diffstat.md); absent on a commit older than 90 days or not asked yet
+	Stats *CommitStats `json:"stats,omitempty"`
+
 	// Subject First line of the message
 	Subject string `json:"subject"`
 
@@ -784,6 +787,18 @@ type CommitPage struct {
 	Commits   []Commit  `json:"commits"`
 	Freshness Freshness `json:"freshness"`
 	Page      Page      `json:"page"`
+}
+
+// CommitStats What a commit changed (design/diffstat.md); absent on a commit older than 90 days or not asked yet
+type CommitStats struct {
+	// Additions Lines added
+	Additions int `json:"additions"`
+
+	// Deletions Lines removed
+	Deletions int `json:"deletions"`
+
+	// Files Files changed; absent when GitHub does not say
+	Files *int `json:"files,omitempty"`
 }
 
 // Dashboard defines model for Dashboard.
@@ -1134,6 +1149,9 @@ type HistoryCommit struct {
 	// Repo Repository address
 	Repo string `json:"repo"`
 	Sha  string `json:"sha"`
+
+	// Stats What a commit changed (design/diffstat.md); absent on a commit older than 90 days or not asked yet
+	Stats *CommitStats `json:"stats,omitempty"`
 
 	// Subject First line of the message
 	Subject string `json:"subject"`

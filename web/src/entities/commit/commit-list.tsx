@@ -2,6 +2,7 @@ import Link from "next/link"
 import type { Ref } from "react"
 import type { Commit, Schemas } from "@/lib/api/client"
 import { addressPath } from "@/lib/paths"
+import { DiffStat } from "./diffstat"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { RelativeTime } from "@/shared/relative-time"
 import { EmptyState } from "@/shared/empty-state"
@@ -68,6 +69,12 @@ export function CommitList({
                 )}
                 <Author name={c.authorName} login={c.authorLogin} /> <AiMark commit={c} /> · <RelativeTime at={c.committedAt} /> ·{" "}
                 <span className="font-mono">{c.sha.slice(0, 7)}</span>
+                {c.stats && (
+                  <>
+                    {" "}
+                    · <DiffStat stats={c.stats} className="align-middle" />
+                  </>
+                )}
               </p>
             </div>
           </li>

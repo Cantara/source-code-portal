@@ -306,3 +306,13 @@ test("a repository page shows its SVG badges", async ({ page }) => {
     await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
   }
 })
+
+// Diff stats (design/diffstat.md): the fake's commits carry them, so every commit list says what each changed.
+test("the commit lists show what each commit changed", async ({ page }) => {
+  await page.goto("/")
+  const latest = page.getByRole("region", { name: "Latest commits" }).or(page.locator("[aria-labelledby=latest]")).first()
+  await expect(latest.getByText(/^\d+ additions? and \d+ deletions? in \d+ files?$/).first()).toBeAttached()
+  await expect(latest.getByText(/^\+\d+$/).first()).toBeVisible()
+  await page.goto("/commits")
+  await expect(page.getByText(/^\+\d+$/).first()).toBeVisible()
+})

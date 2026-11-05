@@ -55,7 +55,8 @@ func TestServeForPlaywright(t *testing.T) {
 		var cs []githubtest.Commit
 		for j := range 30 {
 			cs = append(cs, githubtest.Commit{SHA: fmt.Sprintf("%02d%038d", i, 30-j), Message: fmt.Sprintf("Change %d of repository %d", 30-j, i),
-				AuthorName: "Ann Example", AuthorLogin: "ann", Date: start.Add(time.Duration(30-j)*time.Hour + time.Duration(i)*time.Minute)})
+				AuthorName: "Ann Example", AuthorLogin: "ann", Date: start.Add(time.Duration(30-j)*time.Hour + time.Duration(i)*time.Minute),
+				Additions: 3 * (j + 1), Deletions: j % 4, Files: 1 + j%3}) // diff stats for the lists (design/diffstat.md)
 		}
 		if id == core { // a feature branch (4, 6) forked from 7 and merged back at 1, beside the main line 2, 3, 5
 			for j, ps := range map[int][]int{1: {2, 4}, 2: {3}, 3: {5}, 4: {6}, 5: {7}, 6: {7}} {

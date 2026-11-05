@@ -19,6 +19,7 @@ import { PageHeader } from "@/shared/page-header"
 import { Pager, PageSizeField } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
+import { DiffStat, said } from "@/entities/commit/diffstat"
 import {
   historyQuery,
   historyState,
@@ -396,6 +397,9 @@ function Row({
       <span className="hidden w-28 shrink-0 text-muted-foreground md:block">
         <RelativeTime at={c.committedAt} />
       </span>
+      <span className="hidden w-32 shrink-0 lg:flex">
+        <DiffStat stats={c.stats} />
+      </span>
       <span className="w-16 shrink-0 font-mono text-muted-foreground">{c.sha.slice(0, 7)}</span>
     </div>
   )
@@ -528,6 +532,15 @@ function Details({
         <dd>
           <time dateTime={c.committedAt}>{exactUTC(c.committedAt)}</time>
         </dd>
+        {c.stats && (
+          <>
+            <dt className="text-muted-foreground">Changes</dt>
+            <dd className="flex flex-wrap items-center gap-2">
+              <DiffStat stats={c.stats} />
+              <span className="text-muted-foreground">{said(c.stats)}</span>
+            </dd>
+          </>
+        )}
         <dt className="text-muted-foreground">Commit</dt>
         <dd className="font-mono break-all">{c.sha}</dd>
         <dt className="text-muted-foreground">{c.parents.length === 1 ? "Parent" : "Parents"}</dt>

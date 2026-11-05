@@ -3,10 +3,12 @@ package commits
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	gh "github.com/google/go-github/v92/github"
@@ -33,6 +35,8 @@ type Fetcher interface {
 	// Branches and Tags list the first 100 branches and tags.
 	Branches(ctx context.Context, owner, name string) ([]RefInfo, error)
 	Tags(ctx context.Context, owner, name string) ([]RefInfo, error)
+	// Stats asks the diff stats of at most statsBatch commits by SHA; a commit GitHub does not answer is left out.
+	Stats(ctx context.Context, owner, name string, shas []string) (map[string]Stats, error)
 }
 
 // pageSize is the commits per listed page.
@@ -198,4 +202,85 @@ func (r rest) Tags(ctx context.Context, owner, name string) ([]RefInfo, error) {
 		out = append(out, RefInfo{Name: t.GetName(), SHA: t.GetCommit().GetSHA()})
 	}
 	return out, nil
+}
+
+// statsBatch is the commits one GraphQL query asks (design/diffstat.md).
+const statsBatch = 100
+
+// Stats asks GitHub's GraphQL API for the diff stats of shas, one alias per commit by its object id: one query of about one point
+// for up to 100 commits, where REST needs a request per commit.
+func (r rest) Stats(ctx context.Context, owner, name string, shas []string) (map[string]Stats, error) {
+	if len(shas) == 0 {
+		return map[string]Stats{}, nil
+	}
+	if len(shas) > statsBatch {
+		return nil, fmt.Errorf("commits: %d stats asked, at most %d", len(shas), statsBatch)
+	}
+	c, err := r.src.REST(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+	var q strings.Builder
+	q.WriteString("query($owner:String!,$name:String!){repository(owner:$owner,name:$name){")
+	for i, sha := range shas {
+		if !shaPattern.MatchString(sha) {
+			return nil, fmt.Errorf("commits: %q is not a SHA", sha)
+		}
+		fmt.Fprintf(&q, `c%d:object(oid:"%s"){...on Commit{additions deletions changedFilesIfAvailable}}`, i, sha)
+	}
+	q.WriteString("}}")
+	body := map[string]any{"query": q.String(), "variables": map[string]string{"owner": owner, "name": name}}
+	base, err := url.Parse(c.BaseURL())
+	if err != nil {
+		return nil, err
+	}
+	req, err := c.NewRequest(ctx, http.MethodPost, graphQL(base), body)
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Data struct {
+			Repository map[string]*struct {
+				Additions               int  `json:"additions"`
+				Deletions               int  `json:"deletions"`
+				ChangedFilesIfAvailable *int `json:"changedFilesIfAvailable"`
+			} `json:"repository"`
+		} `json:"data"`
+		Errors []struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	resp, err := c.Do(req, &out)
+	if err != nil {
+		return nil, github.Classify(resp, err)
+	}
+	if out.Data.Repository == nil && len(out.Errors) > 0 {
+		return nil, &github.Error{Kind: github.Transient, Code: "graphql", Err: errors.New(out.Errors[0].Type + ": " + out.Errors[0].Message)}
+	}
+	stats := make(map[string]Stats, len(shas))
+	for i, sha := range shas {
+		v := out.Data.Repository["c"+strconv.Itoa(i)]
+		if v == nil || v.Additions < 0 || v.Deletions < 0 {
+			continue // not a commit GitHub has: the job marks it asked
+		}
+		files := -1
+		if v.ChangedFilesIfAvailable != nil && *v.ChangedFilesIfAvailable >= 0 {
+			files = *v.ChangedFilesIfAvailable
+		}
+		stats[sha] = Stats{Additions: v.Additions, Deletions: v.Deletions, Files: files}
+	}
+	return stats, nil
+}
+
+// graphQL is the GraphQL endpoint beside a REST base: api.github.com/graphql, and /api/graphql on GitHub Enterprise Server, whose
+// REST base is /api/v3/.
+func graphQL(base *url.URL) string {
+	u := *base
+	if strings.HasSuffix(u.Path, "/api/v3/") {
+		u.Path = strings.TrimSuffix(u.Path, "v3/") + "graphql"
+	} else {
+		u.Path = strings.TrimSuffix(u.Path, "/") + "/graphql"
+	}
+	return u.String()
 }

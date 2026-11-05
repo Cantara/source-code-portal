@@ -25,6 +25,8 @@ user account shows its public repositories, or all of them, private ones include
 read access to them). For updates within seconds, add an organisation webhook (for a user account, a webhook on each repository) (Settings, Webhooks) with content type `application/json`, the same secret and the events *Pushes*,
 *Releases* and *Repositories*.
 
+Each recent commit's diff stats (lines added and removed, files changed) come from GitHub's GraphQL API with the same credential and no other permission: up to 100 commits a query, only commits of the last 90 days, each asked once; GraphQL has its own rate limit, apart from the REST one.
+
 Without a webhook the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
 commits, documents, descriptors and manifests are also re-read on their own schedule.
 

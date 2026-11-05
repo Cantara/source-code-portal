@@ -23,7 +23,16 @@ type Commit struct {
 	CommitterName string    `json:"committerName,omitempty"`
 	URL           string    `json:"url"`
 	CommittedAt   time.Time `json:"committedAt"`
-	Parents       []string  `json:"parents"` // first parent first
+	Parents       []string  `json:"parents"`           // first parent first
+	Stats         *Stats    `json:"stats,omitempty"`   // nil until asked (design/diffstat.md)
+	NoStats       bool      `json:"noStats,omitempty"` // asked, and GitHub had none: never asked again
+}
+
+// Stats are what a commit changed: lines added and removed, and files (-1 when GitHub does not say).
+type Stats struct {
+	Additions int `json:"additions"`
+	Deletions int `json:"deletions"`
+	Files     int `json:"files"`
 }
 
 // Label is a branch or a tag at a commit of the history.
@@ -296,8 +305,10 @@ func commitOf(r Ref) oapi.Commit {
 
 // apiCommit is the API form of the commit c of the repository at repo, of origin kind, naming the assistant ai.
 func apiCommit(repo snapshot.RepoKey, c *Commit, kind Origin, ai string) oapi.Commit {
-	return oapi.Commit{Repo: string(repo), Sha: c.SHA, Subject: c.Subject, AuthorName: c.AuthorName, AuthorLogin: c.AuthorLogin,
+	out := oapi.Commit{Repo: string(repo), Sha: c.SHA, Subject: c.Subject, AuthorName: c.AuthorName, AuthorLogin: c.AuthorLogin,
 		Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents, Kind: oapi.CommitKind(kind.String()), Assistant: ai}
+	out.Stats = statsOf(c.Stats)
+	return out
 }
 
 // LastCommit returns the time of the newest commit of e (zero when there is none) and the commits' freshness.
@@ -501,4 +512,16 @@ func loginOf(login string) *string {
 		return nil
 	}
 	return &login
+}
+
+// statsOf is the API form of a commit's diff stats; nil when unknown, its files left out when GitHub did not say.
+func statsOf(s *Stats) *oapi.CommitStats {
+	if s == nil {
+		return nil
+	}
+	out := &oapi.CommitStats{Additions: s.Additions, Deletions: s.Deletions}
+	if s.Files >= 0 {
+		out.Files = new(s.Files)
+	}
+	return out
 }

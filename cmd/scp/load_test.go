@@ -120,8 +120,15 @@ func TestLoad1000(t *testing.T) {
 		}
 		ledger := gh.Ledger()
 		limited := slices.IndexFunc(ledger, func(l string) bool { return strings.HasSuffix(l, " 403") || strings.HasSuffix(l, " 429") })
-		charged := len(slices.DeleteFunc(slices.Clone(ledger), func(l string) bool { return strings.HasSuffix(l, " 304") }))
-		t.Logf("cold start: %v of GitHub time, %d calls (%d charged)", took, len(ledger), charged)
+		// GraphQL has a rate limit of its own (design/diffstat.md): its calls are counted apart from the REST ones.
+		graphQL := len(slices.DeleteFunc(slices.Clone(ledger), func(l string) bool { return !strings.HasPrefix(l, "POST /graphql ") }))
+		charged := len(slices.DeleteFunc(slices.Clone(ledger), func(l string) bool {
+			return strings.HasSuffix(l, " 304") || strings.HasPrefix(l, "POST /graphql ")
+		}))
+		t.Logf("cold start: %v of GitHub time, %d calls (%d REST charged, %d GraphQL)", took, len(ledger), charged, graphQL)
+		if graphQL > 3*loadRepos {
+			t.Errorf("cold start asked %d stats queries, want at most %d (three per repository)", graphQL, 3*loadRepos)
+		}
 		if limited >= 0 {
 			t.Errorf("the rate limit was hit: %s", ledger[limited])
 		}

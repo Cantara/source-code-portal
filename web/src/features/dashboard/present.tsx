@@ -31,6 +31,7 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { meQuery } from "@/lib/api/queries"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import type { Notice } from "@/entities/announcement/announcement"
+import { DiffStat } from "@/entities/commit/diffstat"
 import { Announcements } from "./announcements"
 import { dashboardQuery, moreQuery, morePages, pageQuery, workQuery } from "./api"
 import { dedupe } from "./latest"
@@ -228,7 +229,7 @@ function Stream({
                     </time>
                   </span>
                 </p>
-                <p className="flex min-w-0 items-baseline gap-1.5 text-[0.9375rem]">
+                <p className="flex min-w-0 items-center gap-1.5 text-[0.9375rem]">
                   <AiMark commit={c} />
                   {c.url ? (
                     <a href={c.url} className="truncate hover:underline" rel="noreferrer" title={c.subject}>
@@ -239,6 +240,7 @@ function Stream({
                       {c.subject}
                     </span>
                   )}
+                  <DiffStat stats={c.stats} className="ml-auto pl-2 @max-[22rem]:hidden" />
                 </p>
               </div>
             </li>

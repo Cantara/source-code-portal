@@ -189,7 +189,10 @@ catalog:
 	ledger := gh.Ledger()
 	seen := map[string]int{}
 	for _, l := range ledger {
-		seen[l]++
+		// A GraphQL call names its repository in its body, not its path: each repository's stats query reads the same here.
+		if !strings.HasPrefix(l, "POST /graphql ") {
+			seen[l]++
+		}
 	}
 	for l, n := range seen {
 		if n > 1 {

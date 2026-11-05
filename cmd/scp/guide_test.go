@@ -48,7 +48,9 @@ func TestServeForGuide(t *testing.T) {
 	sha := func(n int) string { return fmt.Sprintf("%016x%024x", uint64(n)*0x9e3779b97f4a7c15, n) }
 	commitOf := func(who string, at time.Time) githubtest.Commit {
 		n++
-		c := githubtest.Commit{SHA: sha(n), Date: at, Message: subjects[n%len(subjects)]}
+		// Diff stats of every size, made up and the same at every run: small fixes, middling changes, a large one now and then.
+		c := githubtest.Commit{SHA: sha(n), Date: at, Message: subjects[n%len(subjects)], Additions: []int{4, 18, 62, 7, 240, 11}[n%6],
+			Deletions: []int{1, 9, 30, 0, 80, 11}[n%6], Files: 1 + n%5}
 		switch who {
 		case "renovate[bot]":
 			c.AuthorName, c.AuthorLogin, c.Message = "renovate[bot]", "renovate[bot]", "chore(deps): update dependency to the latest minor"

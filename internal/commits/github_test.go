@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,29 @@ func TestFromGitHub(t *testing.T) {
 	}
 	if _, _, err := f.Commits(t.Context(), "acme", "empty", "", 1); !github.IsNotFound(err) {
 		t.Errorf("empty repository: err = %v, want not found", err)
+	}
+	// The diff stats come through GraphQL beside the REST base, by object id; a commit GitHub has none for is left out.
+	srv.SetCommits(id, githubtest.Commit{SHA: strings.Repeat("b", 40), Message: "second", AuthorName: "Ann", Date: at, Additions: 12, Deletions: 3, Files: 2},
+		githubtest.Commit{SHA: strings.Repeat("a", 40), Message: "first", AuthorName: "Bo", Date: at.Add(-time.Hour)})
+	stats, err := f.Stats(t.Context(), "acme", "one", []string{strings.Repeat("b", 40), strings.Repeat("a", 40), strings.Repeat("c", 40)})
+	if err != nil || len(stats) != 1 || stats[strings.Repeat("b", 40)] != (Stats{Additions: 12, Deletions: 3, Files: 2}) {
+		t.Errorf("stats = %v, %v", stats, err)
+	}
+	if _, err := f.Stats(t.Context(), "acme", "gone", []string{strings.Repeat("b", 40)}); err == nil {
+		t.Error("stats of a repository GitHub cannot resolve: no error")
+	}
+}
+
+func TestGraphQLEndpoint(t *testing.T) {
+	for base, want := range map[string]string{
+		"https://api.github.com/":         "https://api.github.com/graphql",
+		"https://ghe.example.org/api/v3/": "https://ghe.example.org/api/graphql",
+		"http://127.0.0.1:5000/":          "http://127.0.0.1:5000/graphql",
+	} {
+		u, _ := url.Parse(base)
+		if got := graphQL(u); got != want {
+			t.Errorf("graphQL(%s) = %s, want %s", base, got, want)
+		}
 	}
 }
 
@@ -152,7 +176,16 @@ func TestHistory(t *testing.T) {
 		t.Errorf("a cold run read %v; want 5 default pages, the two feature branches, the branches and the tags", cold)
 	}
 
+	// 505 recent commits: a run asks the stats of 300 (three queries) and runs again soon for the rest, which the next run asks.
+	if cold["/graphql"] != 3 || res.Again != cutAgain {
+		t.Errorf("a cold run asked %d stats queries, again %v; want 3 and soon", cold["/graphql"], res.Again)
+	}
+	res, _ = run(store.Item{State: res.State, Payload: res.Payload})
+	if res.Again != 0 {
+		t.Errorf("the second run left stats to ask: again %v", res.Again)
+	}
 	prev := store.Item{State: res.State, Payload: res.Payload}
+	cold = calls()
 	res, _ = run(prev)
 	warm := calls()
 	if !res.Unchanged || warm["/repos/acme/big/commits"]-cold["/repos/acme/big/commits"] != 1 || warm["304"]-cold["304"] != 3 ||

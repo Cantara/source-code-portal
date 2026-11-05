@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -89,6 +90,7 @@ func New(t testing.TB) *Server {
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/trees/{ref}", s.getTree)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/blobs/{sha}", s.getBlob)
 	mux.HandleFunc("GET /repos/{owner}/{name}/releases/latest", s.latestRelease)
+	mux.HandleFunc("POST /graphql", s.graphQL)
 	s.Server = httptest.NewServer(s.wrap(mux))
 	t.Cleanup(s.Close)
 	return s
@@ -520,6 +522,8 @@ type Commit struct {
 	SHA, Message, AuthorName, AuthorLogin string
 	Date                                  time.Time
 	Parents                               []string // nil: the next commit of the list (a linear history), none for the last
+	// Additions, Deletions and Files are its diff stats, answered by POST /graphql; all zero: GitHub answers null for it.
+	Additions, Deletions, Files int
 }
 
 // SetCommits replaces the default-branch commits of the repository with id (newest first). No commits means an empty repository.
@@ -904,4 +908,50 @@ func (s *Server) getBlob(w http.ResponseWriter, req *http.Request) {
 	}
 	s.respond(w, req, cred, map[string]any{"sha": req.PathValue("sha"), "size": len(content), "encoding": "base64",
 		"content": base64.StdEncoding.EncodeToString([]byte(content))})
+}
+
+// graphAlias is one `alias:object(oid:"sha")` of a GraphQL query, as the commits feature asks diff stats.
+var graphAlias = regexp.MustCompile(`(\w+):object\(oid:"([0-9a-f]{40,64})"\)`)
+
+// graphQL answers the one GraphQL query the portal sends: a repository's commits by object id, each with its diff stats.
+func (s *Server) graphQL(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	var body struct {
+		Query     string            `json:"query"`
+		Variables map[string]string `json:"variables"`
+	}
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "Problems parsing JSON")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r := s.lookup(body.Variables["owner"], body.Variables["name"])
+	if r == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"repository": nil},
+			"errors": []map[string]string{{"type": "NOT_FOUND", "message": "Could not resolve to a Repository"}}})
+		return
+	}
+	all := map[string]Commit{}
+	for _, c := range s.commits[r.GetID()] {
+		all[c.SHA] = c
+	}
+	for _, cs := range s.branches[r.GetID()] {
+		for _, c := range cs {
+			all[c.SHA] = c
+		}
+	}
+	repo := map[string]any{}
+	for _, m := range graphAlias.FindAllStringSubmatch(body.Query, -1) {
+		c, ok := all[m[2]]
+		if !ok || c.Additions+c.Deletions+c.Files == 0 {
+			repo[m[1]] = nil
+			continue
+		}
+		repo[m[1]] = map[string]int{"additions": c.Additions, "deletions": c.Deletions, "changedFilesIfAvailable": c.Files}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"repository": repo}})
 }

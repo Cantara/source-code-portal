@@ -725,6 +725,15 @@ components:
             Who made it: a person with no trace of an AI; a person with an AI co-author (a Co-authored-by trailer or an AI tool's
             footer); a coding agent as the author; automation (CI, dependency and release bots, or a bot's pull request merged)
         assistant: { type: string, description: "The AI named by the commit, as named (\"Claude Opus 5\", \"Copilot\"); empty for none" }
+        stats: { $ref: "#/components/schemas/CommitStats" }
+    CommitStats:
+      type: object
+      description: What a commit changed (design/diffstat.md); absent on a commit older than 90 days or not asked yet
+      required: [additions, deletions]
+      properties:
+        additions: { type: integer, minimum: 0, description: Lines added }
+        deletions: { type: integer, minimum: 0, description: Lines removed }
+        files: { type: integer, minimum: 0, description: Files changed; absent when GitHub does not say }
     Label:
       type: object
       required: [name, kind, sha, default]
