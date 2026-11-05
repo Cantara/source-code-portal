@@ -1,10 +1,10 @@
 import type { Page } from "@playwright/test"
-import { expect, hydrated, test } from "./fixtures"
+import { expect, hydrated, settled, test } from "./fixtures"
 
 // cmd/scp/e2e_test.go: the fake provider signs in Ada Lovelace, an admin in staff; staff sees the private repository vault.
 const token = "e2e-token-0123456789abcdef0123456789abcdef"
 
-/** openAccount opens the account menu once the page answers to clicks. */
+/** openAccount opens the account menu once the page answers to clicks (it follows a sign-in, a navigation by a click). */
 async function openAccount(page: Page) {
   await hydrated(page)
   await page.getByRole("button", { name: "Ada Lovelace" }).click()
@@ -105,7 +105,7 @@ test(
     await page.getByRole("button", { name: "Save" }).click()
     await expect(page.getByText("Saved: every viewer sees this layout")).toBeVisible()
 
-    const anonymous = await browser.newPage()
+    const anonymous = settled(await browser.newPage({ reducedMotion: "reduce" }))
     await anonymous.goto(page.url())
     await expect(anonymous.getByRole("heading", { name: "Designed in the e2e" })).toBeVisible()
     await expect(anonymous.getByRole("button", { name: "Design this page" })).toHaveCount(0)

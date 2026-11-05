@@ -121,19 +121,10 @@ test("the navigator pages by number, remembers the page size and moves by keyboa
 
   // The page size is a choice, kept for the next visit; the first commit shown stays in view.
   await page.goto("/repos/acme/tool/commits?page=3")
-  await page.evaluate(() => {
-    const w = window as unknown as { longTasks: number[] }
-    w.longTasks = []
-    new PerformanceObserver((l) => {
-      for (const e of l.getEntries()) w.longTasks.push(e.duration)
-    }).observe({ type: "longtask", buffered: false })
-  })
   await page.getByLabel("Per page").selectOption("200")
   await expect(page).toHaveURL("/repos/acme/tool/commits?page=2&per=200")
   await expect(rows).toHaveCount(200)
   await expect(pager.getByText("201–400 of 500 commits")).toBeVisible()
-  const longTasks = await page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)
-  expect(longTasks.filter((d) => d > 50)).toEqual([])
   await page.goto("/repos/acme/tool/commits")
   await expect(rows).toHaveCount(200)
   await expect(pager.getByText("1–200 of 500 commits")).toBeVisible()
@@ -155,4 +146,21 @@ test("a product's timeline lists its repositories and its commits by day", async
   await expect(page.locator("main svg circle")).toHaveCount(0) // no graph across repositories
   await repos.getByRole("link", { name: /whydah-sso/ }).click()
   await expect(page).toHaveURL("/repos/acme/whydah-sso/commits")
+})
+
+// @budget: a time budget holds only on a quiet machine, so this runs alone, after every other test (playwright.config.ts).
+test("200 rows of the navigator render without a long task", { tag: "@budget" }, async ({ page }) => {
+  await page.goto("/repos/acme/tool/commits?page=3")
+  await page.evaluate(() => {
+    const w = window as unknown as { longTasks: number[] }
+    w.longTasks = []
+    new PerformanceObserver((l) => {
+      for (const e of l.getEntries()) w.longTasks.push(e.duration)
+    }).observe({ type: "longtask", buffered: false })
+  })
+  await page.getByLabel("Per page").selectOption("200")
+  await expect(page.getByRole("listbox", { name: "Commits" }).getByRole("option")).toHaveCount(200)
+  await expect(page.getByRole("navigation", { name: "Pages", exact: true }).getByText("201–400 of 500 commits")).toBeVisible()
+  const longTasks = await page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)
+  expect(longTasks.filter((d) => d > 50)).toEqual([])
 })

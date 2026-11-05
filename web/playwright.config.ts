@@ -10,20 +10,35 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
-  use: { baseURL: `http://${addr}`, trace: "retain-on-failure" },
-  // One server serves every test. The readers run in parallel and never see another test's write; the tests tagged @writes (the
-  // layouts, the announcements, a push) change what every page shows, so they run after the readers, one at a time.
+  // Reduced motion: every animation is off (index.css keeps them under prefers-reduced-motion: no-preference), so a check never
+  // meets an element half faded in.
+  use: { baseURL: `http://${addr}`, trace: "retain-on-failure", reducedMotion: "reduce" },
+  // One server serves every test, started fresh for every run (never reused: an earlier run's pushes and layouts would stay). The
+  // readers run in parallel and never see another test's write; the tests tagged @writes (the layouts, the announcements, a push)
+  // change what every page shows, so they run after the readers, one at a time; the @budget ones measure time, so they run last,
+  // alone on a quiet machine.
   projects: [
-    { name: "desktop", grepInvert: /@writes/, use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
+    {
+      name: "desktop",
+      grepInvert: /@writes|@budget/,
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
+    },
     {
       name: "phone",
-      grepInvert: /@writes/,
+      grepInvert: /@writes|@budget/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true },
     },
     {
       name: "writes",
       grep: /@writes/,
       dependencies: ["desktop", "phone"],
+      workers: 1,
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
+    },
+    {
+      name: "budget",
+      grep: /@budget/,
+      dependencies: ["writes"],
       workers: 1,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
@@ -34,7 +49,7 @@ export default defineConfig({
     env: { E2E_SCP_ADDR: addr, E2E_CONTROL_ADDR: "127.0.0.1:9191" },
     url: `http://${addr}/api/v1/snapshot`,
     timeout: 180_000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     stdout: "pipe",
   },
 })
