@@ -92,15 +92,18 @@ export function FleetMap({
   work = every,
   now,
   color = "activity",
+  dense = false,
 }: {
   groups: Group[]
   work?: Work
   now: number
   color?: Color
+  /** one strip of tiles without the products' names, for the presentation page (by health only) */
+  dense?: boolean
 }) {
   const all = new Map<string, Member>()
   for (const g of groups) for (const m of g.members) all.set(m.address, m)
-  if (color === "health") return <HealthMap groups={groups} members={[...all.values()]} work={work} now={now} />
+  if (color === "health") return <HealthMap groups={groups} members={[...all.values()]} work={work} now={now} dense={dense} />
   const total = tally([...all.values()], now)
   return (
     <section aria-labelledby="fleet" className="panel relative z-10 flex flex-col gap-3 p-4">
@@ -202,8 +205,37 @@ export function FleetMap({
  * their colours, so the fleet's health reads at a glance and from across a room. The legend counts each level, once per repository;
  * in a narrow container (the presentation page with a wide commit column) only the legend stays, the tiles' room going to the products.
  */
-function HealthMap({ groups, members, work, now }: { groups: Group[]; members: Member[]; work: Work; now: number }) {
+function HealthMap({
+  groups,
+  members,
+  work,
+  now,
+  dense,
+}: {
+  groups: Group[]
+  members: Member[]
+  work: Work
+  now: number
+  dense: boolean
+}) {
   const total = healthTally(members)
+  const tile = (m: Member) => (
+    <Hint
+      key={m.address}
+      heading={m.name}
+      rows={[
+        ...(m.level
+          ? [{ swatch: levels[m.level].className, label: "Health", value: levels[m.level].label }]
+          : [{ swatch: "lvl-dormant", label: "Health", value: "not scored" }]),
+        {
+          swatch: `lvl-${activityAt(m.lastAuthoredAt, m.archived, now)}`,
+          label: `Last change${qualifier(work)}`,
+          value: m.lastAuthoredAt ? `${ago(m.lastAuthoredAt, now)} ago` : "none read",
+        },
+      ]}
+      render={(t) => <Link {...t} href={addressPath(m.address)} tabIndex={-1} className={`cell ${healthCell(m.level)}`} />}
+    />
+  )
   return (
     <section aria-labelledby="fleet" className="panel relative z-10 flex flex-col gap-2 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -220,38 +252,40 @@ function HealthMap({ groups, members, work, now }: { groups: Group[]; members: M
           ))}
         </ul>
       </div>
-      <ul className="flex flex-wrap gap-x-5 gap-y-2 @max-lg:hidden">
-        {groups.map((g) => (
-          <li key={g.id} className="min-w-0 max-w-full">
-            <p className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="truncate font-medium">{g.name}</span>
-              <span className="font-mono text-muted-foreground tabular-nums">{count(g.members.length)}</span>
-            </p>
-            <p className="sr-only">{healthSummary(g.members)}</p>
-            <div aria-hidden="true" className="mt-1 flex max-w-[20rem] flex-wrap gap-1">
-              {g.members.map((m) => (
-                <Hint
-                  key={m.address}
-                  heading={m.name}
-                  rows={[
-                    ...(m.level
-                      ? [{ swatch: levels[m.level].className, label: "Health", value: levels[m.level].label }]
-                      : [{ swatch: "lvl-dormant", label: "Health", value: "not scored" }]),
-                    {
-                      swatch: `lvl-${activityAt(m.lastAuthoredAt, m.archived, now)}`,
-                      label: `Last change${qualifier(work)}`,
-                      value: m.lastAuthoredAt ? `${ago(m.lastAuthoredAt, now)} ago` : "none read",
-                    },
-                  ]}
-                  render={(t) => (
-                    <Link {...t} href={addressPath(m.address)} tabIndex={-1} className={`cell ${healthCell(m.level)}`} />
-                  )}
-                />
-              ))}
-            </div>
-          </li>
-        ))}
-      </ul>
+      {dense ? (
+        // One strip: each product a run of tiles in its order, a gap between runs; the products' names are on their tiles below.
+        <>
+          <ul className="sr-only">
+            {groups.map((g) => (
+              <li key={g.id}>
+                {g.name}: {healthSummary(g.members)}
+              </li>
+            ))}
+          </ul>
+          <div aria-hidden="true" className="flex flex-wrap gap-x-3 gap-y-1">
+            {groups.map((g) => (
+              <span key={g.id} title={g.name} className="flex flex-wrap gap-1">
+                {g.members.map(tile)}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <ul className="flex flex-wrap gap-x-5 gap-y-2 @max-lg:hidden">
+          {groups.map((g) => (
+            <li key={g.id} className="min-w-0 max-w-full">
+              <p className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="truncate font-medium">{g.name}</span>
+                <span className="font-mono text-muted-foreground tabular-nums">{count(g.members.length)}</span>
+              </p>
+              <p className="sr-only">{healthSummary(g.members)}</p>
+              <div aria-hidden="true" className="mt-1 flex max-w-[20rem] flex-wrap gap-1">
+                {g.members.map(tile)}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

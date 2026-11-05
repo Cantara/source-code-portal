@@ -168,7 +168,7 @@ function Screen({
         strip = true
         break
       case "fleet-map":
-        left.push(<FleetMap key={i} groups={groups(el)} work={data.work} now={now} color={el.color ?? "health"} />)
+        left.push(<FleetMap key={i} groups={groups(el)} work={data.work} now={now} color={el.color ?? "health"} dense />)
         break
       case "products":
         left.push(<ProductTiles key={i} groups={groups(el)} work={data.work} now={now} fold />)

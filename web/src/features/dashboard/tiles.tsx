@@ -96,6 +96,7 @@ function Narrow({ g, work: w, now }: { g: Group; work: Work; now: number }) {
       </h3>
       <p className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
         <span className="truncate">
+          {g.health && g.health.level !== "good" && <span className="text-(--lvl-fg)">{levels[g.health.level].label} · </span>}
           {a.lastAuthoredAt ? `${ago(a.lastAuthoredAt, now)} ago` : "no change read"}
           {g.health ? "" : " · not scored"}
         </span>
@@ -118,10 +119,47 @@ function capacity(grid: HTMLElement, box: HTMLElement): { cells: number; wide: n
   return { cells: cols * rows, wide: Math.min(2, cols) * 2 }
 }
 
+/** Plan is how the tiles are drawn: the products shown, each wide or not, and the ones folded into the last tile. */
+export type Plan = { tiles: { g: Group; wide: boolean }[]; folded: Group[] }
+
+/**
+ * plan is the tiles after giving up steps of detail, the least important first, so what matters most stays (design/present.md):
+ * the good products fold from the end; then the products at watch lose their wide tile from the mildest; then they fold, the mildest
+ * first; then those at attention lose their wide tile. A product at attention never folds.
+ */
+export function plan(ordered: Group[], steps: number): Plan {
+  const tiles = ordered.map((g) => ({ g, wide: needs(g), folded: false }))
+  const at = (level: string) => tiles.filter((t) => (t.g.health?.level ?? "none") === level).reverse()
+  const rest = tiles.filter((t) => !needs(t.g)).reverse()
+  const moves: (() => void)[] = [
+    ...rest.map((t) => () => (t.folded = true)),
+    ...at("watch").map((t) => () => (t.wide = false)),
+    ...at("watch").map((t) => () => (t.folded = true)),
+    ...at("attention").map((t) => () => (t.wide = false)),
+  ]
+  for (const m of moves.slice(0, steps)) m()
+  return { tiles: tiles.filter((t) => !t.folded), folded: tiles.filter((t) => t.folded).map((t) => t.g) }
+}
+
+/** steps is how many steps of plan there are: once each product could give up all it can. */
+const stepsOf = (ordered: Group[]) =>
+  ordered.reduce((n, g) => n + (g.health?.level === "watch" ? 2 : g.health?.level === "attention" ? 1 : 1), 0)
+
+/** cost is the cells a plan takes, the fold tile included. */
+const cost = (p: Plan, wide: number) => p.tiles.reduce((n, t) => n + (t.wide ? wide : 1), 0) + (p.folded.length > 0 ? 1 : 0)
+
+/** foldText says what the last tile holds: "7 more good", "3 more to watch, 7 good". */
+export function foldText(folded: Group[]): string {
+  const watch = folded.filter((g) => g.health?.level === "watch").length
+  const good = folded.length - watch
+  if (watch === 0) return `${count(good)} more${folded.every((g) => g.health?.level === "good") ? " good" : ""}`
+  return good > 0 ? `${count(watch)} more to watch, ${count(good)} good` : `${count(watch)} more to watch`
+}
+
 /**
  * ProductTiles are the products compact, for a glance (design/present.md): a product at watch or attention takes a wide tile with
- * its costliest findings, the others a one-line tile. With fold, the tiles keep to the height they are given: the good ones that do
- * not fit fold from the end into one tile, "N more good"; a product that needs a look never folds.
+ * its costliest findings, the others a one-line tile. With fold, the tiles keep to the height they are given, giving up detail in
+ * order of importance (plan) until they fit, and measuring again after they are drawn; what folds is named in the last tile.
  */
 export function ProductTiles({
   groups,
@@ -140,26 +178,36 @@ export function ProductTiles({
   const ordered = byNeed(groups)
   const box = useRef<HTMLDivElement>(null)
   const grid = useRef<HTMLUListElement>(null)
-  const [shown, setShown] = useState(ordered.length)
-  const wide = ordered.filter(needs).length
+  const [steps, setSteps] = useState(0)
+  const max = stepsOf(ordered)
+  const key = ordered.map((g) => `${g.id}:${g.health?.level ?? ""}`).join(",")
 
+  // From the box's size, the fewest steps whose plan fits.
   useLayoutEffect(() => {
     if (!fold || !box.current || !grid.current) return
     const b = box.current
     const g = grid.current
     const measure = () => {
       const c = capacity(g, b)
-      const left = c.cells - wide * c.wide
-      const rest = ordered.length - wide
-      setShown(wide + (rest <= left ? rest : Math.max(0, left - 1)))
+      let s = 0
+      while (s < max && cost(plan(ordered, s), c.wide) > c.cells) s++
+      setSteps(s)
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(b)
     return () => ro.disconnect()
-  }, [fold, wide, ordered.length])
+    // ordered is recomputed each render; key names what it holds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fold, key, max])
 
-  const folded = ordered.slice(shown)
+  // The estimate counts cells; dense packing can leave a hole. Drawn and still too tall: one more step.
+  useLayoutEffect(() => {
+    if (!fold || !box.current || !grid.current) return
+    if (grid.current.scrollHeight > box.current.clientHeight + 1 && steps < max) setSteps(steps + 1)
+  }, [fold, steps, max])
+
+  const { tiles, folded } = fold ? plan(ordered, steps) : plan(ordered, 0)
   return (
     <section
       aria-labelledby={heading ? "products" : undefined}
@@ -176,15 +224,18 @@ export function ProductTiles({
           ref={grid}
           className="grid auto-rows-[4.25rem] grid-flow-row-dense grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-2"
         >
-          {ordered
-            .slice(0, shown)
-            .map((g) =>
-              needs(g) ? <Wide key={g.id} g={g} work={work} now={now} /> : <Narrow key={g.id} g={g} work={work} now={now} />,
-            )}
+          {tiles.map(({ g, wide }) =>
+            wide ? <Wide key={g.id} g={g} work={work} now={now} /> : <Narrow key={g.id} g={g} work={work} now={now} />,
+          )}
           {folded.length > 0 && (
-            <li className="panel lvl-active flex items-center px-3 py-2">
+            <li
+              className={cn(
+                "panel flex items-center px-3 py-2",
+                folded.some(needs) ? levels.watch.className : levels.good.className,
+              )}
+            >
               <Link href="/" className="text-[0.9375rem] font-medium hover:underline">
-                {count(folded.length)} more{folded.every((g) => g.health?.level === "good") ? " good" : ""}
+                {foldText(folded)}
                 <span className="sr-only">: {folded.map((g) => g.name).join(", ")}</span>
               </Link>
             </li>

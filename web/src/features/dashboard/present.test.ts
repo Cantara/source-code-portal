@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Schemas } from "@/lib/api/client"
 import { freshness } from "./present"
-import { byNeed } from "./tiles"
+import { byNeed, foldText, plan } from "./tiles"
 import { columnOf } from "@/lib/preferences"
 
 type Group = Schemas["DashboardGroup"]
@@ -51,5 +51,30 @@ describe("columnOf", () => {
     expect(columnOf("5")).toBe(20)
     expect(columnOf("90")).toBe(60)
     expect(columnOf("wide")).toBe(30)
+  })
+})
+
+describe("plan", () => {
+  const ordered = byNeed([
+    group("a1", "attention", 30, null),
+    group("w1", "watch", 50, null),
+    group("w2", "watch", 70, null),
+    group("g1", "good", 90, "2026-11-04T00:00:00Z"),
+    group("g2", "good", 90, "2026-11-01T00:00:00Z"),
+  ])
+  const at = (steps: number) => {
+    const p = plan(ordered, steps)
+    return { tiles: p.tiles.map((t) => `${t.g.id}${t.wide ? "+" : ""}`), folded: p.folded.map((g) => g.id) }
+  }
+  it("folds the good first, then narrows and folds the mildest at watch, then narrows attention; attention never folds", () => {
+    expect(at(0)).toEqual({ tiles: ["a1+", "w1+", "w2+", "g1", "g2"], folded: [] })
+    expect(at(2)).toEqual({ tiles: ["a1+", "w1+", "w2+"], folded: ["g1", "g2"] })
+    expect(at(3)).toEqual({ tiles: ["a1+", "w1+", "w2"], folded: ["g1", "g2"] })
+    expect(at(5)).toEqual({ tiles: ["a1+", "w1"], folded: ["w2", "g1", "g2"] })
+    expect(at(99)).toEqual({ tiles: ["a1"], folded: ["w1", "w2", "g1", "g2"] })
+  })
+  it("names what the last tile holds", () => {
+    expect(foldText(plan(ordered, 2).folded)).toBe("2 more good")
+    expect(foldText(plan(ordered, 5).folded)).toBe("1 more to watch, 2 good")
   })
 })

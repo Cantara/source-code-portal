@@ -50,12 +50,17 @@ fits from 1024 to 1920 pixels wide.
 
 - **Status strip**, one line: the telemetry tiles as numbers (repositories, products, the count at attention and at watch, people this
   month, the share with AI) and the freshness indicator at its end.
-- **Fleet health**: the `fleet-map` coloured by health level instead of activity (one square per repository, grouped by product, the
-  level's colour and a mark (`!` attention, `◆` watch) so colour is never alone). 1,000 repositories fit 40×25 squares of 8 px.
+- **Fleet health**: the `fleet-map` coloured by health level instead of activity (one square per repository, the level's colour and
+  a shape, attention outlined and watch round, so colour is never alone), drawn dense: one strip, each product a run of squares in
+  its order with a gap between runs and no label line (the products' names are on their tiles; a tap on a square names its
+  repository, a screen reader hears each product's counts). The legend counts the levels on the title line. On Cantara's 134
+  repositories in 13 products it is 106 px high where the labelled map took 240; 1,000 repositories take about 15 rows.
 - **Products as tiles**: a product at watch or attention takes a wide tile of three lines (name, level and the members at attention;
   the last change, the release and the 12-week sparkline of the work that counts; its one or two costliest findings as text). A good
-  product takes a narrow tile of one line (name, last change, sparkline). When the tiles do not fit, the good ones fold from the end into
-  "N more good", which links to the dashboard.
+  product takes a narrow tile of one line (name, last change, sparkline). When the tiles do not fit, they give up detail in order of
+  importance: the good ones fold from the end into one tile, then the mildest at watch lose their wide tile, then they fold too
+  ("3 more to watch, 7 good"), then those at attention lose theirs; a product at attention never folds. The page estimates the cells
+  from the box and measures again after drawing, giving up one more step while anything is cut off.
 - **Latest commits**, the right column at full height: the author's avatar (initials) at the left while the column is at least
   17 rem wide, then the repository with the committer's alias and the time on the first line and the subject alone on the second,
   with the AI and automation marks of the commit lists; as many as fit. A new commit slides in at the top (no motion with
@@ -65,8 +70,7 @@ fits from 1024 to 1920 pixels wide.
   tap back to 30%. The width is the reader's, in the cookie `scp-present-column`, so the server draws it. The left column is a
   container, and as it narrows its elements keep what matters most (container queries): the strip drops the people and the share
   with AI first (below 48 rem), then the products (36 rem) and the repositories (28 rem); a wide tile keeps its costliest finding only
-  (36 rem); the fleet map keeps its counts per level and gives its tiles' room to the products (32 rem); the good products fold
-  sooner. The products at attention and at watch, their wide tiles and the data's age never go.
+  (36 rem); the good products fold sooner. The products at attention and at watch, their wide tiles and the data's age never go.
 - **Text**: 15 px for what is read (tiles, commits, the strip), numbers at 20 px; only the section labels and the fleet map's product
   names are smaller. Dark theme unless the reader chose (`theme-init.js` and `lib/theme.ts` treat the system choice as dark on
   `/present`); the theme's tokens only.
