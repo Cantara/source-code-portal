@@ -1,7 +1,18 @@
 import { load, prefetch } from "@/lib/load"
 import type { Route } from "@/lib/page"
 import { dashboardQuery, pageQuery } from "./api"
-import { columnCookie, columnOf, productsView, sideCookie, sideOf, viewCookie, workCookie, workOf } from "@/lib/preferences"
+import {
+  columnCookie,
+  columnOf,
+  commitsCookie,
+  commitsOf,
+  productsView,
+  sideCookie,
+  sideOf,
+  viewCookie,
+  workCookie,
+  workOf,
+} from "@/lib/preferences"
 import { DashboardView } from "./view"
 import { PresentView } from "./present"
 import type { Search } from "@/lib/page"
@@ -20,6 +31,7 @@ export const dashboardRoute: Route<object> = {
         work={workOf(ctx.cookies[workCookie])}
         view={view ? productsView(view, "cards") : undefined}
         side={sideOf(ctx.cookies[sideCookie])}
+        show={commitsOf(ctx.cookies[commitsCookie])}
       />
     )
   },
@@ -50,6 +62,11 @@ export const presentRoute: Route<object> = {
     appleWebApp: { capable: true, title: "SCP", statusBarStyle: "black-translucent" },
   }),
   render: ({ cookies, search }) => (
-    <PresentView work={lens(search, cookies)} only={only(search)} column={columnOf(cookies[columnCookie])} />
+    <PresentView
+      work={lens(search, cookies)}
+      only={only(search)}
+      column={columnOf(cookies[columnCookie])}
+      show={commitsOf(cookies[commitsCookie])}
+    />
   ),
 }

@@ -92,7 +92,7 @@ describe("pages", () => {
     expect(screen.getByRole("heading", { name: "Latest commits" })).toBeInTheDocument()
   })
 
-  it("counts every kind by default, automation too, and drops the latest commits' own switch", async () => {
+  it("counts every kind by default, automation too, and the latest commits show it", async () => {
     show(<DashboardView />)
     const card = (await screen.findByRole("link", { name: "IAM" })).closest("li") as HTMLElement
     expect(card).toHaveTextContent("13 commits")
@@ -103,7 +103,7 @@ describe("pages", () => {
     ).toBeInTheDocument()
     expect(card).toHaveTextContent(/Last change \d/)
     expect(screen.getByRole("heading", { name: "Latest commits" })).toBeInTheDocument()
-    expect(screen.queryByRole("checkbox", { name: "Include automation" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Show commits by the team or automation" })).toBeInTheDocument()
   })
 
   it("switches the products to a sortable table and remembers the choice", async () => {

@@ -3,7 +3,7 @@
 import type { ReactNode } from "react"
 import type { Schemas } from "@/lib/api/client"
 import { useNow } from "@/lib/clock"
-import { sideOf, type Side } from "@/lib/preferences"
+import { sideOf, type Side, type Work } from "@/lib/preferences"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { FleetMap } from "./fleet-map"
 import { LatestCommits } from "./latest"
@@ -21,11 +21,14 @@ export function Elements({
   data,
   view,
   side = sideOf(undefined),
+  show,
 }: {
   layout: Element[]
   data: Schemas["Dashboard"]
   view?: ProductsView
   side?: Side
+  /** the kinds the reader shows in the latest commits (the cookie), if any */
+  show?: Work
 }) {
   const now = useNow()
   const draw = (el: Element, i: number, fold?: ReactNode) => {
@@ -48,7 +51,14 @@ export function Elements({
       case "latest-commits":
         return (
           <PanelBoundary key={i}>
-            <LatestCommits counted={data.latest} work={data.work} count={el.count ?? 10} fold={fold} />
+            <LatestCommits
+              counted={data.latest}
+              work={data.work}
+              show={show}
+              activity={data.activity}
+              count={el.count ?? 10}
+              fold={fold}
+            />
           </PanelBoundary>
         )
       case "heading":

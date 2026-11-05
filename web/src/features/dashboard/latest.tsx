@@ -4,10 +4,11 @@ import { useInfiniteQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Card, CardTitle } from "@/components/ui/card"
-import { api, type Commit } from "@/lib/api/client"
+import { api, type Commit, type Schemas } from "@/lib/api/client"
 import { CommitList } from "@/entities/commit/commit-list"
-import { every, has, type Work } from "@/lib/preferences"
+import { sameWork, type Work } from "@/lib/preferences"
 import { moreQuery, morePages } from "./api"
+import { ShowPicker, useShow } from "./show"
 
 /** dedupe keeps each commit once, the first time it comes: new commits move older ones to later pages while the reader scrolls. */
 export function dedupe(commits: Commit[]): Commit[] {
@@ -21,36 +22,71 @@ export function dedupe(commits: Commit[]): Commit[] {
 }
 
 /**
- * LatestCommits are the newest commits of the work that counts (the dashboard's, through the reader's lens), and, when the lens leaves
- * automation out, on request the newest of every kind. Scrolled to its end, the list reads the next page of the same commits and
- * goes on, up to morePages pages; past them "All commits" has the rest. As the dashboard's side panel it carries the button that
- * folds it.
+ * LatestCommits are the newest commits of the kinds the reader shows them (ShowPicker: the work that counts until they choose).
+ * Scrolled to its end, the list reads the next page of the same commits and goes on, up to morePages pages; past them "All commits"
+ * has the rest. As the dashboard's side panel it carries the button that folds it.
  */
 export function LatestCommits({
   counted,
   work,
+  show,
+  activity,
   count,
   fold,
 }: {
+  /** the newest commits of the work that counts, as the dashboard read them */
   counted: Commit[]
   work: Work
+  /** the reader's own choice of kinds (the cookie), if any */
+  show?: Work
+  activity: Schemas["Activity"]
   count: number
   /** The side panel's button that folds it away, at the header's end. */
   fold?: ReactNode
 }) {
-  const [all, setAll] = useState(false)
-  const [more, setMore] = useState(false)
-  const lens = all ? every : work
-  const q = useInfiniteQuery({ ...moreQuery(api, lens), enabled: all || more })
-  const read = q.data?.pages.flatMap((p) => p.commits) ?? []
-  const commits = dedupe(all ? read : [...counted.slice(0, count), ...(more ? read : [])])
+  const s = useShow(show, work)
+  return (
+    <Card aria-labelledby="latest" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <CardTitle id="latest" className="min-w-0 flex-1">
+            Latest commits
+          </CardTitle>
+          {fold}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <ShowPicker
+            shown={s.shown}
+            follows={s.follows}
+            activity={activity}
+            onChange={s.set}
+            align="start"
+            className="-ml-1.5"
+          />
+          <Link href="/commits" className="hover:text-primary hover:underline">
+            All commits
+          </Link>
+        </div>
+      </div>
+      <Feed key={s.shown.join(",")} counted={sameWork(s.shown, work) ? counted.slice(0, count) : undefined} shown={s.shown} />
+    </Card>
+  )
+}
+
+/** Feed is the list of one choice of kinds: the dashboard's commits when it is the work that counts, else read page by page. */
+function Feed({ counted, shown }: { counted?: Commit[]; shown: Work }) {
+  const own = counted === undefined
+  const [more, setMore] = useState(own)
+  const q = useInfiniteQuery({ ...moreQuery(api, shown), enabled: more })
+  const read = more ? (q.data?.pages.flatMap((p) => p.commits) ?? []) : []
+  const commits = dedupe([...(counted ?? []), ...read])
   const end = useRef<HTMLDivElement>(null)
   const visible = useRef(false)
   const next = useRef(() => {})
   const pages = q.data?.pages.length ?? 0
   useEffect(() => {
     next.current = () => {
-      if (!more && !all) setMore(true)
+      if (!more) setMore(true)
       else if (q.hasNextPage && !q.isFetching && pages < morePages) void q.fetchNextPage()
     }
   })
@@ -72,37 +108,18 @@ export function LatestCommits({
   useEffect(() => {
     if (!q.isFetching && visible.current) next.current()
   }, [q.isFetching, pages])
-  const done = (more || all) && q.isSuccess && !q.hasNextPage
+  const done = more && q.isSuccess && !q.hasNextPage
   return (
-    <Card aria-labelledby="latest" className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <CardTitle id="latest" className="min-w-0 flex-1">
-            Latest commits
-          </CardTitle>
-          {fold}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          {!has(work, "automation") && (
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} className="accent-primary" />
-              Include automation
-            </label>
-          )}
-          <Link href="/commits" className="hover:text-primary hover:underline">
-            All commits
-          </Link>
-        </div>
-      </div>
-      {all && !q.data ? <p className="text-sm text-muted-foreground">Loading…</p> : <CommitList commits={commits} />}
+    <>
+      {own && !q.data ? <p className="text-sm text-muted-foreground">Loading…</p> : <CommitList commits={commits} />}
       <div ref={end} aria-live="polite" className="text-center text-xs text-muted-foreground">
-        {q.isFetching && (more || all) && q.data ? "Loading more…" : null}
+        {q.isFetching && more && q.data ? "Loading more…" : null}
         {done || (pages >= morePages && !q.isFetching) ? (
           <Link href="/commits" className="hover:text-primary hover:underline">
             Every commit, with filters
           </Link>
         ) : null}
       </div>
-    </Card>
+    </>
   )
 }

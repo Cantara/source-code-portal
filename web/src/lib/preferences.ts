@@ -83,6 +83,20 @@ export function productsView(v: unknown, fallback: ProductsView): ProductsView {
   return productsViews.includes(v as ProductsView) ? (v as ProductsView) : fallback
 }
 
+/**
+ * commitsCookie remembers which kinds of work the latest commits show (the dashboard's panel and the presentation page's column);
+ * without it they show the work that counts.
+ */
+export const commitsCookie = "scp-latest-work"
+
+/** commitsOf is the kinds a cookie names, or none: the latest commits follow the work that counts. */
+export function commitsOf(v: unknown): Work | undefined {
+  return typeof v === "string" && v !== "" ? workOf(v) : undefined
+}
+
+/** sameWork reports whether two lenses count the same kinds. */
+export const sameWork = (a: Work, b: Work) => a.length === b.length && a.every((k) => b.includes(k))
+
 /** columnCookie remembers the presentation page's commit column: its width in percent of the screen (design/present.md). */
 export const columnCookie = "scp-present-column"
 export const columnWidths = { min: 20, max: 60, step: 5, initial: 30 } as const

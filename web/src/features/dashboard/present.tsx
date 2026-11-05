@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn"
 import { useConnectionFailing, useLive } from "@/lib/connection"
 import { ago } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
-import { by, columnCookie, columnWidths, remember, type Work } from "@/lib/preferences"
+import { by, columnCookie, columnWidths, remember, sameWork, type Work } from "@/lib/preferences"
 import { Mark } from "@/components/ui/mark"
 import { AiMark } from "@/entities/commit/ai-mark"
 import { InitialsAvatar } from "@/shared/initials-avatar"
@@ -19,6 +19,7 @@ import { meQuery } from "@/lib/api/queries"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import { dashboardQuery, moreQuery, morePages, pageQuery, workQuery } from "./api"
 import { dedupe } from "./latest"
+import { ShowPicker, useShow } from "./show"
 import { Designer } from "./design"
 import { useShift, useWall } from "./wall"
 import { FleetMap } from "./fleet-map"
@@ -109,7 +110,19 @@ const idleTop = 60_000
  * lets the older ones go, so a wall shows the newest again. A commit that arrives while the page is open slides in at the top
  * (not with reduced motion).
  */
-function Stream({ commits, work, keep }: { commits: Commit[]; work: Work; keep: (c: Commit) => boolean }) {
+function Stream({
+  commits,
+  work,
+  keep,
+  picker,
+}: {
+  commits: Commit[]
+  /** the kinds the column shows */
+  work: Work
+  keep: (c: Commit) => boolean
+  /** the label that chooses the kinds (ShowPicker) */
+  picker?: ReactNode
+}) {
   const now = useNow()
   // The commits of the first render; a row's animation runs once, when it mounts, and only for one that arrived at the top.
   const [shown] = useState(() => new Set(commits.map((c) => c.repo + c.sha)))
@@ -166,7 +179,7 @@ function Stream({ commits, work, keep }: { commits: Commit[]; work: Work; keep: 
         <h2 id="stream" className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
           Latest commits
         </h2>
-        <span className="text-xs text-muted-foreground">{by(work)}</span>
+        {picker ?? <span className="text-xs text-muted-foreground">{by(work)}</span>}
       </div>
       {/* A container: the avatars show while the column is wide enough for them. */}
       <ol
@@ -235,6 +248,8 @@ function Screen({
   frame,
   column = columnWidths.initial,
   onColumn,
+  shown = data.work,
+  picker,
 }: {
   layout: Element[]
   data: Schemas["Dashboard"]
@@ -245,6 +260,9 @@ function Screen({
   column?: number
   /** resizes the column as its edge is dragged; kept when the drag ends (keep) */
   onColumn?: (width: number, keep: boolean) => void
+  /** the kinds the commit column shows, and the label that chooses them */
+  shown?: Work
+  picker?: ReactNode
 }) {
   const now = useNow()
   const scope = only ? { ...data, groups: within(data.groups, undefined, only) } : data
@@ -300,7 +318,9 @@ function Screen({
         {left}
       </div>
       {stream && <Resizer width={column} onChange={onColumn} />}
-      {stream && <Stream commits={commits.slice(0, stream.count ?? 30)} work={data.work} keep={keep} />}
+      {stream && (
+        <Stream key={shown.join(",")} commits={commits.slice(0, stream.count ?? 30)} work={shown} keep={keep} picker={picker} />
+      )}
     </div>
   )
 }
@@ -474,12 +494,16 @@ export function PresentView({
   work,
   only,
   column: initial = columnWidths.initial,
+  show,
 }: {
   work: Work
   only?: string[]
   /** the reader's commit column width (the cookie `scp-present-column`) */
   column?: number
+  /** the kinds the reader shows in the commit column (the cookie `scp-latest-work`), if any */
+  show?: Work
 }) {
+  const s = useShow(show, work)
   const [column, setColumn] = useState(initial)
   const resize = (w: number, keep: boolean) => {
     setColumn(w)
@@ -491,13 +515,14 @@ export function PresentView({
   const [designing, setDesigning] = useState(false)
   const layout = page?.elements ?? defaultPresent
   const count = Math.max(30, ...layout.map((e) => (e.kind === "latest-commits" ? (e.count ?? 30) : 0)))
-  const { data: log } = useQuery(workQuery(api, work, only ? scoped : count))
+  const { data: log } = useQuery(workQuery(api, s.shown, only ? scoped : count))
   useWall()
   const shift = useShift()
   if (!data) return <div className="p-4">{error && <ProblemAlert error={error} />}</div>
 
   const members = new Set(within(data.groups, undefined, only).flatMap((g) => g.members.map((m) => m.address)))
-  const commits = (log?.commits ?? data.latest).filter((c) => !only || members.has(c.repo))
+  const commits = (log?.commits ?? (sameWork(s.shown, work) ? data.latest : [])).filter((c) => !only || members.has(c.repo))
+  const picker = <ShowPicker shown={s.shown} follows={s.follows} activity={data.activity} onChange={s.set} />
   return (
     <>
       <h1 className="sr-only">Presentation</h1>
@@ -522,6 +547,8 @@ export function PresentView({
             frame={cn("fixed inset-0", shift)}
             column={column}
             onColumn={resize}
+            shown={s.shown}
+            picker={picker}
           />
           <Bar onDesign={me?.admin ? () => setDesigning(true) : undefined} />
         </>

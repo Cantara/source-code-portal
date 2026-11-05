@@ -18,7 +18,18 @@ import { defaultLayout, type ProductsView } from "./layout"
  * DashboardView is the landing page: its layout's elements in order (design/layout.md), each answering which product needs a look
  * and why, through the reader's lens (work). view is the reader's remembered products view, when there is one. An admin can switch to the design mode.
  */
-export function DashboardView({ work = every, view, side }: { work?: Work; view?: ProductsView; side?: Side }) {
+export function DashboardView({
+  work = every,
+  view,
+  side,
+  show,
+}: {
+  work?: Work
+  view?: ProductsView
+  side?: Side
+  /** the kinds the reader shows in the latest commits (the cookie), if any */
+  show?: Work
+}) {
   const { data, error } = useQuery(dashboardQuery(api, work))
   const { data: page } = useQuery(pageQuery(api))
   const { data: me } = useQuery(meQuery(api))
@@ -53,7 +64,7 @@ export function DashboardView({ work = every, view, side }: { work?: Work; view?
             onClose={() => setDesigning(false)}
           />
         ) : (
-          <Elements layout={layout} data={data} view={view} side={side} />
+          <Elements layout={layout} data={data} view={view} side={side} show={show} />
         ))}
     </>
   )
