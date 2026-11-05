@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest"
 import type { Repo } from "@/lib/api/client"
 import { product, repo, rules } from "@/test/server"
 import { FindingList, HealthScore } from "./health/findings"
-import { HealthBadges } from "./repo/health-badges"
 import { activity, byActivity } from "./repo/health"
 import { VisibilityBadge } from "./repo/visibility-badge"
 
@@ -93,52 +92,5 @@ describe("health", () => {
     // The kind and weight are named for screen readers; the points show in the hint, not the row.
     expect(screen.getByText(/Dormant, high, costs 30 points/)).toBeInTheDocument()
     expect(screen.queryByText("−30")).toBeNull()
-  })
-
-  it("adds a health chip to a repository only when it is not good", () => {
-    const { container, rerender } = render(<HealthBadges repo={repo("A")} now={now} />)
-    expect(container.textContent).not.toMatch(/attention/)
-    const dormant = repo("B", {
-      health: { score: 40, level: "attention", findings: [{ code: "dormant", penalty: 30, message: "No change for 3 years" }] },
-    })
-    rerender(<HealthBadges repo={dormant} now={now} />)
-    expect(container.textContent).toMatch(/40 needs attention/)
-    expect(container.textContent).toMatch(/No change for 3 years/)
-  })
-
-  it("shows the licence short and links it and the issues to their pages", () => {
-    const { rerender } = render(<HealthBadges repo={repo("A", { openIssues: 1 })} now={now} />)
-    const apl = screen.getByRole("link", { name: "APL2 licence, Apache-2.0" })
-    expect(apl).toHaveTextContent("APL2")
-    expect(apl).toHaveAttribute("href", "https://spdx.org/licenses/Apache-2.0.html")
-    expect(screen.getByRole("link", { name: "1 issue open on GitHub" })).toHaveAttribute(
-      "href",
-      "https://github.com/acme/A/issues",
-    )
-    rerender(<HealthBadges repo={repo("A", { license: "GPL-3.0-or-later", openIssues: 4 })} now={now} />)
-    expect(screen.getByRole("link", { name: "GPL3 licence, GPL-3.0-or-later" })).toHaveTextContent("GPL3")
-    expect(screen.getByRole("link", { name: "4 issues open on GitHub" })).toBeInTheDocument()
-    rerender(<HealthBadges repo={repo("A", { license: "Zlib" })} now={now} />)
-    expect(screen.getByRole("link", { name: "Zlib licence, Zlib" })).toBeInTheDocument()
-    rerender(<HealthBadges repo={repo("A", { license: "NOASSERTION" })} now={now} />)
-    expect(screen.getByText("no licence")).toBeInTheDocument()
-  })
-
-  it("shows the newest published package where there is no GitHub release", () => {
-    const pkg = { ecosystem: "maven", name: "net.example:lib", version: "3.0.21", publishedAt: "2026-10-01T00:00:00Z" }
-    const withPackage = repo("A", {
-      release: null,
-      packages: [{ ...pkg, url: "https://repo.example/net/example/lib/3.0.21/", registry: "example" }],
-    })
-    const { rerender } = render(<HealthBadges repo={withPackage} now={now} />)
-    expect(screen.getByRole("link", { name: /^3\.0\.21 · Maven/ })).toHaveAttribute(
-      "href",
-      "https://repo.example/net/example/lib/3.0.21/",
-    )
-    expect(screen.queryByText("no release")).toBeNull()
-    rerender(<HealthBadges repo={repo("A")} now={now} />)
-    expect(screen.getByRole("link", { name: /Release/ })).toHaveTextContent("v1.0.0")
-    rerender(<HealthBadges repo={repo("A", { release: null })} now={now} />)
-    expect(screen.getByText("no release")).toBeInTheDocument()
   })
 })

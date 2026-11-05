@@ -127,13 +127,23 @@ describe("pages", () => {
       within(table)
         .getAllByRole("row")
         .slice(1)
-        .map((r) => within(r).getAllByRole("cell")[0]?.textContent)
-    expect(names()).toEqual(["acme/Agent", "acme/Core"])
+        .map((r) => within(within(r).getByRole("rowheader")).getAllByRole("link")[0]?.textContent)
+    // One owner goes unsaid: the names alone, as the dashboard's table names its products.
+    expect(names()).toEqual(["Agent", "Core"])
     await user.click(screen.getByRole("button", { name: /Repository/ }))
-    expect(names()).toEqual(["acme/Core", "acme/Agent"])
+    expect(names()).toEqual(["Core", "Agent"])
     expect(screen.getByRole("columnheader", { name: /Repository/ })).toHaveAttribute("aria-sort", "descending")
+    // A number sorts the largest first.
+    await user.click(screen.getByRole("button", { name: /Issues/ }))
+    expect(screen.getByRole("columnheader", { name: /Issues/ })).toHaveAttribute("aria-sort", "descending")
+    await user.click(screen.getByRole("button", { name: /Repository/ }))
     await user.type(screen.getByRole("searchbox", { name: "Filter by name" }), "agent")
-    expect(names()).toEqual(["acme/Agent"])
+    expect(names()).toEqual(["Agent"])
+    // The row's facts link where they are kept: the licence at SPDX, the issues and the release on GitHub.
+    const [, row] = within(table).getAllByRole("row")
+    if (!row) throw new Error("no row")
+    expect(within(row).getByRole("link", { name: "APL2" })).toHaveAttribute("href", "https://spdx.org/licenses/Apache-2.0.html")
+    expect(within(row).getByRole("link", { name: /open issues$/ })).toHaveAttribute("href", expect.stringMatching(/\/issues$/))
   })
 
   it("renders a repository with its descriptor, badges, README and documents", async () => {

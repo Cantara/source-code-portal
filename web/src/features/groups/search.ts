@@ -1,4 +1,6 @@
-export type SortKey = "name" | "pushed"
+/** SortKey is a column of the group's repository table. */
+export const sortKeys = ["name", "release", "licence", "issues", "last", "findings", "health"] as const
+export type SortKey = (typeof sortKeys)[number]
 
 export interface GroupSearch {
   q?: string
@@ -10,7 +12,7 @@ export interface GroupSearch {
 export function validateGroupSearch(s: Record<string, unknown>): GroupSearch {
   const out: GroupSearch = {}
   if (typeof s.q === "string" && s.q !== "") out.q = s.q.slice(0, 100)
-  if (s.sort === "name" || s.sort === "pushed") out.sort = s.sort
+  if (typeof s.sort === "string" && (sortKeys as readonly string[]).includes(s.sort)) out.sort = s.sort as SortKey
   if (s.desc === true || s.desc === "true") out.desc = true
   return out
 }

@@ -16,13 +16,13 @@ async function openAccount(page: Page) {
 test("signing in through the provider returns to the page and shows the private repositories", async ({ page }) => {
   await page.goto("/groups/other")
   await expect(page.getByRole("heading", { level: 1, name: "Other", exact: true })).toBeVisible()
-  await expect(page.getByRole("link", { name: "acme/vault" })).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "vault", exact: true })).toHaveCount(0)
   await page.getByRole("link", { name: "Sign in", exact: true }).click()
   await expect(page).toHaveURL(/\/signin\?return_to=%2Fgroups%2Fother$/)
   await page.getByRole("link", { name: "Sign in with single sign-on" }).click()
   await expect(page).toHaveURL(/\/groups\/other$/)
   await expect(page.getByRole("button", { name: "Ada Lovelace" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "acme/vault" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "vault", exact: true })).toBeVisible()
 
   await openAccount(page)
   await page.getByRole("menu", { name: "Account" }).getByRole("menuitem", { name: "Admin" }).click()
@@ -35,7 +35,7 @@ test("signing in through the provider returns to the page and shows the private 
   await expect(page.getByRole("heading", { level: 1, name: "Dashboard", exact: true })).toBeVisible()
   await page.goto("/groups/other")
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toBeVisible()
-  await expect(page.getByRole("link", { name: "acme/vault" })).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "vault", exact: true })).toHaveCount(0)
 })
 
 test("a token signs in a person without the provider; a wrong one is explained", async ({ page }) => {
@@ -48,7 +48,7 @@ test("a token signs in a person without the provider; a wrong one is explained",
   await page.getByRole("button", { name: "Sign in with the token" }).click()
   await expect(page).toHaveURL(/\/groups\/other$/)
   await expect(page.getByRole("button", { name: "e2e" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "acme/vault" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "vault", exact: true })).toBeVisible()
   await page.getByRole("button", { name: "e2e" }).click()
   await expect(page.getByText("Signed in as e2e through a token.")).toBeVisible()
   await expect(page.getByRole("menuitem", { name: "Admin" })).toHaveCount(0)

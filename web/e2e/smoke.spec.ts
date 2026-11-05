@@ -276,9 +276,10 @@ for (const path of ["/groups/whydah"]) {
     await page.goto(path)
     const repos = page.locator('a[href^="/repos/"]:not([href*="/commits"]):not([href*="/docs/"])')
     await expect.poll(() => repos.count()).toBeGreaterThanOrEqual(3)
-    for (const row of await page.locator("li:has(> div > a[href^='/repos/']), tr:has(a[href^='/repos/'])").all()) {
-      await expect(row.getByText(/issues?$/)).toBeVisible()
-      await expect(row.getByText(/^(no licence|Apache-2\.0|MIT|[A-Z][\w.-]+)$/).first()).toBeVisible()
+    for (const row of await page.locator("tbody tr:has(a[href^='/repos/'])").all()) {
+      await expect(row.getByRole("link", { name: /open issues$/ })).toBeVisible()
+      await expect(row.getByText(/^(no licence|Apache-2\.0|APL2|MIT|[A-Z][\w.-]+)$/).first()).toBeVisible()
+      await expect(row.getByRole("rowheader").locator(".led")).toBeVisible()
     }
   })
 }
