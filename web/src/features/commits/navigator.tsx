@@ -2,7 +2,17 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { usePathname, useSearchParams } from "next/navigation"
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
+import {
+  createContext,
+  useContext,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react"
 import { Alert } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api/client"
@@ -81,7 +91,11 @@ function Navigator({
   const options = historyQuery(api, qc, owner, name, st.filter, st.size, r)
   const { data, error, isPlaceholderData, refetch } = useQuery(options)
   const version = useSnapshotVersion()
-  const commits = useMemo(() => data?.commits ?? [], [data])
+  // The rows follow a deferred copy: React renders a page of up to 200 rows in slices that yield to input, not in one long task.
+  // What acts on a row (the keys, a move across a page's edge) waits until the rows have caught up (settled).
+  const live = useMemo(() => data?.commits ?? [], [data])
+  const commits = useDeferredValue(live)
+  const settled = commits === live
   const index = useMemo(() => new Map(commits.map((c, i) => [c.sha, i])), [commits])
   const children = useMemo(() => {
     const m = new Map<string, string[]>()
@@ -157,7 +171,7 @@ function Navigator({
     if (!to) list.current?.scrollIntoView({ block: "start" })
   }
   useEffect(() => {
-    if (!edge.current || isPlaceholderData || commits.length === 0) return
+    if (!edge.current || isPlaceholderData || !settled || commits.length === 0) return
     const i = edge.current === "first" ? 0 : commits.length - 1
     edge.current = undefined
     select(i)
@@ -170,7 +184,7 @@ function Navigator({
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const n = commits.length
-    if (n === 0 || !data) return
+    if (n === 0 || !data || !settled) return
     const i = moving.current ?? selected ?? -1
     const down = e.key === "ArrowDown" || e.key === "j"
     const up = e.key === "ArrowUp" || e.key === "k"
@@ -388,7 +402,7 @@ function Row({
       aria-posinset={pos}
       aria-setsize={size}
       onClick={onSelect}
-      className={`flex h-8 cursor-pointer scroll-my-12 items-center gap-2 px-2 text-sm ${selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
+      className={`flex h-8 cursor-pointer scroll-my-12 items-center gap-2 px-2 text-sm [contain-intrinsic-size:auto_2rem] [content-visibility:auto] ${selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
     >
       {c.graph && lanes > 0 && <GraphCell row={c.graph} lanes={lanes} height={32} nodeY={16} className="h-8" lane={lane} />}
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
