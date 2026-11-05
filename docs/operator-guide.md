@@ -13,9 +13,11 @@ SCP needs read access to the repositories of the organisations and user accounts
 requests an hour per installation) or a personal access token (5,000 an hour).
 
 **GitHub App.** Create an App in the organisation's settings, or for a user account in your own (Developer settings, GitHub Apps):
-1. Repository permissions: *Contents* read-only and *Metadata* read-only. Nothing else.
+1. Repository permissions, all read-only: *Contents*, *Metadata*, *Pull requests*, *Checks* and *Commit statuses*. Nothing else. The
+   last three show the open pull requests and whose turn each is; without them the portal shows none.
 2. Webhook: active, URL `https://<portal>/webhooks/github`, a random secret (for example `openssl rand -hex 32`), and subscribe to the
-   events *Push*, *Release* and *Repository*. Installation events are sent to Apps without subscribing.
+   events *Push*, *Release*, *Repository*, *Pull request*, *Pull request review*, *Check suite* and *Status*. Installation events
+   are sent to Apps without subscribing.
 3. Generate a private key (a `.pem` file) and note the App ID.
 4. Install the App on each organisation or user account, on all repositories (or the ones to show). An App that may be installed only on
    its own account ("Only on this account") needs one App per account: give each its own source, with the same webhook URL and secret.
@@ -23,9 +25,14 @@ requests an hour per installation) or a personal access token (5,000 an hour).
 **Token.** A fine-grained token with public repository read access, or a classic token without scopes, in a file. Listed with a token, a
 user account shows its public repositories, or all of them, private ones included, when it is the token's own account (the token needs
 read access to them). For updates within seconds, add an organisation webhook (for a user account, a webhook on each repository) (Settings, Webhooks) with content type `application/json`, the same secret and the events *Pushes*,
-*Releases* and *Repositories*.
+*Releases*, *Repositories*, *Pull requests*, *Pull request reviews*, *Check suites* and *Statuses*.
 
 Each recent commit's diff stats (lines added and removed, files changed) come from GitHub's GraphQL API with the same credential and no other permission: up to 100 commits a query, only commits of the last 90 days, each asked once; GraphQL has its own rate limit, apart from the REST one.
+
+The open pull requests are read per repository every 15 minutes, and at once on a pull request, review, check suite or status
+webhook: the listing is a conditional request, free when nothing changed (GitHub does not count a 304), and only a changed
+repository costs one GraphQL query for the reviews, checks and mergeability of the pull requests that changed. Running checks are asked
+again after 5, 10, 20 and then 60 minutes; every pull request once an hour; an archived repository once.
 
 Without a webhook the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
 commits, documents, descriptors and manifests are also re-read on their own schedule.

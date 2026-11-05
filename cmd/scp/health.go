@@ -10,6 +10,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/packages"
+	"github.com/cantara/source-code-portal/internal/pulls"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
@@ -27,8 +28,9 @@ func assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.R
 	d, _ := catalog.DescriptorOf(e)
 	last, commitsFresh := commits.LastCommit(e)
 	sig := health.Signals{Archived: r.Archived, Deprecated: d.Lifecycle == "deprecated", Public: r.Visibility == "public",
-		LastChange: r.PushedAt, LastCommit: last, License: r.License, OpenIssues: r.OpenIssues,
+		LastChange: r.PushedAt, LastCommit: last, License: r.License, OpenIssues: pulls.Issues(e),
 		Failing: failing(e.Fresh) || failing(commitsFresh)}
+	sig.ReviewIdle, sig.OldUpdates = pulls.Waiting(e, health.UpdatesAfter, now)
 	if at, before := commits.LastAuthored(s, r.Key(), commits.WorkTeam); !at.IsZero() {
 		sig.LastChange, sig.Automated, sig.Before = at, before || last.After(at), before
 	}

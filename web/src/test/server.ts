@@ -27,6 +27,40 @@ export function commit(i: number, repo = "acme/core"): S["Commit"] {
   }
 }
 
+/** pullCounts are open pull requests by state; noPulls none. */
+export function pullCounts(over: Partial<S["PullCounts"]["states"]> = {}, oldestReview: string | null = null): S["PullCounts"] {
+  const states = { draft: 0, conflicts: 0, failing: 0, changes: 0, review: 0, checks: 0, ready: 0, unknown: 0, ...over }
+  const open = Object.values(states).reduce((a, b) => a + b, 0)
+  return { open, people: open, automation: 0, states, oldestReview }
+}
+
+export const noPulls = pullCounts()
+
+/** pull is an open pull request of acme/core. */
+export function pull(n: number, over: Partial<S["PullRequest"]> = {}): S["PullRequest"] {
+  return {
+    repo: "acme/core",
+    number: n,
+    title: `Change ${n}`,
+    url: `https://github.com/acme/core/pull/${n}`,
+    author: "ada",
+    bot: false,
+    draft: false,
+    fork: false,
+    createdAt: at,
+    updatedAt: at,
+    base: "main",
+    head: `change-${n}`,
+    labels: [],
+    requested: 0,
+    state: "review",
+    waitsFor: "reviewers",
+    checks: "passing",
+    stats: { additions: 12, deletions: 3, files: 2 },
+    ...over,
+  }
+}
+
 /** rules are the server's rules (GET /rules), held equal to internal/health by cmd/scp's TestRulesFixture. */
 export const rules = serverRules as S["Rules"]
 
@@ -59,6 +93,7 @@ export function repo(name: string, over: Partial<S["Repo"]> = {}): S["Repo"] {
     fork: false,
     stars: 1,
     openIssues: 0,
+    openPulls: 0,
     pushedAt: at,
     lastCommitAt: at,
     lastAuthoredAt: at,
@@ -173,6 +208,7 @@ export const defaults = [
             },
           ],
           summary: { license: "Apache-2.0", language: "Java", released: 1 },
+          pulls: pullCounts({ review: 2, ready: 1 }, at),
         },
       ],
       health: product,
@@ -189,6 +225,15 @@ export const defaults = [
       ungroupedCount: 1,
       latest: [{ ...commit(1), kind: "assisted", assistant: "Claude Opus 5" }],
       freshness: { fresh: 2, stale: 1, unknown: 0, error: 0 },
+      pulls: pullCounts({ review: 2, ready: 1 }, at),
+    }),
+  ),
+  http.get("/pulls", ({ response }) =>
+    response(200).json({
+      pulls: [pull(1), pull(2, { state: "ready", waitsFor: "maintainer" })],
+      counts: pullCounts({ review: 1, ready: 1 }, at),
+      page: { number: 1, size: 50, total: 2, pages: 1 },
+      freshness: fresh,
     }),
   ),
   http.get("/groups", ({ response }) =>

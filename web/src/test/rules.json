@@ -93,7 +93,7 @@
       ]
     },
     {
-      "about": "Many open issues and pull requests wait for an answer.",
+      "about": "Many open issues wait for an answer.",
       "action": {
         "label": "Triage the open issues",
         "path": "issues"
@@ -103,11 +103,45 @@
       "penalties": [
         {
           "points": 20,
-          "when": "More than 50 open issues and pull requests."
+          "when": "More than 50 open issues."
         },
         {
           "points": 10,
-          "when": "More than 20 open issues and pull requests."
+          "when": "More than 20 open issues."
+        }
+      ]
+    },
+    {
+      "about": "A person's pull request waits for a review and nothing happens.",
+      "action": {
+        "label": "Review the open pull requests",
+        "path": "pulls"
+      },
+      "code": "reviews",
+      "label": "Waiting for review",
+      "penalties": [
+        {
+          "points": 15,
+          "when": "A pull request by a person idle for more than 30 days waiting for a review."
+        },
+        {
+          "points": 5,
+          "when": "A pull request by a person idle for more than 7 days waiting for a review."
+        }
+      ]
+    },
+    {
+      "about": "Dependency updates from automation stay open and nobody merges or closes them.",
+      "action": {
+        "label": "Merge or close the dependency updates",
+        "path": "pulls"
+      },
+      "code": "updates",
+      "label": "Old updates",
+      "penalties": [
+        {
+          "points": 5,
+          "when": "A pull request by automation open for more than 30 days."
         }
       ]
     },

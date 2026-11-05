@@ -48,6 +48,34 @@ paths:
         "304": { $ref: "#/components/responses/NotModified" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /pulls:
+    get:
+      operationId: listPulls
+      summary: Open pull requests across repositories, whose turn first, one page at a time
+      description: |
+        Every open pull request of the viewer's view (design/pulls.md). Each has one state and the party it waits for. The default
+        order, `waiting`, puts people's pull requests before automation's, those waiting for reviewers first, then the longest idle.
+        `group` and `repo` intersect; `by` keeps people's or automation's; drafts are left out unless `drafts` or `state=draft`.
+        `counts` cover the scope and `by` (drafts included) whatever the state filter, so the states can be offered as filters.
+      parameters:
+        - { name: group, in: query, required: false, schema: { type: string } }
+        - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
+        - { name: state, in: query, required: false, schema: { $ref: "#/components/schemas/PullState" } }
+        - { name: by, in: query, required: false, description: "people or automation; absent: both", schema: { type: string, enum: [people, automation] } }
+        - { name: drafts, in: query, required: false, schema: { type: boolean, default: false } }
+        - { name: sort, in: query, required: false, schema: { type: string, enum: [waiting, newest, updated], default: waiting } }
+        - { $ref: "#/components/parameters/PageNumber" }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: One page of pull requests
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PullPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /groups:
     get:
       operationId: listGroups
@@ -524,7 +552,7 @@ components:
     Repo:
       type: object
       required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, topics, archived, fork,
-                 stars, openIssues, pushedAt, lastCommitAt, lastAuthoredAt, release, packages, language, groups, health, freshness]
+                 stars, openIssues, openPulls, pushedAt, lastCommitAt, lastAuthoredAt, release, packages, language, groups, health, freshness]
       properties:
         address: { type: string, description: "Lower-case owner/name, used in URLs" }
         owner: { type: string }
@@ -539,7 +567,8 @@ components:
         archived: { type: boolean }
         fork: { type: boolean }
         stars: { type: integer }
-        openIssues: { type: integer, description: Open issues and pull requests }
+        openIssues: { type: integer, description: "Open issues; GitHub's count of issues and pull requests together until the pull requests are read" }
+        openPulls: { type: [integer, "null"], description: Open pull requests; null until read }
         pushedAt: { type: string, format: date-time }
         lastCommitAt: { type: [string, "null"], format: date-time, description: The newest default-branch commit; null until read }
         lastAuthoredAt: { type: [string, "null"], format: date-time, description: "The newest default-branch commit of people's work (by hand or with AI), not automation (bots, release plugins) or a sweep; when no read commit is, the oldest read one (people's is older); null until read" }
@@ -784,6 +813,70 @@ components:
         at: { type: [string, "null"], description: "The commit `at` named, when it is on this page" }
         page: { $ref: "#/components/schemas/Page" }
         freshness: { $ref: "#/components/schemas/Freshness" }
+    PullState:
+      type: string
+      enum: [draft, conflicts, failing, changes, review, checks, ready, unknown]
+      description: >-
+        Whose turn a pull request is, the first that holds: draft, conflicts (it does not merge), failing (its checks) and changes
+        (a reviewer asked) wait for the author; review (a review is required, or none approved yet) for reviewers; checks (running)
+        for CI; ready (approved or no review required, checks passing) for a maintainer to merge; unknown until GitHub's state is read
+    PullRequest:
+      type: object
+      required: [repo, number, title, url, author, bot, draft, fork, createdAt, updatedAt, base, head, labels, requested, state, waitsFor, checks]
+      properties:
+        repo: { type: string, description: Repository address }
+        number: { type: integer }
+        title: { type: string }
+        url: { type: string, description: The pull request on GitHub }
+        author: { type: string, description: GitHub login }
+        bot: { type: boolean, description: "Opened by automation (Dependabot, Renovate, a [bot] or bot-like login)" }
+        draft: { type: boolean }
+        fork: { type: boolean, description: From another repository }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: The last activity }
+        base: { type: string, description: The branch it merges into }
+        head: { type: string, description: Its branch }
+        labels: { type: array, maxItems: 5, items: { $ref: "#/components/schemas/PullLabel" } }
+        requested: { type: integer, description: Reviewers and teams asked for a review }
+        state: { $ref: "#/components/schemas/PullState" }
+        waitsFor: { type: string, enum: [author, reviewers, ci, maintainer, unknown] }
+        checks: { type: string, enum: [passing, failing, running, none], description: "The head commit's checks" }
+        stats: { $ref: "#/components/schemas/CommitStats" }
+    PullLabel:
+      type: object
+      required: [name, color]
+      properties:
+        name: { type: string }
+        color: { type: string, description: "Six hex digits; empty when unknown" }
+    PullCounts:
+      type: object
+      description: Open pull requests by state and by whom
+      required: [open, people, automation, states, oldestReview]
+      properties:
+        open: { type: integer, description: Every open pull request counted, drafts included }
+        people: { type: integer }
+        automation: { type: integer }
+        states:
+          type: object
+          required: [draft, conflicts, failing, changes, review, checks, ready, unknown]
+          properties:
+            draft: { type: integer }
+            conflicts: { type: integer }
+            failing: { type: integer }
+            changes: { type: integer }
+            review: { type: integer }
+            checks: { type: integer }
+            ready: { type: integer }
+            unknown: { type: integer }
+        oldestReview: { type: [string, "null"], format: date-time, description: "The last activity of the person's pull request that waits longest for a review; null when none waits" }
+    PullPage:
+      type: object
+      required: [pulls, counts, page, freshness]
+      properties:
+        pulls: { type: array, items: { $ref: "#/components/schemas/PullRequest" } }
+        counts: { $ref: "#/components/schemas/PullCounts" }
+        page: { $ref: "#/components/schemas/Page" }
+        freshness: { $ref: "#/components/schemas/Freshness" }
     CommitPage:
       type: object
       required: [commits, page, freshness]
@@ -810,7 +903,7 @@ components:
         error: { type: integer }
     DashboardGroup:
       type: object
-      required: [id, name, description, defaultRepo, repoCount, lastActivity, health, activity, members, summary]
+      required: [id, name, description, defaultRepo, repoCount, lastActivity, health, activity, members, summary, pulls]
       properties:
         id: { type: string }
         name: { type: string }
@@ -822,6 +915,7 @@ components:
         activity: { $ref: "#/components/schemas/Activity" }
         members: { type: array, items: { $ref: "#/components/schemas/DashboardMember" }, description: "Every member, by address, for the fleet map" }
         summary: { $ref: "#/components/schemas/GroupSummaryFacts" }
+        pulls: { $ref: "#/components/schemas/PullCounts", description: "The members' open pull requests; automation's only when the work that counts holds it" }
     Activity:
       type: object
       description: >-
@@ -879,14 +973,14 @@ components:
       type: object
       description: >-
         One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products
-        takes view, fleet-map takes color, latest-commits takes count, heading takes text and note (plain text).
+        takes view, fleet-map takes color, latest-commits and pulls take count (pulls also groups), heading takes text and note (plain text).
       required: [kind]
       properties:
-        kind: { type: string, enum: [telemetry, fleet-map, announcements, products, latest-commits, heading] }
+        kind: { type: string, enum: [telemetry, fleet-map, announcements, products, latest-commits, pulls, heading] }
         groups: { type: array, items: { type: string }, minItems: 1, maxItems: 100, description: Group ids in display order }
         view: { type: string, enum: [cards, table, tiles], description: "How products are drawn until the reader switches; tiles: compact, for the presentation page" }
         color: { type: string, enum: [activity, health], description: "What colours the fleet map's tiles: the last change's age (the default) or the health level" }
-        count: { type: integer, minimum: 1, maximum: 50, description: How many commits }
+        count: { type: integer, minimum: 1, maximum: 50, description: How many commits or pull requests }
         text: { type: string, maxLength: 120 }
         note: { type: string, maxLength: 500 }
     PageLayout:
@@ -946,7 +1040,7 @@ components:
       description: "A kind of work: people's by hand, people's with an AI, or maintenance by automation (bots and sweeps)"
     Dashboard:
       type: object
-      required: [work, groups, repoCount, ungroupedCount, latest, health, freshness, activity]
+      required: [work, groups, repoCount, ungroupedCount, latest, health, freshness, activity, pulls]
       properties:
         work: { $ref: "#/components/schemas/Work" }
         groups: { type: array, items: { $ref: "#/components/schemas/DashboardGroup" } }
@@ -956,6 +1050,7 @@ components:
         ungroupedCount: { type: integer, description: Repositories in no group }
         latest: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: "The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them" }
         freshness: { $ref: "#/components/schemas/FreshnessCounts" }
+        pulls: { $ref: "#/components/schemas/PullCounts", description: "Every open pull request of the view; automation's only when the work that counts holds it" }
     DocSummary:
       type: object
       required: [id, path, readme, title, description, format, state, truncated]

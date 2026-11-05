@@ -1,6 +1,6 @@
 # Open pull requests: whose turn it is (PR1 to PR3)
 
-Status: designed (plan.md section 4, P-68). Binding order: ../plan.md > this note > `layout.md`, `health.md`, `github.md`.
+Status: PR1 built, PR2 and PR3 in progress (plan.md section 4, P-68). Binding order: ../plan.md > this note > `layout.md`, `health.md`, `github.md`.
 
 Across many repositories the open pull requests are the work in flight: what waits for a reviewer, what waits for its author, what is
 ready and nobody merges, what dependency bots keep opening. GitHub shows them per repository or through a search one has to write.
@@ -115,11 +115,13 @@ and the badges.
 
 ## Shape
 
-- `internal/pulls` (feature, facet `pulls`, `Of`): `Pull` (`Number`, `Title`, `URL`, `Author`, `Bot`, `Draft`, `Created`,
-  `Updated`, `Base`, `Head`, `Fork`, `Review`, `Checks`, `Mergeable`, `Stats`, `Labels`, `Requested`), `State(p)`, `Repo` (`Open`,
-  `Total`, `Issues`, `Pulls []Pull`, `ETag`); the job `pulls`; an index per snapshot (`Feeds()`: every open pull request with its
-  state, per repository, group and fleet, sorted by waits longest).
-- `internal/github`: `GraphQL(ctx, owner, query, vars)` beside `REST`, the endpoint rule `graphQL(base)` moved from `commits`; D1's
+- `internal/pulls` (feature, facet `pulls`, `Of`): `Pull` (the listing's fields; GraphQL's `Review`, `Approved`, `Changes`,
+  `Checks`, `Mergeable`, `Stats` and `Asked`), `StateOf(p)`, `Set` (`Total`, `Pulls`, `Full`, `Pending`, `PendingAt`); the job
+  `pulls` (`merge` decides what to ask: new or changed by update time or head, all hourly, the unsettled ones by their step); an
+  index per snapshot (`Feeds()`: per repository, group and fleet, whose turn first); `Counts`, `Issues` (GitHub's count less the
+  pull requests), `Waiting` (for health), the hooks `Repo` and `Dashboard` (automation's only when the work that counts holds it).
+  The REST listing gives every field but the reviews, checks, mergeability and stats, so a failed GraphQL query still lists them.
+- `internal/github`: `GraphQL(ctx, client, query, vars, out)` beside `REST`, the endpoint rule `graphQL(base)` moved from `commits`; D1's
   stats query uses it.
 - Contract: `GET /api/v1/pulls` (paged; `group`, `repo`, `state`, `by` (people, automation), `drafts`, `sort`), `PullRequest`;
   `RepoSummary.openPulls` beside `openIssues` (issues only); `DashboardGroup.pulls` (counts by state); `PullSummary` on the

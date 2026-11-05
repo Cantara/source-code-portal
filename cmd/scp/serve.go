@@ -37,6 +37,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/mcpserver"
 	"github.com/cantara/source-code-portal/internal/packages"
+	"github.com/cantara/source-code-portal/internal/pulls"
 	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -82,6 +83,7 @@ func newServeCmd(opts *options) *cobra.Command {
 type (
 	catalogAPI   = catalog.API
 	commitsAPI   = commits.API
+	pullsAPI     = pulls.API
 	docsAPI      = docs.API
 	manifestsAPI = manifests.API
 	layoutAPI    = layout.API
@@ -90,6 +92,7 @@ type (
 	api          struct {
 		catalogAPI
 		commitsAPI
+		pullsAPI
 		docsAPI
 		manifestsAPI
 		layoutAPI
@@ -141,16 +144,17 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	manifestTrees := map[string]manifests.GitHub{}
 	packageTrees := map[string]packages.GitHub{}
 	releases := map[string]badges.Releases{}
+	openPulls := map[string]pulls.Fetcher{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
 		src := gh.Source(s.ID)
 		sources[s.ID], trees[s.ID], manifestTrees[s.ID], packageTrees[s.ID] = src, src, src, src
-		fetchers[s.ID], releases[s.ID] = commits.FromGitHub(src), badges.FromGitHub(src)
+		fetchers[s.ID], releases[s.ID], openPulls[s.ID] = commits.FromGitHub(src), badges.FromGitHub(src), pulls.FromGitHub(src)
 		ids = append(ids, s.ID)
 	}
 
 	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log,
-		commits.Feeds(), manifests.Graph(), search.Indexer(searchOptions()))}
+		commits.Feeds(), pulls.Feeds(), manifests.Graph(), search.Indexer(searchOptions()))}
 	if s.store, err = store.Open(ctx, cfg.Store.Path, log); err != nil {
 		return nil, err
 	}
@@ -176,13 +180,15 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 	documents := docs.New(trees, safehtml.New())
 	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
+	catalogued := func(k snapshot.RepoKey) (snapshot.Repo, bool) {
+		if e := s.pub.Current().Repos[k]; e != nil {
+			return e.Repo, true
+		}
+		return snapshot.Repo{}, false
+	}
 	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
-		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, func(k snapshot.RepoKey) (snapshot.Repo, bool) {
-			if e := s.pub.Current().Repos[k]; e != nil {
-				return e.Repo, true
-			}
-			return snapshot.Repo{}, false
-		}).Spec()} {
+		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec(),
+		pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec()} {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
@@ -235,7 +241,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		external = egress.Guarded(10 * time.Second)
 	}
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view,
-		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth})},
+		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth, Issues: pulls.Issues})},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /knowledge.yaml", Handler: md.KCP()}, {Pattern: "GET /.well-known/kcp.json", Handler: md.WellKnown()},
@@ -268,9 +274,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		routes = append(routes, a.Routes()...)
 	}
 	catalogAPI := catalog.API{Current: view,
-		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
+		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, pulls.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
-		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo, repoHealthAPI},
+		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo, pulls.Repo, repoHealthAPI},
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
 	commitsAPI := commits.API{Current: view}
 	groupNames := func(ctx context.Context) []string {
@@ -296,7 +302,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
-	features := api{catalogAPI, commitsAPI, docs.API{Current: view}, manifests.API{Current: view},
+	features := api{catalogAPI, commitsAPI, pulls.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{}}
 	if s.web != nil {

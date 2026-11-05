@@ -139,7 +139,7 @@ func (a MeAPI) GetMe(ctx context.Context, _ oapi.GetMeRequestObject) (oapi.GetMe
 	v := ViewerOf(ctx)
 	out := oapi.Me{SignedIn: v.SignedIn(), Name: v.Name, Via: oapi.MeVia(v.Via), Private: v.Private, Admin: v.Admin}
 	if !v.SignedIn() {
-		out.Via = oapi.None
+		out.Via = oapi.MeViaNone
 	}
 	if a.SignIn != nil {
 		out.SignIn.Oidc, out.SignIn.Token = a.SignIn()

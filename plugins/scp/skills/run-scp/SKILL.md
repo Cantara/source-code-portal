@@ -58,9 +58,10 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    whom; sign-in (their OpenID Connect provider) and who the administrators are; the assistant and its model provider; webhooks
    (yes, when the portal has a public address). Offer the defaults: a GitHub App, one host with Docker Compose and Caddy, public
    repositories only, webhooks on.
-2. **Access to GitHub.** A GitHub App is best (its own rate limit, webhooks, private repositories by installation): *Contents* and
-   *Metadata* read-only, webhook URL `<public_url>/webhooks/github` with a random secret, events *Push*, *Release*, *Repository*,
-   installed on the accounts. A token (fine-grained, public repositories read; or a classic one without scopes) is fine to start.
+2. **Access to GitHub.** A GitHub App is best (its own rate limit, webhooks, private repositories by installation): *Contents*,
+   *Metadata*, *Pull requests*, *Checks* and *Commit statuses* read-only, webhook URL `<public_url>/webhooks/github` with a random
+   secret, events *Push*, *Release*, *Repository*, *Pull request*, *Pull request review*, *Check suite*, *Status*, installed on the
+   accounts. A token (fine-grained, public repositories read; or a classic one without scopes) is fine to start.
    Walk them through the GitHub pages; they create it.
 3. **Secrets.** In a directory only root and UID 65532 read:
    ```sh

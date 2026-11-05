@@ -13,7 +13,7 @@ import type { Ctx } from "@/lib/page"
 import { panels } from "./repos/[owner]/[name]/panels"
 import { StatusBanners } from "@/features/status/banners"
 import { setLocation } from "@/test/navigation"
-import { activity, commit, fresh, http, server, snapshot } from "@/test/server"
+import { activity, commit, fresh, http, noPulls, server, snapshot } from "@/test/server"
 
 function client() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10_000 } } })
@@ -253,6 +253,7 @@ describe("commit log", () => {
           latest: [],
           activity: activity(),
           freshness: { fresh: 0, stale: 0, unknown: 0, error: 0 },
+          pulls: noPulls,
         }),
       ),
     )
@@ -297,6 +298,7 @@ describe("commit log", () => {
             latest: [],
             activity: activity(),
             freshness: { fresh: 0, stale: 0, unknown: 0, error: 0 },
+            pulls: noPulls,
           }),
         ),
       )

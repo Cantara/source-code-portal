@@ -325,7 +325,11 @@ func (r toolReads) health(ctx context.Context, in map[string]any) (tools.Result,
 	for _, pk := range p.Packages {
 		fmt.Fprintf(&b, "Publishes %s %s, newest %s at %s.\n", pk.Ecosystem, pk.Name, pk.Version, pk.Registry)
 	}
-	fmt.Fprintf(&b, "Open issues and pull requests: %d. License: %s.\n", p.OpenIssues, orUnknown(p.License))
+	if p.OpenPulls != nil {
+		fmt.Fprintf(&b, "Open issues: %d. Open pull requests: %d. License: %s.\n", p.OpenIssues, *p.OpenPulls, orUnknown(p.License))
+	} else {
+		fmt.Fprintf(&b, "Open issues and pull requests: %d. License: %s.\n", p.OpenIssues, orUnknown(p.License))
+	}
 	return tools.Result{Source: snapshot.RepoPage(snapshot.RepoKey(p.Address)), Text: b.String()}, nil
 }
 

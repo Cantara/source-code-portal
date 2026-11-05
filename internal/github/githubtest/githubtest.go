@@ -3,6 +3,7 @@
 package githubtest
 
 import (
+	"cmp"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -48,7 +49,8 @@ type Server struct {
 	tags     map[int64]map[string]string   // by repository id: tag name -> commit SHA
 	files    map[int64]map[string]string   // by repository id: path -> content
 	releases map[int64]*gh.RepositoryRelease
-	treeMax  int // entries of a recursive tree before it is truncated, as GitHub's 100,000; 0: never
+	pulls    map[int64][]Pull // by repository id
+	treeMax  int              // entries of a recursive tree before it is truncated, as GitHub's 100,000; 0: never
 	nextID   int64
 	used     map[string]int // credential -> requests charged this window
 	reset    time.Time
@@ -73,7 +75,7 @@ func New(t testing.TB) *Server {
 	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
 		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
-		releases: map[int64]*gh.RepositoryRelease{}, nextID: 1000, used: map[string]int{}}
+		releases: map[int64]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
 	mux.HandleFunc("POST /app/installations/{id}/access_tokens", s.accessToken)
@@ -90,6 +92,7 @@ func New(t testing.TB) *Server {
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/trees/{ref}", s.getTree)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/blobs/{sha}", s.getBlob)
 	mux.HandleFunc("GET /repos/{owner}/{name}/releases/latest", s.latestRelease)
+	mux.HandleFunc("GET /repos/{owner}/{name}/pulls", s.listPulls)
 	mux.HandleFunc("POST /graphql", s.graphQL)
 	s.Server = httptest.NewServer(s.wrap(mux))
 	t.Cleanup(s.Close)
@@ -945,6 +948,7 @@ func (s *Server) graphQL(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	repo := map[string]any{}
+	s.answerPulls(r.GetID(), body.Query, repo)
 	for _, m := range graphAlias.FindAllStringSubmatch(body.Query, -1) {
 		c, ok := all[m[2]]
 		if !ok || c.Additions+c.Deletions+c.Files == 0 {
@@ -954,4 +958,117 @@ func (s *Server) graphQL(w http.ResponseWriter, req *http.Request) {
 		repo[m[1]] = map[string]int{"additions": c.Additions, "deletions": c.Deletions, "changedFilesIfAvailable": c.Files}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"repository": repo}})
+}
+
+// Pull is an open pull request of the fake: what the REST listing gives and what POST /graphql answers for it.
+type Pull struct {
+	Number                      int
+	Title, Author               string
+	Bot, Draft, Fork            bool // Bot: the author's account type is Bot
+	Created, Updated            time.Time
+	Base, Head, HeadSHA         string
+	Labels                      []string
+	Requested                   int
+	Review, Mergeable, Checks   string // GraphQL's reviewDecision, mergeable and the head's statusCheckRollup state
+	Approved, Changes           bool   // a reviewer's latest opinion
+	Additions, Deletions, Files int
+}
+
+// SetPulls replaces the open pull requests of the repository id.
+func (s *Server) SetPulls(id int64, ps ...Pull) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pulls[id] = slices.Clone(ps)
+}
+
+func (s *Server) listPulls(w http.ResponseWriter, req *http.Request) {
+	cred := s.charge(w, req)
+	if cred == "" {
+		return
+	}
+	s.mu.Lock()
+	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
+	var ps []Pull
+	if r != nil {
+		ps = slices.Clone(s.pulls[r.GetID()])
+	}
+	s.mu.Unlock()
+	if r == nil {
+		writeError(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	slices.SortStableFunc(ps, func(a, b Pull) int { return b.Updated.Compare(a.Updated) })
+	n, _ := strconv.Atoi(req.URL.Query().Get("per_page"))
+	if n <= 0 || n > 100 {
+		n = 30
+	}
+	ps = ps[:min(n, len(ps))]
+	full := r.GetOwner().GetLogin() + "/" + r.GetName()
+	out := make([]map[string]any, 0, len(ps))
+	for _, p := range ps {
+		typ := "User"
+		if p.Bot {
+			typ = "Bot"
+		}
+		head := full
+		if p.Fork {
+			head = "someone/" + r.GetName()
+		}
+		labels := []map[string]string{}
+		for _, l := range p.Labels {
+			labels = append(labels, map[string]string{"name": l, "color": "0e8a16"})
+		}
+		reviewers := make([]map[string]string, p.Requested)
+		for i := range reviewers {
+			reviewers[i] = map[string]string{"login": fmt.Sprintf("reviewer%d", i)}
+		}
+		out = append(out, map[string]any{"number": p.Number, "title": p.Title, "draft": p.Draft,
+			"html_url":   fmt.Sprintf("https://github.com/%s/pull/%d", full, p.Number),
+			"user":       map[string]string{"login": p.Author, "type": typ},
+			"created_at": p.Created.UTC().Format(time.RFC3339), "updated_at": p.Updated.UTC().Format(time.RFC3339),
+			"base":   map[string]any{"ref": p.Base, "repo": map[string]string{"full_name": full}},
+			"head":   map[string]any{"ref": p.Head, "sha": p.HeadSHA, "repo": map[string]string{"full_name": head}},
+			"labels": labels, "requested_reviewers": reviewers, "requested_teams": []any{}, "body": "not read"})
+	}
+	s.respond(w, req, cred, out)
+}
+
+var (
+	pullAlias  = regexp.MustCompile(`(\w+):pullRequest\(number:(\d+)\)`)
+	totalAlias = regexp.MustCompile(`(\w+):pullRequests\(states:OPEN[^)]*\)\{totalCount\}`)
+)
+
+// answerPulls answers a query's pull requests by number and its open count. Callers hold s.mu.
+func (s *Server) answerPulls(id int64, query string, repo map[string]any) {
+	for _, m := range totalAlias.FindAllStringSubmatch(query, -1) {
+		repo[m[1]] = map[string]int{"totalCount": len(s.pulls[id])}
+	}
+	for _, m := range pullAlias.FindAllStringSubmatch(query, -1) {
+		n, _ := strconv.Atoi(m[2])
+		repo[m[1]] = nil
+		for _, p := range s.pulls[id] {
+			if p.Number != n {
+				continue
+			}
+			var opinions []map[string]string
+			if p.Approved {
+				opinions = append(opinions, map[string]string{"state": "APPROVED"})
+			}
+			if p.Changes {
+				opinions = append(opinions, map[string]string{"state": "CHANGES_REQUESTED"})
+			}
+			var rollup any
+			if p.Checks != "" {
+				rollup = map[string]string{"state": p.Checks}
+			}
+			var review any
+			if p.Review != "" {
+				review = p.Review
+			}
+			repo[m[1]] = map[string]any{"reviewDecision": review, "mergeable": cmp.Or(p.Mergeable, "MERGEABLE"),
+				"additions": p.Additions, "deletions": p.Deletions, "changedFiles": p.Files,
+				"latestOpinionatedReviews": map[string]any{"nodes": opinions},
+				"commits":                  map[string]any{"nodes": []any{map[string]any{"commit": map[string]any{"statusCheckRollup": rollup}}}}}
+		}
+	}
 }

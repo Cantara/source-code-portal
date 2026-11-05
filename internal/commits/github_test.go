@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -52,19 +51,6 @@ func TestFromGitHub(t *testing.T) {
 	}
 	if _, err := f.Stats(t.Context(), "acme", "gone", []string{strings.Repeat("b", 40)}); err == nil {
 		t.Error("stats of a repository GitHub cannot resolve: no error")
-	}
-}
-
-func TestGraphQLEndpoint(t *testing.T) {
-	for base, want := range map[string]string{
-		"https://api.github.com/":         "https://api.github.com/graphql",
-		"https://ghe.example.org/api/v3/": "https://ghe.example.org/api/graphql",
-		"http://127.0.0.1:5000/":          "http://127.0.0.1:5000/graphql",
-	} {
-		u, _ := url.Parse(base)
-		if got := graphQL(u); got != want {
-			t.Errorf("graphQL(%s) = %s, want %s", base, got, want)
-		}
 	}
 }
 

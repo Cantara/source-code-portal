@@ -256,22 +256,22 @@ func (e DocSummaryState) Valid() bool {
 
 // Defines values for FreshnessStatus.
 const (
-	Error   FreshnessStatus = "error"
-	Fresh   FreshnessStatus = "fresh"
-	Stale   FreshnessStatus = "stale"
-	Unknown FreshnessStatus = "unknown"
+	FreshnessStatusError   FreshnessStatus = "error"
+	FreshnessStatusFresh   FreshnessStatus = "fresh"
+	FreshnessStatusStale   FreshnessStatus = "stale"
+	FreshnessStatusUnknown FreshnessStatus = "unknown"
 )
 
 // Valid indicates whether the value is a known member of the FreshnessStatus enum.
 func (e FreshnessStatus) Valid() bool {
 	switch e {
-	case Error:
+	case FreshnessStatusError:
 		return true
-	case Fresh:
+	case FreshnessStatusFresh:
 		return true
-	case Stale:
+	case FreshnessStatusStale:
 		return true
-	case Unknown:
+	case FreshnessStatusUnknown:
 		return true
 	default:
 		return false
@@ -402,6 +402,7 @@ const (
 	LayoutElementKindHeading       LayoutElementKind = "heading"
 	LayoutElementKindLatestCommits LayoutElementKind = "latest-commits"
 	LayoutElementKindProducts      LayoutElementKind = "products"
+	LayoutElementKindPulls         LayoutElementKind = "pulls"
 	LayoutElementKindTelemetry     LayoutElementKind = "telemetry"
 )
 
@@ -417,6 +418,8 @@ func (e LayoutElementKind) Valid() bool {
 	case LayoutElementKindLatestCommits:
 		return true
 	case LayoutElementKindProducts:
+		return true
+	case LayoutElementKindPulls:
 		return true
 	case LayoutElementKindTelemetry:
 		return true
@@ -475,22 +478,109 @@ func (e ManifestEcosystem) Valid() bool {
 
 // Defines values for MeVia.
 const (
-	None  MeVia = "none"
-	Oidc  MeVia = "oidc"
-	Proxy MeVia = "proxy"
-	Token MeVia = "token"
+	MeViaNone  MeVia = "none"
+	MeViaOidc  MeVia = "oidc"
+	MeViaProxy MeVia = "proxy"
+	MeViaToken MeVia = "token"
 )
 
 // Valid indicates whether the value is a known member of the MeVia enum.
 func (e MeVia) Valid() bool {
 	switch e {
-	case None:
+	case MeViaNone:
 		return true
-	case Oidc:
+	case MeViaOidc:
 		return true
-	case Proxy:
+	case MeViaProxy:
 		return true
-	case Token:
+	case MeViaToken:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PullRequestChecks.
+const (
+	PullRequestChecksFailing PullRequestChecks = "failing"
+	PullRequestChecksNone    PullRequestChecks = "none"
+	PullRequestChecksPassing PullRequestChecks = "passing"
+	PullRequestChecksRunning PullRequestChecks = "running"
+)
+
+// Valid indicates whether the value is a known member of the PullRequestChecks enum.
+func (e PullRequestChecks) Valid() bool {
+	switch e {
+	case PullRequestChecksFailing:
+		return true
+	case PullRequestChecksNone:
+		return true
+	case PullRequestChecksPassing:
+		return true
+	case PullRequestChecksRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PullRequestWaitsFor.
+const (
+	PullRequestWaitsForAuthor     PullRequestWaitsFor = "author"
+	PullRequestWaitsForCi         PullRequestWaitsFor = "ci"
+	PullRequestWaitsForMaintainer PullRequestWaitsFor = "maintainer"
+	PullRequestWaitsForReviewers  PullRequestWaitsFor = "reviewers"
+	PullRequestWaitsForUnknown    PullRequestWaitsFor = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the PullRequestWaitsFor enum.
+func (e PullRequestWaitsFor) Valid() bool {
+	switch e {
+	case PullRequestWaitsForAuthor:
+		return true
+	case PullRequestWaitsForCi:
+		return true
+	case PullRequestWaitsForMaintainer:
+		return true
+	case PullRequestWaitsForReviewers:
+		return true
+	case PullRequestWaitsForUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PullState.
+const (
+	PullStateChanges   PullState = "changes"
+	PullStateChecks    PullState = "checks"
+	PullStateConflicts PullState = "conflicts"
+	PullStateDraft     PullState = "draft"
+	PullStateFailing   PullState = "failing"
+	PullStateReady     PullState = "ready"
+	PullStateReview    PullState = "review"
+	PullStateUnknown   PullState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the PullState enum.
+func (e PullState) Valid() bool {
+	switch e {
+	case PullStateChanges:
+		return true
+	case PullStateChecks:
+		return true
+	case PullStateConflicts:
+		return true
+	case PullStateDraft:
+		return true
+	case PullStateFailing:
+		return true
+	case PullStateReady:
+		return true
+	case PullStateReview:
+		return true
+	case PullStateUnknown:
 		return true
 	default:
 		return false
@@ -635,6 +725,45 @@ func (e GetPageParamsPage) Valid() bool {
 	case GetPageParamsPageDashboard:
 		return true
 	case GetPageParamsPagePresent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPullsParamsBy.
+const (
+	ListPullsParamsByAutomation ListPullsParamsBy = "automation"
+	ListPullsParamsByPeople     ListPullsParamsBy = "people"
+)
+
+// Valid indicates whether the value is a known member of the ListPullsParamsBy enum.
+func (e ListPullsParamsBy) Valid() bool {
+	switch e {
+	case ListPullsParamsByAutomation:
+		return true
+	case ListPullsParamsByPeople:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPullsParamsSort.
+const (
+	Newest  ListPullsParamsSort = "newest"
+	Updated ListPullsParamsSort = "updated"
+	Waiting ListPullsParamsSort = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the ListPullsParamsSort enum.
+func (e ListPullsParamsSort) Valid() bool {
+	switch e {
+	case Newest:
+		return true
+	case Updated:
+		return true
+	case Waiting:
 		return true
 	default:
 		return false
@@ -814,8 +943,11 @@ type Dashboard struct {
 	Health *ProductHealth `json:"health"`
 
 	// Latest The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them
-	Latest    []Commit `json:"latest"`
-	RepoCount int      `json:"repoCount"`
+	Latest []Commit `json:"latest"`
+
+	// Pulls Every open pull request of the view; automation's only when the work that counts holds it
+	Pulls     PullCounts `json:"pulls"`
+	RepoCount int        `json:"repoCount"`
 
 	// UngroupedCount Repositories in no group
 	UngroupedCount int `json:"ungroupedCount"`
@@ -841,9 +973,12 @@ type DashboardGroup struct {
 	LastActivity *time.Time `json:"lastActivity"`
 
 	// Members Every member, by address, for the fleet map
-	Members   []DashboardMember `json:"members"`
-	Name      string            `json:"name"`
-	RepoCount int               `json:"repoCount"`
+	Members []DashboardMember `json:"members"`
+	Name    string            `json:"name"`
+
+	// Pulls The members' open pull requests; automation's only when the work that counts holds it
+	Pulls     PullCounts `json:"pulls"`
+	RepoCount int        `json:"repoCount"`
 
 	// Summary What most members share, said once instead of on every repository; null where fewer than 80% share it
 	Summary GroupSummaryFacts `json:"summary"`
@@ -1195,12 +1330,12 @@ type Label struct {
 // LabelKind defines model for Label.Kind.
 type LabelKind string
 
-// LayoutElement One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits takes count, heading takes text and note (plain text).
+// LayoutElement One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits and pulls take count (pulls also groups), heading takes text and note (plain text).
 type LayoutElement struct {
 	// Color What colours the fleet map's tiles: the last change's age (the default) or the health level
 	Color *LayoutElementColor `json:"color,omitempty"`
 
-	// Count How many commits
+	// Count How many commits or pull requests
 	Count *int `json:"count,omitempty"`
 
 	// Groups Group ids in display order
@@ -1391,6 +1526,98 @@ type ProductHealth struct {
 	Watch int `json:"watch"`
 }
 
+// PullCounts Open pull requests by state and by whom
+type PullCounts struct {
+	Automation int `json:"automation"`
+
+	// OldestReview The last activity of the person's pull request that waits longest for a review; null when none waits
+	OldestReview *time.Time `json:"oldestReview"`
+
+	// Open Every open pull request counted
+	Open   int `json:"open"`
+	People int `json:"people"`
+	States struct {
+		Changes   int `json:"changes"`
+		Checks    int `json:"checks"`
+		Conflicts int `json:"conflicts"`
+		Draft     int `json:"draft"`
+		Failing   int `json:"failing"`
+		Ready     int `json:"ready"`
+		Review    int `json:"review"`
+		Unknown   int `json:"unknown"`
+	} `json:"states"`
+}
+
+// PullLabel defines model for PullLabel.
+type PullLabel struct {
+	// Color Six hex digits; empty when unknown
+	Color string `json:"color"`
+	Name  string `json:"name"`
+}
+
+// PullPage defines model for PullPage.
+type PullPage struct {
+	// Counts Open pull requests by state and by whom
+	Counts    PullCounts    `json:"counts"`
+	Freshness Freshness     `json:"freshness"`
+	Page      Page          `json:"page"`
+	Pulls     []PullRequest `json:"pulls"`
+}
+
+// PullRequest defines model for PullRequest.
+type PullRequest struct {
+	// Author GitHub login
+	Author string `json:"author"`
+
+	// Base The branch it merges into
+	Base string `json:"base"`
+
+	// Bot Opened by automation (Dependabot, Renovate, a [bot] or bot-like login)
+	Bot bool `json:"bot"`
+
+	// Checks The head commit's checks
+	Checks    PullRequestChecks `json:"checks"`
+	CreatedAt time.Time         `json:"createdAt"`
+	Draft     bool              `json:"draft"`
+
+	// Fork From another repository
+	Fork bool `json:"fork"`
+
+	// Head Its branch
+	Head   string      `json:"head"`
+	Labels []PullLabel `json:"labels"`
+	Number int         `json:"number"`
+
+	// Repo Repository address
+	Repo string `json:"repo"`
+
+	// Requested Reviewers and teams asked for a review
+	Requested int `json:"requested"`
+
+	// State Whose turn a pull request is, the first that holds: draft, conflicts (it does not merge), failing (its checks) and changes (a reviewer asked) wait for the author; review (a review is required, or none approved yet) for reviewers; checks (running) for CI; ready (approved or no review required, checks passing) for a maintainer to merge; unknown until GitHub's state is read
+	State PullState `json:"state"`
+
+	// Stats What a commit changed (design/diffstat.md); absent on a commit older than 90 days or not asked yet
+	Stats *CommitStats `json:"stats,omitempty"`
+	Title string       `json:"title"`
+
+	// UpdatedAt The last activity
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	// Url The pull request on GitHub
+	Url      string              `json:"url"`
+	WaitsFor PullRequestWaitsFor `json:"waitsFor"`
+}
+
+// PullRequestChecks The head commit's checks
+type PullRequestChecks string
+
+// PullRequestWaitsFor defines model for PullRequest.WaitsFor.
+type PullRequestWaitsFor string
+
+// PullState Whose turn a pull request is, the first that holds: draft, conflicts (it does not merge), failing (its checks) and changes (a reviewer asked) wait for the author; review (a review is required, or none approved yet) for reviewers; checks (running) for CI; ready (approved or no review required, checks passing) for a maintainer to merge; unknown until GitHub's state is read
+type PullState string
+
 // QRCode The link as a QR code: an SVG path over a square of size modules, the quiet zone not included
 type QRCode struct {
 	Path string `json:"path"`
@@ -1445,9 +1672,12 @@ type Repo struct {
 	License string `json:"license"`
 	Name    string `json:"name"`
 
-	// OpenIssues Open issues and pull requests
-	OpenIssues int    `json:"openIssues"`
-	Owner      string `json:"owner"`
+	// OpenIssues Open issues; GitHub's count of issues and pull requests together until the pull requests are read
+	OpenIssues int `json:"openIssues"`
+
+	// OpenPulls Open pull requests; null until read
+	OpenPulls *int   `json:"openPulls"`
+	Owner     string `json:"owner"`
 
 	// Packages The packages it publishes to a registry with their newest release, the newest first; empty when none is known
 	Packages []Package `json:"packages"`
@@ -1705,6 +1935,30 @@ type GetDashboardParams struct {
 // GetPageParamsPage defines parameters for GetPage.
 type GetPageParamsPage string
 
+// ListPullsParams defines parameters for ListPulls.
+type ListPullsParams struct {
+	Group *string `form:"group,omitempty" json:"group,omitempty"`
+
+	// Repo owner/name
+	Repo  *string    `form:"repo,omitempty" json:"repo,omitempty"`
+	State *PullState `form:"state,omitempty" json:"state,omitempty"`
+
+	// By people or automation; absent: both
+	By     *ListPullsParamsBy   `form:"by,omitempty" json:"by,omitempty"`
+	Drafts *bool                `form:"drafts,omitempty" json:"drafts,omitempty"`
+	Sort   *ListPullsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListPullsParamsBy defines parameters for ListPulls.
+type ListPullsParamsBy string
+
+// ListPullsParamsSort defines parameters for ListPulls.
+type ListPullsParamsSort string
+
 // ListReposParams defines parameters for ListRepos.
 type ListReposParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
@@ -1772,6 +2026,9 @@ type ServerInterface interface {
 	// GetPage A page's layout, its elements resolved against the viewer's view
 	// (GET /pages/{page})
 	GetPage(w http.ResponseWriter, r *http.Request, page GetPageParamsPage)
+	// ListPulls Open pull requests across repositories, whose turn first, one page at a time
+	// (GET /pulls)
+	ListPulls(w http.ResponseWriter, r *http.Request, params ListPullsParams)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(w http.ResponseWriter, r *http.Request, params ListReposParams)
@@ -2032,6 +2289,130 @@ func (siw *ServerInterfaceWrapper) GetPage(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetPage(w, r, page)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPulls operation middleware
+func (siw *ServerInterfaceWrapper) ListPulls(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPullsParams
+
+	// ------------- Optional query parameter "group" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group", r.URL.Query(), &params.Group, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "repo" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "repo", r.URL.Query(), &params.Repo, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "repo"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repo", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "by" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "by", r.URL.Query(), &params.By, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "by"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "by", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "drafts" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "drafts", r.URL.Query(), &params.Drafts, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "drafts"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "drafts", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPulls(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2621,6 +3002,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/dashboard", wrapper.GetDashboard)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commits", wrapper.ListCommits)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pulls", wrapper.ListPulls)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group}", wrapper.GetGroup)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/repos", wrapper.ListRepos)
@@ -2944,6 +3326,77 @@ type GetPage404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetPage404ApplicationProblemPlusJSONResponse) VisitGetPageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPullsRequestObject struct {
+	Params ListPullsParams
+}
+
+type ListPullsResponseObject interface {
+	VisitListPullsResponse(w http.ResponseWriter) error
+}
+
+type ListPulls200ResponseHeaders struct {
+	ETag *string
+}
+
+type ListPulls200JSONResponse struct {
+	Body    PullPage
+	Headers ListPulls200ResponseHeaders
+}
+
+func (response ListPulls200JSONResponse) VisitListPullsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPulls304Response = NotModifiedResponse
+
+func (response ListPulls304Response) VisitListPullsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type ListPulls400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListPulls400ApplicationProblemPlusJSONResponse) VisitListPullsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPulls404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListPulls404ApplicationProblemPlusJSONResponse) VisitListPullsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -3578,6 +4031,9 @@ type StrictServerInterface interface {
 	// GetPage A page's layout, its elements resolved against the viewer's view
 	// (GET /pages/{page})
 	GetPage(ctx context.Context, request GetPageRequestObject) (GetPageResponseObject, error)
+	// ListPulls Open pull requests across repositories, whose turn first, one page at a time
+	// (GET /pulls)
+	ListPulls(ctx context.Context, request ListPullsRequestObject) (ListPullsResponseObject, error)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(ctx context.Context, request ListReposRequestObject) (ListReposResponseObject, error)
@@ -3821,6 +4277,32 @@ func (sh *strictHandler) GetPage(w http.ResponseWriter, r *http.Request, page Ge
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetPageResponseObject); ok {
 		if err := validResponse.VisitGetPageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPulls operation middleware
+func (sh *strictHandler) ListPulls(w http.ResponseWriter, r *http.Request, params ListPullsParams) {
+	var request ListPullsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPulls(ctx, request.(ListPullsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPulls")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPullsResponseObject); ok {
+		if err := validResponse.VisitListPullsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -115,7 +115,7 @@ github:
 			t.Fatal("not catalogued within 10s")
 		}
 	}
-	if m := me(anon); m.SignedIn || m.Via != oapi.None || !m.SignIn.Oidc || !m.SignIn.Token {
+	if m := me(anon); m.SignedIn || m.Via != oapi.MeViaNone || !m.SignIn.Oidc || !m.SignIn.Token {
 		t.Errorf("anonymous: %+v", m)
 	}
 	if _, b := do(anon, http.MethodGet, "/api/v1/repos"); strings.Contains(b, "acme/secret") {
@@ -131,7 +131,7 @@ github:
 	if code, b := do(ada.Client, http.MethodGet, "/auth/login?return_to=/api/v1/repos"); code != http.StatusOK || !strings.Contains(b, "acme/secret") {
 		t.Fatalf("Ada after sign-in: %d %s", code, b)
 	}
-	if m := me(ada.Client); !m.SignedIn || m.Name != "Ada Lovelace" || m.Via != oapi.Oidc || !m.Admin || !m.Private {
+	if m := me(ada.Client); !m.SignedIn || m.Name != "Ada Lovelace" || m.Via != oapi.MeViaOidc || !m.Admin || !m.Private {
 		t.Errorf("Ada: %+v", m)
 	}
 	if code, b := do(ada.Client, http.MethodGet, "/api/v1/admin/status"); code != http.StatusOK || !strings.Contains(b, `"ready"`) {

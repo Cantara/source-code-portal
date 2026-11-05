@@ -16,21 +16,28 @@ const (
 	dormantAfter = 730 * day
 	// unreleasedAfter is how old a release with changes since must be before it is a finding.
 	unreleasedAfter = 90 * day
-	// issuesMany and issuesTooMany are the open issues and pull requests that cost points.
+	// issuesMany and issuesTooMany are the open issues that cost points.
 	issuesMany, issuesTooMany = 20, 50
+	// reviewsAfter and reviewsLongAfter are how long a person's pull request may wait idle for a review before it costs points.
+	reviewsAfter, reviewsLongAfter = 7 * day, 30 * day
+	// UpdatesAfter is how long automation's pull requests (dependency updates) may stay open before they cost points.
+	UpdatesAfter = 30 * day
 	// goodFrom and watchFrom are the scores the levels start at.
 	goodFrom, watchFrom = 80, 50
 	// highFrom and mediumFrom are the penalties the severities start at.
 	highFrom, mediumFrom = 25, 20
 )
 
-// penalties are what each finding costs, by its code; issues costs the first past issuesTooMany and the second past issuesMany.
+// penalties are what each finding costs, by its code; issues costs the first past issuesTooMany and the second past issuesMany,
+// reviews the first past reviewsLongAfter and the second past reviewsAfter.
 var penalties = map[string][]int{ //nolint:gochecknoglobals // a constant table
 	"dormant":    {30},
 	"failing":    {25},
 	"unreleased": {20},
 	"no-licence": {20},
 	"issues":     {20, 10},
+	"reviews":    {15, 5},
+	"updates":    {5},
 	"quiet":      {10},
 }
 
@@ -171,12 +178,21 @@ func Describe() Rules {
 			{Code: "no-licence", Label: "No licence", About: "A public repository without a licence cannot safely be used by others.",
 				Penalties: []Penalty{{penalties["no-licence"][0], "A public repository without a licence GitHub detects."}},
 				Action:    Action{"Add a licence", "community/license/new"}},
-			{Code: "issues", Label: "Backlog", About: "Many open issues and pull requests wait for an answer.",
+			{Code: "issues", Label: "Backlog", About: "Many open issues wait for an answer.",
 				Penalties: []Penalty{
-					{penalties["issues"][0], fmt.Sprintf("More than %d open issues and pull requests.", issuesTooMany)},
-					{penalties["issues"][1], fmt.Sprintf("More than %d open issues and pull requests.", issuesMany)},
+					{penalties["issues"][0], fmt.Sprintf("More than %d open issues.", issuesTooMany)},
+					{penalties["issues"][1], fmt.Sprintf("More than %d open issues.", issuesMany)},
 				},
 				Action: Action{"Triage the open issues", "issues"}},
+			{Code: "reviews", Label: "Waiting for review", About: "A person's pull request waits for a review and nothing happens.",
+				Penalties: []Penalty{
+					{penalties["reviews"][0], "A pull request by a person idle for more than " + span(reviewsLongAfter) + " waiting for a review."},
+					{penalties["reviews"][1], "A pull request by a person idle for more than " + span(reviewsAfter) + " waiting for a review."},
+				},
+				Action: Action{"Review the open pull requests", "pulls"}},
+			{Code: "updates", Label: "Old updates", About: "Dependency updates from automation stay open and nobody merges or closes them.",
+				Penalties: []Penalty{{penalties["updates"][0], "A pull request by automation open for more than " + span(UpdatesAfter) + "."}},
+				Action:    Action{"Merge or close the dependency updates", "pulls"}},
 			{Code: "quiet", Label: "Quiet",
 				About:     fmt.Sprintf("No one has changed it for %s: is it done, or forgotten?", span(recentFor)),
 				Penalties: []Penalty{{penalties["quiet"][0], "No change by the team for more than " + span(recentFor) + "."}},

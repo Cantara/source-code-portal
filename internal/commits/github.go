@@ -229,38 +229,22 @@ func (r rest) Stats(ctx context.Context, owner, name string, shas []string) (map
 		fmt.Fprintf(&q, `c%d:object(oid:"%s"){...on Commit{additions deletions changedFilesIfAvailable}}`, i, sha)
 	}
 	q.WriteString("}}")
-	body := map[string]any{"query": q.String(), "variables": map[string]string{"owner": owner, "name": name}}
-	base, err := url.Parse(c.BaseURL())
-	if err != nil {
-		return nil, err
-	}
-	req, err := c.NewRequest(ctx, http.MethodPost, graphQL(base), body)
-	if err != nil {
-		return nil, err
-	}
 	var out struct {
-		Data struct {
-			Repository map[string]*struct {
-				Additions               int  `json:"additions"`
-				Deletions               int  `json:"deletions"`
-				ChangedFilesIfAvailable *int `json:"changedFilesIfAvailable"`
-			} `json:"repository"`
-		} `json:"data"`
-		Errors []struct {
-			Type    string `json:"type"`
-			Message string `json:"message"`
-		} `json:"errors"`
+		Repository map[string]*struct {
+			Additions               int  `json:"additions"`
+			Deletions               int  `json:"deletions"`
+			ChangedFilesIfAvailable *int `json:"changedFilesIfAvailable"`
+		} `json:"repository"`
 	}
-	resp, err := c.Do(req, &out)
-	if err != nil {
-		return nil, github.Classify(resp, err)
+	if err := github.GraphQL(ctx, c, q.String(), map[string]any{"owner": owner, "name": name}, &out); err != nil {
+		return nil, err
 	}
-	if out.Data.Repository == nil && len(out.Errors) > 0 {
-		return nil, &github.Error{Kind: github.Transient, Code: "graphql", Err: errors.New(out.Errors[0].Type + ": " + out.Errors[0].Message)}
+	if out.Repository == nil {
+		return nil, &github.Error{Kind: github.NotFound, Code: "not_found", Err: errors.New("graphql: no repository")}
 	}
 	stats := make(map[string]Stats, len(shas))
 	for i, sha := range shas {
-		v := out.Data.Repository["c"+strconv.Itoa(i)]
+		v := out.Repository["c"+strconv.Itoa(i)]
 		if v == nil || v.Additions < 0 || v.Deletions < 0 {
 			continue // not a commit GitHub has: the job marks it asked
 		}
@@ -271,16 +255,4 @@ func (r rest) Stats(ctx context.Context, owner, name string, shas []string) (map
 		stats[sha] = Stats{Additions: v.Additions, Deletions: v.Deletions, Files: files}
 	}
 	return stats, nil
-}
-
-// graphQL is the GraphQL endpoint beside a REST base: api.github.com/graphql, and /api/graphql on GitHub Enterprise Server, whose
-// REST base is /api/v3/.
-func graphQL(base *url.URL) string {
-	u := *base
-	if strings.HasSuffix(u.Path, "/api/v3/") {
-		u.Path = strings.TrimSuffix(u.Path, "v3/") + "graphql"
-	} else {
-		u.Path = strings.TrimSuffix(u.Path, "/") + "/graphql"
-	}
-	return u.String()
 }

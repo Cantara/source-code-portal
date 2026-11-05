@@ -102,6 +102,8 @@ type Data struct {
 	LastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)
 	// Health is a repository's health at now.
 	Health func(*snapshot.Snapshot, *snapshot.RepoEntry, time.Time) health.Repo
+	// Issues is a repository's open issues, its pull requests left out; nil: GitHub's count of both.
+	Issues func(*snapshot.RepoEntry) int
 	// Product is a group's weighed health at now.
 	Product func(*snapshot.Snapshot, snapshot.Group, time.Time) health.Product
 }
@@ -165,8 +167,12 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 			b.message, b.color = l, infoColor
 		}
 	case "issues":
-		b.label, b.message, b.color = "issues", formatCount(e.Repo.OpenIssues)+" open", infoColor
-		if e.Repo.OpenIssues == 0 {
+		n := e.Repo.OpenIssues
+		if h.Issues != nil {
+			n = h.Issues(e)
+		}
+		b.label, b.message, b.color = "issues", formatCount(n)+" open", infoColor
+		if n == 0 {
 			b.color = successColor
 		}
 	default:

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/cantara/source-code-portal/internal/actor"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 )
 
@@ -73,17 +74,6 @@ func footer(body string) string {
 	return ""
 }
 
-// botLike reports whether a name or login is automation's: a GitHub App (`renovate[bot]`) or named like a bot (`Renovate Bot`,
-// `snyk-bot`).
-func botLike(s string) bool {
-	s = strings.ToLower(strings.TrimSpace(s))
-	switch s {
-	case "renovate", "dependabot", "github-actions", "jenkins", "dependabot-preview":
-		return true
-	}
-	return strings.HasSuffix(s, "[bot]") || strings.HasSuffix(s, " bot") || strings.HasSuffix(s, "-bot") || strings.HasSuffix(s, "_bot")
-}
-
 // Classify returns the origin of c and the assistant it names: the AI co-author's or agent's name ("Claude Opus 5", "Copilot"), "" for
 // none. The order: a release plugin or a bot author is automation; a known agent is an agent; an AI co-author or footer is assisted;
 // a bot co-author (a bot's pull request merged by a person) is automation.
@@ -99,7 +89,7 @@ func Classify(c *Commit) (Origin, string) {
 		ai, _ := coAuthors(c.Body)
 		return OriginAgent, cmp.Or(ai, a)
 	}
-	if botLike(c.AuthorLogin) || botLike(c.AuthorName) {
+	if actor.Bot(c.AuthorLogin) || actor.Bot(c.AuthorName) {
 		return OriginAutomation, ""
 	}
 	ai, bot := coAuthors(c.Body)
@@ -132,7 +122,7 @@ func coAuthors(body string) (ai string, bot bool) {
 			if ai == "" {
 				ai = cmp.Or(strings.TrimSpace(note.ReplaceAllString(name, "")), local)
 			}
-		case botLike(name) || botLike(local):
+		case actor.Bot(name) || actor.Bot(local):
 			bot = true
 		}
 	}

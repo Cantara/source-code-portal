@@ -44,8 +44,10 @@ type Signals struct {
 	Release    string    // the latest release's tag; empty when there is none
 	Released   time.Time
 	License    string
-	OpenIssues int
-	Failing    bool // SCP keeps failing to read it
+	OpenIssues int           // open issues, pull requests not counted once they are read
+	ReviewIdle time.Duration // how long a person's pull request waiting for a review has been idle, the longest; 0: none waits
+	OldUpdates int           // automation's pull requests open longer than UpdatesAfter
+	Failing    bool          // SCP keeps failing to read it
 }
 
 // Finding is a reason a score lost points.
@@ -98,9 +100,18 @@ func Assess(s Signals, now time.Time) Repo {
 	}
 	switch {
 	case s.OpenIssues > issuesTooMany:
-		add("issues", penalties["issues"][0], "%d open issues and pull requests", s.OpenIssues)
+		add("issues", penalties["issues"][0], "%d open issues", s.OpenIssues)
 	case s.OpenIssues > issuesMany:
-		add("issues", penalties["issues"][1], "%d open issues and pull requests", s.OpenIssues)
+		add("issues", penalties["issues"][1], "%d open issues", s.OpenIssues)
+	}
+	switch {
+	case s.ReviewIdle > reviewsLongAfter:
+		add("reviews", penalties["reviews"][0], "A pull request has waited %s for a review", span(s.ReviewIdle))
+	case s.ReviewIdle > reviewsAfter:
+		add("reviews", penalties["reviews"][1], "A pull request has waited %s for a review", span(s.ReviewIdle))
+	}
+	if s.OldUpdates > 0 {
+		add("updates", penalties["updates"][0], "%s open for more than %s", plural(s.OldUpdates, "dependency update", "dependency updates"), span(UpdatesAfter))
 	}
 	score := 100
 	for _, f := range fs {
@@ -108,6 +119,14 @@ func Assess(s Signals, now time.Time) Repo {
 	}
 	score = max(score, 0)
 	return Repo{Counted: true, Score: score, Level: LevelOf(score), Recent: age <= recentFor, Findings: fs}
+}
+
+// plural is n with the word for one or for many.
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }
 
 // span is a duration in whole days, months or years.

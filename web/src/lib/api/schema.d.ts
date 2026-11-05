@@ -44,6 +44,29 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/pulls": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Open pull requests across repositories, whose turn first, one page at a time
+     * @description Every open pull request of the viewer's view (design/pulls.md). Each has one state and the party it waits for. The default
+     *     order, `waiting`, puts people's pull requests before automation's, those waiting for reviewers first, then the longest idle.
+     *     `group` and `repo` intersect; `by` keeps people's or automation's; drafts are left out unless `drafts` or `state=draft`.
+     *     `counts` cover the scope and `by` (drafts included) whatever the state filter, so the states can be offered as filters.
+     */
+    get: operations["listPulls"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/groups": {
     parameters: {
       query?: never
@@ -532,8 +555,10 @@ export interface components {
       archived: boolean
       fork: boolean
       stars: number
-      /** @description Open issues and pull requests */
+      /** @description Open issues; GitHub's count of issues and pull requests together until the pull requests are read */
       openIssues: number
+      /** @description Open pull requests; null until read */
+      openPulls: number | null
       /** Format: date-time */
       pushedAt: string
       /**
@@ -795,6 +820,82 @@ export interface components {
       page: components["schemas"]["Page"]
       freshness: components["schemas"]["Freshness"]
     }
+    /**
+     * @description Whose turn a pull request is, the first that holds: draft, conflicts (it does not merge), failing (its checks) and changes (a reviewer asked) wait for the author; review (a review is required, or none approved yet) for reviewers; checks (running) for CI; ready (approved or no review required, checks passing) for a maintainer to merge; unknown until GitHub's state is read
+     * @enum {string}
+     */
+    PullState: "draft" | "conflicts" | "failing" | "changes" | "review" | "checks" | "ready" | "unknown"
+    PullRequest: {
+      /** @description Repository address */
+      repo: string
+      number: number
+      title: string
+      /** @description The pull request on GitHub */
+      url: string
+      /** @description GitHub login */
+      author: string
+      /** @description Opened by automation (Dependabot, Renovate, a [bot] or bot-like login) */
+      bot: boolean
+      draft: boolean
+      /** @description From another repository */
+      fork: boolean
+      /** Format: date-time */
+      createdAt: string
+      /**
+       * Format: date-time
+       * @description The last activity
+       */
+      updatedAt: string
+      /** @description The branch it merges into */
+      base: string
+      /** @description Its branch */
+      head: string
+      labels: components["schemas"]["PullLabel"][]
+      /** @description Reviewers and teams asked for a review */
+      requested: number
+      state: components["schemas"]["PullState"]
+      /** @enum {string} */
+      waitsFor: "author" | "reviewers" | "ci" | "maintainer" | "unknown"
+      /**
+       * @description The head commit's checks
+       * @enum {string}
+       */
+      checks: "passing" | "failing" | "running" | "none"
+      stats?: components["schemas"]["CommitStats"]
+    }
+    PullLabel: {
+      name: string
+      /** @description Six hex digits; empty when unknown */
+      color: string
+    }
+    /** @description Open pull requests by state and by whom */
+    PullCounts: {
+      /** @description Every open pull request counted */
+      open: number
+      people: number
+      automation: number
+      states: {
+        draft: number
+        conflicts: number
+        failing: number
+        changes: number
+        review: number
+        checks: number
+        ready: number
+        unknown: number
+      }
+      /**
+       * Format: date-time
+       * @description The last activity of the person's pull request that waits longest for a review; null when none waits
+       */
+      oldestReview: string | null
+    }
+    PullPage: {
+      pulls: components["schemas"]["PullRequest"][]
+      counts: components["schemas"]["PullCounts"]
+      page: components["schemas"]["Page"]
+      freshness: components["schemas"]["Freshness"]
+    }
     CommitPage: {
       commits: components["schemas"]["Commit"][]
       page: components["schemas"]["Page"]
@@ -835,6 +936,8 @@ export interface components {
       /** @description Every member, by address, for the fleet map */
       members: components["schemas"]["DashboardMember"][]
       summary: components["schemas"]["GroupSummaryFacts"]
+      /** @description The members' open pull requests; automation's only when the work that counts holds it */
+      pulls: components["schemas"]["PullCounts"]
     }
     /** @description Work on the default branches. People's work is every commit not made by automation (CI, dependency and release bots) and not part of a sweep: a subject that landed in more than 10 repositories on one day (UTC). A coding agent's commit is people's work: someone set the agent to it. People's work is by hand or with an AI (an AI co-author or footer, or a coding agent as the author); AI use leaves no trace in some tools (inline completion), so ai is a lower bound. Automation and sweeps are maintenance. The counts give every kind; the people (of people's work that counts), the last change and the recent repositories follow the work that counts (Dashboard.work). */
     Activity: {
@@ -900,10 +1003,10 @@ export interface components {
       /** @description Members with a release */
       released: number
     }
-    /** @description One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits takes count, heading takes text and note (plain text). */
+    /** @description One block of a page. Each kind reads only its own fields: products and fleet-map take groups (absent: every group), products takes view, fleet-map takes color, latest-commits and pulls take count (pulls also groups), heading takes text and note (plain text). */
     LayoutElement: {
       /** @enum {string} */
-      kind: "telemetry" | "fleet-map" | "announcements" | "products" | "latest-commits" | "heading"
+      kind: "telemetry" | "fleet-map" | "announcements" | "products" | "latest-commits" | "pulls" | "heading"
       /** @description Group ids in display order */
       groups?: string[]
       /**
@@ -916,7 +1019,7 @@ export interface components {
        * @enum {string}
        */
       color?: "activity" | "health"
-      /** @description How many commits */
+      /** @description How many commits or pull requests */
       count?: number
       text?: string
       note?: string
@@ -982,6 +1085,8 @@ export interface components {
       /** @description The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them */
       latest: components["schemas"]["Commit"][]
       freshness: components["schemas"]["FreshnessCounts"]
+      /** @description Every open pull request of the view; automation's only when the work that counts holds it */
+      pulls: components["schemas"]["PullCounts"]
     }
     DocSummary: {
       /** @description Path parameter of the document */
@@ -1292,6 +1397,42 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["CommitPage"]
+        }
+      }
+      304: components["responses"]["NotModified"]
+      400: components["responses"]["BadRequest"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  listPulls: {
+    parameters: {
+      query?: {
+        group?: string
+        /** @description owner/name */
+        repo?: string
+        state?: components["schemas"]["PullState"]
+        /** @description people or automation; absent: both */
+        by?: "people" | "automation"
+        drafts?: boolean
+        sort?: "waiting" | "newest" | "updated"
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description One page of pull requests */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["PullPage"]
         }
       }
       304: components["responses"]["NotModified"]
