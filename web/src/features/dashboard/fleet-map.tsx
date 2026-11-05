@@ -199,7 +199,8 @@ export function FleetMap({
 
 /**
  * HealthMap is the fleet map coloured by health: every repository one tile by product, attention outlined and watch round besides
- * their colours, so the fleet's health reads at a glance and from across a room. The legend counts each level, once per repository.
+ * their colours, so the fleet's health reads at a glance and from across a room. The legend counts each level, once per repository;
+ * in a narrow container (the presentation page with a wide commit column) only the legend stays, the tiles' room going to the products.
  */
 function HealthMap({ groups, members, work, now }: { groups: Group[]; members: Member[]; work: Work; now: number }) {
   const total = healthTally(members)
@@ -219,7 +220,7 @@ function HealthMap({ groups, members, work, now }: { groups: Group[]; members: M
           ))}
         </ul>
       </div>
-      <ul className="flex flex-wrap gap-x-5 gap-y-2">
+      <ul className="flex flex-wrap gap-x-5 gap-y-2 @max-lg:hidden">
         {groups.map((g) => (
           <li key={g.id} className="min-w-0 max-w-full">
             <p className="flex items-baseline justify-between gap-2 text-xs">

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
 import { api, type Commit, type Schemas } from "@/lib/api/client"
 import { snapshotQuery } from "@/lib/api/snapshot"
 import { useNow } from "@/lib/clock"
@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn"
 import { useConnectionFailing, useLive } from "@/lib/connection"
 import { ago } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
-import { by, type Work } from "@/lib/preferences"
+import { by, columnCookie, columnWidths, remember, type Work } from "@/lib/preferences"
 import { AiMark } from "@/entities/commit/ai-mark"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { meQuery } from "@/lib/api/queries"
@@ -133,12 +133,18 @@ function Screen({
   commits,
   only,
   frame,
+  column = columnWidths.initial,
+  onColumn,
 }: {
   layout: Element[]
   data: Schemas["Dashboard"]
   commits: Commit[]
   only?: string[]
   frame: string
+  /** the commit column's width in percent of the screen, in landscape */
+  column?: number
+  /** resizes the column as its edge is dragged; kept when the drag ends (keep) */
+  onColumn?: (width: number, keep: boolean) => void
 }) {
   const now = useNow()
   const scope = only ? { ...data, groups: within(data.groups, undefined, only) } : data
@@ -173,11 +179,13 @@ function Screen({
   return (
     <div
       className={cn(
-        "grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] landscape:grid-cols-[minmax(0,1fr)_minmax(18rem,30%)] landscape:grid-rows-1",
+        "grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] landscape:grid-rows-1 landscape:gap-x-0",
+        stream ? columns[column] : "landscape:grid-cols-1",
         frame,
       )}
     >
-      <div className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
+      {/* A container: as the commit column widens, the elements keep the signals that matter most (container queries). */}
+      <div className="@container flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
         {!strip && (
           <div className="flex justify-end">
             <Freshness />
@@ -185,7 +193,99 @@ function Screen({
         )}
         {left}
       </div>
+      {stream && <Resizer width={column} onChange={onColumn} />}
       {stream && <Stream commits={commits.slice(0, stream.count ?? 30)} work={data.work} />}
+    </div>
+  )
+}
+
+/** columns are the landscape grid at each width of the commit column, as written classes (the CSP allows no style attribute). */
+const columns: Record<number, string> = {
+  20: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_20%]",
+  25: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_25%]",
+  30: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_30%]",
+  35: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_35%]",
+  40: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_40%]",
+  45: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_45%]",
+  50: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_50%]",
+  55: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_55%]",
+  60: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_60%]",
+}
+
+const clampColumn = (w: number) =>
+  Math.min(columnWidths.max, Math.max(columnWidths.min, Math.round(w / columnWidths.step) * columnWidths.step))
+
+/** A press that moves less than this is a tap, not a drag; two taps within doubleTap bring back the usual width. */
+const slop = 4
+const doubleTap = 400
+
+/**
+ * Resizer is the commit column's edge in landscape: dragged (a finger or a pointer) or moved with the arrow keys, in steps of 5% of
+ * the screen from 20% to 60%; a double tap or click brings back the usual width. Taps are told apart here, as a touch on a handle
+ * that takes the whole gesture (touch-action none) sends no dblclick in every browser, and a tap never moves the column.
+ */
+function Resizer({ width, onChange }: { width: number; onChange?: (width: number, keep: boolean) => void }) {
+  const press = useRef<{ x: number; moved: boolean } | null>(null)
+  const lastTap = useRef(Number.NEGATIVE_INFINITY)
+  const at = (e: PointerEvent<HTMLDivElement>) => {
+    const frame = e.currentTarget.parentElement?.getBoundingClientRect()
+    return frame ? clampColumn(((frame.right - e.clientX) / frame.width) * 100) : width
+  }
+  const key = (e: KeyboardEvent<HTMLDivElement>) => {
+    const to = {
+      ArrowLeft: width + columnWidths.step,
+      ArrowRight: width - columnWidths.step,
+      Home: columnWidths.max,
+      End: columnWidths.min,
+    }[e.key]
+    if (to === undefined || !onChange) return
+    e.preventDefault()
+    onChange(clampColumn(to), true)
+  }
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize latest commits"
+      aria-valuemin={columnWidths.min}
+      aria-valuemax={columnWidths.max}
+      aria-valuenow={width}
+      aria-valuetext={`${width}% of the screen`}
+      tabIndex={onChange ? 0 : -1}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        press.current = { x: e.clientX, moved: false }
+      }}
+      onPointerMove={(e) => {
+        const p = press.current
+        if (!p || !e.currentTarget.hasPointerCapture(e.pointerId)) return
+        if (!p.moved && Math.abs(e.clientX - p.x) < slop) return
+        p.moved = true
+        onChange?.(at(e), false)
+      }}
+      onPointerUp={(e) => {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+        const p = press.current
+        press.current = null
+        if (p?.moved) {
+          onChange?.(at(e), true)
+          lastTap.current = Number.NEGATIVE_INFINITY
+          return
+        }
+        if (e.timeStamp - lastTap.current < doubleTap) {
+          onChange?.(columnWidths.initial, true)
+          lastTap.current = Number.NEGATIVE_INFINITY
+        } else lastTap.current = e.timeStamp
+      }}
+      onPointerCancel={() => {
+        press.current = null
+      }}
+      onKeyDown={key}
+      title="Drag to resize; double-tap for the usual width"
+      // As wide as the gap it replaces, a hairline to see; the hit area reaches past it for a finger.
+      className="group relative hidden cursor-col-resize touch-none justify-center outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:content-[''] landscape:flex"
+    >
+      <span className="my-6 w-px rounded-full bg-border transition-all group-hover:w-0.5 group-hover:bg-primary group-focus-visible:w-0.5 group-focus-visible:bg-primary group-active:w-0.5 group-active:bg-primary" />
     </div>
   )
 }
@@ -264,7 +364,21 @@ function Bar({ onDesign }: { onDesign?: () => void }) {
  * or a screen on a wall. It keeps the screen awake, reloads on a new release and once an hour, and shifts by a pixel or two now and
  * then against burn-in; a tap shows its controls. only is the groups the address names.
  */
-export function PresentView({ work, only }: { work: Work; only?: string[] }) {
+export function PresentView({
+  work,
+  only,
+  column: initial = columnWidths.initial,
+}: {
+  work: Work
+  only?: string[]
+  /** the reader's commit column width (the cookie `scp-present-column`) */
+  column?: number
+}) {
+  const [column, setColumn] = useState(initial)
+  const resize = (w: number, keep: boolean) => {
+    setColumn(w)
+    if (keep) remember(columnCookie, String(w))
+  }
   const { data, error } = useQuery(dashboardQuery(api, work))
   const { data: page } = useQuery(pageQuery(api, "present"))
   const { data: me } = useQuery(meQuery(api))
@@ -286,13 +400,23 @@ export function PresentView({ work, only }: { work: Work; only?: string[] }) {
           <Designer
             page="present"
             groups={data.groups}
-            preview={(draft) => <Screen layout={draft} data={data} commits={commits} only={only} frame="relative h-[40rem]" />}
+            preview={(draft) => (
+              <Screen layout={draft} data={data} commits={commits} only={only} frame="relative h-[40rem]" column={column} />
+            )}
             onClose={() => setDesigning(false)}
           />
         </div>
       ) : (
         <>
-          <Screen layout={layout} data={data} commits={commits} only={only} frame={cn("fixed inset-0", shift)} />
+          <Screen
+            layout={layout}
+            data={data}
+            commits={commits}
+            only={only}
+            frame={cn("fixed inset-0", shift)}
+            column={column}
+            onColumn={resize}
+          />
           <Bar onDesign={me?.admin ? () => setDesigning(true) : undefined} />
         </>
       )}

@@ -317,6 +317,9 @@ keeps the screen awake, is dark unless the reader chose, reloads for a new relea
 against burn-in. A tap shows its controls; an administrator designs it as the dashboard (`present.json` in `layout.dir`).
 
 - One screen per team: `/present?groups=payments,identity` keeps to those products, `?work=hand,ai` fixes the work that counts.
+- Drag the commit column's edge (or use the arrow keys on it) to make it wider, up to 60% of the screen; the device remembers it. The
+  left side then keeps what matters most: the products that need a look and how current the page is stay, the people, the counts and
+  the fleet map's tiles give way first.
 - On an iPad, *Share › Add to Home Screen* opens it full screen without the browser (the page's web app manifest starts at
   `/present`). Turn off auto-lock or rely on the page's wake lock, which Safari grants after the first tap.
 - With `access.require_auth`, sign in once on the tablet: through single sign-on, or on `/signin` with a token of its own from

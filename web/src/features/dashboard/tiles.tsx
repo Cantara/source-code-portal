@@ -69,8 +69,9 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
       </div>
       {h && h.findings.length > 0 && (
         <ul className="flex flex-col text-[0.9375rem]">
-          {h.findings.slice(0, tileFindings).map((f) => (
-            <li key={f.repo + f.code} className="truncate">
+          {h.findings.slice(0, tileFindings).map((f, i) => (
+            // A narrow container keeps the costliest finding only.
+            <li key={f.repo + f.code} className={cn("truncate", i > 0 && "@max-xl:hidden")}>
               <span className="font-medium">{f.repo.split("/")[1]}</span>{" "}
               <span className="text-muted-foreground">{f.message}</span>
             </li>

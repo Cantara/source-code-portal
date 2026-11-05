@@ -714,6 +714,10 @@ export function GuideView({ version }: { version: string }) {
                   ["/present?work=hand,ai", "The work that counts on this screen, whatever its browser chose."],
                   ["Add to Home Screen", "On an iPad, Share › Add to Home Screen opens it full screen, without the browser."],
                   ["Signed in", "Where the portal needs sign-in, sign in once on the tablet: the page keeps the session."],
+                  [
+                    "A wider column",
+                    "Drag the commits' edge, up to 60% of the screen; the products that need a look and the page's freshness always stay.",
+                  ],
                 ]}
               />
             </div>

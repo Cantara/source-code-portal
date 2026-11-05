@@ -1,7 +1,7 @@
 import { load, prefetch } from "@/lib/load"
 import type { Route } from "@/lib/page"
 import { dashboardQuery, pageQuery } from "./api"
-import { productsView, sideCookie, sideOf, viewCookie, workCookie, workOf } from "@/lib/preferences"
+import { columnCookie, columnOf, productsView, sideCookie, sideOf, viewCookie, workCookie, workOf } from "@/lib/preferences"
 import { DashboardView } from "./view"
 import { PresentView } from "./present"
 import type { Search } from "@/lib/page"
@@ -49,5 +49,7 @@ export const presentRoute: Route<object> = {
     manifest: "/manifest.webmanifest",
     appleWebApp: { capable: true, title: "SCP", statusBarStyle: "black-translucent" },
   }),
-  render: ({ cookies, search }) => <PresentView work={lens(search, cookies)} only={only(search)} />,
+  render: ({ cookies, search }) => (
+    <PresentView work={lens(search, cookies)} only={only(search)} column={columnOf(cookies[columnCookie])} />
+  ),
 }

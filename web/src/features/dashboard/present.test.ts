@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { Schemas } from "@/lib/api/client"
 import { freshness } from "./present"
 import { byNeed } from "./tiles"
+import { columnOf } from "@/lib/preferences"
 
 type Group = Schemas["DashboardGroup"]
 
@@ -39,5 +40,16 @@ describe("freshness", () => {
   })
   it("is offline at once while the server fails", () => {
     expect(freshness(true, true, now, now).word).toBe("Offline")
+  })
+})
+
+describe("columnOf", () => {
+  it("reads the commit column's width on the 5% grid within 20% to 60%", () => {
+    expect(columnOf(undefined)).toBe(30)
+    expect(columnOf("45")).toBe(45)
+    expect(columnOf("43")).toBe(45)
+    expect(columnOf("5")).toBe(20)
+    expect(columnOf("90")).toBe(60)
+    expect(columnOf("wide")).toBe(30)
   })
 })

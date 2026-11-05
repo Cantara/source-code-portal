@@ -83,6 +83,18 @@ export function productsView(v: unknown, fallback: ProductsView): ProductsView {
   return productsViews.includes(v as ProductsView) ? (v as ProductsView) : fallback
 }
 
+/** columnCookie remembers the presentation page's commit column: its width in percent of the screen (design/present.md). */
+export const columnCookie = "scp-present-column"
+export const columnWidths = { min: 20, max: 60, step: 5, initial: 30 } as const
+
+/** columnOf is the column's width a cookie names, on the 5% grid within 20% to 60%; the initial width otherwise. */
+export function columnOf(v: unknown): number {
+  const n = typeof v === "string" && /^\d{1,3}$/.test(v) ? Number(v) : NaN
+  if (Number.isNaN(n)) return columnWidths.initial
+  const stepped = Math.round(n / columnWidths.step) * columnWidths.step
+  return Math.min(Math.max(stepped, columnWidths.min), columnWidths.max)
+}
+
 /** Side is the dashboard's side panel of the latest commits beside the products: open or folded to a rail, and its width (rem). */
 export type Side = { open: boolean; width: number }
 

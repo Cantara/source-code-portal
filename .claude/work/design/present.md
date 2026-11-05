@@ -59,6 +59,13 @@ fits from 1024 to 1920 pixels wide.
 - **Latest commits**, the right column at full height: repository, time, author and subject on two lines, the AI and automation marks
   of the commit lists; as many as fit. A new commit slides in at the top (no motion with `prefers-reduced-motion`). It follows the
   work that counts.
+- **The commit column's width**: in landscape its left edge is a handle (`role=separator`), as wide as the gap it replaces and a hairline to see, its hit area reaching past it for a finger: dragged by a finger or a pointer, or
+  moved with the arrow keys, from 20% to 60% of the screen in steps of 5% (written grid classes: the CSP allows no style), a double
+  tap back to 30%. The width is the reader's, in the cookie `scp-present-column`, so the server draws it. The left column is a
+  container, and as it narrows its elements keep what matters most (container queries): the strip drops the people and the share
+  with AI first (below 48 rem), then the products (36 rem) and the repositories (28 rem); a wide tile keeps its costliest finding only
+  (36 rem); the fleet map keeps its counts per level and gives its tiles' room to the products (32 rem); the good products fold
+  sooner. The products at attention and at watch, their wide tiles and the data's age never go.
 - **Text**: 15 px for what is read (tiles, commits, the strip), numbers at 20 px; only the section labels and the fleet map's product
   names are smaller. Dark theme unless the reader chose (`theme-init.js` and `lib/theme.ts` treat the system choice as dark on
   `/present`); the theme's tokens only.

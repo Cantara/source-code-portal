@@ -104,9 +104,9 @@ export function Telemetry({ data, now }: { data: Schemas["Dashboard"]; now: numb
 }
 
 /** Figure is one of the strip's numbers with what it counts. */
-function Figure({ value, label, level }: { value: string; label: string; level?: string }) {
+function Figure({ value, label, level, className }: { value: string; label: string; level?: string; className?: string }) {
   return (
-    <div className={cn("flex items-baseline gap-1.5", level)}>
+    <div className={cn("flex items-baseline gap-1.5", level, className)}>
       <dt className="sr-only">{label}</dt>
       <dd className="flex items-baseline gap-1.5">
         {level && <span aria-hidden="true" className="led self-center" />}
@@ -121,7 +121,9 @@ function Figure({ value, label, level }: { value: string; label: string; level?:
 
 /**
  * TelemetryStrip is the telemetry in one line, for the presentation page: repositories, products, the products at attention and
- * at watch, the people of the last 30 days and their share with AI; end is what closes the line (the data's age).
+ * at watch, the people of the last 30 days and their share with AI; end is what closes the line (the data's age). As its container
+ * narrows it keeps what matters most: the people and the share with AI go first, then the products, then the repositories; the
+ * products that need a look and the data's age always stay.
  */
 export function TelemetryStrip({ data, end }: { data: Schemas["Dashboard"]; end?: ReactNode }) {
   const a = data.activity
@@ -131,13 +133,25 @@ export function TelemetryStrip({ data, end }: { data: Schemas["Dashboard"]; end?
   return (
     <section aria-label="Telemetry" className="panel flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-2">
       <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <Figure value={count(data.repoCount)} label={data.repoCount === 1 ? "repository" : "repositories"} />
-        <Figure value={count(data.groups.length)} label={data.groups.length === 1 ? "product" : "products"} />
+        <Figure
+          value={count(data.repoCount)}
+          label={data.repoCount === 1 ? "repository" : "repositories"}
+          className="@max-md:hidden"
+        />
+        <Figure
+          value={count(data.groups.length)}
+          label={data.groups.length === 1 ? "product" : "products"}
+          className="@max-xl:hidden"
+        />
         {attention > 0 && <Figure value={count(attention)} label="need attention" level={levels.attention.className} />}
         {watch > 0 && <Figure value={count(watch)} label="to watch" level={levels.watch.className} />}
         {attention === 0 && watch === 0 && <Figure value="0" label="need attention" level={levels.good.className} />}
-        <Figure value={count(a.authorCount)} label={a.authorCount === 1 ? "person in 30 days" : "people in 30 days"} />
-        {all > 0 && <Figure value={percent(a.ai, all)} label="with AI" />}
+        <Figure
+          value={count(a.authorCount)}
+          label={a.authorCount === 1 ? "person in 30 days" : "people in 30 days"}
+          className="@max-3xl:hidden"
+        />
+        {all > 0 && <Figure value={percent(a.ai, all)} label="with AI" className="@max-3xl:hidden" />}
       </dl>
       {end}
     </section>
