@@ -37,6 +37,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/mcpserver"
 	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/safehtml"
+	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
@@ -144,7 +145,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 
 	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log,
-		commits.Feeds(), manifests.Graph())}
+		commits.Feeds(), manifests.Graph(), search.Indexer(searchOptions()))}
 	if s.store, err = store.Open(ctx, cfg.Store.Path, log); err != nil {
 		return nil, err
 	}

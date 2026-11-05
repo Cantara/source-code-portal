@@ -1,6 +1,6 @@
 # Search: one index of what the portal holds (Q1 to Q3)
 
-Status: queued (plan.md section 4), next. Binding order: ../plan.md > this note.
+Status: Q1 built, Q2 in progress (plan.md section 4). Binding order: ../plan.md > this note.
 
 A reader looks for something the portal already knows: the repository that does OAuth, the document that explains the session
 timeout, who uses `slf4j-api`, the commit that rotated the keys. Today there is no search: the assistant's `search_repositories`
@@ -68,11 +68,15 @@ No stemming: the text is English and Norwegian mixed and mostly names; a query's
 "session"), and a word with no hit of at least five letters is tried again within one edit ("sesion"), named on the page as such.
 Tokens longer than 64 bytes are dropped; a document indexes at most 64 KiB of text.
 
-**Segment.** For one repository: its documents (kind, reference, the fields' lengths) and, per term, the postings (document number
-and frequency per field), delta- and varint-encoded in one byte slice, with the terms sorted for prefix lookups. No positions: a
-phrase (`"session timeout"`) is the terms' intersection checked against the document's text, which the facets already hold, for the
-candidates alone. Budget at the load test's 1,000 repositories (cmd/scp/load_test.go): under 64 MB for every segment, a cold build
-under 3 s, a publish that changed one repository under 20 ms.
+**Segment.** For one repository: its documents (kind, time, item, each field's length in a byte) and its terms, sorted and
+front-coded in blocks of 16, each term followed by its postings (document distance and frequency per field; a posting in one field,
+the common case, is one byte), one offset kept per block; and a Bloom filter of the terms (10 bits a term), so a word a segment
+lacks costs a few bit tests, not a lookup: a correction tries hundreds of variants in every segment. No positions: a phrase
+(`"session timeout"`) is the terms' intersection checked against the documents' text, which `Read` gives again, for the
+candidates alone. Budgets at 1,000 repositories of a heavy synthetic corpus (`internal/search/size_test.go`: three documents of four
+sections, two manifests of 30 dependencies, two packages and 500 commits each, a vocabulary of 5,000 words with a long tail, an
+issue number per commit): under 96 MB (measured 84 MB), a cold build under 3 s (0.3 s), a publish that changed one repository
+under 20 ms, a query's p99 under 50 ms (30 ms, a correction).
 
 **Reuse.** `snapshot.Snapshot.Digest(k)` (new): the sum of a content digest of each of the repository's items, kept by
 `Builder.Mark` beside the version's digest (P-21), with the listing's fields hashed in. The version's digest also holds the item's
@@ -90,14 +94,14 @@ summed first, for the view's IDF), scores BM25F with the weights above and the k
 dep 1, commit 0.8), and keeps the best 1,000; equal scores order by recency, then reference. A query checks its context between
 segments and stops at the request's deadline.
 
-**Snippets.** For a page's hits only: up to 240 characters of the field that matched, around the first match, as plain text with
-the matches' offsets (`highlights: [[start, end]]`). The page marks them itself; no HTML leaves the server, and repository text never
-becomes markup (as the assistant's answers, P-28).
+**Snippets.** For a page's hits only: up to 240 characters of the field that matched, around the first match, one line, as parts of
+plain text with the matches flagged (`[{text, mark}]`), the title likewise. The page marks them itself; no HTML leaves the server,
+and repository text never becomes markup (as the assistant's answers, P-28).
 
 ## Q2: the API, the tool and the leak test
 
 - `GET /api/v1/search?q=&in=&page=&limit=` in the contract: the parsed query (words, filters, a corrected word), the count per kind,
-  and a numbered page (P-26: 25, 50 or 100 a page) of hits `{kind, title, repo, url, snippet, highlights, at}`. `in` narrows to a
+  and a numbered page (P-26: 25, 50 or 100 a page) of hits `{kind, title, repo, url, snippet, at}` (title and snippet as parts). `in` narrows to a
   kind; the counts are always all kinds, for the page's tabs. An empty query is 400 as a problem; nothing found is 200 with none.
 - `GET /api/v1/search/suggest?q=`: up to 8 repositories, groups and documents whose names or titles start with the words, for the
   header's box; no snippets.
