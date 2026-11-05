@@ -1,7 +1,17 @@
+import type { Page } from "@playwright/test"
 import { expect, test } from "./fixtures"
 
 // cmd/scp/e2e_test.go: the fake provider signs in Ada Lovelace, an admin in staff; staff sees the private repository vault.
 const token = "e2e-token-0123456789abcdef0123456789abcdef"
+
+/** openAccount opens the account menu, pressing again while the page is not yet hydrated (a busy run renders it before its script runs). */
+async function openAccount(page: Page) {
+  const menu = page.getByRole("menu", { name: "Account" })
+  await expect(async () => {
+    if (!(await menu.isVisible())) await page.getByRole("button", { name: "Ada Lovelace" }).click()
+    await expect(menu).toBeVisible({ timeout: 1000 })
+  }).toPass()
+}
 
 test("signing in through the provider returns to the page and shows the private repositories", async ({ page }) => {
   await page.goto("/groups/other")
@@ -14,13 +24,13 @@ test("signing in through the provider returns to the page and shows the private 
   await expect(page.getByRole("button", { name: "Ada Lovelace" })).toBeVisible()
   await expect(page.getByRole("link", { name: "acme/vault" })).toBeVisible()
 
-  await page.getByRole("button", { name: "Ada Lovelace" }).click()
+  await openAccount(page)
   await page.getByRole("menu", { name: "Account" }).getByRole("menuitem", { name: "Admin" }).click()
   await expect(page.getByRole("heading", { level: 1, name: "Admin", exact: true })).toBeVisible()
   await expect(page.getByText("Signed in as Ada Lovelace through single sign-on, an administrator.")).toBeVisible()
   await expect(page.getByRole("heading", { name: "Snapshot" })).toBeVisible()
 
-  await page.getByRole("button", { name: "Ada Lovelace" }).click()
+  await openAccount(page)
   await page.getByRole("menuitem", { name: "Sign out" }).click() // through the provider's end session back to the dashboard
   await expect(page.getByRole("heading", { level: 1, name: "Dashboard", exact: true })).toBeVisible()
   await page.goto("/groups/other")
