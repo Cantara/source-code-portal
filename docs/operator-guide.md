@@ -336,7 +336,7 @@ against burn-in. A tap shows its controls; an administrator designs it as the da
 #### 2.4.1 Announcements
 
 The portal carries the team's news: an event with a sign-up link, planned maintenance, a change everyone must know about. An
-announcement shows below the fleet on the dashboard and on `/present` (the `announcements` element in the design mode; move it like any
+announcement shows above the fleet on the dashboard and on `/present` (the `announcements` element in the design mode; move it like any
 other) while its time lasts, and goes away by itself. It is plain text with one link, never HTML or Markdown.
 
 - **Administrators** write them on the *Admin* page's *Announcements* card: the title, a line, when it starts and ends, where, a link

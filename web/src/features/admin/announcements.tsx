@@ -387,7 +387,7 @@ export function AnnouncementsCard() {
         )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Shown below the fleet on the dashboard and on /present while their time lasts; at most three at once.
+        Shown above the fleet on the dashboard and on /present while their time lasts; at most three at once.
       </p>
       {!data.writable && (
         <Alert variant="warn" className="mt-3">

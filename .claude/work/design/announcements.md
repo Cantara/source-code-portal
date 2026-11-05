@@ -91,7 +91,7 @@ day large, the month small, from `starts`), the title one step larger and semibo
 
 ## Built-in layouts
 
-The dashboard and `/present` gain the element after the fleet map: telemetry, fleet map, announcements, products, latest commits.
+The dashboard and `/present` gain the element above the fleet map, right below the fleet's numbers: telemetry, announcements, fleet map, products, latest commits.
 An element with nothing to show draws nothing, so a portal without announcements looks as before.
 
 ## Done when

@@ -1130,7 +1130,7 @@ claude mcp add --transport http scp https://portal.example.org/mcp \
               ["The assistant", "questions about the catalogue in plain language, with your model provider"],
               ["Agents", "Claude Code and browser agents read the catalogue through /mcp and WebMCP"],
               ["The design mode", "administrators arrange the dashboard and the presentation page for everyone"],
-              ["Announcements", "the team's news below the fleet, with a sign-up link and a QR code on the wall, until they end"],
+              ["Announcements", "the team's news above the fleet, with a sign-up link and a QR code on the wall, until they end"],
               ["Several instances", "one portal served together through Hazelcast"],
             ].map(([t, d]) => (
               <li key={t} className="rounded-lg border border-border p-3">
