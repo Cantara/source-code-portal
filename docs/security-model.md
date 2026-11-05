@@ -35,6 +35,11 @@ none of the operator duties below except the network layout.
   status, request id), never the answer. Metrics and `/api/v1/status` carry no repository names.
 - **Repository text is untrusted.** Rendered documents pass one sanitiser. Markdown answers, `/llms*.txt`, `/knowledge.yaml` and the
   assistant's tool results have control and invisible characters removed, and are marked as data, never instructions.
+- **Read-only towards GitHub.** The portal asks for read permissions only and sends only reads: GET requests and GraphQL queries,
+  never a write or a mutation. The fake GitHub every test runs against fails a test that sends anything else
+  (`internal/github/githubtest`).
+- **Webhooks anyone can cause.** On a public repository anyone may open an issue or a pull request, or comment: such events re-read
+  that repository at most once a minute, so outsiders cannot spend the portal's GitHub rate limit (`internal/sync` `Settle`).
 - **Agents.** Every tool agents can call only reads. `/mcp` takes a bearer token or the authenticating proxy's identity, never a
   browser's session cookie, and refuses a request whose `Origin` is another site (the DNS rebinding guard MCP asks for); a tool call
   carrying a cookie must come from the portal's own pages. The pages' WebMCP tools are for the page's own origin only (the
@@ -51,8 +56,12 @@ none of the operator duties below except the network layout.
 ## What you provide
 
 - **One instance per audience.** The portal knows one boundary: private or not. Run one instance for each group of people who may see
-  the same repositories, with its own GitHub App installed on **only those repositories** (*Selected repositories*), with *Contents*
-  and *Metadata* read-only and nothing else. The installation is the boundary GitHub enforces; `exclude` is a second fence.
+  the same repositories, with its own GitHub App installed on **only those repositories** (*Selected repositories*), with read-only
+  permissions and nothing else: *Contents* and *Metadata* (the catalogue), *Issues* (the open issues), *Pull requests*, *Checks* and
+  *Commit statuses* (the open pull requests); leave out the ones whose feature you do not want (operator guide, section 1). The
+  installation is the boundary GitHub enforces; `exclude` is a second fence. Whoever holds the App's private key can read everything
+  those permissions cover in every installed repository, issue and pull request discussions included, though the portal itself keeps
+  only their titles, labels and logins.
 - **Secrets from files.** The App key, webhook secret, session key, token secrets, registry credentials and LLM key are read from files (a secrets manager's
   mount). Rotate the webhook secret with `webhook.previous_secret_file`. Rotate the App key, session key and tokens by replacing the
   file and restarting; a new session key signs everyone out.

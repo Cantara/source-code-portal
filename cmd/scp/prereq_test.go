@@ -124,7 +124,7 @@ func TestPrerequisitesDocumented(t *testing.T) {
 		}
 	}
 	for _, p := range []string{"docs/production.md", "deploy/config.example.yaml", "plugins/scp/skills/run-scp/SKILL.md",
-		"web/src/features/guide/view.tsx", ".claude/skills/configure-scp/SKILL.md"} {
+		"web/src/features/guide/view.tsx", ".claude/skills/configure-scp/SKILL.md", "docs/security-model.md"} {
 		text := read(p)
 		for _, n := range prereq.Needs {
 			for _, perm := range n.Permissions {
