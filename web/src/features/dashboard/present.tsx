@@ -228,7 +228,15 @@ function Stream({
                 </p>
                 <p className="flex min-w-0 items-baseline gap-1.5 text-[0.9375rem]">
                   <AiMark commit={c} />
-                  <span className="truncate">{c.subject}</span>
+                  {c.url ? (
+                    <a href={c.url} className="truncate hover:underline" rel="noreferrer" title={c.subject}>
+                      {c.subject}
+                    </a>
+                  ) : (
+                    <span className="truncate" title={c.subject}>
+                      {c.subject}
+                    </span>
+                  )}
                 </p>
               </div>
             </li>

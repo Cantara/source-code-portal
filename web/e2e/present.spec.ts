@@ -17,7 +17,10 @@ for (const { width, height, profile } of sized) {
     await page.setViewportSize({ width, height })
     await page.goto("/present")
     await expect(page.locator("[data-profile]")).toHaveAttribute("data-profile", profile)
-    await expect(page.getByRole("region", { name: "Latest commits" }).getByRole("listitem").first()).toBeVisible()
+    const first = page.getByRole("region", { name: "Latest commits" }).getByRole("listitem").first()
+    await expect(first).toBeVisible()
+    // Its subject is the commit's link on GitHub, as the dashboard's are.
+    await expect(first.getByRole("link").last()).toHaveAttribute("href", /\/commit\/[0-9a-f]+$/)
     await expect(page.getByRole("banner")).toHaveCount(0)
     const size = await page.evaluate(() => {
       const d = document.documentElement
