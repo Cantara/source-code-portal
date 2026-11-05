@@ -10,7 +10,7 @@ import { every, has, type Work } from "@/lib/preferences"
 import { moreQuery, morePages } from "./api"
 
 /** dedupe keeps each commit once, the first time it comes: new commits move older ones to later pages while the reader scrolls. */
-function dedupe(commits: Commit[]): Commit[] {
+export function dedupe(commits: Commit[]): Commit[] {
   const seen = new Set<string>()
   return commits.filter((c) => {
     const k = `${c.repo}@${c.sha}`

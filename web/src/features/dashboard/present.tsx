@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
 import { api, type Commit, type Schemas } from "@/lib/api/client"
@@ -17,7 +17,8 @@ import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { meQuery } from "@/lib/api/queries"
 import { apply, useTheme, type Choice } from "@/lib/theme"
-import { dashboardQuery, pageQuery, workQuery } from "./api"
+import { dashboardQuery, moreQuery, morePages, pageQuery, workQuery } from "./api"
+import { dedupe } from "./latest"
 import { Designer } from "./design"
 import { useShift, useWall } from "./wall"
 import { FleetMap } from "./fleet-map"
@@ -98,16 +99,67 @@ function Freshness() {
   )
 }
 
+/** idleTop is how long a scrolled column waits untouched before it goes back to the newest commits (a screen on a wall). */
+const idleTop = 60_000
+
 /**
- * Stream is the newest commits of the work that counts, as many as the column holds: the author's avatar while the column is wide
- * enough, then the repository with who and when on one line and the subject on the next, the whole width its own.
- * A commit that arrives while the page is open slides in at the top (not with reduced motion).
+ * Stream is the newest commits of the work that counts: the author's avatar while the column is wide enough, then the repository
+ * with who and when on one line and the subject on the next, the whole width its own. The column scrolls: at its end it reads
+ * the next pages of the same commits (keep: the products the address names), and a minute untouched it goes back to the top and
+ * lets the older ones go, so a wall shows the newest again. A commit that arrives while the page is open slides in at the top
+ * (not with reduced motion).
  */
-function Stream({ commits, work }: { commits: Commit[]; work: Work }) {
+function Stream({ commits, work, keep }: { commits: Commit[]; work: Work; keep: (c: Commit) => boolean }) {
   const now = useNow()
-  // The commits of the first render; a row's animation runs once, when it mounts.
+  // The commits of the first render; a row's animation runs once, when it mounts, and only for one that arrived at the top.
   const [shown] = useState(() => new Set(commits.map((c) => c.repo + c.sha)))
-  const rows = commits.map((c) => ({ c, id: c.repo + c.sha, fresh: !shown.has(c.repo + c.sha) }))
+  const [more, setMore] = useState(false)
+  const q = useInfiniteQuery({ ...moreQuery(api, work), enabled: more })
+  const read = more ? (q.data?.pages.flatMap((p) => p.commits) ?? []) : []
+  const top = new Set(commits.map((c) => c.repo + c.sha))
+  const rows = dedupe([...commits, ...read.filter(keep)]).map((c) => {
+    const id = c.repo + c.sha
+    return { c, id, fresh: top.has(id) && !shown.has(id) }
+  })
+  const list = useRef<HTMLOListElement>(null)
+  const end = useRef<HTMLLIElement>(null)
+  const visible = useRef(false)
+  const next = useRef(() => {})
+  const pages = q.data?.pages.length ?? 0
+  useEffect(() => {
+    next.current = () => {
+      if (!more) setMore(true)
+      else if (q.hasNextPage && !q.isFetching && pages < morePages) void q.fetchNextPage()
+    }
+  })
+  useEffect(() => {
+    const root = list.current
+    const el = end.current
+    if (!root || !el || typeof IntersectionObserver === "undefined") return
+    const seen = new IntersectionObserver(
+      (es) => {
+        visible.current = es.some((e) => e.isIntersecting)
+        if (visible.current) next.current()
+      },
+      { root, rootMargin: "0px 0px 300px 0px" },
+    )
+    seen.observe(el)
+    return () => seen.disconnect()
+  }, [])
+  useEffect(() => {
+    if (more && !q.isFetching && visible.current) next.current()
+  }, [more, q.isFetching, pages])
+  // Back to the newest after a minute untouched.
+  const idle = useRef<number | undefined>(undefined)
+  const scrolled = () => {
+    window.clearTimeout(idle.current)
+    if ((list.current?.scrollTop ?? 0) === 0) return
+    idle.current = window.setTimeout(() => {
+      list.current?.scrollTo({ top: 0, behavior: "smooth" })
+      setMore(false)
+    }, idleTop)
+  }
+  useEffect(() => () => window.clearTimeout(idle.current), [])
   return (
     <section aria-labelledby="stream" className="panel flex min-h-0 flex-col overflow-hidden">
       <div className="flex items-baseline justify-between gap-2 border-b border-border px-3 py-2">
@@ -117,7 +169,13 @@ function Stream({ commits, work }: { commits: Commit[]; work: Work }) {
         <span className="text-xs text-muted-foreground">{by(work)}</span>
       </div>
       {/* A container: the avatars show while the column is wide enough for them. */}
-      <ol className="@container min-h-0 flex-1 divide-y divide-border overflow-hidden">
+      <ol
+        ref={list}
+        onScroll={scrolled}
+        tabIndex={0}
+        aria-label="Latest commits, newest first"
+        className="@container min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring [scrollbar-width:thin]"
+      >
         {rows.map(({ c, id, fresh }) => {
           const who = c.authorLogin || c.authorName
           return (
@@ -146,6 +204,13 @@ function Stream({ commits, work }: { commits: Commit[]; work: Work }) {
             </li>
           )
         })}
+        <li ref={end} aria-hidden="true" className="px-3 py-2 text-center text-xs text-muted-foreground">
+          {more && q.isFetching
+            ? "Loading more…"
+            : more && (pages >= morePages || (q.isSuccess && !q.hasNextPage))
+              ? "The rest is under All commits"
+              : ""}
+        </li>
       </ol>
     </section>
   )
@@ -184,6 +249,9 @@ function Screen({
   const now = useNow()
   const scope = only ? { ...data, groups: within(data.groups, undefined, only) } : data
   const groups = (el: Element) => within(data.groups, el.groups, only)
+  // The older commits the column reads as it scrolls keep to the products the address names, as the newest do.
+  const members = new Set(scope.groups.flatMap((g) => g.members.map((m) => m.address)))
+  const keep = (c: Commit) => !only || members.has(c.repo)
   const left: ReactNode[] = []
   let strip = false
   layout.forEach((el, i) => {
@@ -232,7 +300,7 @@ function Screen({
         {left}
       </div>
       {stream && <Resizer width={column} onChange={onColumn} />}
-      {stream && <Stream commits={commits.slice(0, stream.count ?? 30)} work={data.work} />}
+      {stream && <Stream commits={commits.slice(0, stream.count ?? 30)} work={data.work} keep={keep} />}
     </div>
   )
 }
