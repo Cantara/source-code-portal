@@ -40,7 +40,7 @@ lint: need-golangci ## vet, golangci-lint, govulncheck, eslint, tsc, prettier
 
 test: ## Go tests with the race detector, web tests
 	CGO_ENABLED=1 go test -race -count=1 -timeout 10m ./...
-	go test -count=1 -run '^(TestLoad1000|TestIndexSize)$$' ./cmd/scp ./internal/search
+	go test -count=1 -p 1 -run '^(TestLoad1000|TestIndexSize)$$' ./cmd/scp ./internal/search
 	$(PNPM) -C web test
 
 e2e: web ## Playwright against the server running the web bundle and a fake GitHub (needs `pnpm -C web exec playwright install chromium`)

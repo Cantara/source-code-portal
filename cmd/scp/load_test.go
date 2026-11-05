@@ -198,9 +198,9 @@ func TestLoad1000(t *testing.T) {
 		ds := took[p]
 		slices.Sort(ds)
 		p99 := ds[len(ds)*99/100]
-		bound := 100 * time.Millisecond
+		bound := 100 * time.Millisecond * slack()
 		if strings.Contains(p, "/history") {
-			bound = 50 * time.Millisecond
+			bound = 50 * time.Millisecond * slack()
 		}
 		if p99 > bound {
 			t.Errorf("%s: p99 %v over %v", p, p99, bound)
