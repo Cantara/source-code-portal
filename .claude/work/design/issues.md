@@ -20,7 +20,7 @@ first, with the exact total when every page was read.**
 - **Fields.** Number, title (`untrusted.Text`, 200), URL, author and whether its account is a bot, created and updated, labels (5,
   50 each, with colour), assignees (3 logins and their count), comments, milestone title, GitHub's issue type (`type.name`). No
   bodies and no comments' text.
-- **Triggers.** The webhook events `issues` and `issue_comment` (passed through by `webhook.Normalise` under their names) and the
+- **Triggers.** The webhook event `issues` (passed through by `webhook.Normalise` under its name; not `issue_comment`, P-73) and the
   TTL: 15 minutes. An archived repository is read once.
 - **Measured on Cantara (2026-11-05)**: 351 open issues in 136 repositories, at most 17 in one; 128 are Renovate's dependency
   dashboards. One page per repository, nearly always 304: at most 4 free requests per repository an hour.
@@ -75,7 +75,7 @@ API and the tool.
   the order is one schema, `QueueSort`, for both lists.
 - The fake GitHub: `SetIssues(owner, name, ...Issue)`, served by the issues listing with the pull requests of `SetPulls` among them.
 - `/pulls` and `/issues` share their state chips and filter form (`shared/queue.tsx`: `QueueChips`, `QueueForm`).
-- The GitHub App needs **Issues: read** and the events **Issues** and **Issue comment**.
+- The GitHub App needs **Issues: read** and the event **Issues**.
 
 ## Milestones
 

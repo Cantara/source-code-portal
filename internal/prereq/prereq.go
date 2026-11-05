@@ -35,9 +35,9 @@ var Needs = []Need{ //nolint:gochecknoglobals // the one table of prerequisites
 	{Feature: Catalogue, Title: "The catalogue", Permissions: []string{"contents", "metadata"}, Events: []string{"push", "release", "repository"},
 		Jobs: []string{"commits", "docs", "manifests"}, Effect: "Repositories, documents, manifests and commits are not read."},
 	{Feature: Pulls, Title: "Pull requests", Permissions: []string{"pull_requests", "checks", "statuses"},
-		Events: []string{"pull_request", "pull_request_review", "check_suite", "status"}, Jobs: []string{"pulls"},
+		Events: []string{"pull_request", "pull_request_review"}, Jobs: []string{"pulls"},
 		Effect: "Open pull requests are not read: /pulls and the pull request panels stay empty."},
-	{Feature: Issues, Title: "Issues", Permissions: []string{"issues"}, Events: []string{"issues", "issue_comment"}, Jobs: []string{"issues"},
+	{Feature: Issues, Title: "Issues", Permissions: []string{"issues"}, Events: []string{"issues"}, Jobs: []string{"issues"},
 		Effect: "Open issues are not read: /issues and the issue panels stay empty."},
 }
 

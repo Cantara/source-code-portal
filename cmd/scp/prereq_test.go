@@ -25,7 +25,7 @@ func TestPrerequisites(t *testing.T) {
 	srv := githubtest.New(t)
 	srv.Install("acme")
 	srv.SetGrants("acme", map[string]string{"contents": "read", "metadata": "read", "pull_requests": "read", "checks": "read", "statuses": "read"},
-		[]string{"push", "release", "repository", "pull_request", "pull_request_review", "check_suite", "status"})
+		[]string{"push", "release", "repository", "pull_request", "pull_request_review"})
 	c, err := github.New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme"},
 		App: &config.App{ID: srv.AppID, PrivateKey: config.NewSecret(srv.PrivateKeyPEM())}}}}, nil, slog.New(slog.DiscardHandler))
 	if err != nil {
@@ -53,7 +53,7 @@ func TestPrerequisites(t *testing.T) {
 		t.Errorf("the public's answer: %+v; want the feature and its effect only", pub)
 	}
 	adm := get(true).Unmet
-	if len(adm) != 1 || !slices.Equal(*adm[0].Permissions, []string{"Issues"}) || !slices.Equal(*adm[0].Events, []string{"Issues", "Issue comment"}) ||
+	if len(adm) != 1 || !slices.Equal(*adm[0].Permissions, []string{"Issues"}) || !slices.Equal(*adm[0].Events, []string{"Issues"}) ||
 		!slices.Equal(*adm[0].Owners, []string{"acme"}) || !strings.Contains(*adm[0].Fix, "set Issues to Read-only") {
 		t.Errorf("the administrator's answer: %+v", adm)
 	}
@@ -124,7 +124,7 @@ func TestPrerequisitesDocumented(t *testing.T) {
 		}
 	}
 	for _, p := range []string{"docs/production.md", "deploy/config.example.yaml", "plugins/scp/skills/run-scp/SKILL.md",
-		"web/src/features/guide/view.tsx", ".claude/skills/configure-scp/SKILL.md"} {
+		"web/src/features/guide/view.tsx", ".claude/skills/configure-scp/SKILL.md", "docs/security-model.md"} {
 		text := read(p)
 		for _, n := range prereq.Needs {
 			for _, perm := range n.Permissions {

@@ -15,8 +15,8 @@ One table in the core package `internal/prereq`, the single source the code, the
 | Feature | Read permissions | Webhook events |
 |---|---|---|
 | The catalogue: repositories, README and documents, manifests, commits, releases, packages | Contents, Metadata | Push, Release, Repository |
-| Pull requests | Pull requests, Checks, Commit statuses | Pull request, Pull request review, Check suite, Status |
-| Issues | Issues | Issues, Issue comment |
+| Pull requests | Pull requests, Checks, Commit statuses | Pull request, Pull request review |
+| Issues | Issues | Issues |
 
 Every permission is read-only; the portal never writes to GitHub (P-71): it sends only GET requests and GraphQL queries, never a
 mutation, and the fake GitHub fails a test on anything else (but the App's own token request). Events matter only when `webhook.secret_file` is set: without

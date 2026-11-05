@@ -60,8 +60,8 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    repositories only, webhooks on.
 2. **Access to GitHub.** A GitHub App is best (its own rate limit, webhooks, private repositories by installation): *Contents*,
    *Metadata*, *Issues*, *Pull requests*, *Checks* and *Commit statuses* read-only, webhook URL `<public_url>/webhooks/github` with a
-   random secret, events *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*,
-   *Check suite*, *Status*, installed on the
+   random secret, events *Push*, *Release*, *Repository*, *Issues*, *Pull request*, *Pull request review* (not *Issue comment*,
+   *Check suite* or *Status*: every comment and CI update, not needed), installed on the
    accounts. Each permission serves a feature, and a missing one leaves it empty (the table is the operator guide's section 1):
    *Contents* and *Metadata* the catalogue, *Issues* `/issues`, *Pull requests*, *Checks* and *Commit statuses* `/pulls`. Tell
    them that the portal only reads (every permission *Read-only*) and that a later change must be accepted on each installation by an

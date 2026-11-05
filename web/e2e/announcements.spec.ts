@@ -32,8 +32,8 @@ test("the presentation page shows the event, never dismissible, with the link's 
   await expect(region.getByRole("button", { name: /Dismiss/ })).toHaveCount(0)
 })
 
-test("an admin writes, previews, publishes and removes an announcement", async ({ page, browser }, info) => {
-  test.skip(info.project.name !== "desktop", "one announcements file serves both projects")
+// @writes: the announcements file is the server's, so this runs after the readers, one test at a time (playwright.config.ts).
+test("an admin writes, previews, publishes and removes an announcement", { tag: "@writes" }, async ({ page, browser }) => {
   await page.goto("/signin")
   await page.getByRole("link", { name: "Sign in with single sign-on" }).click()
   await expect(page.getByRole("button", { name: "Ada Lovelace" })).toBeVisible()

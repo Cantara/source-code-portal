@@ -29,7 +29,8 @@ In GitHub, the organisation's *Settings*, *Developer settings*, *GitHub Apps*, *
 - Name: `Example Source Code Portal`; homepage `https://scp.example.org`.
 - Webhook: active, URL `https://scp.example.org/webhooks/github`, secret: the contents of `webhook-secret`.
 - Repository permissions, all read-only: *Contents*, *Metadata*, *Issues*, *Pull requests*, *Checks*, *Commit statuses*. Nothing else.
-- Subscribe to events: *Push*, *Release*, *Repository*, *Issues*, *Issue comment*, *Pull request*, *Pull request review*, *Check suite*, *Status*.
+- Subscribe to events: *Push*, *Release*, *Repository*, *Issues*, *Pull request*, *Pull request review*. Not *Issue comment*, *Check
+  suite* or *Status*: they fire on every comment and CI update, and the portal does not need them.
 - Where can it be installed: *Only on this account*.
 
 Each permission serves a feature: *Contents* and *Metadata* the catalogue, *Issues* the open issues, *Pull requests*, *Checks* and
