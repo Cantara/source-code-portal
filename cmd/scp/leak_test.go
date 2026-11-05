@@ -165,7 +165,7 @@ func publicPaths(t *testing.T) []string {
 		// The search, by the private repository's name, its README's and commit's words, a filter and a prefix.
 		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=repo:zq-hidden",
 		"/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search?q=zq-hidden&in=repo", "/api/v1/search/suggest?q=zq-hidden",
-		"/api/v1/search/suggest?q=zq-hid")
+		"/api/v1/search/suggest?q=zq-hid", "/opensearch.xml")
 }
 
 // TestNoLeak fetches every public path as the public, in HTML and Markdown: no answer carries a trace of the private repository,

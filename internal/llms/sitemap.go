@@ -50,8 +50,23 @@ func (l *LLMs) Sitemap() http.Handler {
 // Robots serves /robots.txt: every page may be crawled but the API, and the sitemap is named.
 func (l *LLMs) Robots() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body := fmt.Sprintf("User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: %s/sitemap.xml\n", l.originOf(r))
+		body := fmt.Sprintf("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /search\n\nSitemap: %s/sitemap.xml\n", l.originOf(r))
 		serveAs(w, r, "text/plain; charset=utf-8", machineCache, []byte(body))
+	})
+}
+
+// OpenSearch serves /opensearch.xml: the portal's search for a browser to add as a search engine (design/search.md), the page and
+// its JSON.
+func (l *LLMs) OpenSearch() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := escape(l.originOf(r))
+		body := xml.Header + `<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">` + "\n" +
+			"<ShortName>Source Code Portal</ShortName>\n<Description>Repositories, documents, dependencies, packages and commits</Description>\n" +
+			"<InputEncoding>UTF-8</InputEncoding>\n" +
+			`<Url type="text/html" method="get" template="` + origin + `/search?q={searchTerms}"/>` + "\n" +
+			`<Url type="application/json" method="get" template="` + origin + `/api/v1/search?q={searchTerms}"/>` + "\n" +
+			"</OpenSearchDescription>\n"
+		serveAs(w, r, "application/opensearchdescription+xml", machineCache, []byte(body))
 	})
 }
 

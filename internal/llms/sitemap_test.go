@@ -36,6 +36,7 @@ func TestSitemap(t *testing.T) {
 	mux.Handle("GET /sitemap.xml", l.Sitemap())
 	mux.Handle("GET /sitemaps/{file}", l.Sitemap())
 	mux.Handle("GET /robots.txt", l.Robots())
+	mux.Handle("GET /opensearch.xml", l.OpenSearch())
 
 	rec := get(mux, "/sitemap.xml")
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/xml; charset=utf-8" || rec.Header().Get("Cache-Control") != machineCache {
@@ -50,9 +51,15 @@ func TestSitemap(t *testing.T) {
 		t.Errorf("a part of a sitemap without parts: %d", rec.Code)
 	}
 	robots := get(mux, "/robots.txt")
-	if robots.Body.String() != "User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: https://scp.example/sitemap.xml\n" ||
+	if robots.Body.String() != "User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /search\n\nSitemap: https://scp.example/sitemap.xml\n" ||
 		robots.Header().Get("Cache-Control") != machineCache {
 		t.Errorf("robots.txt: %q %v", robots.Body.String(), robots.Header())
+	}
+	open := get(mux, "/opensearch.xml")
+	if body := open.Body.String(); open.Header().Get("Content-Type") != "application/opensearchdescription+xml" ||
+		!strings.Contains(body, `<Url type="text/html" method="get" template="https://scp.example/search?q={searchTerms}"/>`) ||
+		!strings.Contains(body, `template="https://scp.example/api/v1/search?q={searchTerms}"`) {
+		t.Errorf("opensearch.xml: %v\n%s", open.Header(), body)
 	}
 
 	// Without server.public_url, the request's origin.
