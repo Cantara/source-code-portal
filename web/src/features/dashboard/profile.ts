@@ -29,5 +29,5 @@ export function useProfile(guess: Profile, told: boolean, ask?: string) {
   useEffect(() => {
     if (seen) remember(profileCookie, profile)
   }, [seen, profile])
-  return { profile, wall, setWall }
+  return { profile, wall, setWall, size: seen ? seen.replace("x", "×") : undefined }
 }

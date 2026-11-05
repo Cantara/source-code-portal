@@ -1,17 +1,22 @@
 import AxeBuilder from "@axe-core/playwright"
 import { expect, test } from "./fixtures"
+import { screens } from "./screens"
 
 // design/present.md: the presentation page fits the screen it is on, without the header, every product a tile or in the fold.
 
-for (const [width, height] of [
-  [1180, 820],
-  [1366, 1024],
-  [1920, 1080],
-  [820, 1180],
-] as const) {
-  test(`/present fills ${width}×${height} without scrolling`, async ({ page }) => {
+// The screens the page is designed on (screens.ts, shared with the owner), and a few common others.
+const sized = [
+  ...Object.values(screens).map((x) => ({ width: x.width, height: x.height, profile: x.profile })),
+  { width: 1180, height: 820, profile: "handheld-landscape" },
+  { width: 1920, height: 1080, profile: "desk" },
+  { width: 820, height: 1180, profile: "handheld-portrait" },
+]
+
+for (const { width, height, profile } of sized) {
+  test(`/present fills ${width}×${height} without scrolling, as ${profile}`, async ({ page }) => {
     await page.setViewportSize({ width, height })
     await page.goto("/present")
+    await expect(page.locator("[data-profile]")).toHaveAttribute("data-profile", profile)
     await expect(page.getByRole("region", { name: "Latest commits" }).getByRole("listitem").first()).toBeVisible()
     await expect(page.getByRole("banner")).toHaveCount(0)
     const size = await page.evaluate(() => {

@@ -8,7 +8,7 @@ import { ago, count, plural } from "@/lib/format"
 import { groupPath } from "@/lib/paths"
 import { levels } from "@/entities/health/health"
 import { FindingMark } from "@/entities/health/findings"
-import { levelLabel } from "@/lib/rules"
+import { levelLabel, window } from "@/lib/rules"
 import { useRules } from "@/lib/rules-context"
 import { Hint } from "@/shared/hint"
 import { healthCell } from "./fleet-map"
@@ -128,6 +128,49 @@ function Narrow({ g, work: w, now }: { g: Group; work: Work; now: number }) {
   )
 }
 
+/** people is "ada, bo and 3 others": the people of an activity by login. */
+function people(a: Group["activity"]): string {
+  const names = a.authors.map((p) => p.login || p.name)
+  const more = a.authorCount - names.length
+  const parts = more > 0 ? [...names, plural(more, "other", "others")] : names
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : (parts[0] ?? "")
+}
+
+/**
+ * Tall is a good product with room to spare: two rows of the grid for what its card on the dashboard says first, the work that
+ * counts and its last change, its twelve weeks across the tile, and the people behind it.
+ */
+function Tall({ g, work: w, now }: { g: Group; work: Work; now: number }) {
+  const rules = useRules()
+  const a = g.activity
+  return (
+    <li
+      className={cn(
+        "panel row-span-2 flex min-w-0 flex-col justify-between gap-1 p-3",
+        g.health && levels[g.health.level].className,
+      )}
+    >
+      <h3 className="flex min-w-0 items-center gap-2 text-[0.9375rem] leading-tight font-semibold">
+        <span aria-hidden="true" className="led" />
+        <Link href={groupPath(g.id)} className="truncate hover:underline">
+          {g.name}
+        </Link>
+      </h3>
+      <p className="flex items-baseline justify-between gap-2 text-sm text-muted-foreground">
+        <span className="min-w-0 truncate">
+          <span className="font-mono text-base font-semibold text-foreground tabular-nums">{count(counted(a, w))}</span>{" "}
+          {noun(counted(a, w), w)}
+        </span>
+        <span className="shrink-0 font-mono text-xs">{a.lastAuthoredAt ? ago(a.lastAuthoredAt, now) : "–"}</span>
+      </p>
+      <Sparkline parts={series(a, w)} label={weekly(a, w)} className="h-6 w-full" />
+      <p className="truncate text-sm">
+        {a.authorCount > 0 ? people(a) : <span className="text-muted-foreground">no one in {window(rules)}</span>}
+      </p>
+    </li>
+  )
+}
+
 /** Grid is the tiles' grid as the browser laid it out: its columns, and the rows its box holds at the fixed row height. */
 type Grid = { cols: number; rows: number }
 
@@ -140,15 +183,15 @@ function gridOf(grid: HTMLElement, box: HTMLElement): Grid {
 }
 
 /** Plan is how the tiles are drawn: the products shown, each wide or not, and the ones folded into the last tile. */
-export type Plan = { tiles: { g: Group; wide: boolean }[]; folded: Group[] }
+export type Plan = { tiles: { g: Group; wide: boolean; tall: boolean }[]; folded: Group[] }
 
 /**
  * plan is the tiles with steps given up by the products that need a look, the least important first: the mildest at watch lose
  * their wide tile, then they fold, the mildest first, then those at attention lose theirs (a product at attention never folds);
- * and the first good of the rest shown, the others folded.
+ * and the first good of the rest shown, the others folded; the first tall of those shown take two rows, richer.
  */
-export function plan(ordered: Group[], steps: number, good: number): Plan {
-  const tiles = ordered.map((g) => ({ g, wide: needs(g), folded: false }))
+export function plan(ordered: Group[], steps: number, good: number, tall = 0): Plan {
+  const tiles = ordered.map((g) => ({ g, wide: needs(g), tall: false, folded: false }))
   const at = (level: string) => tiles.filter((t) => t.g.health?.level === level).reverse()
   const moves: (() => void)[] = [
     ...at("watch").map((t) => () => (t.wide = false)),
@@ -156,18 +199,27 @@ export function plan(ordered: Group[], steps: number, good: number): Plan {
     ...at("attention").map((t) => () => (t.wide = false)),
   ]
   for (const m of moves.slice(0, steps)) m()
-  tiles.filter((t) => !needs(t.g)).forEach((t, i) => (t.folded = i >= good))
+  tiles
+    .filter((t) => !needs(t.g))
+    .forEach((t, i) => {
+      t.folded = i >= good
+      t.tall = !t.folded && i < tall
+    })
   return { tiles: tiles.filter((t) => !t.folded), folded: tiles.filter((t) => t.folded).map((t) => t.g) }
 }
 
 /**
  * fits says whether a plan's tiles, the fold tile last, fit the grid, placed as the browser places them (grid-auto-flow: row dense:
- * each tile at the first free place from the top left): a wide tile takes two columns (one on a single column) and two rows.
+ * each tile at the first free place from the top left): a wide tile takes two columns (one on a single column) and two rows, a tall
+ * one two rows.
  */
 export function fits(p: Plan, grid: Grid): boolean {
   const { cols, rows } = grid
   const used = Array.from({ length: rows }, () => new Array<boolean>(cols).fill(false))
-  const spans = [...p.tiles.map((t) => (t.wide ? [Math.min(2, cols), 2] : [1, 1])), ...(p.folded.length > 0 ? [[1, 1]] : [])]
+  const spans = [
+    ...p.tiles.map((t) => (t.wide ? [Math.min(2, cols), 2] : t.tall ? [1, 2] : [1, 1])),
+    ...(p.folded.length > 0 ? [[1, 1]] : []),
+  ]
   for (const [w = 1, h = 1] of spans) {
     let placed = false
     for (let r = 0; r + h <= rows && !placed; r++)
@@ -183,12 +235,13 @@ export function fits(p: Plan, grid: Grid): boolean {
   return true
 }
 
-/** Choice is a plan's two settings: the steps given up by the products that need a look, and how many good ones show. */
-type Choice = { steps: number; good: number }
+/** Choice is a plan's settings: the steps given up by the products that need a look, how many good ones show, how many tall. */
+type Choice = { steps: number; good: number; tall: number }
 
 /**
  * choose is what the grid shows: the fewest steps that let the products needing a look fit, then as many of the others as still
- * fit beside them, so the space a narrowed or folded tile left is used again.
+ * fit beside them, so the space a narrowed or folded tile left is used again; when every product shows, the room left makes good
+ * ones richer.
  */
 export function choose(ordered: Group[], grid: Grid): Choice {
   const rest = ordered.filter((g) => !needs(g)).length
@@ -197,7 +250,10 @@ export function choose(ordered: Group[], grid: Grid): Choice {
   while (steps < max && !fits(plan(ordered, steps, 0), grid)) steps++
   let good = rest
   while (good > 0 && !fits(plan(ordered, steps, good), grid)) good--
-  return { steps, good }
+  // Room to spare once every product shows: the good ones take richer tiles, the most recent first, while they all still fit.
+  let tall = 0
+  if (good === rest) while (tall < good && fits(plan(ordered, steps, good, tall + 1), grid)) tall++
+  return { steps, good, tall }
 }
 
 /** foldText says what the last tile holds: "7 more good", "3 more to watch, 7 good". */
@@ -231,7 +287,7 @@ export function ProductTiles({
   const ordered = byNeed(groups)
   const box = useRef<HTMLDivElement>(null)
   const grid = useRef<HTMLUListElement>(null)
-  const all = { steps: 0, good: ordered.length }
+  const all = { steps: 0, good: ordered.length, tall: 0 }
   const [choice, setChoice] = useState<Choice>(all)
   const key = ordered.map((g) => `${g.id}:${g.health?.level ?? ""}`).join(",")
 
@@ -243,7 +299,9 @@ export function ProductTiles({
     // Drawn and still cut off (a font or a rounding the placement did not foresee): one good fewer, or one more step.
     const check = () => {
       if (g.scrollHeight > b.clientHeight + 1)
-        setChoice((c) => (c.good > 0 ? { ...c, good: c.good - 1 } : { ...c, steps: c.steps + 1 }))
+        setChoice((c) =>
+          c.tall > 0 ? { ...c, tall: c.tall - 1 } : c.good > 0 ? { ...c, good: c.good - 1 } : { ...c, steps: c.steps + 1 },
+        )
     }
     measure()
     const sized = new ResizeObserver(measure)
@@ -258,7 +316,7 @@ export function ProductTiles({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fold, key])
 
-  const { tiles, folded } = fold ? plan(ordered, choice.steps, choice.good) : plan(ordered, 0, ordered.length)
+  const { tiles, folded } = fold ? plan(ordered, choice.steps, choice.good, choice.tall) : plan(ordered, 0, ordered.length)
   return (
     <section
       aria-labelledby={heading ? "products" : undefined}
@@ -275,8 +333,14 @@ export function ProductTiles({
           ref={grid}
           className="grid auto-rows-[4.25rem] grid-flow-row-dense grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-2"
         >
-          {tiles.map(({ g, wide }) =>
-            wide ? <Wide key={g.id} g={g} work={work} now={now} /> : <Narrow key={g.id} g={g} work={work} now={now} />,
+          {tiles.map(({ g, wide, tall }) =>
+            wide ? (
+              <Wide key={g.id} g={g} work={work} now={now} />
+            ) : tall ? (
+              <Tall key={g.id} g={g} work={work} now={now} />
+            ) : (
+              <Narrow key={g.id} g={g} work={work} now={now} />
+            ),
           )}
           {folded.length > 0 && (
             <li

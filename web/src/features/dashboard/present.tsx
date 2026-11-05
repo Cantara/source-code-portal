@@ -321,9 +321,10 @@ function Screen({
   return (
     <div
       data-profile={profile}
+      data-split={profile !== "handheld-portrait" || undefined}
       className={cn(
-        "grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] landscape:grid-rows-1 landscape:gap-x-0",
-        stream ? columns[column] : "landscape:grid-cols-1",
+        "grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] split:grid-rows-1 split:gap-x-0",
+        stream ? columns[column] : "split:grid-cols-1",
         frame,
       )}
     >
@@ -347,15 +348,15 @@ function Screen({
 
 /** columns are the landscape grid at each width of the commit column, as written classes (the CSP allows no style attribute). */
 const columns: Record<number, string> = {
-  20: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_20%]",
-  25: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_25%]",
-  30: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_30%]",
-  35: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_35%]",
-  40: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_40%]",
-  45: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_45%]",
-  50: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_50%]",
-  55: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_55%]",
-  60: "landscape:grid-cols-[minmax(0,1fr)_0.75rem_60%]",
+  20: "split:grid-cols-[minmax(0,1fr)_0.75rem_20%]",
+  25: "split:grid-cols-[minmax(0,1fr)_0.75rem_25%]",
+  30: "split:grid-cols-[minmax(0,1fr)_0.75rem_30%]",
+  35: "split:grid-cols-[minmax(0,1fr)_0.75rem_35%]",
+  40: "split:grid-cols-[minmax(0,1fr)_0.75rem_40%]",
+  45: "split:grid-cols-[minmax(0,1fr)_0.75rem_45%]",
+  50: "split:grid-cols-[minmax(0,1fr)_0.75rem_50%]",
+  55: "split:grid-cols-[minmax(0,1fr)_0.75rem_55%]",
+  60: "split:grid-cols-[minmax(0,1fr)_0.75rem_60%]",
 }
 
 const clampColumn = (w: number) =>
@@ -366,7 +367,7 @@ const slop = 4
 const doubleTap = 400
 
 /**
- * Resizer is the commit column's edge in landscape: dragged (a finger or a pointer) or moved with the arrow keys, in steps of 5% of
+ * Resizer is the commit column's edge in split: dragged (a finger or a pointer) or moved with the arrow keys, in steps of 5% of
  * the screen from 20% to 60%; a double tap or click brings back the profile's usual width. Taps are told apart here, as a touch on a handle
  * that takes the whole gesture (touch-action none) sends no dblclick in every browser, and a tap never moves the column.
  */
@@ -438,7 +439,7 @@ function Resizer({
       onKeyDown={key}
       title="Drag to resize; double-tap for the usual width"
       // As wide as the gap it replaces, a hairline to see; the hit area reaches past it for a finger.
-      className="group relative hidden cursor-col-resize touch-none justify-center outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:content-[''] landscape:flex"
+      className="group relative hidden cursor-col-resize touch-none justify-center outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:content-[''] split:flex"
     >
       <span className="my-6 w-px rounded-full bg-border transition-all group-hover:w-0.5 group-hover:bg-primary group-focus-visible:w-0.5 group-focus-visible:bg-primary group-active:w-0.5 group-active:bg-primary" />
     </div>
@@ -448,11 +449,14 @@ function Resizer({
 /** Bar is the controls a tap or a key shows for a few seconds: back to the dashboard, the theme, full screen, the design mode. */
 function Bar({
   profile,
+  size,
   wall,
   onWall,
   onDesign,
 }: {
   profile: Profile
+  /** the window's size in CSS pixels, so two people can tell they look at the same screen */
+  size?: string
   wall: boolean
   onWall: (wall: boolean) => void
   onDesign?: () => void
@@ -502,6 +506,7 @@ function Bar({
       {/* The profile this screen is in, and the wall it can be told it is (a wall has a desk's pixels). */}
       <span className="px-2 text-xs font-medium tracking-widest text-muted-foreground uppercase">
         {profiles.find((x) => x.value === profile)?.label}
+        {size && <span className="ml-1.5 font-mono font-normal tracking-normal normal-case">{size}</span>}
       </span>
       <button type="button" className={button} aria-pressed={wall} onClick={() => onWall(!wall)}>
         {wall ? "Not a wall" : "On a wall"}
@@ -620,7 +625,13 @@ export function PresentView({
             shown={s.shown}
             picker={picker}
           />
-          <Bar profile={p.profile} wall={p.wall} onWall={p.setWall} onDesign={me?.admin ? () => setDesigning(true) : undefined} />
+          <Bar
+            profile={p.profile}
+            size={p.size}
+            wall={p.wall}
+            onWall={p.setWall}
+            onDesign={me?.admin ? () => setDesigning(true) : undefined}
+          />
         </>
       )}
     </>

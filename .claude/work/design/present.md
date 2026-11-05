@@ -102,16 +102,27 @@ fits from 1024 to 1920 pixels wide.
 
 ## Profiles
 
-A screen is one of four profiles, named for where it sits (P-64): **Handheld portrait** (a tablet upright: the commit column below
-the rest), **Handheld landscape** (a tablet on its side, narrower than 1600 CSS px; an iPad Pro 13" is 1376), **Desk** (a monitor at
-arm's length, 1600 px and wider, such as a 27" display at 2560×1440: the commit log is the point, 60% of the screen) and **Wall** (a
-screen read from across a room). The page finds the first three from the window as it is and as it changes (`profileOf`,
+A screen is one of four profiles, named for where it sits (P-64): **Handheld portrait** (a tablet upright, narrower than 1100 CSS
+px: the commit column below the rest; an iPad Pro 13" upright is 1032), **Handheld landscape** (a tablet on its side, narrower than
+1600; the iPad is 1376), **Desk** (a monitor at arm's length: 1600 px and wider on its side, or an upright window wider than a tablet,
+such as half a 27" display at 1280×1328; the commit log is the point, 60% of the screen) and **Wall** (a screen read from across a
+room). Every profile but Handheld portrait is split, the commit column beside the rest, whichever way the window stands: the
+frame's `data-split` and the `split:` variant, not the screen's orientation. The page finds the first three from the window as it is and as it changes (`profileOf`,
 `useProfile` in `profile.ts`); a wall has a desk's pixels and no browser knows the viewer's distance, so a screen is told once
 (`?profile=wall` or *On a wall* in the tap bar, the cookie `scp-present-wall`; `?profile=auto` forgets it). Each profile keeps its own
 commit column (the cookie `scp-present-column`, `handheld-landscape:30,desk:55`, only the widths that differ from their defaults: 60%
 for a desk, 30% for the rest), and a double tap brings back the profile's own. The server cannot see the window, so the page
 remembers the profile it last found (`scp-present-profile`) and the server renders that profile's column at once; a screen whose
-profile changed corrects it on its first paint. The tap bar names the profile. A profile holds the column's width now; it is where a
+profile changed corrects it on its first paint. The tap bar names the profile and the window's size in CSS pixels, so two people can tell they look at the same screen.
+
+The screens the page is designed and checked on are named in `web/e2e/screens.ts` (the iPad Pro 13" on its side and upright, a 27"
+XDR in full screen and half of it in Chrome); the e2e suite fills each without scrolling, as its profile.
+
+When every product shows and room is left, the good ones take richer tiles, two rows tall, the most recent first (`choose`, the
+plan's `tall`): the work that counts with its last change, its twelve weeks across the tile and the people behind it. Room goes to
+showing every product first; a richer tile never folds one.
+
+A profile holds the column's width now; it is where a
 profile's own layout or type size would go.
 
 ## Data and layout

@@ -114,10 +114,16 @@ export const profiles: { value: Profile; label: string }[] = [
 /** deskFrom is the width (CSS pixels) from which a screen on its side is a desk's monitor: wider than the largest tablet. */
 export const deskFrom = 1600
 
-/** profileOf is the profile of a window of width by height: a wall when the screen was told it is one. */
+/** handheldUpTo is the width below which an upright screen is a tablet held upright (an iPad Pro 13" is 1032 wide). */
+export const handheldUpTo = 1100
+
+/**
+ * profileOf is the profile of a window of width by height: a wall when the screen was told it is one; an upright window wider than
+ * a tablet is a desk's (half a 27" monitor, 1280 by 1328), split as a desk is, whichever way it stands.
+ */
 export function profileOf(width: number, height: number, wall: boolean): Profile {
   if (wall) return "wall"
-  if (height > width) return "handheld-portrait"
+  if (height > width) return width < handheldUpTo ? "handheld-portrait" : "desk"
   return width >= deskFrom ? "desk" : "handheld-landscape"
 }
 

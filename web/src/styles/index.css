@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
+/* The presentation page split in two, the commit column beside the rest: set by its profile, not the screen's orientation (P-64). */
+@custom-variant split (&:is([data-split], [data-split] *));
 
 @theme inline {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;

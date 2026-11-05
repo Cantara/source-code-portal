@@ -48,6 +48,8 @@ describe("profiles", () => {
     expect(profileOf(820, 1180, false)).toBe("handheld-portrait")
     expect(profileOf(1376, 1032, false)).toBe("handheld-landscape")
     expect(profileOf(2560, 1440, false)).toBe("desk")
+    expect(profileOf(1032, 1376, false)).toBe("handheld-portrait")
+    expect(profileOf(1280, 1328, false)).toBe("desk")
     expect(profileOf(2560, 1440, true)).toBe("wall")
     expect(profileNamed("desk")).toBe("desk")
     expect(profileNamed("tv")).toBeUndefined()
@@ -90,8 +92,19 @@ describe("plan", () => {
     const grid = { cols: 3, rows: 4 }
     expect(fits(plan(ordered, 1, 2), grid)).toBe(true) // a1+ w1+ stacked, w2 g1 g2 in column 3, nothing folded
     expect(fits(plan(ordered, 0, 0), grid)).toBe(false) // three wide tiles need six rows
-    expect(choose(ordered, grid)).toEqual({ steps: 1, good: 2 })
+    // Every product shows, and column 3 has a row to spare: the newest good one takes two rows, richer.
+    expect(choose(ordered, grid)).toEqual({ steps: 1, good: 2, tall: 1 })
     // 3×2: a1 wide, then column 3 holds w1 and the fold tile (w2, g1, g2 folded).
-    expect(choose(ordered, { cols: 3, rows: 2 })).toEqual({ steps: 3, good: 0 })
+    expect(choose(ordered, { cols: 3, rows: 2 })).toEqual({ steps: 3, good: 0, tall: 0 })
+  })
+  it("makes good ones richer only when every product shows, and never at the cost of one", () => {
+    // 4 columns, 6 rows: everything fits wide with room, so both good ones take tall tiles.
+    expect(choose(ordered, { cols: 4, rows: 6 })).toEqual({ steps: 0, good: 2, tall: 2 })
+    expect(show(plan(ordered, 0, 2, 1)).tiles).toEqual(["a1+", "w1+", "w2+", "g1", "g2"])
+    expect(
+      plan(ordered, 0, 2, 1)
+        .tiles.filter((t) => t.tall)
+        .map((t) => t.g.id),
+    ).toEqual(["g1"])
   })
 })
