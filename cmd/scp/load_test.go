@@ -41,6 +41,9 @@ func (m inMemory) RoundTrip(req *http.Request) (*http.Response, error) {
 // TestLoad1000 is the M4 load check: a cold start of 1,000 repositories completes within the GitHub budget without hitting the rate
 // limit, a warm start serves them at once, and every page of the API answers quickly under concurrent load.
 func TestLoad1000(t *testing.T) {
+	if race {
+		t.Skip("the load check measures time: it runs without the race detector (make test)")
+	}
 	gh := githubtest.New(t)
 	gh.AddToken("ghp_load")
 	commit := func(i, n int) githubtest.Commit {
@@ -154,7 +157,7 @@ func TestLoad1000(t *testing.T) {
 	}()
 	warm := time.Now()
 	for !loaded(srv.pub.Current()) {
-		if time.Since(warm) > 10*time.Second*slowdown {
+		if time.Since(warm) > 10*time.Second {
 			t.Fatal("the warm start did not serve the stored catalogue")
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -195,12 +198,9 @@ func TestLoad1000(t *testing.T) {
 		ds := took[p]
 		slices.Sort(ds)
 		p99 := ds[len(ds)*99/100]
-		bound := 100 * time.Millisecond * slowdown
+		bound := 100 * time.Millisecond
 		if strings.Contains(p, "/history") {
-			bound = 50 * time.Millisecond * slowdown
-		}
-		if slowdown > 1 {
-			bound *= 2 // -race on a shared CI runner sits near 1s at p99; a regression is still many times that
+			bound = 50 * time.Millisecond
 		}
 		if p99 > bound {
 			t.Errorf("%s: p99 %v over %v", p, p99, bound)

@@ -81,17 +81,28 @@ func TestServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The intervals shortened, and every step told in order: the test waits on what happened, not on time.
+	s.minBackoff, s.buildEvery, s.probeEvery = 10*time.Millisecond, 10*time.Millisecond, 5*time.Millisecond
+	events := make(chan string, 16)
+	s.observe = func(e string) { events <- e }
+	expect := func(want ...string) {
+		t.Helper()
+		for _, w := range want {
+			select {
+			case got := <-events:
+				if got != w {
+					t.Fatalf("event %q, want %q; log:\n%s", got, w, out)
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatalf("no %q; log:\n%s", w, out)
+			}
+		}
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() { done <- s.Run(ctx, "http://127.0.0.1:9") }()
 
-	deadline := time.Now().Add(10 * time.Second) // the first start crashes; the restart a second later stays up
-	for !s.Ready() {
-		if time.Now().After(deadline) {
-			t.Fatalf("not ready; log:\n%s", out)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	expect("exited", "ready")               // the first start crashes; the restart stays up
 	resp, err := http.Get(s.URL().String()) //nolint:forbidigo // loopback test server
 	if err != nil {
 		t.Fatal(err)
@@ -116,22 +127,13 @@ func TestServer(t *testing.T) {
 	if err := os.Chtimes(dir+"/BUILD", time.Time{}, time.Now().Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	deadline = time.Now().Add(10 * time.Second)
-	for !strings.Contains(out.String(), "bundle replaced") || strings.Count(out.String(), "web UI server ready") < 2 {
-		if time.Now().After(deadline) {
-			t.Fatalf("no restart after the bundle changed; log:\n%s", out)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	expect("replaced", "ready")
 	if err := os.WriteFile(dir+"/BUILD", []byte("commit-2\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	deadline = time.Now().Add(10 * time.Second)
-	for s.Build() != "commit-2" {
-		if time.Now().After(deadline) {
-			t.Fatalf("Build = %q after a new commit's bundle, want commit-2; log:\n%s", s.Build(), out)
-		}
-		time.Sleep(20 * time.Millisecond)
+	expect("replaced", "ready")
+	if got := s.Build(); got != "commit-2" {
+		t.Errorf("Build = %q after a new commit's bundle, want commit-2", got)
 	}
 	cancel()
 	select {
