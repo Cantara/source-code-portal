@@ -10,7 +10,20 @@ import { cn } from "@/lib/cn"
 import { useConnectionFailing, useLive } from "@/lib/connection"
 import { ago } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
-import { by, columnCookie, columnWidths, remember, sameWork, type Work } from "@/lib/preferences"
+import {
+  by,
+  columnCookie,
+  columnDefaults,
+  columnsValue,
+  columnWidths,
+  forget,
+  profiles,
+  remember,
+  sameWork,
+  type Columns,
+  type Profile,
+  type Work,
+} from "@/lib/preferences"
 import { Mark } from "@/components/ui/mark"
 import { AiMark } from "@/entities/commit/ai-mark"
 import { InitialsAvatar } from "@/shared/initials-avatar"
@@ -19,6 +32,7 @@ import { meQuery } from "@/lib/api/queries"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import { dashboardQuery, moreQuery, morePages, pageQuery, workQuery } from "./api"
 import { dedupe } from "./latest"
+import { useProfile } from "./profile"
 import { ShowPicker, useShow } from "./show"
 import { Designer } from "./design"
 import { useShift, useWall } from "./wall"
@@ -246,7 +260,9 @@ function Screen({
   commits,
   only,
   frame,
-  column = columnWidths.initial,
+  column = columnDefaults["handheld-landscape"],
+  usual = column,
+  profile,
   onColumn,
   shown = data.work,
   picker,
@@ -260,6 +276,9 @@ function Screen({
   column?: number
   /** resizes the column as its edge is dragged; kept when the drag ends (keep) */
   onColumn?: (width: number, keep: boolean) => void
+  /** the profile's usual width of the commit column, and the profile (data-profile on the frame) */
+  usual?: number
+  profile?: Profile
   /** the kinds the commit column shows, and the label that chooses them */
   shown?: Work
   picker?: ReactNode
@@ -301,6 +320,7 @@ function Screen({
   const stream = layout.find((e) => e.kind === "latest-commits")
   return (
     <div
+      data-profile={profile}
       className={cn(
         "grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] landscape:grid-rows-1 landscape:gap-x-0",
         stream ? columns[column] : "landscape:grid-cols-1",
@@ -317,7 +337,7 @@ function Screen({
         )}
         {left}
       </div>
-      {stream && <Resizer width={column} onChange={onColumn} />}
+      {stream && <Resizer width={column} usual={usual} onChange={onColumn} />}
       {stream && (
         <Stream key={shown.join(",")} commits={commits.slice(0, stream.count ?? 30)} work={shown} keep={keep} picker={picker} />
       )}
@@ -347,10 +367,19 @@ const doubleTap = 400
 
 /**
  * Resizer is the commit column's edge in landscape: dragged (a finger or a pointer) or moved with the arrow keys, in steps of 5% of
- * the screen from 20% to 60%; a double tap or click brings back the usual width. Taps are told apart here, as a touch on a handle
+ * the screen from 20% to 60%; a double tap or click brings back the profile's usual width. Taps are told apart here, as a touch on a handle
  * that takes the whole gesture (touch-action none) sends no dblclick in every browser, and a tap never moves the column.
  */
-function Resizer({ width, onChange }: { width: number; onChange?: (width: number, keep: boolean) => void }) {
+function Resizer({
+  width,
+  usual,
+  onChange,
+}: {
+  width: number
+  /** the profile's width, which a double tap brings back */
+  usual: number
+  onChange?: (width: number, keep: boolean) => void
+}) {
   const press = useRef<{ x: number; moved: boolean } | null>(null)
   const lastTap = useRef(Number.NEGATIVE_INFINITY)
   const at = (e: PointerEvent<HTMLDivElement>) => {
@@ -399,7 +428,7 @@ function Resizer({ width, onChange }: { width: number; onChange?: (width: number
           return
         }
         if (e.timeStamp - lastTap.current < doubleTap) {
-          onChange?.(columnWidths.initial, true)
+          onChange?.(usual, true)
           lastTap.current = Number.NEGATIVE_INFINITY
         } else lastTap.current = e.timeStamp
       }}
@@ -417,7 +446,17 @@ function Resizer({ width, onChange }: { width: number; onChange?: (width: number
 }
 
 /** Bar is the controls a tap or a key shows for a few seconds: back to the dashboard, the theme, full screen, the design mode. */
-function Bar({ onDesign }: { onDesign?: () => void }) {
+function Bar({
+  profile,
+  wall,
+  onWall,
+  onDesign,
+}: {
+  profile: Profile
+  wall: boolean
+  onWall: (wall: boolean) => void
+  onDesign?: () => void
+}) {
   const [shown, setShown] = useState(false)
   const [within, setWithin] = useState(false)
   const choice = useTheme()
@@ -460,6 +499,13 @@ function Bar({ onDesign }: { onDesign?: () => void }) {
         shown || within ? "opacity-100" : "pointer-events-none opacity-0",
       )}
     >
+      {/* The profile this screen is in, and the wall it can be told it is (a wall has a desk's pixels). */}
+      <span className="px-2 text-xs font-medium tracking-widest text-muted-foreground uppercase">
+        {profiles.find((x) => x.value === profile)?.label}
+      </span>
+      <button type="button" className={button} aria-pressed={wall} onClick={() => onWall(!wall)}>
+        {wall ? "Not a wall" : "On a wall"}
+      </button>
       {/* A whole page load: the dashboard draws its own theme and header. */}
       <a href="/" className={button}>
         Dashboard
@@ -493,21 +539,35 @@ function Bar({ onDesign }: { onDesign?: () => void }) {
 export function PresentView({
   work,
   only,
-  column: initial = columnWidths.initial,
+  columns: initial = columnDefaults,
+  profile: guess = "handheld-landscape",
+  wall: told = false,
+  ask,
   show,
 }: {
   work: Work
   only?: string[]
-  /** the reader's commit column width (the cookie `scp-present-column`) */
-  column?: number
+  /** the commit column's width per profile (the cookie `scp-present-column`) */
+  columns?: Columns
+  /** the profile the page last found on this screen (the cookie `scp-present-profile`), for the first paint */
+  profile?: Profile
+  /** whether this screen was told it is on a wall (the cookie `scp-present-wall`), and the address's `?profile=` */
+  wall?: boolean
+  ask?: string
   /** the kinds the reader shows in the commit column (the cookie `scp-latest-work`), if any */
   show?: Work
 }) {
   const s = useShow(show, work)
-  const [column, setColumn] = useState(initial)
+  const p = useProfile(guess, told, ask)
+  const [columns, setColumns] = useState(initial)
+  const column = columns[p.profile]
   const resize = (w: number, keep: boolean) => {
-    setColumn(w)
-    if (keep) remember(columnCookie, String(w))
+    const next = { ...columns, [p.profile]: w }
+    setColumns(next)
+    if (!keep) return
+    const v = columnsValue(next)
+    if (v) remember(columnCookie, v)
+    else forget(columnCookie)
   }
   const { data, error } = useQuery(dashboardQuery(api, work))
   const { data: page } = useQuery(pageQuery(api, "present"))
@@ -532,7 +592,15 @@ export function PresentView({
             page="present"
             groups={data.groups}
             preview={(draft) => (
-              <Screen layout={draft} data={data} commits={commits} only={only} frame="relative h-[40rem]" column={column} />
+              <Screen
+                layout={draft}
+                data={data}
+                commits={commits}
+                only={only}
+                frame="relative h-[40rem]"
+                column={column}
+                profile={p.profile}
+              />
             )}
             onClose={() => setDesigning(false)}
           />
@@ -546,11 +614,13 @@ export function PresentView({
             only={only}
             frame={cn("fixed inset-0", shift)}
             column={column}
+            usual={columnDefaults[p.profile]}
+            profile={p.profile}
             onColumn={resize}
             shown={s.shown}
             picker={picker}
           />
-          <Bar onDesign={me?.admin ? () => setDesigning(true) : undefined} />
+          <Bar profile={p.profile} wall={p.wall} onWall={p.setWall} onDesign={me?.admin ? () => setDesigning(true) : undefined} />
         </>
       )}
     </>

@@ -101,7 +101,7 @@ test("the commit column widens by its edge, is remembered, and the left keeps wh
 test("a double tap on the commit column's edge brings back its usual width", async ({ browser }) => {
   const baseURL = test.info().project.use.baseURL ?? ""
   const ctx = await browser.newContext({ baseURL, viewport: { width: 1180, height: 820 }, hasTouch: true, isMobile: true })
-  await ctx.addCookies([{ name: "scp-present-column", value: "50", url: baseURL }])
+  await ctx.addCookies([{ name: "scp-present-column", value: "handheld-landscape:50", url: baseURL }])
   const page = await ctx.newPage()
   await page.goto("/present")
   const edge = page.getByRole("separator", { name: "Resize latest commits" })
@@ -112,4 +112,36 @@ test("a double tap on the commit column's edge brings back its usual width", asy
   await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
   await expect(edge).toHaveAttribute("aria-valuenow", "30")
   await ctx.close()
+})
+
+test("each profile keeps its own commit column: a desk's monitor starts at 60%, a tablet at 30%, a wall is told", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop", "a landscape screen")
+  const frame = page.locator("[data-profile]")
+  const edge = page.getByRole("separator", { name: "Resize latest commits" })
+  // A 27-inch monitor at its usual resolution is a desk: the commit log takes most of it.
+  await page.setViewportSize({ width: 2560, height: 1440 })
+  await page.goto("/present")
+  await expect(frame).toHaveAttribute("data-profile", "desk")
+  await expect(edge).toHaveAttribute("aria-valuenow", "60")
+  await edge.focus()
+  await page.keyboard.press("ArrowRight")
+  await expect(edge).toHaveAttribute("aria-valuenow", "55")
+  // The same browser as a tablet on its side: its own width, untouched by the desk's.
+  await page.setViewportSize({ width: 1180, height: 820 })
+  await expect(frame).toHaveAttribute("data-profile", "handheld-landscape")
+  await expect(edge).toHaveAttribute("aria-valuenow", "30")
+  // Back on the desk after a reload: its width was kept, and the server rendered it at once.
+  await page.setViewportSize({ width: 2560, height: 1440 })
+  await page.reload()
+  await expect(frame).toHaveAttribute("data-profile", "desk")
+  await expect(edge).toHaveAttribute("aria-valuenow", "55")
+  // A wall has a desk's pixels: the address tells the screen, which remembers it until told auto.
+  await page.goto("/present?profile=wall")
+  await expect(frame).toHaveAttribute("data-profile", "wall")
+  await page.goto("/present")
+  await expect(frame).toHaveAttribute("data-profile", "wall")
+  await page.goto("/present?profile=auto")
+  await expect(frame).toHaveAttribute("data-profile", "desk")
 })

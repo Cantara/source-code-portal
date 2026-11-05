@@ -97,17 +97,79 @@ export function commitsOf(v: unknown): Work | undefined {
 /** sameWork reports whether two lenses count the same kinds. */
 export const sameWork = (a: Work, b: Work) => a.length === b.length && a.every((k) => b.includes(k))
 
-/** columnCookie remembers the presentation page's commit column: its width in percent of the screen (design/present.md). */
-export const columnCookie = "scp-present-column"
-export const columnWidths = { min: 20, max: 60, step: 5, initial: 30 } as const
+/**
+ * Profile is the kind of screen the presentation page is on, named for where it sits (design/present.md, P-64): a tablet held
+ * upright or on its side, a big monitor at a desk (the commit log beside the fleet), a screen on a wall read from across a room.
+ * The page tells the first three from the window (profileOf); a wall has the pixels of a desk, so a screen is told it is one.
+ */
+export type Profile = "handheld-portrait" | "handheld-landscape" | "desk" | "wall"
 
-/** columnOf is the column's width a cookie names, on the 5% grid within 20% to 60%; the initial width otherwise. */
-export function columnOf(v: unknown): number {
+export const profiles: { value: Profile; label: string }[] = [
+  { value: "handheld-portrait", label: "Handheld portrait" },
+  { value: "handheld-landscape", label: "Handheld landscape" },
+  { value: "desk", label: "Desk" },
+  { value: "wall", label: "Wall" },
+]
+
+/** deskFrom is the width (CSS pixels) from which a screen on its side is a desk's monitor: wider than the largest tablet. */
+export const deskFrom = 1600
+
+/** profileOf is the profile of a window of width by height: a wall when the screen was told it is one. */
+export function profileOf(width: number, height: number, wall: boolean): Profile {
+  if (wall) return "wall"
+  if (height > width) return "handheld-portrait"
+  return width >= deskFrom ? "desk" : "handheld-landscape"
+}
+
+/** profileCookie remembers the last profile the page found, so the server renders that profile's column at once. */
+export const profileCookie = "scp-present-profile"
+
+/** profileNamed is the profile a cookie names, or none. */
+export function profileNamed(v: unknown): Profile | undefined {
+  return profiles.find((p) => p.value === v)?.value
+}
+
+/** wallCookie remembers that this screen is on a wall (`?profile=wall`, or the tap bar); `?profile=auto` forgets it. */
+export const wallCookie = "scp-present-wall"
+
+/**
+ * columnCookie remembers the presentation page's commit column per profile, its width in percent of the screen
+ * ("handheld-landscape:30,desk:60"): a width dragged on the desk's monitor leaves the tablet's alone.
+ */
+export const columnCookie = "scp-present-column"
+export const columnWidths = { min: 20, max: 60, step: 5 } as const
+
+/** Columns are the commit column's width per profile. */
+export type Columns = Record<Profile, number>
+
+/** columnDefaults are each profile's width until it is dragged: the commit log takes most of a desk, a third elsewhere. */
+export const columnDefaults: Columns = { "handheld-portrait": 30, "handheld-landscape": 30, desk: 60, wall: 30 }
+
+/** columnOf is a width on the 5% grid within 20% to 60%; fallback when it is no number. */
+export function columnOf(v: unknown, fallback: number): number {
   const n = typeof v === "string" && /^\d{1,3}$/.test(v) ? Number(v) : NaN
-  if (Number.isNaN(n)) return columnWidths.initial
+  if (Number.isNaN(n)) return fallback
   const stepped = Math.round(n / columnWidths.step) * columnWidths.step
   return Math.min(Math.max(stepped, columnWidths.min), columnWidths.max)
 }
+
+/** columnsOf reads the cookie's widths by profile; a profile it does not name keeps its default. */
+export function columnsOf(v: unknown): Columns {
+  const out = { ...columnDefaults }
+  for (const part of typeof v === "string" ? v.split(",") : []) {
+    const [name, width] = part.split(":")
+    const p = profileNamed(name)
+    if (p) out[p] = columnOf(width, columnDefaults[p])
+  }
+  return out
+}
+
+/** columnsValue is the cookie's value: only the widths that differ from their defaults. */
+export const columnsValue = (c: Columns) =>
+  profiles
+    .filter((p) => c[p.value] !== columnDefaults[p.value])
+    .map((p) => `${p.value}:${c[p.value]}`)
+    .join(",")
 
 /** Side is the dashboard's side panel of the latest commits beside the products: open or folded to a rail, and its width (rem). */
 export type Side = { open: boolean; width: number }

@@ -318,7 +318,12 @@ keeps the screen awake, is dark unless the reader chose, reloads for a new relea
 against burn-in. A tap shows its controls; an administrator designs it as the dashboard (`present.json` in `layout.dir`).
 
 - One screen per team: `/present?groups=payments,identity` keeps to those products, `?work=hand,ai` fixes the work that counts.
-- Drag the commit column's edge (or use the arrow keys on it) to make it wider, up to 60% of the screen; the device remembers it. The
+- The page knows the kind of screen it is on, its *profile*: *Handheld portrait* (a tablet held upright), *Handheld landscape* (a
+  tablet on its side, up to 1600 pixels wide), *Desk* (a wider monitor: the commit log takes 60% of it) and *Wall* (a screen read
+  from across a room). A wall has a desk's pixels, so tell the screen once: `/present?profile=wall`, or *On a wall* in its controls;
+  `?profile=auto` forgets it. The controls show the profile.
+- Drag the commit column's edge (or use the arrow keys on it) to make it wider, up to 60% of the screen; the device remembers it for
+  each profile, so a width dragged on the desk leaves the tablet's alone, and a double tap brings back the profile's own. The
   left side then keeps what matters most: the products that need a look and how current the page is stay, the people, the counts and
   the counts give way first; the products then fold the good ones, then shrink and fold the mildest to watch.
 - On an iPad, *Share › Add to Home Screen* opens it full screen without the browser (the page's web app manifest starts at

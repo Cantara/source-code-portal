@@ -3,14 +3,17 @@ import type { Route } from "@/lib/page"
 import { dashboardQuery, pageQuery } from "./api"
 import {
   columnCookie,
-  columnOf,
+  columnsOf,
   commitsCookie,
   commitsOf,
   productsView,
+  profileCookie,
+  profileNamed,
   sideCookie,
   sideOf,
   viewCookie,
   workCookie,
+  wallCookie,
   workOf,
 } from "@/lib/preferences"
 import { DashboardView } from "./view"
@@ -65,7 +68,10 @@ export const presentRoute: Route<object> = {
     <PresentView
       work={lens(search, cookies)}
       only={only(search)}
-      column={columnOf(cookies[columnCookie])}
+      columns={columnsOf(cookies[columnCookie])}
+      profile={profileNamed(cookies[profileCookie])}
+      wall={cookies[wallCookie] === "1"}
+      ask={typeof search.profile === "string" ? search.profile : undefined}
       show={commitsOf(cookies[commitsCookie])}
     />
   ),

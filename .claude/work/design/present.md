@@ -100,6 +100,20 @@ fits from 1024 to 1920 pixels wide.
 - **Several screens.** `?groups=core,tools` limits the page to those products, `?work=hand,ai` fixes the work that counts, so each
   screen is a bookmark. Neither is stored.
 
+## Profiles
+
+A screen is one of four profiles, named for where it sits (P-64): **Handheld portrait** (a tablet upright: the commit column below
+the rest), **Handheld landscape** (a tablet on its side, narrower than 1600 CSS px; an iPad Pro 13" is 1376), **Desk** (a monitor at
+arm's length, 1600 px and wider, such as a 27" display at 2560×1440: the commit log is the point, 60% of the screen) and **Wall** (a
+screen read from across a room). The page finds the first three from the window as it is and as it changes (`profileOf`,
+`useProfile` in `profile.ts`); a wall has a desk's pixels and no browser knows the viewer's distance, so a screen is told once
+(`?profile=wall` or *On a wall* in the tap bar, the cookie `scp-present-wall`; `?profile=auto` forgets it). Each profile keeps its own
+commit column (the cookie `scp-present-column`, `handheld-landscape:30,desk:55`, only the widths that differ from their defaults: 60%
+for a desk, 30% for the rest), and a double tap brings back the profile's own. The server cannot see the window, so the page
+remembers the profile it last found (`scp-present-profile`) and the server renders that profile's column at once; a screen whose
+profile changed corrects it on its first paint. The tap bar names the profile. A profile holds the column's width now; it is where a
+profile's own layout or type size would go.
+
 ## Data and layout
 
 - The layout store gets the page `present` (`layout.Store`, `<layout.dir>/present.json`) with a built-in default: `telemetry`,
@@ -126,6 +140,7 @@ fits from 1024 to 1920 pixels wide.
 |---|---|
 | K1 | `/present` from the layout page `present`: the grid, the status strip, `fleet-map.color: health`, `products.view: tiles` with the fold, latest commits at full height, the live data and the freshness indicator, `?groups=` and `?work=` |
 | K2 | The wall: no chrome with the tap bar, wake lock, the manifest, reload on a new build and hourly, burn-in shift; design mode on `/present`; docs, the Guide (a section with a picture), the plugin |
+| K3 | Profiles: Handheld portrait, Handheld landscape, Desk and Wall, found from the window (a wall told), each with its own commit column, Desk at 60%; the tap bar names the profile; docs and the plugin |
 
 ## Not now
 

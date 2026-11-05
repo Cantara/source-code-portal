@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { Schemas } from "@/lib/api/client"
 import { freshness } from "./present"
 import { byNeed, choose, fits, foldText, plan, type Plan } from "./tiles"
-import { columnOf } from "@/lib/preferences"
+import { columnDefaults, columnsOf, columnsValue, profileNamed, profileOf } from "@/lib/preferences"
 
 type Group = Schemas["DashboardGroup"]
 
@@ -43,14 +43,25 @@ describe("freshness", () => {
   })
 })
 
-describe("columnOf", () => {
-  it("reads the commit column's width on the 5% grid within 20% to 60%", () => {
-    expect(columnOf(undefined)).toBe(30)
-    expect(columnOf("45")).toBe(45)
-    expect(columnOf("43")).toBe(45)
-    expect(columnOf("5")).toBe(20)
-    expect(columnOf("90")).toBe(60)
-    expect(columnOf("wide")).toBe(30)
+describe("profiles", () => {
+  it("are told from the window: upright is handheld, on its side a tablet up to 1600 px, a desk's monitor beyond", () => {
+    expect(profileOf(820, 1180, false)).toBe("handheld-portrait")
+    expect(profileOf(1376, 1032, false)).toBe("handheld-landscape")
+    expect(profileOf(2560, 1440, false)).toBe("desk")
+    expect(profileOf(2560, 1440, true)).toBe("wall")
+    expect(profileNamed("desk")).toBe("desk")
+    expect(profileNamed("tv")).toBeUndefined()
+  })
+
+  it("keep a commit column of their own, on the 5% grid within 20% to 60%, the desk's 60% until dragged", () => {
+    expect(columnsOf(undefined)).toEqual(columnDefaults)
+    expect(columnsOf(undefined).desk).toBe(60)
+    const c = columnsOf("handheld-landscape:43,desk:90,tv:20,wall:wide")
+    expect(c["handheld-landscape"]).toBe(45)
+    expect(c.desk).toBe(60)
+    expect(c.wall).toBe(30)
+    expect(columnsValue({ ...columnDefaults, "handheld-landscape": 45 })).toBe("handheld-landscape:45")
+    expect(columnsValue(columnDefaults)).toBe("")
   })
 })
 

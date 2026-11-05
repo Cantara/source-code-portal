@@ -145,7 +145,9 @@ claude mcp add --transport http scp https://portal.example.org/mcp --header "Aut
 ## A screen on a wall
 
 `/present` is the presentation page for a tablet or a TV: one screen, no scrolling, live, nothing to configure. Bookmark one per team
-(`/present?groups=payments,identity`, `?work=hand,ai`); on an iPad add it to the home screen. Behind `access.require_auth` sign in
+(`/present?groups=payments,identity`, `?work=hand,ai`); on an iPad add it to the home screen. The page picks its profile from the screen (*Handheld portrait*, *Handheld
+landscape* up to 1600 px, *Desk* beyond, the commit log at 60%), each with its own commit column; a TV is told it is on a wall once
+with `/present?profile=wall`. Behind `access.require_auth` sign in
 once on the device, with single sign-on or a token of its own from `auth.tokens` (only the groups it shows): the page's hourly reload
 renews the session. An administrator arranges it like the dashboard; with `layout.dir`
 the layout is `present.json` beside `dashboard.json`.
