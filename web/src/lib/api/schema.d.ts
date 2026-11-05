@@ -446,7 +446,7 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /** @enum {string} */
-    SearchKind: "repo" | "group" | "doc" | "dep" | "package" | "commit"
+    SearchKind: "repo" | "group" | "doc" | "dep" | "package" | "commit" | "pull"
     TextPart: {
       text: string
       /** @description The part matched the query */
@@ -474,6 +474,8 @@ export interface components {
       dep: number
       package: number
       commit: number
+      /** @description Open pull requests */
+      pull: number
     }
     SearchCorrection: {
       from: string

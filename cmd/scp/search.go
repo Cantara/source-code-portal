@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"slices"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/docs"
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/packages"
+	"github.com/cantara/source-code-portal/internal/pulls"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -102,6 +104,16 @@ func searchRead(e *snapshot.RepoEntry) search.Repository {
 			pd.Fields[search.FieldMeta] = p.Latest.Version + " " + p.Latest.Registry
 		}
 		out.Documents = append(out.Documents, pd)
+	}
+
+	if set, _ := pulls.Of(e); set != nil { // open pull requests by title, its author and its branch; a hit opens them on /pulls
+		at := "/pulls?repo=" + url.QueryEscape(string(r.Key())) + "&drafts=true"
+		for _, p := range set.Pulls {
+			pd := search.Document{Kind: search.KindPull, Title: p.Title, URL: at, At: p.Updated}
+			pd.Fields[search.FieldTitle], pd.Fields[search.FieldMeta] = p.Title, p.Head+" "+string(pulls.StateOf(&p))
+			pd.Fields[search.FieldAuthor] = p.Author
+			out.Documents = append(out.Documents, pd)
+		}
 	}
 
 	cs, _ := commits.Of(e)

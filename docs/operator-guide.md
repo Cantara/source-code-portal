@@ -256,7 +256,7 @@ headers decide who the viewer is.
 The portal can answer questions about its catalogue in plain language on its *Ask* page (`/ask`): which repositories use a library,
 what a group holds, what changed lately, why a repository's health is low. A language model reads the catalogue through read-only
 tools (search what the portal holds, list and read groups, read a repository's README and technology, read a document, the recent commits,
-a repository's health) and answers in Markdown with links into the portal. It sees exactly what the person asking may see: a private
+the open pull requests, a repository's health) and answers in Markdown with links into the portal. It sees exactly what the person asking may see: a private
 repository only for a viewer who sees private repositories.
 
 Nothing is stored: the conversation lives in the browser's page and is sent with each question. What the tools read is sent to the
@@ -285,9 +285,10 @@ cost with `scp_assistant_tokens_total` (section 5).
 ### 2.4 The landing page and the design mode
 
 The dashboard shows signals, not every attribute of every repository: a telemetry row (the commits by hand, with AI and by
-automation in the last 30 days, the repositories changed, the findings, whether the catalogue is current; the presentation page's
-strip shows the same six), a fleet map with every repository
-as one tile coloured by its last change by a person, the products as cards or a sortable table, and the latest commits by people. A
+automation in the last 30 days, the repositories changed, the findings, the open pull requests, whether the catalogue is current; the
+presentation page's strip shows the same), a fleet map with every repository
+as one tile coloured by its last change by a person, the products as cards or a sortable table, the open pull requests whose turn it is
+first, and the latest commits by people. A
 commit by a bot or a release plugin is automation; a commit whose subject landed in more than 10 repositories on one day is a sweep.
 Neither counts as a person's work. A person's commit with an AI `Co-authored-by` trailer (as Claude Code, Copilot and Cursor write
 them) or an AI tool's footer, and a coding agent's own commit, are people's work "with AI": the cards and the telemetry count them and
@@ -302,7 +303,8 @@ is kept in the reader's browser, never on the server. Settings also hold the pro
 
 An administrator can arrange the page: *Design this page* on the dashboard opens the design mode, with the page's elements in a list
 to add, move (the arrows, or drag them), set up and remove, beside a live preview. The elements are the telemetry, the fleet map and the
-products (each for every product or for chosen ones, in your order), the latest commits (how many) and a heading with a line of text.
+products (each for every product or for chosen ones, in your order), the pull requests (how many), the latest commits (how many) and a
+heading with a line of text.
 *Save* keeps the layout for every viewer; *Back to the built-in layout* removes it.
 
 ```yaml
@@ -376,6 +378,21 @@ announcements:
   stays dismissed in that browser until it is edited); on `/present` none is dismissible, and on a desk or a wall its link also shows
   as a QR code for a phone.
 - A signed-in announcement is never sent to the public, on any page or in the API.
+
+### 2.4.2 Pull requests
+
+**Pull requests** in the header (`/pulls`) lists every open pull request a reader may see, and says for each whose turn it is: the
+author's (a draft, conflicts, failing checks, changes requested), the reviewers' (a review is required, or none approved yet), CI's
+(checks running) or a maintainer's (ready to merge). People's come before automation's, those waiting for a review first, then the
+longest idle; the states are filters, and the product, the repository, whose and the order are a form that works without JavaScript.
+A pull request by Dependabot, Renovate, Snyk (its `snyk-fix-` and `snyk-upgrade-` branches, whoever's account it uses) or any
+`[bot]` is automation, and counts only when the work that counts holds automation.
+
+The dashboard's telemetry and the presentation page's strip count them, the dashboard shows the longest waiting beside the products,
+`/present` as a band below them, the product and group tables have a column, and a group's and a repository's page a panel. A
+repository's open issues no longer count its pull requests, and two findings cost points: a person's pull request idle while waiting
+for a review (more than 7 days, more than 30), and automation's left open for more than 30 days. They need the App's *Pull requests*,
+*Checks* and *Commit statuses* read permissions (section 1); without them GitHub refuses the listing and `/pulls` stays empty.
 
 ### 2.5 Published packages
 

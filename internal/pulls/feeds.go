@@ -167,6 +167,20 @@ func OfRepo(s *snapshot.Snapshot, k snapshot.RepoKey) []Ref { return feedIndex.G
 // All is every open pull request of s, whose turn first.
 func All(s *snapshot.Snapshot) []Ref { return feedIndex.Get(s).all }
 
+// Badge is a repository's open pull requests and how many wait for a review (open -1 when not read yet), for its badge.
+func Badge(e *snapshot.RepoEntry) (open, review int) {
+	r, _ := Of(e)
+	if r == nil {
+		return -1, 0
+	}
+	for i := range r.Pulls {
+		if StateOf(&r.Pulls[i]) == StateReview {
+			review++
+		}
+	}
+	return r.Total, review
+}
+
 // Open is the open pull requests of a repository (-1 when not read yet).
 func Open(e *snapshot.RepoEntry) int {
 	if r, _ := Of(e); r != nil {

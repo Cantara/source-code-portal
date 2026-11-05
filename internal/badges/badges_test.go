@@ -117,6 +117,15 @@ var data = Data{LastCommit: lastCommit, //nolint:gochecknoglobals // test double
 	Product: func(*snapshot.Snapshot, snapshot.Group, time.Time) health.Product {
 		return health.Product{Counted: 1, Score: 41, Level: health.Attention}
 	},
+	Pulls: func(e *snapshot.RepoEntry) (int, int) {
+		switch e.Repo.Name {
+		case "x":
+			return 3, 1
+		case "y":
+			return 0, 0
+		}
+		return -1, 0
+	},
 }
 
 func TestHandler(t *testing.T) {
@@ -136,8 +145,12 @@ func TestHandler(t *testing.T) {
 		{"/badges/repos/acme/new/license.svg", "none", "public, max-age=60", 200, false},
 		{"/badges/repos/acme/new/last-commit.svg", "unknown", "public, max-age=60", 200, false},
 		{"/badges/repos/acme/x/health.svg", "72", "public, max-age=300", 200, true},
+		{"/badges/repos/acme/x/pulls.svg", "3 open, 1 to review", "public, max-age=300", 200, true},
+		{"/badges/repos/acme/old/pulls.svg", "3 open, 1 to review", "public, max-age=300", 200, true},
+		{"/badges/repos/acme/new/pulls.svg", "unknown", "public, max-age=60", 200, false},
 		{"/badges/repos/acme/new/health.svg", "none", "public, max-age=60", 200, false},
 		{"/badges/groups/g/repos.svg", "2", "public, max-age=300", 200, true},
+		{"/badges/groups/g/pulls.svg", "unknown", "public, max-age=60", 200, false},
 		{"/badges/groups/g/health.svg", "41", "public, max-age=300", 200, true},
 		{"/badges/groups/g/last-commit.svg", "3 days ago", "public, max-age=300", 200, true},
 		{"/badges/groups/g/release.svg", "v1.2.3", "public, max-age=300", 200, true},

@@ -34,7 +34,7 @@ const hit = (over: Partial<Schemas["SearchHit"]>): Schemas["SearchHit"] => ({
 
 const result = (over: Partial<Schemas["SearchResult"]> = {}): Schemas["SearchResult"] => ({
   query: "sesion",
-  counts: { repo: 1, group: 0, doc: 2, dep: 0, package: 0, commit: 0 },
+  counts: { repo: 1, group: 0, doc: 2, dep: 0, package: 0, commit: 0, pull: 0 },
   corrections: [{ from: "sesion", to: "session" }],
   hits: [hit({}), hit({ kind: "repo", title: [{ text: "acme/whydah-core" }], url: "/repos/acme/whydah-core", snippet: [] })],
   page: { number: 1, size: 25, total: 3, pages: 2 },
@@ -78,7 +78,7 @@ describe("search", () => {
     server.use(
       http.get("/search", ({ response }) =>
         response(200).json(
-          result({ hits: [], corrections: [], counts: { repo: 0, group: 0, doc: 0, dep: 0, package: 0, commit: 0 } }),
+          result({ hits: [], corrections: [], counts: { repo: 0, group: 0, doc: 0, dep: 0, package: 0, commit: 0, pull: 0 } }),
         ),
       ),
     )

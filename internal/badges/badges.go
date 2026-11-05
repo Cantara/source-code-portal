@@ -104,12 +104,14 @@ type Data struct {
 	Health func(*snapshot.Snapshot, *snapshot.RepoEntry, time.Time) health.Repo
 	// Issues is a repository's open issues, its pull requests left out; nil: GitHub's count of both.
 	Issues func(*snapshot.RepoEntry) int
+	// Pulls is a repository's open pull requests and how many wait for a review (open -1: not read yet); nil: no pulls badge.
+	Pulls func(*snapshot.RepoEntry) (open, review int)
 	// Product is a group's weighed health at now.
 	Product func(*snapshot.Snapshot, snapshot.Group, time.Time) health.Product
 }
 
-// Handler serves GET /badges/repos/{owner}/{name}/{kind}.svg (last-commit, release, license, issues, health) and
-// GET /badges/groups/{group}/{kind}.svg (repos, health, last-commit, release) from the viewer's view of the current snapshot.
+// Handler serves GET /badges/repos/{owner}/{name}/{kind}.svg (last-commit, release, license, issues, pulls, health) and
+// GET /badges/groups/{group}/{kind}.svg (repos, health, last-commit, release, pulls) from the viewer's view of the current snapshot.
 func Handler(current func(context.Context) *snapshot.Snapshot, d Data) http.Handler {
 	h := handler{current: current, Data: d, now: time.Now}
 	mux := http.NewServeMux()
@@ -156,6 +158,8 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 	case "health":
 		r := h.Health(s, e, h.now())
 		b, data = score(r.Counted, r.Score, r.Level)
+	case "pulls":
+		b, data = h.pulls([]*snapshot.RepoEntry{e})
 	case "license":
 		b.label = "license"
 		switch l := e.Repo.License; l {
@@ -213,11 +217,44 @@ func (h handler) group(w http.ResponseWriter, r *http.Request) {
 		b.label = "last commit"
 	case "release":
 		b, data = release(groupRelease(s, g))
+	case "pulls":
+		es := make([]*snapshot.RepoEntry, 0, len(g.Members))
+		for _, k := range g.Members {
+			if e := s.Repos[k]; e != nil {
+				es = append(es, e)
+			}
+		}
+		b, data = h.pulls(es)
 	default:
 		h.write(w, r, unknown(""), http.StatusNotFound, false)
 		return
 	}
 	h.write(w, r, b, http.StatusOK, data)
+}
+
+// pulls is the pull requests badge of the repositories es: "3 open, 1 to review", green with none, unknown until every one is read.
+func (h handler) pulls(es []*snapshot.RepoEntry) (badge, bool) {
+	b := badge{label: "pull requests", message: "unknown", color: neutralColor}
+	if h.Pulls == nil {
+		return b, false
+	}
+	open, review := 0, 0
+	for _, e := range es {
+		o, r := h.Pulls(e)
+		if o < 0 {
+			return b, false
+		}
+		open, review = open+o, review+r
+	}
+	switch {
+	case open == 0:
+		b.message, b.color = "none open", successColor
+	case review > 0:
+		b.message, b.color = formatCount(open)+" open, "+formatCount(review)+" to review", infoColor
+	default:
+		b.message, b.color = formatCount(open)+" open", infoColor
+	}
+	return b, true
 }
 
 // read reports whether a fetch completed with an answer, content or none.

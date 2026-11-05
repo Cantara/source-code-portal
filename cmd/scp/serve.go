@@ -241,7 +241,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		external = egress.Guarded(10 * time.Second)
 	}
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view,
-		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth, Issues: pulls.Issues})},
+		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth, Issues: pulls.Issues, Pulls: pulls.Badge})},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /knowledge.yaml", Handler: md.KCP()}, {Pattern: "GET /.well-known/kcp.json", Handler: md.WellKnown()},
@@ -287,7 +287,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return names
 	}
 	searchAPI := search.API{Current: view, Observe: m.search}
-	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group()}.catalogue()
+	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, pulls: pulls.API{Current: view}, repo: md.Repo(), doc: md.Doc(), group: md.Group()}.catalogue()
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +381,7 @@ func llmsOptions(origin func(*http.Request) string) llms.Options {
 		},
 		Freshness:  func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
 		LastCommit: func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
+		Pulls:      pulls.Badge,
 		Origin:     origin,
 	}
 }

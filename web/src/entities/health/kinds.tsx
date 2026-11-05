@@ -1,5 +1,5 @@
 import type { ComponentType } from "react"
-import { ArchiveIcon, FlagIcon, HourglassIcon, InboxIcon, ScaleIcon, SyncOffIcon, TagIcon } from "@/components/ui/icons"
+import { ArchiveIcon, FlagIcon, HourglassIcon, InboxIcon, PullIcon, ScaleIcon, SyncOffIcon, TagIcon } from "@/components/ui/icons"
 import { cn } from "@/lib/cn"
 import type { Severity } from "@/lib/rules"
 
@@ -17,6 +17,8 @@ const kindIcons: Record<string, ComponentType<{ className?: string }>> = {
   unreleased: TagIcon,
   "no-licence": ScaleIcon,
   issues: InboxIcon,
+  reviews: PullIcon,
+  updates: PullIcon,
 }
 
 /** severities are the severities' colours; their names and where they start come from the rules. */

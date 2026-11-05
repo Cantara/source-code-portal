@@ -463,7 +463,7 @@ components:
   schemas:
     SearchKind:
       type: string
-      enum: [repo, group, doc, dep, package, commit]
+      enum: [repo, group, doc, dep, package, commit, pull]
     TextPart:
       type: object
       required: [text]
@@ -482,7 +482,7 @@ components:
         at: { type: string, format: date-time, description: "When it happened (a commit)" }
     SearchCounts:
       type: object
-      required: [repo, group, doc, dep, package, commit]
+      required: [repo, group, doc, dep, package, commit, pull]
       properties:
         repo: { type: integer }
         group: { type: integer }
@@ -490,6 +490,7 @@ components:
         dep: { type: integer }
         package: { type: integer }
         commit: { type: integer }
+        pull: { type: integer, description: Open pull requests }
     SearchCorrection:
       type: object
       required: [from, to]

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -39,6 +40,8 @@ type Options struct {
 	Technology func(*snapshot.Snapshot, *snapshot.RepoEntry) Technology
 	Freshness  func(*snapshot.RepoEntry) snapshot.Freshness // what the freshness counts and a group's status follow
 	LastCommit func(*snapshot.RepoEntry) time.Time          // the newest commit: the sitemap's lastmod; zero when unknown
+	// Pulls is a repository's open pull requests and how many wait for a review (open -1 when not read); nil: not said.
+	Pulls func(*snapshot.RepoEntry) (open, review int)
 	// Origin is the request's public origin, for the sitemap's absolute URLs when there is no server.public_url.
 	Origin func(*http.Request) string
 }
@@ -149,6 +152,7 @@ func (l *LLMs) Repo() http.Handler {
 			fmt.Fprintf(&b, "---\nscp:\n  repo: %s\n---\n\n# %s\n", quote(string(e.Repo.Key())), line(e.Repo.Owner+"/"+e.Repo.Name, maxDescription))
 		}
 		b.WriteString(l.technology(l.current(r.Context()), e))
+		b.WriteString(l.pulls(e))
 		serve(w, r, "text/markdown; charset=utf-8", b.Bytes())
 	})
 }
@@ -181,6 +185,19 @@ func (l *LLMs) technology(s *snapshot.Snapshot, e *snapshot.RepoEntry) string {
 		return ""
 	}
 	return "\n## Technology and dependencies\n\nRead by the portal from the repository's package manifests.\n\n" + b.String()
+}
+
+// pulls is the portal's line on a repository's open pull requests; empty when they are not read or Options.Pulls is unset.
+func (l *LLMs) pulls(e *snapshot.RepoEntry) string {
+	if l.opts.Pulls == nil {
+		return ""
+	}
+	open, review := l.opts.Pulls(e)
+	if open < 0 {
+		return ""
+	}
+	return fmt.Sprintf("\n## Pull requests\n\n%d open, %d waiting for a review: [whose turn each is](%s).\n", open, review,
+		l.url("/pulls?repo="+url.QueryEscape(string(e.Repo.Key()))+"&drafts=true"))
 }
 
 // Doc serves /repos/{owner}/{name}/docs/{path...}: the document whose path without its extension is path (an .md suffix on the

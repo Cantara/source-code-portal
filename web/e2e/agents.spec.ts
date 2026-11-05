@@ -45,6 +45,7 @@ test("the pages offer a browser's agent the portal's tools, which answer from th
       "get_repository",
       "list_groups",
       "open_page",
+      "open_pull_requests",
       "recent_commits",
       "repository_health",
       "repository_packages",

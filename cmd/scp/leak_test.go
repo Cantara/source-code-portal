@@ -162,13 +162,13 @@ func publicPaths(t *testing.T) []string {
 	return append(paths, "/llms.txt", "/llms-full.txt", "/knowledge.yaml", "/.well-known/kcp.json", "/sitemap.xml", "/sitemaps/1.xml",
 		"/groups/all.md", "/repos/acme/open/readme.md", "/repos/acme/zq-hidden/readme.md", "/repos/acme/zq-hidden/docs/docs/guide.md",
 		"/badges/repos/acme/zq-hidden/last-commit.svg", "/badges/repos/acme/zq-hidden/release.svg", "/badges/repos/acme/zq-hidden/license.svg",
-		"/badges/repos/acme/zq-hidden/issues.svg", "/badges/repos/acme/zq-hidden/health.svg", "/badges/groups/all/repos.svg",
+		"/badges/repos/acme/zq-hidden/issues.svg", "/badges/repos/acme/zq-hidden/pulls.svg", "/badges/repos/acme/zq-hidden/health.svg", "/badges/groups/all/repos.svg",
 		"/badges/groups/all/health.svg", "/badges/groups/all/last-commit.svg", "/badges/groups/all/release.svg",
 		"/images/acme/zq-hidden/00000000000000000000000000000000", "/badge/license/zq-hidden/main", "/commits/zq-hidden",
 		"/commits/acme/zq-hidden", "/contents/acme/zq-hidden/main", "/api/v1/events", "/api/v1/admin/layouts/dashboard",
 		"/api/v1/pages/present", "/api/v1/pages/dashboard", "/api/v1/admin/layouts/present", "/api/v1/admin/announcements",
 		// The search, by the private repository's name, its README's and commit's words, a filter and a prefix.
-		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=repo:zq-hidden",
+		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=repo:zq-hidden",
 		"/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search?q=zq-hidden&in=repo", "/api/v1/search/suggest?q=zq-hidden",
 		"/api/v1/search/suggest?q=zq-hid", "/opensearch.xml")
 }
@@ -198,7 +198,7 @@ func TestNoLeak(t *testing.T) {
 		}
 	}
 	for _, p := range []string{"/api/v1/pages/dashboard", "/api/v1/pages/present", "/api/v1/repos/acme/zq-hidden", "/api/v1/pulls", "/llms.txt", "/knowledge.yaml", "/api/v1/repos/acme/open/manifests",
-		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search/suggest?q=zq-hid"} {
+		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search/suggest?q=zq-hid"} {
 		if _, b, _ := get(p, staff...); !strings.Contains(b, "zq-hidden") {
 			t.Errorf("staff %s does not show the private repository:\n%s", p, b)
 		}
@@ -217,8 +217,9 @@ func TestNoLeakThroughTools(t *testing.T) {
 	input := func(name, repo string) string {
 		return map[string]string{
 			"search": `{"input":{"query":"` + repo + `"}}`, "list_groups": `{"input":{}}`, "get_group": `{"input":{"group":"all"}}`,
-			"get_document":   `{"input":{"owner":"acme","name":"` + repo + `","path":"docs/guide.md"}}`,
-			"recent_commits": `{"input":{"repo":"acme/` + repo + `","work":["hand","ai","automation"]}}`,
+			"get_document":       `{"input":{"owner":"acme","name":"` + repo + `","path":"docs/guide.md"}}`,
+			"recent_commits":     `{"input":{"repo":"acme/` + repo + `","work":["hand","ai","automation"]}}`,
+			"open_pull_requests": `{"input":{"repo":"acme/` + repo + `"}}`,
 		}[name]
 	}
 	nonce := regexp.MustCompile(`id=\\"[0-9a-f]+\\"`)

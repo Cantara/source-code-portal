@@ -21,6 +21,7 @@ type toolReads struct {
 	find             searchAPI
 	catalog          catalogAPI
 	commits          commitsAPI
+	pulls            pullsAPI
 	repo, doc, group http.Handler
 }
 
@@ -74,11 +75,11 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 	return tools.New(
 		tool("search", "Search the portal",
 			"Searches what the portal holds: repositories, groups, document sections (README and docs/), manifests and their dependencies, "+
-				"published packages and default-branch commits; not source code. The query is words (all required), \"phrases\", "+
-				"-exclusions, OR between two words, and filters: in:repo|group|doc|dep|package|commit, group:, repo:, lang:, topic:, "+
+				"published packages, default-branch commits and open pull requests; not source code. The query is words (all required), \"phrases\", "+
+				"-exclusions, OR between two words, and filters: in:repo|group|doc|dep|package|commit|pull, group:, repo:, lang:, topic:, "+
 				"lifecycle:, author:, kind:hand|ai|automation, dep: (a dependency's name), before: and after: (dates, 2026-11-05). Best first.",
 			schema([]string{"query"}, map[string]any{"query": prop("string", "The query, up to 256 characters"),
-				"in": map[string]any{"type": "string", "enum": []string{"repo", "group", "doc", "dep", "package", "commit"},
+				"in": map[string]any{"type": "string", "enum": []string{"repo", "group", "doc", "dep", "package", "commit", "pull"},
 					"description": "Only hits of this kind; the counts stay every kind's"}, "limit": limit}),
 			func(in map[string]any) string { return "Searching for " + arg(in, "query") }, r.search),
 		tool("list_groups", "List groups", "Lists the groups of repositories with their ids, names and sizes.", schema(nil, map[string]any{}),
@@ -100,12 +101,72 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 				}
 				return "Reading the latest commits"
 			}, r.recentCommits),
+		tool("open_pull_requests", "Open pull requests",
+			"Lists the open pull requests whose turn it is first, of everything, a group or one repository: each its state (needs review, "+
+				"ready to merge, changes requested, failing checks, conflicts, checks running, draft) and whom it waits for, who opened it "+
+				"(a person or automation such as Dependabot, Renovate or Snyk), when it was opened and last updated, and the counts by state.",
+			schema(nil, map[string]any{"group": prop("string", "A group id"), "repo": prop("string", "A repository as owner/name"),
+				"state": map[string]any{"type": "string", "enum": []string{"review", "ready", "changes", "failing", "conflicts", "checks", "draft"},
+					"description": "Only pull requests in this state"},
+				"by":    map[string]any{"type": "string", "enum": []string{"people", "automation"}, "description": "Only people's or automation's; default both"},
+				"limit": limit}),
+			func(in map[string]any) string {
+				if s := arg(in, "repo") + arg(in, "group"); s != "" {
+					return "Reading the pull requests of " + s
+				}
+				return "Reading the open pull requests"
+			}, r.openPulls),
 		repoTool("repository_health", "Repository health", "Reads a repository's health score, level and findings, its latest release, packages and activity.", "Checking the health of", r.health),
 		repoTool("repository_packages", "Repository packages", "Lists what a repository publishes to package registries (Maven, npm, PyPI, crates.io, Go, NuGet, ...) with the newest release of each.", "Reading the packages of", r.packages),
 	)
 }
 
 var errNotFound = errors.New("not found in the catalogue")
+
+// openPulls lists open pull requests whose turn first (design/pulls.md) with the counts by state.
+func (r toolReads) openPulls(ctx context.Context, in map[string]any) (tools.Result, error) {
+	limit := intArg(in, "limit", 20, 50)
+	params := oapi.ListPullsParams{Limit: &limit}
+	if g := arg(in, "group"); g != "" {
+		params.Group = &g
+	}
+	if p := strings.ToLower(arg(in, "repo")); p != "" {
+		params.Repo = &p
+	}
+	if st := arg(in, "state"); st != "" {
+		v := oapi.PullState(st)
+		params.State = &v
+	}
+	if by := arg(in, "by"); by != "" {
+		v := oapi.ListPullsParamsBy(by)
+		params.By = &v
+	}
+	res, err := r.pulls.ListPulls(ctx, oapi.ListPullsRequestObject{Params: params})
+	if err != nil {
+		return tools.Result{}, err
+	}
+	ok, isOK := res.(oapi.ListPulls200JSONResponse)
+	if !isOK {
+		return tools.Result{}, fmt.Errorf("the group or repository is %w", errNotFound)
+	}
+	c := ok.Body.Counts
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d open (%d by people, %d by automation): %d need review, %d ready to merge, %d changes requested, %d failing checks, "+
+		"%d with conflicts, %d checks running, %d drafts.\n\n", c.Open, c.People, c.Automation, c.States.Review, c.States.Ready,
+		c.States.Changes, c.States.Failing, c.States.Conflicts, c.States.Checks, c.States.Draft)
+	for _, p := range ok.Body.Pulls {
+		who := p.Author
+		if p.Bot {
+			who += " (automation)"
+		}
+		fmt.Fprintf(&b, "- [%s #%d](%s) %s, waits for %s: %s, by %s, opened %s, updated %s\n", p.Repo, p.Number, p.Url, p.State,
+			p.WaitsFor, p.Title, who, p.CreatedAt.UTC().Format("2006-01-02"), p.UpdatedAt.UTC().Format("2006-01-02"))
+	}
+	if len(ok.Body.Pulls) == 0 {
+		b.WriteString("No open pull requests.\n")
+	}
+	return tools.Result{Source: "/pulls", Text: b.String()}, nil
+}
 
 func day(t *time.Time) string {
 	if t == nil {

@@ -69,7 +69,7 @@ func (a API) Search(ctx context.Context, req oapi.SearchRequestObject) (oapi.Sea
 	}
 	r := ix.Search(ctx, q, only, (number-1)*size, size)
 	out.Counts = oapi.SearchCounts{Repo: r.Counts[KindRepo], Group: r.Counts[KindGroup], Doc: r.Counts[KindDoc], Dep: r.Counts[KindDep],
-		Package: r.Counts[KindPackage], Commit: r.Counts[KindCommit]}
+		Package: r.Counts[KindPackage], Commit: r.Counts[KindCommit], Pull: r.Counts[KindPull]}
 	for _, c := range r.Corrections {
 		out.Corrections = append(out.Corrections, oapi.SearchCorrection{From: c.From, To: c.To})
 	}

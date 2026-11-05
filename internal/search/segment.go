@@ -22,6 +22,7 @@ const (
 	KindDep
 	KindPackage
 	KindCommit
+	KindPull
 	kinds
 )
 
@@ -37,6 +38,8 @@ func (k Kind) String() string {
 		return "dep"
 	case KindPackage:
 		return "package"
+	case KindPull:
+		return "pull"
 	default:
 		return "commit"
 	}
@@ -84,8 +87,9 @@ func weights() weighting {
 			KindDep:     {FieldName: 6, FieldText: 3},
 			KindPackage: {FieldName: 6, FieldMeta: 1},
 			KindCommit:  {FieldTitle: 2, FieldText: 0.5, FieldAuthor: 2},
+			KindPull:    {FieldTitle: 3, FieldMeta: 1, FieldAuthor: 2},
 		},
-		kind: [kinds]float64{KindRepo: 1.5, KindGroup: 1.5, KindDoc: 1.2, KindDep: 1, KindPackage: 1, KindCommit: 0.8},
+		kind: [kinds]float64{KindRepo: 1.5, KindGroup: 1.5, KindDoc: 1.2, KindDep: 1, KindPackage: 1, KindCommit: 0.8, KindPull: 1},
 	}
 }
 
