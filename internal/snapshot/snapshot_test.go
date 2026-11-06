@@ -184,6 +184,18 @@ func TestPanickingIndexKeepsItsLastValue(t *testing.T) {
 	}
 }
 
+// An index that panics with nothing before it to keep (the first build) fails the build: no half-built snapshot is served.
+func TestPanickingFirstIndexKeepsTheOldSnapshot(t *testing.T) {
+	const bad Index[int] = "bad"
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), bad.Build(func(*Snapshot) int { panic("boom") }))
+	defer p.Close()
+	p.Update(func(b *Builder) { b.SetCatalogued() })
+	p.Flush()
+	if got := p.Current(); !got.BuiltAt.IsZero() || got.Catalogued {
+		t.Fatal("a snapshot whose first index panicked was published")
+	}
+}
+
 // notes and noteCount are a test feature's facet and index.
 const (
 	notes     Facet[[]string] = "notes"
