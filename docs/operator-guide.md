@@ -181,7 +181,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `cluster.name` | `dev` | the Hazelcast cluster name |
 | `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
-| `web.node` | `node` | the Node.js 24 executable that runs the bundle |
+| `web.node` | `node` | the Node.js executable that runs the bundle (26, the current LTS; 24 also runs it) |
 | `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4) and the announcements written in Admin (`announcements.json`, section 2.4.1); empty: the built-in layouts and the configured announcements, no saving |
 | `announcements[]` | `[]` | the deployment's announcements (section 2.4.1): `id`, `title`, `text`, `tone`, `starts`, `ends`, `place`, `link` (`label`, `url`), `lang`, `pages`, `audience`, `from`, `until`, `published`; at most 20 |
 | `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy, `nuget` the feed whose `index.json` is the service index, `rubygems` a gem server, `packagist` a Composer repository |
@@ -566,7 +566,7 @@ or Chrome was not relaunched. The Guide (`/guide#webmcp`) shows the same steps w
 ## 3. Run
 
 **Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.0.0.tar.gz`, the same for every platform) from
-the GitHub release, check them and run them with Node.js 24 on the `PATH` (or `web.node`):
+the GitHub release, check them and run them with Node.js 26 on the `PATH` (or `web.node`):
 
 ```sh
 sha256sum -c scp_2.0.0_checksums.txt --ignore-missing

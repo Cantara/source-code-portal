@@ -152,7 +152,7 @@ contrast in both themes. The header shows whether the live stream is open (`Live
   `X-Forwarded-*`, removes the identity headers, keeps the response's caching headers; an unreachable child answers 503 with
   `Retry-After: 5`.
 - Release: `scp-web_<version>.tar.gz` (the bundle) beside the binaries, in the signed checksums; the image is
-  `distroless/nodejs24-debian13` with `/scp`, the bundle in `/web`, `SCP_WEB_DIR=/web` and `SCP_WEB_NODE=/nodejs/bin/node`.
+  `distroless/nodejs26-debian13` with `/scp`, the bundle in `/web`, `SCP_WEB_DIR=/web` and `SCP_WEB_NODE=/nodejs/bin/node`.
 
 ## Tests
 - `vitest` + Testing Library (jsdom) + MSW typed from `paths`, any unmocked request fails (`app/views.test.tsx`, `entities/entities.test.tsx`,

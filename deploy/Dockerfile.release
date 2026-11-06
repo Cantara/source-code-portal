@@ -1,7 +1,7 @@
 # Release image: the final stage of deploy/Dockerfile around the binary GoReleaser built and the web bundle release.yml built, so the
 # bytes in the image are the bytes in the signed archives. GoReleaser's dockers_v2 lays the build context out as <os>/<arch>/scp
 # ($TARGETPLATFORM selects the binary) plus the extra file web/bundle.
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:b8cec4b2f2126ff7bd034ec9ac207ffb3272667dfdc48376e3b035d3270549ba
+FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:9b945e92c1b5463a4b75f11e8417515e4bea7355f6adfd79ec220fbbe905dda8
 ARG BUILD_ID=dev
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="Source Code Portal" \

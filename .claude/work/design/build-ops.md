@@ -130,8 +130,8 @@ format, `vitest`, build); job `e2e` (Playwright Chromium, bundle build, `pnpm -C
 `docker run --read-only --cap-drop=ALL scp:dev version` and a Node check for `/web/server.js`); job `gate` (`if: always()`, `needs` all
 other jobs, fails when any failed, was cancelled or skipped) is the one required check; a new job joins the gate's `needs` list.
 
-Image (`deploy/Dockerfile`, every base by digest): `node:24-alpine` with pnpm builds `web/bundle` -> `golang:1.27.2-alpine` builds the
-static binary and runs `scp version` -> `gcr.io/distroless/nodejs24-debian13:nonroot` with `/scp`, the bundle in `/web`,
+Image (`deploy/Dockerfile`, every base by digest): `node:26-alpine` with pnpm builds `web/bundle` -> `golang:1.27.3-alpine` builds the
+static binary and runs `scp version` -> `gcr.io/distroless/nodejs26-debian13:nonroot` with `/scp`, the bundle in `/web`,
 `SCP_WEB_DIR=/web` and `SCP_WEB_NODE=/nodejs/bin/node`; UID 65532, `/data` the writable volume for SQLite, `EXPOSE 9090 9091`,
 `ENTRYPOINT ["/scp"]`, `CMD ["serve"]`, OCI labels. It runs with a read-only root filesystem and all capabilities dropped; SQLite uses
 `temp_store=MEMORY`, so `/data` is the only writable mount.

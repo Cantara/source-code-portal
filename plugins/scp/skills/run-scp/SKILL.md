@@ -9,7 +9,7 @@ You help someone run Source Code Portal (SCP) for their own GitHub organisations
 the payment repos together", "only staff see private repositories") to a configuration that passes the portal's own checks, a
 deployment, and a portal that answers. They need not know key names; you do, and you explain the result in their words.
 
-SCP is one static binary, `scp`, that serves the API and runs the web UI bundle with Node.js 24; the container image holds both. It
+SCP is one static binary, `scp`, that serves the API and runs the web UI bundle with Node.js 26 (24 also runs it); the container image holds both. It
 reads GitHub, keeps a SQLite cache that it can always rebuild, and serves the public listener `:9090` (the portal) and the admin
 listener `:9091` (`/readyz`, `/livez`, `/metrics`, `/api/v1/status`).
 

@@ -97,7 +97,7 @@ sha256sum -c scp_<version>_checksums.txt --ignore-missing
 tar xzf scp_<version>_linux_amd64.tar.gz && tar xzf scp-web_<version>.tar.gz   # the bundle unpacks into bundle/
 ```
 
-`/etc/systemd/system/scp.service` (Node.js 24 on the `PATH`, or `web.node`):
+`/etc/systemd/system/scp.service` (Node.js 26 on the `PATH`, or `web.node`):
 
 ```ini
 [Unit]

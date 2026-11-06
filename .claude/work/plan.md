@@ -72,7 +72,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | Sign-in | `coreos/go-oidc` v3, `golang.org/x/oauth2` |
 | Language models | own `net/http` adapters for the Anthropic Messages and OpenAI Chat Completions wire formats (P-28) |
 | Tests | `testing`, `testing/synctest`, `go-cmp`, `goleak` |
-| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, react-markdown with remark-gfm (the assistant's answers), Vitest, MSW, Playwright with axe; pnpm 12, Node.js 24 |
+| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, react-markdown with remark-gfm (the assistant's answers), Vitest, MSW, Playwright with axe; pnpm 12, Node.js 26 |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, cosign, Renovate |
 
 ## 4. Work
