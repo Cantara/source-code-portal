@@ -4,6 +4,32 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.4
+
+The presentation page, open pull requests and issues, announcements and commit diff stats; the dashboard's side panel in sections.
+No configuration change is needed to upgrade. Pull requests and issues need the GitHub App's *Pull requests* and *Issues* read
+permissions and their events (the operator guide, section 1): without them the portal says what is missing and keeps working, or
+`features.pulls: false` and `features.issues: false` switch them off.
+
+- `/present`, the fleet on one screen for a tablet, a desk or a wall: the status strip with the data's age, the fleet by health,
+  products as tiles that fold the good ones, and a side column. Profiles (Handheld portrait, Handheld landscape, Desk, Wall) each
+  keep their own column width; on a wall it stays awake, reloads and shifts against burn-in. An admin designs it as the dashboard.
+- Open pull requests and whose turn each is (`/pulls`, `GET /api/v1/pulls`, the tool `open_pull_requests`, search `in:pull`, the
+  pulls badges); open issues and where each stands (`/issues`, `GET /api/v1/issues`, the tool `open_issues`, search `in:issue`).
+  The health findings for reviews waiting and old updates come from them.
+- The dashboard's side panel and `/present`'s side column in sections: the latest commits, the pull requests (newest first) and the
+  issues (newest first), sharing the height equally, each scrolling on its own and loading more at its end, each hidden by its
+  button; all hidden, the panel folds to a rail. Each screen remembers its choice.
+- Announcements at the top of the dashboard and `/present`, from `scp.yaml` and written by admins in the pages, with QR codes on
+  `/present`.
+- Commit diff stats (+a −d and a five-block bar) in every commit list, from GitHub's GraphQL API, for the last 90 days.
+- The portal says what GitHub must grant each feature: `GET /api/v1/prerequisites`, the warnings on the admin status and the pages.
+  It stays read-only towards GitHub, and the App subscribes only to the events that change what it shows.
+- `features.pulls` and `features.issues` (default on) switch a feature off everywhere: pages, API, tools, search, badges, sitemap.
+- The public cannot tell a portal with private repositories from one without them.
+- The Guide covers the presentation page, pull requests, issues and trying WebMCP in Chrome; the operator guide, the API guide and
+  the operators' plugin follow.
+
 ## 2.2.3
 
 Search across what the portal holds. No configuration change is needed to upgrade: the index is built in memory from what the portal
