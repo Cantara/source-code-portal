@@ -1,6 +1,6 @@
 # Alumni: the retired repositories (AL1, AL2)
 
-Status: AL1 built, AL2 in progress (plan.md section 4, P-81). Binding order: ../plan.md > this note > `catalog.md`, `health.md`, `layout.md`.
+Status: AL1 built, AL2 in progress (the tool, llms, docs and the Guide are built; the group's `N retired` link is left) (plan.md section 4, P-81). Binding order: ../plan.md > this note > `catalog.md`, `health.md`, `layout.md`.
 
 A catalogue only grows. A repository that was archived, or that its owners marked deprecated, is no longer work in progress, but it
 is still a record: what it was, who built it, when it last moved, what it last released, and what still depends on it. The portal
@@ -52,8 +52,8 @@ saying why it is retired and since when it was last active.
 ## Agents and the rest (AL2)
 
 The tool `retired_repositories` (the catalogue of `cmd/scp/tools.go`: same parameters as the API), the search kind `alumni`
-filter is not needed (a retired repository is already found by name; its row says *Archived*), `llms.txt` lists them in their own
-section, the badges are unchanged. Docs, the Guide's section on the Alumni, the plugin's reference.
+filter is not needed (a retired repository is already found by name; its row says *Archived*), `llms.txt` marks a retired repository with
+its reason (`archived`; `deprecated` is its lifecycle already) and links the JSON list, the badges are unchanged. Docs, the Guide's section on the Alumni, the plugin's reference.
 
 ## Tests
 
