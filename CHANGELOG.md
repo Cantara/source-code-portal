@@ -4,6 +4,16 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.6
+
+Dependency updates only; no configuration change is needed to upgrade.
+
+- Next.js 16.4.5 (security fixes for `use cache`, Cache Components, the image optimiser and the edge runtime) and oapi-codegen 2.8.2
+  (security release; the generated code is unchanged), with Vite 8.3.6, TanStack Query 5.106.1, goldmark 2.1.15, SQLite (modernc) 1.61.1,
+  pnpm 12.18, GoReleaser 2.20 and docker/login-action 4.8. TypeScript stays on 6 for the tooling API and on 7.0 for `tsc`.
+- The documents pipeline builds its Markdown extensions per render (goldmark 2.1.14 deprecated the shared ones); rendered output is
+  unchanged.
+
 ## 2.2.5
 
 Fixes from a review of the code, webhooks that are not lost, and every dependency brought up to date. No configuration change is needed
