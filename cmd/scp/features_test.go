@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gogh "github.com/google/go-github/v92/github"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -26,7 +27,7 @@ func busy(gh **githubtest.Server) func(*githubtest.Server) {
 // count of issues and pull requests together and says so.
 func TestFeaturesOff(t *testing.T) {
 	var gh *githubtest.Server
-	get, _ := privatePortalAt(t, "access: {private_groups: [staff]}\nfeatures: {pulls: false, issues: false}\n", busy(&gh))
+	get, base := privatePortalAt(t, "access: {private_groups: [staff]}\nfeatures: {pulls: false, issues: false}\n", busy(&gh))
 	for _, l := range gh.Ledger() {
 		if strings.Contains(l, "/pulls") || strings.Contains(l, "/issues") {
 			t.Errorf("GitHub asked for a switched-off feature: %s", l)
@@ -46,6 +47,7 @@ func TestFeaturesOff(t *testing.T) {
 		strings.Contains(b, `"pull"`) || strings.Contains(b, `"issue"`) {
 		t.Errorf("tools name a switched-off feature: %s", b)
 	}
+	mcpHolds(t, base, false, false)
 	if _, b, _ := get("/sitemap.xml"); strings.Contains(b, "/pulls") || strings.Contains(b, "/issues") {
 		t.Errorf("sitemap: %s", b)
 	}
@@ -70,7 +72,7 @@ func TestFeaturesOff(t *testing.T) {
 // TestPullsOff: with pull requests off and issues on, the issues stay, and the Backlog judges the issues read, exact.
 func TestPullsOff(t *testing.T) {
 	var gh *githubtest.Server
-	get, _ := privatePortalAt(t, "access: {private_groups: [staff]}\nfeatures: {pulls: false}\n", busy(&gh))
+	get, base := privatePortalAt(t, "access: {private_groups: [staff]}\nfeatures: {pulls: false}\n", busy(&gh))
 	var d oapi.RepoDetail
 	var body string
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
@@ -93,9 +95,44 @@ func TestPullsOff(t *testing.T) {
 	if _, b, _ := get("/api/v1/tools", staff...); strings.Contains(b, "open_pull_requests") || !strings.Contains(b, "open_issues") {
 		t.Errorf("tools: %s", b)
 	}
+	mcpHolds(t, base, false, true)
 	for _, l := range gh.Ledger() {
 		if strings.Contains(l, "/pulls") {
 			t.Errorf("GitHub asked for the pull requests: %s", l)
 		}
+	}
+}
+
+// mcpHolds checks what an agent finds over MCP: the tools of the features switched on and none of the others, the search's kinds
+// the same, and a call of a switched-off tool refused.
+func mcpHolds(t *testing.T, base string, pulls, issues bool) {
+	t.Helper()
+	s := mcpSession(t, base, "")
+	list, err := s.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	has := map[string]bool{}
+	var search string
+	for _, tool := range list.Tools {
+		has[tool.Name] = true
+		if tool.Name == "search" {
+			b, _ := json.Marshal(tool.InputSchema)
+			search = string(b) + tool.Description
+		}
+	}
+	for name, kind := range map[string]string{"open_pull_requests": `"pull"`, "open_issues": `"issue"`} {
+		on := name == "open_pull_requests" && pulls || name == "open_issues" && issues
+		if has[name] != on || strings.Contains(search, kind) != on {
+			t.Errorf("MCP %s listed %v, search kind %s %v; want %v:\n%s", name, has[name], kind, strings.Contains(search, kind), on, search)
+		}
+		if !on {
+			if r, err := s.CallTool(t.Context(), &mcp.CallToolParams{Name: name, Arguments: map[string]any{}}); err == nil && !r.IsError {
+				t.Errorf("MCP called the switched-off %s: %s", name, text(r))
+			}
+		}
+	}
+	if !has["search"] || !has["recent_commits"] {
+		t.Errorf("MCP tools: %v", has)
 	}
 }

@@ -57,8 +57,8 @@ The findings judge only what the portal reads:
 
 - `internal/config`: the keys, their defaults, an unknown key refused.
 - `cmd/scp`: a portal with each switch off and both off against the fake GitHub: no request of a switched-off kind reaches it
-  (the ledger), the routes, tools, MCP list, search kinds, badges, sitemap and rules as above; the Backlog count in each of the
-  three cases.
+  (the ledger), the routes, tools, search kinds, badges, sitemap and rules as above; over MCP (`mcpHolds`) the tools listed, the
+  search's kinds and a switched-off tool's call refused; the Backlog count in each of the three cases.
 - `internal/health`: `Describe` without the pull request rules.
 - `web`: Vitest for the header and the repository page without each feature; one Playwright run of the e2e server with
   `features.pulls: false` is not added (the Go test covers the answers; the web reads one flag).
