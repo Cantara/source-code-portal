@@ -132,14 +132,7 @@ func newNonce() string {
 // Origin is the portal's public origin: server.public_url, else the scheme and host the request arrived with (the scheme from a
 // trusted proxy's X-Forwarded-Proto).
 func (o Options) Origin(r *http.Request) string {
-	if u, err := url.Parse(o.PublicURL); err == nil && u.Host != "" {
-		return u.Scheme + "://" + u.Host
-	}
-	scheme := "http"
-	if r.TLS != nil || o.fromTrusted(r) && r.Header.Get("X-Forwarded-Proto") == "https" {
-		scheme = "https"
-	}
-	return scheme + "://" + r.Host
+	return PortalOrigin(r, o.PublicURL, o.fromTrusted(r) && r.Header.Get("X-Forwarded-Proto") == "https")
 }
 
 func hasReservedPrefix(p string) bool {

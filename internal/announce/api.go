@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"mime"
 	"net/http"
 	"slices"
 
@@ -60,10 +59,6 @@ func (h admin) get(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h admin) put(w http.ResponseWriter, r *http.Request) {
-	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
-		httpapi.WriteProblem(w, http.StatusUnsupportedMediaType, "unsupported-media-type", "Send the announcements as application/json.")
-		return
-	}
 	switch {
 	case !httpapi.SameOrigin(r, h.publicURL):
 		httpapi.WriteProblem(w, http.StatusForbidden, "cross-origin", "Change the announcements from the portal's own pages.")
@@ -73,10 +68,7 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body saveBody
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil {
-		httpapi.WriteProblem(w, http.StatusBadRequest, "validation-failed", "The body is not a list of announcements.")
+	if !httpapi.JSONBody(w, r, &body, "the announcements", "The body is not a list of announcements.") {
 		return
 	}
 	b, err := h.n.check(body.Announcements)
