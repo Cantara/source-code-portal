@@ -42,6 +42,7 @@ func TestPublicTwin(t *testing.T) {
 	outsider := []string{"Authorization", "Bearer " + outsiderSecret}
 	for _, p := range append(publicPaths(t), edgePaths...) {
 		for _, h := range [][]string{{"Accept", "*/*"}, {"Accept", "text/markdown"}, outsider} {
+			h = streamed(p, h...)
 			code, b, _ := get(p, h...)
 			tc, tb, _ := twin(p, h...)
 			if code != tc || normal(b) != normal(tb) {
