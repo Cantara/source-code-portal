@@ -3,14 +3,14 @@
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-GOLANGCI_LINT_VERSION := 2.14.0
+GOLANGCI_LINT_VERSION := 2.15.0
 PNPM ?= pnpm
 VERSION ?= dev
 CONFIG ?= scp.yaml
 BUILD_ID ?= $(shell git rev-parse HEAD 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.build=$(BUILD_ID)
 
-.PHONY: help web build gen lint test e2e check image run dev clean need-golangci
+.PHONY: help web build gen lint test e2e check hooks image run dev clean need-golangci
 
 help: ## list targets
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
@@ -50,6 +50,9 @@ check: gen ## the gate: generated code current, modules tidy, lint, test
 	git diff --exit-code
 	go mod tidy -diff
 	$(MAKE) lint test e2e
+
+hooks: ## switch on the pre-commit hook (gofmt and Prettier on what is staged) for this clone
+	git config core.hooksPath .githooks
 
 image: ## build the container image scp:dev
 	docker build -f deploy/Dockerfile --build-arg VERSION=$(VERSION) --build-arg BUILD_ID=$(BUILD_ID) -t scp:dev .

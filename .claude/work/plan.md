@@ -126,3 +126,12 @@ Each milestone starts with its design note and lands as small commits on `main`,
 - The agent decides and records decisions in `decisions.md`; open questions are not left in documents.
 - No test touches the network: a fake GitHub server and recorded fixtures.
 - Planning stays under `.claude/work/`; `docs/` is user documentation; finished work moves to `.claude/work/history/`.
+
+## Complexity backlog
+
+`.golangci.yml` holds `gocyclo` at 45 and `gocognit` at 65 (tests excepted): the worst functions today, so none gets harder to read. These are the ones past
+a sensible limit (cyclomatic 25, cognitive 40), to split when their code is next changed, worst first, then the ceilings come down:
+`search.(*Index).run` (cognitive 106, suppressed), `pulls.readPulls` (62), `issues.readIssues` (58), `packages.PyPI.project` (55),
+`cmd/scp.newServer` (53), `commits.sides` (50), `cmd/scp.searchRead` (48), `httpapi.Options.wrap` (44), `commits.layout` (43), `docs.rewrite` (42);
+cyclomatic: `search.(*Index).run` (43), `cmd/scp.newServer` (42), `config.Announcement.check` (35), `commits.API.GetHistory` (31), `packages.Client.Get` (31), `manifests.parsePOM` (30), `search.Parse` (30),
+`layout.check` (28), `config.Packages.validate` (27), `config.GitHub.validate` (27), `packages.parseVersion` (26), `catalog.ParseDescriptor` (26).
