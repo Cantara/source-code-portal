@@ -15,7 +15,9 @@ import type { Ctx } from "@/lib/page"
 import { panels } from "./repos/[owner]/[name]/panels"
 import { StatusBanners } from "@/features/status/banners"
 import { setLocation } from "@/test/navigation"
-import { activity, commit, fresh, http, noPulls, server, snapshot } from "@/test/server"
+import { MainNav } from "./shell"
+import { RulesProvider } from "@/lib/rules-context"
+import { activity, commit, fresh, http, noPulls, rules, server, snapshot } from "@/test/server"
 
 function client() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10_000 } } })
@@ -193,6 +195,26 @@ describe("pages", () => {
     await user.click(within(table).getByRole("button", { name: /Commits, 30 days/ }))
     expect(within(table).getByRole("columnheader", { name: /Commits, 30 days/ })).toHaveAttribute("aria-sort", "descending")
     expect(document.cookie).toContain("scp-view-products=table")
+  })
+
+  it("leaves out the pull requests and issues an operator switched off", async () => {
+    const off = { ...rules, features: { pulls: false, issues: false } }
+    show(
+      <RulesProvider rules={off}>
+        <MainNav />
+        <GroupView group="iam" />
+      </RulesProvider>,
+      "/groups/iam",
+    )
+    await screen.findByRole("heading", { level: 1, name: "IAM" })
+    const nav = within(screen.getByRole("navigation", { name: "Main" }))
+    expect(nav.getByRole("link", { name: "Commits" })).toBeInTheDocument()
+    expect(nav.queryByRole("link", { name: "Pull requests" })).not.toBeInTheDocument()
+    expect(nav.queryByRole("link", { name: "Issues" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("columnheader", { name: /PRs/ })).not.toBeInTheDocument()
+    expect(screen.getByRole("columnheader", { name: /Issues/ })).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /open issues$/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Pull requests" })).not.toBeInTheDocument()
   })
 
   it("filters and sorts the repositories of a group through the URL", async () => {

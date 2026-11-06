@@ -31,6 +31,14 @@ it matters: the page of the feature (`/pulls`, `/issues`) says the feature is of
 refuses a feature's reads (403) for most repositories. `GET /api/v1/prerequisites` gives the same; only an administrator sees the
 missing permissions, the accounts and the fix.
 
+**Doing without pull requests or issues.** An App without the *Pull requests*, *Checks* and *Commit statuses* permissions, or
+without *Issues*, can switch the feature off instead of leaving it empty: `features.pulls: false`, `features.issues: false` (section
+2). A switched-off feature is not there at all: GitHub is never asked for it, its row above is not checked (no warning), and it has no
+page, header link, panel, dashboard element, tool, search kind, badge or sitemap entry; leave its events unticked too. The rest
+works with what it still reads: the findings of pull requests (*waiting for review*, *old updates*) are not made, and the *backlog*
+finding judges the best count held: the issues read, else GitHub's count less the open pull requests read, else GitHub's own count
+of issues and pull requests together, which the finding then says.
+
 **After changing an App's permissions** GitHub asks each installation to accept them: an owner of the organisation (Organization
 settings, GitHub Apps, the App, *Review request*). Until then the installation keeps its old permissions and the warning stays. Check
 it with `gh api /orgs/<org>/installations --jq '.installations[] | {app_slug, permissions, events}'`.
@@ -172,6 +180,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `packages.registries[].auth` | none | `user` and `password_file` (Basic; the password may be an access token), or `token_file` (a bearer token), with `header` to send it in another header (`X-JFrog-Art-Api`, or `Authorization` for Cargo's raw token) |
 | `packages.public` | `true` | ask the public registries too (Maven Central, npm, PyPI, crates.io, proxy.golang.org, CocoaPods trunk, nuget.org, rubygems.org, Packagist) for public repositories; `false`: only the configured ones and those the build files name |
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
+| `features.pulls` | `true` | the open pull requests (section 2.4.2); `false`: switched off, as if the portal had none (section 1) |
+| `features.issues` | `true` | the open issues (section 2.4.3); `false`: switched off (section 1) |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
 
@@ -422,6 +432,7 @@ The dashboard's telemetry and the presentation page's strip count them, the dash
 repository's open issues no longer count its pull requests, and two findings cost points: a person's pull request idle while waiting
 for a review (more than 7 days, more than 30), and automation's left open for more than 30 days. They need the App's *Pull requests*,
 *Checks* and *Commit statuses* read permissions (section 1); without them GitHub refuses the listing and `/pulls` stays empty.
+`features.pulls: false` switches them off (section 1).
 
 ### 2.4.3 Issues
 
@@ -433,6 +444,7 @@ dependency dashboard is automation), those needing triage first, then the longes
 product, the repository, whose and the order are a form that works without JavaScript. A group's and a repository's page have a panel
 with the ones that wait longest, and the group table's issue counts link to them. The dashboard keeps its signal, the *backlog*
 finding. They need the App's *Issues* read permission (section 1); without it GitHub refuses the listing and `/issues` stays empty.
+`features.issues: false` switches them off (section 1).
 
 ### 2.5 Published packages
 
@@ -686,7 +698,7 @@ steps, and job failures. Secrets are never logged.
 | Symptom | Look at |
 |---|---|
 | `config check` exits 2 | every problem is listed with its key; unknown keys and `SCP_*` variables are errors |
-| `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub prerequisites* card names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation (section 1) |
+| `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub prerequisites* card names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation, or switch the feature off with `features.pulls` or `features.issues` (section 1) |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
 | A repository is missing | it must be public, not a fork (unless `include_forks`), not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it) |
 | Pushes show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository, `scp_webhook_deliveries_total` by result |

@@ -597,7 +597,7 @@ components:
     Repo:
       type: object
       required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, topics, archived, fork,
-                 stars, openIssues, openPulls, pushedAt, lastCommitAt, lastAuthoredAt, release, packages, language, groups, health, freshness]
+                 stars, openIssues, openIssuesWithPulls, openPulls, pushedAt, lastCommitAt, lastAuthoredAt, release, packages, language, groups, health, freshness]
       properties:
         address: { type: string, description: "Lower-case owner/name, used in URLs" }
         owner: { type: string }
@@ -612,7 +612,8 @@ components:
         archived: { type: boolean }
         fork: { type: boolean }
         stars: { type: integer }
-        openIssues: { type: integer, description: "Open issues; GitHub's count of issues and pull requests together until the pull requests are read" }
+        openIssues: { type: integer, description: "Open issues, the best count held: the issues read, else GitHub's count less the open pull requests read, else GitHub's count of both (openIssuesWithPulls)" }
+        openIssuesWithPulls: { type: boolean, description: "openIssues counts the open pull requests too: neither is read (switched off, or not yet)" }
         openPulls: { type: [integer, "null"], description: Open pull requests; null until read }
         pushedAt: { type: string, format: date-time }
         lastCommitAt: { type: [string, "null"], format: date-time, description: The newest default-branch commit; null until read }
@@ -627,9 +628,16 @@ components:
     ActivityLevel: { type: string, enum: [active, recent, quiet, dormant, archived], description: "How recently the work that counts changed a repository; the ages are in /rules" }
     Rules:
       type: object
-      required: [windowDays, levels, severities, activity, findings]
+      required: [windowDays, levels, severities, activity, findings, features]
       properties:
         windowDays: { type: integer, description: The days the activity counts cover }
+        features:
+          type: object
+          description: "The parts an operator may switch off (features in scp.yaml); a switched-off one has no pages, data, tools or findings"
+          required: [pulls, issues]
+          properties:
+            pulls: { type: boolean, description: The open pull requests }
+            issues: { type: boolean, description: The open issues }
         levels: { type: array, items: { $ref: "#/components/schemas/LevelRule" } }
         severities: { type: array, items: { $ref: "#/components/schemas/SeverityRule" } }
         activity: { type: array, items: { $ref: "#/components/schemas/ActivityRule" } }

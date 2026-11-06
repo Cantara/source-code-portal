@@ -31,6 +31,10 @@
       "withinDays": null
     }
   ],
+  "features": {
+    "issues": true,
+    "pulls": true
+  },
   "findings": [
     {
       "about": "No one has worked on it for 2 years: archive it, or bring it back to life.",

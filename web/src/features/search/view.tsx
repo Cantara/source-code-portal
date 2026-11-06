@@ -12,6 +12,7 @@ import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { kinds, maxQuery, searchHref, searchQuery, searchState, type Hit, type SearchState } from "./api"
 import { Parts } from "./parts"
+import { useFeatures } from "@/lib/rules-context"
 
 /** Problem is a refused query's problem as the server rendered it. */
 export interface Problem {
@@ -163,12 +164,17 @@ function HitItem({ hit }: { hit: Hit }) {
 
 /** Help is the query language, shown before a search and when nothing was found. */
 function Help() {
+  const features = useFeatures()
+  const one = kinds
+    .filter((k) => (k.kind !== "pull" || features.pulls) && (k.kind !== "issue" || features.issues))
+    .map((k) => k.kind)
+    .join(", ")
   const rows: [string, string][] = [
     ["session timeout", "every word, anywhere: names, documents, dependencies, packages and commits"],
     ['"session timeout"', "the words next to each other"],
     ["oauth -legacy", "without a word"],
     ["oauth OR saml", "either word"],
-    ["in:doc, in:issue", "one kind: repo, group, doc, dep, package, commit, pull, issue"],
+    ["in:doc, in:commit", `one kind: ${one}`],
     ["group:iam repo:whydah", "within a group, or repositories whose name holds a word"],
     ["lang:java topic:iam lifecycle:production", "a repository's language, topic or lifecycle"],
     ["dep:slf4j", "repositories that depend on a package"],

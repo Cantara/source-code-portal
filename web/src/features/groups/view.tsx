@@ -26,6 +26,7 @@ import { cn } from "@/lib/cn"
 import { FindingList, HealthScore } from "@/entities/health/findings"
 import { VisibilityBadge } from "@/entities/repo/visibility-badge"
 import { groupQuery, issuesQuery, pullsQuery } from "@/lib/api/queries"
+import { useFeatures } from "@/lib/rules-context"
 import { PullList } from "@/entities/pull/pull"
 import { IssueList } from "@/entities/issue/issue"
 import { groupCommitsQuery, groupIssues, groupPulls } from "./api"
@@ -145,6 +146,8 @@ export function GroupView({ group }: { group: string }) {
   const text = q ?? ""
   const now = useNow()
   const { data, error } = useQuery(groupQuery(api, group))
+  const features = useFeatures()
+  const shown = columns.filter((c) => c.key !== "pulls" || features.pulls)
   const repos = data ? view(data.repos, text, sort, desc) : []
   // One owner (the usual case) goes unsaid on every row; several are named.
   const owners = new Set(data?.repos.map((r) => r.owner) ?? [])
@@ -202,7 +205,7 @@ export function GroupView({ group }: { group: string }) {
                 <table className="w-full text-sm">
                   <caption className="sr-only">Repositories of {data.name}, sortable by every column</caption>
                   <thead>
-                    <tr className="border-b border-border text-xs text-muted-foreground">{columns.map(header)}</tr>
+                    <tr className="border-b border-border text-xs text-muted-foreground">{shown.map(header)}</tr>
                   </thead>
                   <tbody>
                     {repos.map((r) => {
@@ -247,21 +250,38 @@ export function GroupView({ group }: { group: string }) {
                             )}
                           </td>
                           <td className="px-3 py-2 text-center font-mono tabular-nums">
-                            <Link href={`/issues?repo=${encodeURIComponent(r.address)}`} className="hover:underline">
-                              {count(r.openIssues)}
-                              <span className="sr-only"> open issues</span>
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2 text-center font-mono tabular-nums">
-                            {r.openPulls === null ? (
-                              none
-                            ) : (
-                              <Link href={`/pulls?repo=${encodeURIComponent(r.address)}`} className="hover:underline">
-                                {count(r.openPulls)}
-                                <span className="sr-only"> open pull requests</span>
+                            {features.issues ? (
+                              <Link href={`/issues?repo=${encodeURIComponent(r.address)}`} className="hover:underline">
+                                {count(r.openIssues)}
+                                <span className="sr-only"> open issues</span>
                               </Link>
+                            ) : (
+                              <span
+                                title={
+                                  r.openIssuesWithPulls
+                                    ? "Open issues and pull requests together, as GitHub counts them"
+                                    : undefined
+                                }
+                              >
+                                {count(r.openIssues)}
+                                <span className="sr-only">
+                                  {r.openIssuesWithPulls ? " open issues and pull requests" : " open issues"}
+                                </span>
+                              </span>
                             )}
                           </td>
+                          {features.pulls && (
+                            <td className="px-3 py-2 text-center font-mono tabular-nums">
+                              {r.openPulls === null ? (
+                                none
+                              ) : (
+                                <Link href={`/pulls?repo=${encodeURIComponent(r.address)}`} className="hover:underline">
+                                  {count(r.openPulls)}
+                                  <span className="sr-only"> open pull requests</span>
+                                </Link>
+                              )}
+                            </td>
+                          )}
                           <td className="px-3 py-2 font-mono whitespace-nowrap">
                             <RelativeTime at={lastChange(r)} />
                           </td>
@@ -281,12 +301,16 @@ export function GroupView({ group }: { group: string }) {
           </section>
           <div className="flex min-w-0 flex-col gap-6">
             {data.health && <GroupHealth health={data.health} />}
-            <PanelBoundary>
-              <GroupPulls group={group} />
-            </PanelBoundary>
-            <PanelBoundary>
-              <GroupIssues group={group} />
-            </PanelBoundary>
+            {features.pulls && (
+              <PanelBoundary>
+                <GroupPulls group={group} />
+              </PanelBoundary>
+            )}
+            {features.issues && (
+              <PanelBoundary>
+                <GroupIssues group={group} />
+              </PanelBoundary>
+            )}
             <PanelBoundary>
               <LatestCommits group={group} />
             </PanelBoundary>

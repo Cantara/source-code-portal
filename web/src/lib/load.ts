@@ -29,6 +29,22 @@ export async function load<T, K extends QueryKey>(
 }
 
 /**
+ * list fetches a list page's query on the server, whose filter may name nothing (its own 404 is then the page's answer): a feature
+ * switched off (problem switched-off) shows the not-found page, any other failure gives undefined.
+ */
+export async function list<T, K extends QueryKey>(
+  qc: QueryClient,
+  options: QueryExecuteOptions<T, Error, T, T, K>,
+): Promise<T | undefined> {
+  try {
+    return await qc.query(options)
+  } catch (e) {
+    if (e instanceof ProblemError && e.code === "switched-off") notFound()
+    return undefined
+  }
+}
+
+/**
  * peek fetches a query for a page's metadata; any failure gives undefined. Metadata never decides the status: the page does, so the
  * not-found page renders on the server.
  */

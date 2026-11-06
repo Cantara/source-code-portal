@@ -14,6 +14,7 @@ import { SidePanel } from "./side"
 import { Telemetry } from "./telemetry"
 import { kindLabel, pick, type Element, type Kind, type ProductsView } from "./layout"
 import { Pulls } from "./pulls"
+import { useFeatures } from "@/lib/rules-context"
 
 /** sideKinds are the elements that sit beside the products on a wide screen. */
 const sideKinds = new Set<Kind>(["pulls", "latest-commits"])
@@ -42,6 +43,7 @@ export function Elements({
   dismissed?: string[]
 }) {
   const now = useNow()
+  const features = useFeatures()
   const draw = (el: Element, i: number, fold?: ReactNode) => {
     switch (el.kind) {
       case "telemetry":
@@ -73,7 +75,7 @@ export function Elements({
           </PanelBoundary>
         )
       case "pulls":
-        return <Pulls key={i} work={data.work} counts={data.pulls} n={el.count ?? 5} fold={fold} />
+        return features.pulls && <Pulls key={i} work={data.work} counts={data.pulls} n={el.count ?? 5} fold={fold} />
       case "announcements":
         return <Announcements key={i} list={notices} dismissed={dismissed} />
       case "heading":

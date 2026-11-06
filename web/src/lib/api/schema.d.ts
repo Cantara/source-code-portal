@@ -605,8 +605,10 @@ export interface components {
       archived: boolean
       fork: boolean
       stars: number
-      /** @description Open issues; GitHub's count of issues and pull requests together until the pull requests are read */
+      /** @description Open issues, the best count held: the issues read, else GitHub's count less the open pull requests read, else GitHub's count of both (openIssuesWithPulls) */
       openIssues: number
+      /** @description openIssues counts the open pull requests too: neither is read (switched off, or not yet) */
+      openIssuesWithPulls: boolean
       /** @description Open pull requests; null until read */
       openPulls: number | null
       /** Format: date-time */
@@ -646,6 +648,13 @@ export interface components {
     Rules: {
       /** @description The days the activity counts cover */
       windowDays: number
+      /** @description The parts an operator may switch off (features in scp.yaml); a switched-off one has no pages, data, tools or findings */
+      features: {
+        /** @description The open pull requests */
+        pulls: boolean
+        /** @description The open issues */
+        issues: boolean
+      }
       levels: components["schemas"]["LevelRule"][]
       severities: components["schemas"]["SeverityRule"][]
       activity: components["schemas"]["ActivityRule"][]

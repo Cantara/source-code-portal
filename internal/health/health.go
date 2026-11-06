@@ -44,7 +44,8 @@ type Signals struct {
 	Release    string    // the latest release's tag; empty when there is none
 	Released   time.Time
 	License    string
-	OpenIssues int           // open issues, pull requests not counted once they are read
+	OpenIssues int           // open issues, the best count held (design/features.md)
+	WithPulls  bool          // OpenIssues counts the open pull requests too: neither is read
 	ReviewIdle time.Duration // how long a person's pull request waiting for a review has been idle, the longest; 0: none waits
 	OldUpdates int           // automation's pull requests open longer than UpdatesAfter
 	Failing    bool          // SCP keeps failing to read it
@@ -98,11 +99,15 @@ func Assess(s Signals, now time.Time) Repo {
 	if s.Public && s.License == "" {
 		add("no-licence", penalties["no-licence"][0], "No licence detected")
 	}
+	issues := "%d open issues"
+	if s.WithPulls {
+		issues = "%d open issues and pull requests"
+	}
 	switch {
 	case s.OpenIssues > issuesTooMany:
-		add("issues", penalties["issues"][0], "%d open issues", s.OpenIssues)
+		add("issues", penalties["issues"][0], issues, s.OpenIssues)
 	case s.OpenIssues > issuesMany:
-		add("issues", penalties["issues"][1], "%d open issues", s.OpenIssues)
+		add("issues", penalties["issues"][1], issues, s.OpenIssues)
 	}
 	switch {
 	case s.ReviewIdle > reviewsLongAfter:

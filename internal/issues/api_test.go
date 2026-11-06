@@ -79,6 +79,11 @@ func TestListIssues(t *testing.T) {
 	if got := numbers(list(oapi.ListIssuesParams{Sort: new(oapi.Newest), Limit: new(2)})); !slices.Equal(got, []int{1, 3}) {
 		t.Errorf("newest: %v", got)
 	}
+	if res, _ := (API{Current: a.Current, Off: true}).ListIssues(t.Context(), oapi.ListIssuesRequestObject{}); res == nil {
+		t.Error("no answer switched off")
+	} else if _, ok := res.(oapi.ListIssues404ApplicationProblemPlusJSONResponse); !ok {
+		t.Errorf("switched off: %T", res)
+	}
 	if res, _ := a.ListIssues(t.Context(), oapi.ListIssuesRequestObject{Params: oapi.ListIssuesParams{Repo: new("acme/nope")}}); res == nil {
 		t.Error("no answer for an unknown repository")
 	} else if _, ok := res.(oapi.ListIssues404ApplicationProblemPlusJSONResponse); !ok {

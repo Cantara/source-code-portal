@@ -20,7 +20,14 @@ type Callout = keyof typeof shots.callouts
 const docs = "https://github.com/Cantara/source-code-portal/blob/main/docs"
 
 /** none are no rules: the API could not be read, and the page names nothing it cannot know. */
-const none: Rules = { windowDays: 0, levels: [], severities: [], activity: [], findings: [] }
+const none: Rules = {
+  windowDays: 0,
+  levels: [],
+  severities: [],
+  activity: [],
+  findings: [],
+  features: { pulls: true, issues: true },
+}
 
 /** cardRows are the product card's rows, in the order of their callouts. */
 const cardRows = (rules: Rules): { at: Callout; title: string; body: ReactNode }[] => [
@@ -894,6 +901,12 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
                 Without a permission, its part of the portal stays empty, and the portal says so on that page and on the{" "}
                 <em>Admin</em> page; without an event, it updates on its schedule instead. Permissions added later take effect
                 once an owner of the organisation accepts them on the installation.
+              </p>
+              <p>
+                Doing without the pull requests or the issues? Leave their permissions and events out and switch them off:{" "}
+                <code className="font-mono text-xs">features: {"{ pulls: false }"}</code> or{" "}
+                <code className="font-mono text-xs">{"{ issues: false }"}</code> in the configuration. The portal then has no
+                page, panel or finding of theirs, and nothing warns.
               </p>
             </Step>
             <Step n={3} title="Keep its key and install it">

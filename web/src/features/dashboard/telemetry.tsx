@@ -123,7 +123,7 @@ export function signals(data: Schemas["Dashboard"], rules: Rules, now = Date.now
       })),
       level: h ? levels[h.level].className : undefined,
     },
-    pullsSignal(data, now),
+    ...(rules.features.pulls ? [pullsSignal(data, now)] : []),
     {
       key: "products",
       label: "Products",

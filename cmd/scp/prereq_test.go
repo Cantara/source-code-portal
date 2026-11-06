@@ -37,7 +37,7 @@ func TestPrerequisites(t *testing.T) {
 	}
 	empty := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler)).Current()
 	p := &prereqs{sources: []string{"gh"}, source: c.Source, current: func() *snapshot.Snapshot { return empty }, webhooks: true,
-		log: slog.New(slog.DiscardHandler)}
+		needs: prereq.Needs, log: slog.New(slog.DiscardHandler)}
 	get := func(admin bool) oapi.PrerequisiteList {
 		t.Helper()
 		ctx := httpapi.WithViewer(t.Context(), httpapi.Viewer{Admin: admin, Private: admin})
@@ -60,6 +60,12 @@ func TestPrerequisites(t *testing.T) {
 	if w := warnings(p.check()); len(w) != 1 || !strings.HasPrefix(w[0], "Issues (gh): Open issues are not read") {
 		t.Errorf("status warnings: %v", w)
 	}
+	// Issues switched off: nothing is missing.
+	p.needs = needs(config.Features{Pulls: true})
+	if got := get(true); len(got.Unmet) != 0 {
+		t.Errorf("issues switched off: %+v", got)
+	}
+	p.needs = prereq.Needs
 
 	srv.SetGrants("acme", githubtest.AllPermissions, githubtest.AllEvents)
 	if err := src.RefreshInstallations(t.Context()); err != nil {

@@ -184,6 +184,10 @@ func TestResolve(t *testing.T) {
 	if len(*l.Elements[0].Groups) != 3 {
 		t.Error("Resolve changed the stored layout")
 	}
+	if got := Resolve(Layout{Elements: []oapi.LayoutElement{{Kind: oapi.LayoutElementKindPulls}, {Kind: oapi.LayoutElementKindTelemetry}}}, s,
+		oapi.LayoutElementKindPulls); len(got) != 1 || got[0].Kind != oapi.LayoutElementKindTelemetry {
+		t.Errorf("switched off = %+v", got)
+	}
 }
 
 func TestAdminRoutes(t *testing.T) {

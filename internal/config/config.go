@@ -35,6 +35,7 @@ type Config struct {
 	Layout    Layout    `mapstructure:"layout"`
 	Packages  Packages  `mapstructure:"packages"`
 	Ops       Ops       `mapstructure:"ops"`
+	Features  Features  `mapstructure:"features"`
 	// Announcements are the deployment's announcements (design/announcements.md), locked in the admin's card.
 	Announcements []Announcement `mapstructure:"announcements"`
 }
@@ -49,6 +50,12 @@ type Server struct {
 	// RawTrustedProxies are CIDRs allowed to set X-Forwarded-For; TrustedProxies holds them parsed.
 	RawTrustedProxies []string       `mapstructure:"trusted_proxies"`
 	TrustedProxies    []netip.Prefix `mapstructure:"-"`
+}
+
+// Features switches the parts of the portal an operator may do without (design/features.md, P-77); the catalogue has no switch.
+type Features struct {
+	Pulls  bool `mapstructure:"pulls"`  // the open pull requests
+	Issues bool `mapstructure:"issues"` // the open issues
 }
 
 // Ops configures operator tooling on the admin listener.
@@ -110,6 +117,8 @@ func defaults() map[string]any {
 		"web.node":                     "node",
 		"layout.dir":                   "",
 		"packages.public":              true,
+		"features.pulls":               true,
+		"features.issues":              true,
 	}
 }
 

@@ -1,6 +1,6 @@
 import { groupsQuery, issuesQuery } from "@/lib/api/queries"
 import { crumbs } from "@/lib/crumbs"
-import { prefetch } from "@/lib/load"
+import { list, prefetch } from "@/lib/load"
 import type { Ctx, Route } from "@/lib/page"
 import { pageSize, sizeCookie } from "@/lib/paging"
 import { ld } from "@/lib/seo"
@@ -15,7 +15,7 @@ export const issuesRoute: Route<object> = {
   load: (ctx) => {
     const st = issuesState(ctx.search, size(ctx))
     return Promise.all([
-      ctx.qc.query(issuesQuery(ctx.api, { ...st.filter, page: st.page, size: st.size })).catch(() => undefined),
+      list(ctx.qc, issuesQuery(ctx.api, { ...st.filter, page: st.page, size: st.size })),
       prefetch(ctx.qc, groupsQuery(ctx.api)),
     ])
   },

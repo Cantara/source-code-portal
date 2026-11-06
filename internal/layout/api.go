@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"slices"
 
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -19,6 +20,8 @@ type API struct {
 	Store   *Store
 	// Notices are the announcements the viewer may see on a page now (design/announcements.md); nil: none.
 	Notices func(ctx context.Context, page string) []oapi.Announcement
+	// Off is the element kinds of the features switched off (design/features.md): left out where a layout holds them.
+	Off []oapi.LayoutElementKind
 }
 
 func (a API) GetPage(ctx context.Context, req oapi.GetPageRequestObject) (oapi.GetPageResponseObject, error) {
@@ -32,14 +35,18 @@ func (a API) GetPage(ctx context.Context, req oapi.GetPageRequestObject) (oapi.G
 	if a.Notices != nil {
 		notices = a.Notices(ctx, page)
 	}
-	return oapi.GetPage200JSONResponse{Body: oapi.PageLayout{Page: page, Elements: Resolve(p.Layout, a.Current(ctx)), Stored: p.Stored,
+	return oapi.GetPage200JSONResponse{Body: oapi.PageLayout{Page: page, Elements: Resolve(p.Layout, a.Current(ctx), a.Off...), Stored: p.Stored,
 		Announcements: notices}}, nil
 }
 
-// Resolve is l for a viewer of s: the groups the view has no repository of are left out, and an element whose groups all are.
-func Resolve(l Layout, s *snapshot.Snapshot) []oapi.LayoutElement {
+// Resolve is l for a viewer of s: the groups the view has no repository of are left out, an element whose groups all are, and the
+// elements of the kinds off.
+func Resolve(l Layout, s *snapshot.Snapshot, off ...oapi.LayoutElementKind) []oapi.LayoutElement {
 	out := make([]oapi.LayoutElement, 0, len(l.Elements))
 	for _, e := range l.Elements {
+		if slices.Contains(off, e.Kind) {
+			continue
+		}
 		if e.Groups != nil {
 			var keep []string
 			for _, id := range *e.Groups {

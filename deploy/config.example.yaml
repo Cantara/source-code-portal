@@ -32,6 +32,7 @@ sync:
 # A fine-grained token: read access to the same (Contents, Metadata, Issues, Pull requests, Commit statuses; checks come with them).
 # Without webhooks every feature still refreshes on its schedule: the listing every catalog.reconcile_interval, pull requests and
 # issues every 15 minutes.
+# Without pull requests or issues, leave their permissions and events out and switch them off (features below): nothing warns.
 github:
   sources:
     - id: github
@@ -129,5 +130,9 @@ announcements: []
 #    pages: [dashboard, present] # one or both
 #    audience: everyone # or signed-in
 #    published: true # false: held as a draft
+# The parts a portal may do without (operator guide, section 1): a switched-off one is not read and has no page, tool or finding.
+features:
+  pulls: true # the open pull requests (/pulls)
+  issues: true # the open issues (/issues)
 ops:
   pprof: false # /debug/pprof/ on the admin listener
