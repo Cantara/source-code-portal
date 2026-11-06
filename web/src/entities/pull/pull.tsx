@@ -106,6 +106,7 @@ export function PullList({
               <PullStateChip state={p.state} />
               {showRepo ? (
                 <Link
+                  prefetch={false}
                   href={addressPath(p.repo)}
                   className="inline-flex min-h-6 items-center rounded border border-border px-1.5 text-xs font-medium text-foreground hover:bg-accent"
                 >

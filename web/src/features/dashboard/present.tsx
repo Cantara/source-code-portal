@@ -240,7 +240,7 @@ function Stream({
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <p className="flex items-baseline gap-2 text-[0.9375rem]">
-                    <Link href={addressPath(c.repo)} className="min-w-0 truncate font-semibold hover:underline">
+                    <Link prefetch={false} href={addressPath(c.repo)} className="min-w-0 truncate font-semibold hover:underline">
                       {c.repo.split("/")[1]}
                     </Link>
                     <span className="ml-auto flex max-w-[55%] shrink-0 items-baseline gap-1.5 text-sm text-muted-foreground">

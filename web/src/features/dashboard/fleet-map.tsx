@@ -171,6 +171,7 @@ export function FleetMap({
                     ]}
                     render={(t) => (
                       <Link
+                        prefetch={false}
                         {...t}
                         href={addressPath(m.address)}
                         tabIndex={-1}
@@ -224,7 +225,9 @@ function HealthMap({
           value: m.lastAuthoredAt ? `${ago(m.lastAuthoredAt, now)} ago` : "none read",
         },
       ]}
-      render={(t) => <Link {...t} href={addressPath(m.address)} tabIndex={-1} className={`cell ${healthCell(m.level)}`} />}
+      render={(t) => (
+        <Link prefetch={false} {...t} href={addressPath(m.address)} tabIndex={-1} className={`cell ${healthCell(m.level)}`} />
+      )}
     />
   )
   return (

@@ -113,7 +113,7 @@ function ProductCard({ group, work: w, now }: { group: Group; work: Work; now: n
         <ul aria-label={`Changed last${qualifier(w)}`} className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
           {a.recent.map((r) => (
             <li key={r.repo} className="flex min-w-0 items-baseline gap-1">
-              <Link href={addressPath(r.repo)} className="truncate font-medium hover:underline">
+              <Link prefetch={false} href={addressPath(r.repo)} className="truncate font-medium hover:underline">
                 {r.repo.split("/")[1]}
               </Link>
               <time dateTime={r.at} className="font-mono text-muted-foreground" suppressHydrationWarning>
