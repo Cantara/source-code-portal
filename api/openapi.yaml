@@ -133,6 +133,29 @@ paths:
         "304": { $ref: "#/components/responses/NotModified" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /insights:
+    get:
+      operationId: getInsights
+      summary: What the held data says about the fleet, derived on request
+      description: |
+        Five insights of the viewer's view (design/insights.md), all derived from what the portal holds: how often the fleet ships
+        (stable releases per month, the median days between a product's last stable releases), the technology manifests declare, the
+        internal libraries most repositories depend on, the repositories where one person wrote nearly all of the people's recent
+        commits, and the repositories by how long ago they last changed. It names repositories, never people. `group` and `repo`
+        narrow the scope; the thresholds used are in the answer.
+      parameters:
+        - { name: group, in: query, required: false, schema: { type: string } }
+        - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
+      responses:
+        "200":
+          description: The insights
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Insights" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /alumni:
     get:
       operationId: listAlumni
@@ -1105,6 +1128,101 @@ components:
         releases: { type: array, items: { $ref: "#/components/schemas/ReleaseEntry" } }
         counts: { $ref: "#/components/schemas/ReleaseCounts" }
         page: { $ref: "#/components/schemas/Page" }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    InsightThresholds:
+      type: object
+      required: [months, releases, singleAuthorShare, singleAuthorCommits, sharedLibraries]
+      properties:
+        months: { type: integer, description: Months of releases counted }
+        releases: { type: integer, description: "Stable releases a product's median interval reads" }
+        singleAuthorShare: { type: integer, description: "Percent of people's commits one author wrote" }
+        singleAuthorCommits: { type: integer, description: "People's commits that must be held" }
+        sharedLibraries: { type: integer, description: Libraries listed }
+    InsightMonth:
+      type: object
+      required: [month, releases]
+      properties:
+        month: { type: string, description: "YYYY-MM (UTC)" }
+        releases: { type: integer }
+    InsightProduct:
+      type: object
+      required: [group, name, releases]
+      properties:
+        group: { type: string }
+        name: { type: string }
+        releases: { type: integer, description: Stable releases held across the product }
+        medianDays: { type: [integer, "null"], description: "Median days between its last stable releases; null with fewer than two" }
+        last: { type: [string, "null"], format: date-time, description: Its newest stable release }
+    InsightCount:
+      type: object
+      required: [name, repos, share]
+      properties:
+        name: { type: string }
+        repos: { type: integer }
+        share: { type: number, description: "Of the repositories in scope, 0 to 1" }
+    InsightRuntime:
+      type: object
+      required: [name, repos, oldest, newest]
+      properties:
+        name: { type: string, description: "go, node or java" }
+        repos: { type: integer }
+        oldest: { type: string }
+        newest: { type: string }
+    InsightLibrary:
+      type: object
+      required: [repo, dependants, dependantRepos]
+      properties:
+        repo: { type: string, description: owner/name }
+        dependants: { type: integer, description: Live repositories that depend on it }
+        dependantRepos: { type: array, items: { type: string }, description: The first ten }
+        release: { type: [string, "null"], description: Its latest stable release }
+        retired: { $ref: "#/components/schemas/AlumniReason" }
+    InsightRepo:
+      type: object
+      required: [repo, commits]
+      properties:
+        repo: { type: string, description: owner/name }
+        commits: { type: integer, description: "People's commits held" }
+    InsightDormant:
+      type: object
+      required: [repo, lastChange]
+      properties:
+        repo: { type: string, description: owner/name }
+        lastChange: { type: [string, "null"], format: date-time }
+    InsightAgeing:
+      type: object
+      required: [active, recent, quiet, dormant, dormantRepos]
+      properties:
+        active: { type: integer }
+        recent: { type: integer }
+        quiet: { type: integer }
+        dormant: { type: integer }
+        dormantRepos: { type: array, items: { $ref: "#/components/schemas/InsightDormant" }, description: The longest dormant first, at most 50 }
+    InsightCadence:
+      type: object
+      required: [months, products]
+      properties:
+        months: { type: array, items: { $ref: "#/components/schemas/InsightMonth" }, description: The last months, oldest first }
+        products: { type: array, items: { $ref: "#/components/schemas/InsightProduct" } }
+    InsightTechnology:
+      type: object
+      required: [languages, buildTools, runtimes, unknown]
+      properties:
+        languages: { type: array, items: { $ref: "#/components/schemas/InsightCount" } }
+        buildTools: { type: array, items: { $ref: "#/components/schemas/InsightCount" } }
+        runtimes: { type: array, items: { $ref: "#/components/schemas/InsightRuntime" } }
+        unknown: { type: integer, description: Repositories whose manifests name no language }
+    Insights:
+      type: object
+      required: [repos, thresholds, cadence, technology, libraries, singleAuthor, ageing, freshness]
+      properties:
+        repos: { type: integer, description: Repositories in scope, retired ones left out }
+        thresholds: { $ref: "#/components/schemas/InsightThresholds" }
+        cadence: { $ref: "#/components/schemas/InsightCadence" }
+        technology: { $ref: "#/components/schemas/InsightTechnology" }
+        libraries: { type: array, items: { $ref: "#/components/schemas/InsightLibrary" } }
+        singleAuthor: { type: array, items: { $ref: "#/components/schemas/InsightRepo" } }
+        ageing: { $ref: "#/components/schemas/InsightAgeing" }
         freshness: { $ref: "#/components/schemas/Freshness" }
     AlumniReason: { type: string, enum: [archived, deprecated], description: "Archived on GitHub, or `lifecycle: deprecated` in scp.yaml" }
     AlumniSort: { type: string, enum: [active, name, group, used], description: "active: last active first (default); name; group; used: most dependants first" }

@@ -318,6 +318,11 @@ export function GroupView({ group }: { group: string }) {
             <PanelBoundary>
               <LatestCommits group={group} />
             </PanelBoundary>
+            <p className="text-sm">
+              <Link href={`/insights?group=${encodeURIComponent(group)}`} className="hover:underline">
+                Insights of this product
+              </Link>
+            </p>
           </div>
         </div>
       )}

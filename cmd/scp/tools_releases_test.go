@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/insights"
 	"github.com/cantara/source-code-portal/internal/releases"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -75,5 +76,38 @@ func TestSearchReadsReleases(t *testing.T) {
 	if len(got) != 2 || got[0].Title != "v2.0.0 Two" || got[1].Title != "v1.0.0" || got[0].URL != "/releases?repo=acme%2Fcore&variant=all" ||
 		got[0].Fields[search.FieldText] != "Single sign-on" || got[0].Fields[search.FieldAuthor] != "ann" {
 		t.Errorf("release documents = %+v", got)
+	}
+}
+
+// TestFleetInsightsTool: the tool tells the five insights as the API has them and never names a person.
+func TestFleetInsightsTool(t *testing.T) {
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	now := time.Now().UTC()
+	p.Update(func(b *snapshot.Builder) {
+		b.ReplaceSource("gh", []*snapshot.RepoEntry{
+			{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "core", Visibility: "public"}},
+			{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 2}, Owner: "acme", Name: "app", Visibility: "public"}},
+		}, nil, snapshot.SourceStatus{ID: "gh"})
+	})
+	p.Flush()
+	api := newInsights(func(context.Context) *snapshot.Snapshot { return p.Current() })
+	api.Facts = func(_ *snapshot.Snapshot, e *snapshot.RepoEntry) insights.Facts {
+		if e.Repo.Name == "core" {
+			return insights.Facts{Language: "Go", UsedBy: []snapshot.RepoKey{"acme/app"}, People: 30, Top: 30, LastChange: now}
+		}
+		return insights.Facts{Language: "Go", People: 5, LastChange: now.AddDate(-3, 0, 0)}
+	}
+	r := toolReads{insights: api}
+	res, err := r.fleetInsights(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"2 repositories", "## Cadence", "- Go: 2 repositories (100%)", "- acme/core: 1 dependants", "## Mostly one person's", "- acme/core\n", "1 dormant", "- acme/app, last changed"} {
+		if !strings.Contains(res.Text, want) {
+			t.Errorf("text lacks %q:\n%s", want, res.Text)
+		}
+	}
+	if _, err := r.fleetInsights(t.Context(), map[string]any{"repo": "acme/nope"}); err == nil {
+		t.Error("an unknown repository is an error")
 	}
 }

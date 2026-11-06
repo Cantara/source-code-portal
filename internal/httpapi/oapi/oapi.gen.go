@@ -1542,6 +1542,141 @@ type HistoryPage struct {
 	Page  Page `json:"page"`
 }
 
+// InsightAgeing defines model for InsightAgeing.
+type InsightAgeing struct {
+	Active  int `json:"active"`
+	Dormant int `json:"dormant"`
+
+	// DormantRepos The longest dormant first
+	DormantRepos []InsightDormant `json:"dormantRepos"`
+	Quiet        int              `json:"quiet"`
+	Recent       int              `json:"recent"`
+}
+
+// InsightCadence defines model for InsightCadence.
+type InsightCadence struct {
+	// Months The last months
+	Months   []InsightMonth   `json:"months"`
+	Products []InsightProduct `json:"products"`
+}
+
+// InsightCount defines model for InsightCount.
+type InsightCount struct {
+	Name  string `json:"name"`
+	Repos int    `json:"repos"`
+
+	// Share Of the repositories in scope, 0 to 1
+	Share float32 `json:"share"`
+}
+
+// InsightDormant defines model for InsightDormant.
+type InsightDormant struct {
+	LastChange *time.Time `json:"lastChange"`
+
+	// Repo owner/name
+	Repo string `json:"repo"`
+}
+
+// InsightLibrary defines model for InsightLibrary.
+type InsightLibrary struct {
+	// DependantRepos The first ten
+	DependantRepos []string `json:"dependantRepos"`
+
+	// Dependants Live repositories that depend on it
+	Dependants int `json:"dependants"`
+
+	// Release Its latest stable release
+	Release *string `json:"release,omitempty"`
+
+	// Repo owner/name
+	Repo string `json:"repo"`
+
+	// Retired Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
+	Retired *AlumniReason `json:"retired,omitempty"`
+}
+
+// InsightMonth defines model for InsightMonth.
+type InsightMonth struct {
+	// Month YYYY-MM (UTC)
+	Month    string `json:"month"`
+	Releases int    `json:"releases"`
+}
+
+// InsightProduct defines model for InsightProduct.
+type InsightProduct struct {
+	Group string `json:"group"`
+
+	// Last Its newest stable release
+	Last *time.Time `json:"last,omitempty"`
+
+	// MedianDays Median days between its last stable releases; null with fewer than two
+	MedianDays *int   `json:"medianDays,omitempty"`
+	Name       string `json:"name"`
+
+	// Releases Stable releases held across the product
+	Releases int `json:"releases"`
+}
+
+// InsightRepo defines model for InsightRepo.
+type InsightRepo struct {
+	// Commits People's commits held
+	Commits int `json:"commits"`
+
+	// Repo owner/name
+	Repo string `json:"repo"`
+}
+
+// InsightRuntime defines model for InsightRuntime.
+type InsightRuntime struct {
+	// Name go, node or java
+	Name   string `json:"name"`
+	Newest string `json:"newest"`
+	Oldest string `json:"oldest"`
+	Repos  int    `json:"repos"`
+}
+
+// InsightTechnology defines model for InsightTechnology.
+type InsightTechnology struct {
+	BuildTools []InsightCount   `json:"buildTools"`
+	Languages  []InsightCount   `json:"languages"`
+	Runtimes   []InsightRuntime `json:"runtimes"`
+
+	// Unknown Repositories whose manifests name no language
+	Unknown int `json:"unknown"`
+}
+
+// InsightThresholds defines model for InsightThresholds.
+type InsightThresholds struct {
+	// Months Months of releases counted
+	Months int `json:"months"`
+
+	// Releases Stable releases a product's median interval reads
+	Releases int `json:"releases"`
+
+	// SharedLibraries Libraries listed
+	SharedLibraries int `json:"sharedLibraries"`
+
+	// SingleAuthorCommits People's commits that must be held
+	SingleAuthorCommits int `json:"singleAuthorCommits"`
+
+	// SingleAuthorShare Percent of people's commits one author wrote
+	SingleAuthorShare int `json:"singleAuthorShare"`
+}
+
+// Insights defines model for Insights.
+type Insights struct {
+	Ageing    InsightAgeing    `json:"ageing"`
+	Cadence   InsightCadence   `json:"cadence"`
+	Freshness Freshness        `json:"freshness"`
+	Libraries []InsightLibrary `json:"libraries"`
+
+	// Repos Repositories in scope
+	Repos        int               `json:"repos"`
+	SingleAuthor []InsightRepo     `json:"singleAuthor"`
+	Technology   InsightTechnology `json:"technology"`
+	Thresholds   InsightThresholds `json:"thresholds"`
+}
+
 // Issue defines model for Issue.
 type Issue struct {
 	// Assigned Every assignee counted
@@ -2364,6 +2499,14 @@ type GetDashboardParams struct {
 	Work *Work `form:"work,omitempty" json:"work,omitempty"`
 }
 
+// GetInsightsParams defines parameters for GetInsights.
+type GetInsightsParams struct {
+	Group *string `form:"group,omitempty" json:"group,omitempty"`
+
+	// Repo owner/name
+	Repo *string `form:"repo,omitempty" json:"repo,omitempty"`
+}
+
 // ListIssuesParams defines parameters for ListIssues.
 type ListIssuesParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
@@ -2490,6 +2633,9 @@ type ServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(w http.ResponseWriter, r *http.Request, group string)
+	// GetInsights What the held data says about the fleet, derived on request
+	// (GET /insights)
+	GetInsights(w http.ResponseWriter, r *http.Request, params GetInsightsParams)
 	// ListIssues Open issues across repositories, where each stands, one page at a time
 	// (GET /issues)
 	ListIssues(w http.ResponseWriter, r *http.Request, params ListIssuesParams)
@@ -2839,6 +2985,52 @@ func (siw *ServerInterfaceWrapper) GetGroup(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGroup(w, r, group)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInsights operation middleware
+func (siw *ServerInterfaceWrapper) GetInsights(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetInsightsParams
+
+	// ------------- Optional query parameter "group" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group", r.URL.Query(), &params.Group, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "repo" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "repo", r.URL.Query(), &params.Repo, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "repo"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repo", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInsights(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3844,6 +4036,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pulls", wrapper.ListPulls)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues", wrapper.ListIssues)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/releases", wrapper.ListReleases)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/insights", wrapper.GetInsights)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/alumni", wrapper.ListAlumni)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prerequisites", wrapper.GetPrerequisites)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
@@ -4164,6 +4357,77 @@ type GetGroup404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetGroup404ApplicationProblemPlusJSONResponse) VisitGetGroupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInsightsRequestObject struct {
+	Params GetInsightsParams
+}
+
+type GetInsightsResponseObject interface {
+	VisitGetInsightsResponse(w http.ResponseWriter) error
+}
+
+type GetInsights200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetInsights200JSONResponse struct {
+	Body    Insights
+	Headers GetInsights200ResponseHeaders
+}
+
+func (response GetInsights200JSONResponse) VisitGetInsightsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInsights304Response = NotModifiedResponse
+
+func (response GetInsights304Response) VisitGetInsightsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetInsights400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetInsights400ApplicationProblemPlusJSONResponse) VisitGetInsightsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInsights404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetInsights404ApplicationProblemPlusJSONResponse) VisitGetInsightsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5105,6 +5369,9 @@ type StrictServerInterface interface {
 	// GetGroup One group with its repositories
 	// (GET /groups/{group})
 	GetGroup(ctx context.Context, request GetGroupRequestObject) (GetGroupResponseObject, error)
+	// GetInsights What the held data says about the fleet, derived on request
+	// (GET /insights)
+	GetInsights(ctx context.Context, request GetInsightsRequestObject) (GetInsightsResponseObject, error)
 	// ListIssues Open issues across repositories, where each stands, one page at a time
 	// (GET /issues)
 	ListIssues(ctx context.Context, request ListIssuesRequestObject) (ListIssuesResponseObject, error)
@@ -5342,6 +5609,32 @@ func (sh *strictHandler) GetGroup(w http.ResponseWriter, r *http.Request, group 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetGroupResponseObject); ok {
 		if err := validResponse.VisitGetGroupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInsights operation middleware
+func (sh *strictHandler) GetInsights(w http.ResponseWriter, r *http.Request, params GetInsightsParams) {
+	var request GetInsightsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInsights(ctx, request.(GetInsightsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInsights")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInsightsResponseObject); ok {
+		if err := validResponse.VisitGetInsightsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

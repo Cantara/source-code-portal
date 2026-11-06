@@ -10,6 +10,7 @@ import { GroupView } from "@/features/groups/view"
 import { IssuesView } from "@/features/issues/view"
 import { AlumniView } from "@/features/alumni/view"
 import { PullsView } from "@/features/pulls/view"
+import { InsightsView } from "@/features/insights/view"
 import { ReleasesView } from "@/features/releases/view"
 import { repoRoute } from "@/features/repos/route"
 import { RepoView } from "@/features/repos/view"
@@ -47,6 +48,29 @@ describe("pages", () => {
     expect(chips.queryByRole("link", { name: /Failing checks/ })).toBeNull()
     expect(screen.getByRole("link", { name: "Change 1" })).toHaveAttribute("href", "https://github.com/acme/core/pull/1")
     expect(screen.getByRole("form", { name: "Filter pull requests" })).toHaveAttribute("action", "/pulls")
+  })
+
+  it("answers five questions about the fleet, naming repositories and no one", async () => {
+    show(<InsightsView />, "/insights")
+    expect(await screen.findByRole("heading", { level: 1, name: "Insights" })).toBeInTheDocument()
+    expect(await screen.findByText("3 stable releases in the last 12 months.")).toBeInTheDocument()
+    for (const q of [
+      "How often does the fleet ship?",
+      "What is the fleet built on?",
+      "What does the fleet lean on?",
+      "Where does knowledge sit with one person?",
+      "What has gone quiet?",
+    ])
+      expect(screen.getByRole("heading", { name: q })).toBeInTheDocument()
+    expect(screen.getByText("Go in 3 repositories, 60% of the fleet.")).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: /Stable releases per month/ })).toBeInTheDocument()
+    expect(screen.getByRole("cell", { name: "None released" })).toBeInTheDocument()
+    expect(screen.getByText(/Archived, still used/)).toBeInTheDocument()
+    const single = within(screen.getByRole("list", { name: "Repositories mostly one person's" }))
+    expect(single.getByRole("link", { name: "acme/api" })).toHaveAttribute("href", "/repos/acme/api")
+    expect(
+      within(screen.getByRole("list", { name: "Dormant repositories" })).getByRole("link", { name: "acme/quiet" }),
+    ).toBeInTheDocument()
   })
 
   it("lists the recent releases, the variants as filters with their counts", async () => {

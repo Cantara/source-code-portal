@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,7 +29,7 @@ import (
 var hiddenMarks = []string{"zq-hidden", "zq hidden", "Zq Hidden", "q7 vault"} //nolint:gochecknoglobals // test table
 
 // fetch requests a path of the portal with headers; a stream ends at the deadline with what it sent. The pseudo-header ":post"
-// makes it a POST of its value as application/json.
+// makes it a POST of its value as application/json; ":events" with a number n ends a stream after its n-th event instead of at the deadline.
 type fetch func(path string, headers ...string) (int, string, http.Header)
 
 // staff is the trusted proxy's identity of a member of the private group (the test is the proxy: it is on 127.0.0.1).
@@ -141,8 +142,13 @@ announcements:
 				req.Header.Set("Content-Type", "application/json")
 			}
 		}
+		events := 0
 		for i := 0; i+1 < len(headers); i += 2 {
-			if headers[i] != ":post" {
+			switch headers[i] {
+			case ":post":
+			case ":events":
+				events, _ = strconv.Atoi(headers[i+1])
+			default:
 				req.Header.Set(headers[i], headers[i+1])
 			}
 		}
@@ -151,6 +157,9 @@ announcements:
 			t.Fatal(err)
 		}
 		defer func() { _ = resp.Body.Close() }()
+		if events > 0 {
+			return resp.StatusCode, firstEvents(resp.Body, events), resp.Header
+		}
 		b, _ := io.ReadAll(resp.Body)
 		return resp.StatusCode, string(b), resp.Header
 	}
@@ -168,6 +177,50 @@ announcements:
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("not loaded within 10s: %s\n%s\n%s", b, docs, mf)
+		}
+	}
+}
+
+// streamed ends the event stream after its first two events (the retry hint and the snapshot's), where a path is the stream; the rest
+// of its life is the heartbeat, which a comparison of two portals' answers needs not wait for.
+func streamed(path string, headers ...string) []string {
+	if path == "/api/v1/events" {
+		return append(slices.Clone(headers), ":events", "2")
+	}
+	return headers
+}
+
+// firstEvents reads a server-sent stream up to the end of its n-th event (a blank line ends an event) or its end: what an open
+// stream has said so far, without waiting for the deadline.
+func firstEvents(r io.Reader, n int) string {
+	var b strings.Builder
+	buf := make([]byte, 512)
+	for strings.Count(b.String(), "\n\n") < n {
+		k, err := r.Read(buf)
+		b.Write(buf[:k])
+		if err != nil {
+			break
+		}
+	}
+	return b.String()
+}
+
+// untilListed waits until the lists of pull requests, issues and releases hold what the jobs of their own read (a cold start runs
+// them after the catalogue's, which privatePortal waits for), so a test that reads them sees their answer and not an unread one.
+func untilListed(t *testing.T, get fetch) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		ready := true
+		for _, p := range []string{"/api/v1/pulls", "/api/v1/issues", "/api/v1/releases"} {
+			var l struct{ Freshness oapi.Freshness }
+			_, b, _ := get(p, staff...)
+			ready = ready && json.Unmarshal([]byte(b), &l) == nil && l.Freshness.Status == "fresh"
+		}
+		if ready {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the lists were not read within 10s")
 		}
 	}
 }
@@ -204,10 +257,11 @@ func publicPaths(t *testing.T) []string {
 // and each address naming it answers word for word as an address that does not exist (no existence leak). A staff member sees it.
 func TestNoLeak(t *testing.T) {
 	get := privatePortal(t, "access: {private_groups: [staff]}\n")
+	untilListed(t, get)
 	clean := regexp.MustCompile(`urn:scp:request:\w+`)
 	for _, p := range publicPaths(t) {
 		for _, accept := range []string{"*/*", "text/markdown"} {
-			code, b, _ := get(p, "Accept", accept)
+			code, b, _ := get(p, streamed(p, "Accept", accept)...)
 			if !strings.Contains(p, "zq-hidden") {
 				for _, m := range hiddenMarks {
 					if strings.Contains(b, m) {
@@ -249,6 +303,7 @@ func TestNoLeakThroughTools(t *testing.T) {
 			"open_pull_requests":   `{"input":{"repo":"acme/` + repo + `"}}`,
 			"open_issues":          `{"input":{"repo":"acme/` + repo + `"}}`,
 			"recent_releases":      `{"input":{"repo":"acme/` + repo + `","variant":"all"}}`,
+			"fleet_insights":       `{"input":{"repo":"acme/` + repo + `"}}`,
 			"retired_repositories": `{"input":{"q":"` + repo + `"}}`,
 		}[name]
 	}

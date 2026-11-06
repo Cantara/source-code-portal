@@ -40,6 +40,7 @@ test("the pages offer a browser's agent the portal's tools, which answer from th
     .poll(() => names(page))
     .toEqual([
       "current_page",
+      "fleet_insights",
       "get_document",
       "get_group",
       "get_repository",

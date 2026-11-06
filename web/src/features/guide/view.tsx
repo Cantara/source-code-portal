@@ -740,7 +740,10 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                 product&apos;s page show their own. <strong className="text-foreground">Alumni</strong> keeps the retired
                 repositories apart from the live products: the archived ones, and those whose <code>scp.yaml</code> says{" "}
                 <code>lifecycle: deprecated</code>, each with when it was last active, how many people worked on it (counted,
-                never named) and how many repositories still depend on it.
+                never named) and how many repositories still depend on it. <strong className="text-foreground">Insights</strong>{" "}
+                answers five questions from what the portal holds: how often the fleet ships, what it is built on, which libraries
+                it leans on, which repositories are mostly one person&apos;s (the repository, never the person) and which have
+                gone quiet.
               </p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 # Insights: what the held data says about the fleet (IN1, IN2)
 
-Status: in progress (plan.md section 4, P-83). Binding order: ../plan.md > this note > `health.md`, `layout.md`, `releases.md`.
+Status: IN1 and IN2 built (plan.md section 4, P-83). Binding order: ../plan.md > this note > `health.md`, `layout.md`, `releases.md`.
 
 The dashboard shows where things stand now. Insights shows what the portal already holds says over time and across products: how the
 fleet is built, what it leans on, how often it ships. **Every insight is derived from the snapshot; the feature adds no job, no
@@ -31,15 +31,16 @@ viewer's view: Cadence, Technology, Shared libraries, Single-author repositories
 ## API
 
 `GET /api/v1/insights` (contract): `group`, `repo` (as `scope.Params`). One answer with the five insights and the scope's freshness;
-the thresholds (90%, 20 commits, 12 months, 5 releases) come from `GET /api/v1/rules` (`internal/health/rules.go` holds every
-threshold, P-62), not from the page. Per request, the viewer's view, the leak test lists the route.
+the thresholds (90%, 20 commits, 12 months, 5 releases, 10 libraries) are constants of `internal/insights` told in the answer's
+`thresholds` (not in `/api/v1/rules`: they are not health rules; the page reads them from the answer, so none is written in the page).
+The feature gets what it reads of the others as `Facts` wired in `cmd/scp/insights.go` (releases, manifests, `commits.Authorship`). Per request, the viewer's view, the leak test lists the route.
 
 ## Pages
 
 `/insights` in the header: the cards in the order above, each with its question as the heading and the answer first (a number or a
 sentence), the detail below it; a group page links to its own insights (`?group=`). Charts are inline SVG from the server's numbers
 (no chart library); every figure also exists as text or a table for screen readers; colours are the theme's tokens. Server-rendered,
-canonical, in the sitemap. IN2 adds the tool `fleet_insights`, the search and llms entries, the Guide and the plugin.
+canonical, in the sitemap. IN2 adds the tool `fleet_insights` (same parameters), the sitemap entry and the `llms.txt` link, the Guide and the docs. No search kind: an insight is derived, not text to find. The plugin is for operators and has nothing of it.
 
 ## Tests
 
