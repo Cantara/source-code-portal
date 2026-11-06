@@ -104,11 +104,11 @@ live on their own page.
    state, a link to `/pulls?repo=` and to GitHub's list; the header's figures say issues and pull requests apart.
 6. **Commits navigator**: a branch that has an open pull request carries its `#123` and state beside its name (the job holds
    `headRefName`; the commits job already reads the ten newest branches).
-7. **The `pulls` element** ("Pull requests", its one option how many): the pull requests that wait longest, each
+7. **The `pulls` element** ("Pull requests", its one option how many): the newest open pull requests first (owner, 2026-11-06), each
    two short lines with its state, `repo #123`, title, author and last activity, and "All N open" to `/pulls`; nothing when none is
-   open. In both built-in layouts: on the dashboard after the products, at the top of their side panel above the latest commits (5); on `/present` the
-   strip's signal "Pull requests" (the telemetry's, P-61) and the element as a band below the products (8, in two columns where there
-   is room; a single product named in the address, `?groups=`, gives its own), so a team's review queue is on the wall. An admin moves or removes it in design mode.
+   open. In both built-in layouts: a section of the side panel after the latest commits (5) on the dashboard and of the side column (8) on `/present`
+   (`layout.md`, L5 and L6), beside the strip's signal "Pull requests" (the telemetry's, P-61); a single product named in the address,
+   `?groups=`, gives its own. An admin moves or removes it in design mode.
 8. **Agents and the rest**: the tool `open_pull_requests` in the catalogue (assistant, MCP, WebMCP; the `/pulls` filters), the
    search index's kind `pull` (title, head branch, state, author; `in:pull`, a hit opens `/pulls?repo=`), the badge
    `/badges/repos/{o}/{n}/pulls.svg` and the group's (open, and of them needing review), a "Pull requests" section in a

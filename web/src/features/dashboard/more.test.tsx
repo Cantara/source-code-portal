@@ -21,14 +21,14 @@ const section: Section = { open: true, toggle: () => {}, label: "Section", fixed
 const client = () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
 const page = (number: number) => ({ number, size: 25, total: 4, pages: 2 })
 
-describe("the side sections read more at their end", () => {
+describe("the side sections list the newest first and read more at their end", () => {
   it("Pulls reads the next pages of the same list, each pull request once, and ends with a link to every one", async () => {
     vi.stubGlobal("IntersectionObserver", InView)
     const asked: string[] = []
     const counts = pullCounts({ review: 4 })
     server.use(
       http.get("/pulls", ({ query, response }) => {
-        asked.push(`${query.get("limit")}:${query.get("page") ?? ""}`)
+        asked.push(`${query.get("sort")}:${query.get("limit")}:${query.get("page") ?? ""}`)
         // The element's own two first, then page 1 repeats them, page 2 is the last.
         const n = Number(query.get("page") ?? 0)
         const pulls = n === 0 ? [pull(1), pull(2)] : n === 1 ? [pull(1), pull(2), pull(3)] : [pull(4)]
@@ -42,7 +42,7 @@ describe("the side sections read more at their end", () => {
     )
     expect(await screen.findByText("Change 4")).toBeInTheDocument()
     expect(screen.getAllByText("Change 1")).toHaveLength(1)
-    expect(asked).toEqual(["2:", "25:1", "25:2"])
+    expect(asked).toEqual(["newest:2:", "newest:25:1", "newest:25:2"])
     expect(await screen.findByRole("link", { name: "Every pull request, with filters" })).toHaveAttribute(
       "href",
       "/pulls?by=people",
@@ -54,7 +54,7 @@ describe("the side sections read more at their end", () => {
     const asked: string[] = []
     server.use(
       http.get("/issues", ({ query, response }) => {
-        asked.push(`${query.get("limit")}:${query.get("page") ?? ""}`)
+        asked.push(`${query.get("sort")}:${query.get("limit")}:${query.get("page") ?? ""}`)
         const n = Number(query.get("page") ?? 0)
         const issues = n === 0 ? [issue(1), issue(2)] : n === 1 ? [issue(1), issue(2), issue(3)] : [issue(4)]
         return response(200).json({ issues, counts: issueCounts({ triage: 4 }), page: page(Math.max(n, 1)), freshness: fresh })
@@ -67,7 +67,7 @@ describe("the side sections read more at their end", () => {
     )
     expect(await screen.findByText("Problem 4")).toBeInTheDocument()
     expect(screen.getAllByText("Problem 1")).toHaveLength(1)
-    expect(asked).toEqual(["2:", "25:1", "25:2"])
+    expect(asked).toEqual(["newest:2:", "newest:25:1", "newest:25:2"])
     unmount()
     // Two of at most five: nothing more to read.
     asked.length = 0
@@ -77,6 +77,6 @@ describe("the side sections read more at their end", () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText("Problem 2")).toBeInTheDocument()
-    expect(asked).toEqual(["5:"])
+    expect(asked).toEqual(["newest:5:"])
   })
 })

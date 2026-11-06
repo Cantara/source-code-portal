@@ -30,12 +30,12 @@ export const kinds: { kind: Kind; label: string; about: string }[] = [
   {
     kind: "pulls",
     label: "Pull requests",
-    about: "The open pull requests whose turn it is first, the ones waiting for a review at the top; all of them on /pulls.",
+    about: "The newest open pull requests first, each with whose turn it is; all of them on /pulls.",
   },
   {
     kind: "issues",
     label: "Issues",
-    about: "The open issues that wait first, the ones needing triage at the top; all of them on /issues.",
+    about: "The newest open issues first, each with where it stands; all of them on /issues.",
   },
   {
     kind: "latest-commits",

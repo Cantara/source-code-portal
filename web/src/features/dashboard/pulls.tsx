@@ -15,8 +15,8 @@ import { PullList } from "@/entities/pull/pull"
 import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
 /**
- * Pulls is the pulls element (design/pulls.md): the open pull requests of the work that counts whose turn it is first, the ones
- * waiting for a review at the top, each its state, repository and number, who and when; "All N open" goes to /pulls. Nothing when
+ * Pulls is the pulls element (design/pulls.md): the open pull requests of the work that counts, the newest first, each whose turn,
+ * each its state, repository and number, who and when; "All N open" goes to /pulls. Nothing when
  * none is open. As a section of the dashboard's side panel (section) its title folds it and its list scrolls inside it; on a wall
  * (wall) its rows run in columns.
  */

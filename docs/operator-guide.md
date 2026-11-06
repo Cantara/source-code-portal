@@ -326,8 +326,8 @@ cost with `scp_assistant_tokens_total` (section 5).
 The dashboard shows signals, not every attribute of every repository: a telemetry row (the commits by hand, with AI and by
 automation in the last 30 days, the repositories changed, the findings, the open pull requests, whether the catalogue is current; the
 presentation page's strip shows the same), a fleet map with every repository
-as one tile coloured by its last change by a person, the products as cards or a sortable table, the open pull requests whose turn it is
-first, and the latest commits by people. A
+as one tile coloured by its last change by a person, the products as cards or a sortable table, the newest open pull requests
+and issues, and the latest commits by people. A
 commit by a bot or a release plugin is automation; a commit whose subject landed in more than 10 repositories on one day is a sweep.
 Neither counts as a person's work. A person's commit with an AI `Co-authored-by` trailer (as Claude Code, Copilot and Cursor write
 them) or an AI tool's footer, and a coding agent's own commit, are people's work "with AI": the cards and the telemetry count them and
@@ -445,7 +445,7 @@ stands: *needs triage* (no label, milestone or issue type: nobody has looked at 
 (enhancement, feature, improvement), a question (question, support) or other. People's come before automation's (Renovate's
 dependency dashboard is automation), those needing triage first, then the longest idle; the states are filters, and the kind, the
 product, the repository, whose and the order are a form that works without JavaScript. A group's and a repository's page have a panel
-with the ones that wait longest, and the group table's issue counts link to them. The dashboard's side panel has them after the
+with the ones that wait longest, and the group table's issue counts link to them. The dashboard's side panel has the newest after the
 latest commits and the pull requests, each a third of it with its own scroll that reads more as it nears its end; a reader hides
 any of the three by its button, and the others take the space. `/present` has the same three in its side column. The dashboard keeps its signal, the *backlog*
 finding. They need the App's *Issues* read permission (section 1); without it GitHub refuses the listing and `/issues` stays empty.

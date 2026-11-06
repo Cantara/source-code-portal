@@ -717,9 +717,8 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                 for each whose turn it is: its author&apos;s (a draft, conflicts, failing checks, changes asked for), the
                 reviewers&apos; (no approval yet), CI&apos;s (checks running) or a maintainer&apos;s (ready to merge).
                 People&apos;s come first, those waiting for a review at the top, then the longest idle; the states are filters.
-                Dependency updates by Dependabot, Renovate and Snyk are automation. The dashboard shows the ones waiting longest
-                above the latest commits, and a pull request a person has left waiting for a review for more than a week costs its
-                repository points.
+                Dependency updates by Dependabot, Renovate and Snyk are automation. The dashboard shows the newest in its side
+                panel, and a pull request a person has left waiting for a review for more than a week costs its repository points.
               </p>
               <p>
                 <strong className="text-foreground">Issues</strong>, beside it, holds every open issue and says where each stands:

@@ -15,7 +15,7 @@ import { useMore } from "./more"
 import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
 /**
- * Issues is the issues element (design/layout.md): the open issues of the work that counts that wait first, each where it stands
+ * Issues is the issues element (design/layout.md): the open issues of the work that counts, the newest first, each where it stands
  * and its kind, repository and number, who and when; a line of how many need triage and how many nobody took; "All N open" goes to
  * /issues. Nothing when none is open. As a section of the dashboard's side panel (section) its title folds it and its list scrolls
  * inside it; on a wall (wall) its rows run in columns.

@@ -44,22 +44,32 @@ export const moreQuery = (api: Api, work: Work) =>
 /** moreSize is a page of the pull requests and issues their sections read as the reader scrolls. */
 export const moreSize = 25
 
-/** morePullsQuery is a lens's open pull requests, whose turn first, page after page, for the section that goes on as it is scrolled. */
+/** morePullsQuery is a lens's open pull requests, the newest first, page after page, for the section that goes on as it is scrolled. */
 export const morePullsQuery = (api: Api, f: PullFilter) =>
   infiniteQueryOptions({
-    queryKey: ["pulls", "more", f.group ?? "", f.by ?? ""] as const,
+    queryKey: ["pulls", "more", f.group ?? "", f.by ?? "", f.sort ?? ""] as const,
     queryFn: ({ signal, pageParam }) =>
-      unwrap(api.GET("/pulls", { params: { query: { group: f.group, by: f.by, limit: moreSize, page: pageParam } }, signal })),
+      unwrap(
+        api.GET("/pulls", {
+          params: { query: { group: f.group, by: f.by, sort: f.sort, limit: moreSize, page: pageParam } },
+          signal,
+        }),
+      ),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
   })
 
-/** moreIssuesQuery is a lens's open issues, what waits first, page after page, for the section that goes on as it is scrolled. */
+/** moreIssuesQuery is a lens's open issues, the newest first, page after page, for the section that goes on as it is scrolled. */
 export const moreIssuesQuery = (api: Api, f: IssueFilter) =>
   infiniteQueryOptions({
-    queryKey: ["issues", "more", f.group ?? "", f.by ?? ""] as const,
+    queryKey: ["issues", "more", f.group ?? "", f.by ?? "", f.sort ?? ""] as const,
     queryFn: ({ signal, pageParam }) =>
-      unwrap(api.GET("/issues", { params: { query: { group: f.group, by: f.by, limit: moreSize, page: pageParam } }, signal })),
+      unwrap(
+        api.GET("/issues", {
+          params: { query: { group: f.group, by: f.by, sort: f.sort, limit: moreSize, page: pageParam } },
+          signal,
+        }),
+      ),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
   })
@@ -87,8 +97,18 @@ export const storedLayoutQuery = (page: Page) =>
 /** byWork is whose pull requests the work that counts holds: automation's only when it counts automation (as the server counts). */
 export const byWork = (work: Work): PullFilter["by"] => (has(work, "automation") ? undefined : "people")
 
-/** pullsFilter is what the pulls element reads: the first count of the work that counts, whose turn first. */
-export const pullsFilter = (work: Work, n: number, group?: string): PullFilter => ({ group, by: byWork(work), size: n })
+/** pullsFilter is what the pulls element reads: the first n of the work that counts, the newest first (owner, 2026-11-06). */
+export const pullsFilter = (work: Work, n: number, group?: string): PullFilter => ({
+  group,
+  by: byWork(work),
+  sort: "newest",
+  size: n,
+})
 
-/** issuesFilter is what the issues element reads: the first n of the work that counts, what waits first. */
-export const issuesFilter = (work: Work, n: number, group?: string): IssueFilter => ({ group, by: byWork(work), size: n })
+/** issuesFilter is what the issues element reads: the first n of the work that counts, the newest first (owner, 2026-11-06). */
+export const issuesFilter = (work: Work, n: number, group?: string): IssueFilter => ({
+  group,
+  by: byWork(work),
+  sort: "newest",
+  size: n,
+})
