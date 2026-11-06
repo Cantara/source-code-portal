@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	gh "github.com/google/go-github/v92/github"
+	gh "github.com/google/go-github/v93/github"
 )
 
 // GraphQL posts query with vars to the GraphQL endpoint beside c's REST base and decodes the answer's data into out. An answer

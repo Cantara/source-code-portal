@@ -16,7 +16,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	gogh "github.com/google/go-github/v92/github"
+	gogh "github.com/google/go-github/v93/github"
 
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
