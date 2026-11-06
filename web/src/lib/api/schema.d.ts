@@ -115,6 +115,30 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/insights": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What the held data says about the fleet, derived on request
+     * @description Five insights of the viewer's view (design/insights.md), all derived from what the portal holds: how often the fleet ships
+     *     (stable releases per month, the median days between a product's last stable releases), the technology manifests declare, the
+     *     internal libraries most repositories depend on, the repositories where one person wrote nearly all of the people's recent
+     *     commits, and the repositories by how long ago they last changed. It names repositories, never people. `group` and `repo`
+     *     narrow the scope; the thresholds used are in the answer.
+     */
+    get: operations["getInsights"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/alumni": {
     parameters: {
       query?: never
@@ -1147,6 +1171,103 @@ export interface components {
       page: components["schemas"]["Page"]
       freshness: components["schemas"]["Freshness"]
     }
+    InsightThresholds: {
+      /** @description Months of releases counted */
+      months: number
+      /** @description Stable releases a product's median interval reads */
+      releases: number
+      /** @description Percent of people's commits one author wrote */
+      singleAuthorShare: number
+      /** @description People's commits that must be held */
+      singleAuthorCommits: number
+      /** @description Libraries listed */
+      sharedLibraries: number
+    }
+    InsightMonth: {
+      /** @description YYYY-MM (UTC) */
+      month: string
+      releases: number
+    }
+    InsightProduct: {
+      group: string
+      name: string
+      /** @description Stable releases held across the product */
+      releases: number
+      /** @description Median days between its last stable releases; null with fewer than two */
+      medianDays?: number | null
+      /**
+       * Format: date-time
+       * @description Its newest stable release
+       */
+      last?: string | null
+    }
+    InsightCount: {
+      name: string
+      repos: number
+      /** @description Of the repositories in scope, 0 to 1 */
+      share: number
+    }
+    InsightRuntime: {
+      /** @description go, node or java */
+      name: string
+      repos: number
+      oldest: string
+      newest: string
+    }
+    InsightLibrary: {
+      /** @description owner/name */
+      repo: string
+      /** @description Live repositories that depend on it */
+      dependants: number
+      /** @description The first ten */
+      dependantRepos: string[]
+      /** @description Its latest stable release */
+      release?: string | null
+      retired?: components["schemas"]["AlumniReason"]
+    }
+    InsightRepo: {
+      /** @description owner/name */
+      repo: string
+      /** @description People's commits held */
+      commits: number
+    }
+    InsightDormant: {
+      /** @description owner/name */
+      repo: string
+      /** Format: date-time */
+      lastChange: string | null
+    }
+    InsightAgeing: {
+      active: number
+      recent: number
+      quiet: number
+      dormant: number
+      /** @description The longest dormant first */
+      dormantRepos: components["schemas"]["InsightDormant"][]
+    }
+    InsightCadence: {
+      /** @description The last months */
+      months: components["schemas"]["InsightMonth"][]
+      products: components["schemas"]["InsightProduct"][]
+    }
+    InsightTechnology: {
+      languages: components["schemas"]["InsightCount"][]
+      buildTools: components["schemas"]["InsightCount"][]
+      runtimes: components["schemas"]["InsightRuntime"][]
+      /** @description Repositories whose manifests name no language */
+      unknown: number
+    }
+    Insights: {
+      /** @description Repositories in scope */
+      repos: number
+      thresholds: components["schemas"]["InsightThresholds"]
+      cadence: components["schemas"]["InsightCadence"]
+      technology: components["schemas"]["InsightTechnology"]
+      libraries: components["schemas"]["InsightLibrary"][]
+      singleAuthor: components["schemas"]["InsightRepo"][]
+      ageing: components["schemas"]["InsightAgeing"]
+      freshness: components["schemas"]["Freshness"]
+    }
     /**
      * @description Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
      * @enum {string}
@@ -1791,6 +1912,34 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["ReleasePage"]
+        }
+      }
+      304: components["responses"]["NotModified"]
+      400: components["responses"]["BadRequest"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  getInsights: {
+    parameters: {
+      query?: {
+        group?: string
+        /** @description owner/name */
+        repo?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The insights */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Insights"]
         }
       }
       304: components["responses"]["NotModified"]

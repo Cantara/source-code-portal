@@ -282,6 +282,7 @@ func TestNoLeakThroughTools(t *testing.T) {
 			"open_pull_requests":   `{"input":{"repo":"acme/` + repo + `"}}`,
 			"open_issues":          `{"input":{"repo":"acme/` + repo + `"}}`,
 			"recent_releases":      `{"input":{"repo":"acme/` + repo + `","variant":"all"}}`,
+			"fleet_insights":       `{"input":{"repo":"acme/` + repo + `"}}`,
 			"retired_repositories": `{"input":{"q":"` + repo + `"}}`,
 		}[name]
 	}

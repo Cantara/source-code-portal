@@ -317,6 +317,41 @@ export const defaults = [
       freshness: fresh,
     }),
   ),
+  http.get("/insights", ({ response }) =>
+    response(200).json({
+      repos: 5,
+      thresholds: { months: 12, releases: 5, singleAuthorShare: 90, singleAuthorCommits: 20, sharedLibraries: 10 },
+      cadence: {
+        months: Array.from({ length: 12 }, (_, i) => ({
+          month: `2026-${String(i + 1).padStart(2, "0")}`,
+          releases: i === 10 ? 3 : 0,
+        })),
+        products: [
+          { group: "iam", name: "Identity", releases: 3, medianDays: 12, last: "2026-11-05T10:00:00Z" },
+          { group: "tools", name: "Tools", releases: 0, medianDays: null, last: null },
+        ],
+      },
+      technology: {
+        languages: [{ name: "Go", repos: 3, share: 0.6 }],
+        buildTools: [{ name: "Go modules", repos: 3, share: 0.6 }],
+        runtimes: [{ name: "go", repos: 3, oldest: "1.21", newest: "1.27" }],
+        unknown: 1,
+      },
+      libraries: [
+        { repo: "acme/core", dependants: 12, dependantRepos: ["acme/api", "acme/web"], release: "v2.0.0" },
+        { repo: "acme/old-lib", dependants: 1, dependantRepos: ["acme/web"], release: null, retired: "archived" },
+      ],
+      singleAuthor: [{ repo: "acme/api", commits: 48 }],
+      ageing: {
+        active: 2,
+        recent: 1,
+        quiet: 1,
+        dormant: 1,
+        dormantRepos: [{ repo: "acme/quiet", lastChange: "2024-09-01T00:00:00Z" }],
+      },
+      freshness: fresh,
+    }),
+  ),
   http.get("/alumni", ({ response }) =>
     response(200).json({
       alumni: [

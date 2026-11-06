@@ -191,6 +191,9 @@ export function MainNav({ ask = false }: { ask?: boolean }) {
       <Link href="/alumni" className={nav} aria-current={path === "/alumni" ? "page" : undefined}>
         Alumni
       </Link>
+      <Link href="/insights" className={nav} aria-current={path === "/insights" ? "page" : undefined}>
+        Insights
+      </Link>
       {ask && (
         <Link href="/ask" className={nav} aria-current={path === "/ask" ? "page" : undefined}>
           Ask

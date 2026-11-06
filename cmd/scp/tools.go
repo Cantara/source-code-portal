@@ -26,6 +26,7 @@ type toolReads struct {
 	pulls            pullsAPI
 	issues           issuesAPI
 	releases         releasesAPI
+	insights         insightsAPI
 	repo, doc, group http.Handler
 	features         config.Features // a switched-off feature has no tool and no search kind (design/features.md)
 }
@@ -172,6 +173,18 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 				"sort":   map[string]any{"type": "string", "enum": []string{"active", "name", "group", "used"}, "description": "The order; default last active first"},
 				"limit":  limit}),
 			func(map[string]any) string { return "Reading the retired repositories" }, r.retired),
+		tool("fleet_insights", "Fleet insights",
+			"Reads what the portal's held data says about the fleet, or a group or one repository: how often it ships (stable releases per "+
+				"month, the median days between a product's last releases), the technology its manifests declare, the internal libraries most "+
+				"repositories depend on, the repositories where one person wrote nearly all of the people's recent commits (named by "+
+				"repository, never by person) and the repositories by how long ago they changed, with the dormant ones listed.",
+			schema(nil, map[string]any{"group": prop("string", "A group id"), "repo": prop("string", "A repository as owner/name")}),
+			func(in map[string]any) string {
+				if s := arg(in, "repo") + arg(in, "group"); s != "" {
+					return "Reading the insights of " + s
+				}
+				return "Reading the fleet insights"
+			}, r.fleetInsights),
 		repoTool("repository_health", "Repository health", "Reads a repository's health score, level and findings, its latest release, packages and activity.", "Checking the health of", r.health),
 		repoTool("repository_packages", "Repository packages", "Lists what a repository publishes to package registries (Maven, npm, PyPI, crates.io, Go, NuGet, ...) with the newest release of each.", "Reading the packages of", r.packages),
 	}
@@ -378,6 +391,64 @@ func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result
 		b.WriteString("No retired repositories.\n")
 	}
 	return tools.Result{Source: "/alumni", Text: b.String()}, nil
+}
+
+// fleetInsights tells the five insights (design/insights.md) in words and lists.
+func (r toolReads) fleetInsights(ctx context.Context, in map[string]any) (tools.Result, error) {
+	params := oapi.GetInsightsParams{}
+	if g := arg(in, "group"); g != "" {
+		params.Group = &g
+	}
+	if p := strings.ToLower(arg(in, "repo")); p != "" {
+		params.Repo = &p
+	}
+	res, err := r.insights.GetInsights(ctx, oapi.GetInsightsRequestObject{Params: params})
+	if err != nil {
+		return tools.Result{}, err
+	}
+	ok, isOK := res.(oapi.GetInsights200JSONResponse)
+	if !isOK {
+		return tools.Result{}, fmt.Errorf("the group or repository is %w", errNotFound)
+	}
+	i, th := ok.Body, ok.Body.Thresholds
+	var b strings.Builder
+	releases := 0
+	for _, m := range i.Cadence.Months {
+		releases += m.Releases
+	}
+	fmt.Fprintf(&b, "%d repositories (retired ones left out).\n\n## Cadence\n%d stable releases in the last %d months.\n", i.Repos, releases, th.Months)
+	for _, p := range i.Cadence.Products {
+		if p.MedianDays != nil {
+			fmt.Fprintf(&b, "- %s: %d stable releases held, a median of %d days between the last %d\n", p.Name, p.Releases, *p.MedianDays, th.Releases)
+		} else {
+			fmt.Fprintf(&b, "- %s: %d stable releases held\n", p.Name, p.Releases)
+		}
+	}
+	b.WriteString("\n## Technology\n")
+	for _, l := range i.Technology.Languages {
+		fmt.Fprintf(&b, "- %s: %d repositories (%d%%)\n", l.Name, l.Repos, int(l.Share*100+0.5))
+	}
+	for _, rt := range i.Technology.Runtimes {
+		fmt.Fprintf(&b, "- %s: %d repositories, from %s to %s\n", rt.Name, rt.Repos, rt.Oldest, rt.Newest)
+	}
+	fmt.Fprintf(&b, "- %d repositories name no language\n\n## Shared libraries\n", i.Technology.Unknown)
+	for _, l := range i.Libraries {
+		fmt.Fprintf(&b, "- %s: %d dependants", l.Repo, l.Dependants)
+		if l.Retired != nil {
+			fmt.Fprintf(&b, ", %s and still used", *l.Retired)
+		}
+		b.WriteString("\n")
+	}
+	fmt.Fprintf(&b, "\n## Mostly one person's (%d%% or more of %d people's commits or more; the person is never named)\n", th.SingleAuthorShare, th.SingleAuthorCommits)
+	for _, s := range i.SingleAuthor {
+		fmt.Fprintf(&b, "- %s\n", s.Repo)
+	}
+	a := i.Ageing
+	fmt.Fprintf(&b, "\n## Ageing\n%d active, %d recent, %d quiet, %d dormant.\n", a.Active, a.Recent, a.Quiet, a.Dormant)
+	for _, d := range a.DormantRepos {
+		fmt.Fprintf(&b, "- %s, last changed %s\n", d.Repo, day(d.LastChange))
+	}
+	return tools.Result{Source: "/insights", Text: b.String()}, nil
 }
 
 func day(t *time.Time) string {

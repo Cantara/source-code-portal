@@ -45,6 +45,7 @@ export const keys = {
       f.size ?? 50,
       f.page ?? 1,
     ] as const,
+  insights: (group: string) => ["insights", group] as const,
   alumni: (f: AlumniFilter) =>
     ["alumni", f.group ?? "", f.q ?? "", f.reason ?? "", f.used ?? false, f.sort ?? "active", f.size ?? 50, f.page ?? 1] as const,
   issues: (f: IssueFilter) =>
@@ -122,6 +123,14 @@ export interface PullFilter {
   page?: number
   size?: number
 }
+
+/** insightsQuery is what the held data says about the fleet, or about one product (GET /insights). */
+export const insightsQuery = (api: Api, group = "") =>
+  queryOptions({
+    queryKey: keys.insights(group),
+    queryFn: ({ signal }) => unwrap(api.GET("/insights", { params: { query: { group: group || undefined } }, signal })),
+    placeholderData: keepPreviousData,
+  })
 
 /** ReleaseFilter is a list of releases (GET /releases): its scope, variant, window and order, and the page. */
 export interface ReleaseFilter {

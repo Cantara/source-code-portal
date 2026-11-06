@@ -104,7 +104,7 @@ var edgePaths = []string{ //nolint:gochecknoglobals // test table
 	"/api/v1/repos/acme/zq-hidden/", "/api/v1/repos/acme/zq-hidden.git", "/repos/acme/ZQ-hidden/readme.md", "/badges/repos/acme/ZQ-HIDDEN/release.svg",
 	"/api/v1/repos/acme/zq-hidden/history?ref=main", "/api/v1/repos/acme/zq-hidden/docs/README.md",
 	"/api/v1/commits?repo=acme/zq-hidden", "/api/v1/commits?repo=ACME/ZQ-HIDDEN", "/api/v1/commits?group=all",
-	"/api/v1/pulls?repo=acme/zq-hidden", "/api/v1/pulls?group=all&drafts=true", "/api/v1/issues?repo=acme/zq-hidden", "/api/v1/issues?group=all", "/api/v1/alumni", "/api/v1/alumni?group=all&q=zq", "/api/v1/releases?variant=all", "/api/v1/releases?repo=acme/zq-hidden&variant=all",
+	"/api/v1/pulls?repo=acme/zq-hidden", "/api/v1/pulls?group=all&drafts=true", "/api/v1/issues?repo=acme/zq-hidden", "/api/v1/issues?group=all", "/api/v1/alumni", "/api/v1/alumni?group=all&q=zq", "/api/v1/insights", "/api/v1/insights?repo=acme/zq-hidden", "/api/v1/insights?group=all", "/api/v1/releases?variant=all", "/api/v1/releases?repo=acme/zq-hidden&variant=all",
 	"/api/v1/search?q=ZQ-HIDDEN", "/api/v1/search?q=zq-hiddem", "/api/v1/search?q=vaul", "/api/v1/search?q=q7", "/api/v1/search?q=%22zq+hidden%22",
 	"/api/v1/search?q=change+-open", "/api/v1/search?q=ann", "/api/v1/search/suggest?q=zq", "/api/v1/search/suggest?q=va", "/api/v1/search/suggest?q=q",
 	"/api/v1/status", "/metrics", "/debug/pprof/", "/api/v1/admin/assistant/test",
@@ -124,7 +124,7 @@ func toolInputs(name string) []string {
 	case "get_document":
 		return []string{`{"input":{"owner":"acme","name":"open","path":"README.md"}}`,
 			`{"input":{"owner":"acme","name":"zq-hidden","path":"docs/guide.md"}}`}
-	case "recent_commits", "open_pull_requests", "open_issues", "recent_releases":
+	case "recent_commits", "open_pull_requests", "open_issues", "recent_releases", "fleet_insights":
 		return []string{`{"input":{}}`, `{"input":{"repo":"acme/open"}}`, `{"input":{"repo":"acme/zq-hidden"}}`}
 	case "retired_repositories":
 		return []string{`{"input":{}}`, `{"input":{"q":"open"}}`, `{"input":{"q":"zq-hidden"}}`}
