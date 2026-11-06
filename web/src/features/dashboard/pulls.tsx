@@ -11,14 +11,15 @@ import { count } from "@/lib/format"
 import type { Work } from "@/lib/preferences"
 import { byWork, pullsFilter, morePullsQuery } from "./api"
 import { useMore } from "./more"
-import { PullList } from "@/entities/pull/pull"
+import { PullList, stateOf } from "@/entities/pull/pull"
+import { ColumnSection } from "./column"
 import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
 /**
- * Pulls is the pulls element (design/pulls.md): the open pull requests of the work that counts, the newest first, each whose turn,
- * each its state, repository and number, who and when; "All N open" goes to /pulls. Nothing when
- * none is open. As a section of the dashboard's side panel (section) its title folds it and its list scrolls inside it; on a wall
- * (wall) its rows run in columns.
+ * Pulls is the pulls element (design/pulls.md): the open pull requests of the work that counts, the newest first, each with whose turn,
+ * its state, repository and number, who and when; "All N open" goes to /pulls. Nothing when none is open. As a section of the
+ * dashboard's side panel (section) its title folds it and its list scrolls inside it; drawn as a section of the presentation page's
+ * side column (column), its rows are the latest commits' two lines.
  */
 export function Pulls({
   work,
@@ -26,7 +27,7 @@ export function Pulls({
   counts,
   n,
   section,
-  wall = false,
+  column = false,
 }: {
   work: Work
   /** one product's, else the fleet's */
@@ -35,7 +36,8 @@ export function Pulls({
   counts: Schemas["PullCounts"]
   n: number
   section?: Section
-  wall?: boolean
+  /** drawn as a section of the presentation page's side column, as its latest commits are */
+  column?: boolean
 }) {
   const f = pullsFilter(work, n, group)
   const { data } = useQuery(pullsQuery(api, f))
@@ -48,8 +50,24 @@ export function Pulls({
   if (group) q.set("group", group)
   if (byWork(work)) q.set("by", "people")
   const all = `/pulls${q.size > 0 ? `?${q}` : ""}`
+  if (column) {
+    return (
+      <ColumnSection
+        id="pulls"
+        title="Pull requests"
+        all={{ href: all, text: `All ${count(counts.open)} open` }}
+        section={section}
+        rows={shown.map((p) => ({ ...p, at: p.createdAt, state: stateOf(p.state) }))}
+        end={end}
+        loading={more.loading}
+        done={more.done}
+        empty="None open"
+        rest="Every pull request, with filters"
+      />
+    )
+  }
   return (
-    <Card aria-labelledby="pulls" className={cn("flex flex-col gap-2", wall && "min-h-0 overflow-hidden", sectionCard(section))}>
+    <Card aria-labelledby="pulls" className={cn("flex flex-col gap-2", sectionCard(section))}>
       <div className="flex items-center gap-2">
         <SectionTitle id="pulls">Pull requests</SectionTitle>
         <Link href={all} className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline">
@@ -68,13 +86,7 @@ export function Pulls({
       )}
       {section?.open !== false && (
         <div id="pulls-body" className={cn("flex flex-col gap-2", sectionBody(section))}>
-          {shown.length > 0 && (
-            <PullList
-              pulls={shown}
-              compact
-              className={wall ? "grid grid-cols-1 gap-x-6 divide-y-0 @3xl:grid-cols-2" : undefined}
-            />
-          )}
+          {shown.length > 0 && <PullList pulls={shown} compact />}
           <div ref={end} aria-live="polite" className="text-center text-xs text-muted-foreground">
             {more.loading ? "Loading more…" : null}
             {more.done ? (

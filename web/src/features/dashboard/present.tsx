@@ -404,11 +404,11 @@ function Screen({
             counts={one?.pulls ?? data.pulls}
             n={e.count ?? 8}
             section={sec}
-            wall
+            column
           />
         )
       case "issues":
-        return <Issues key="issues" work={data.work} group={one?.id} n={e.count ?? 8} section={sec} wall />
+        return <Issues key="issues" work={data.work} group={one?.id} n={e.count ?? 8} section={sec} column />
     }
     return null
   }

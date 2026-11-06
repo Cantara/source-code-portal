@@ -74,7 +74,11 @@ fits from 1024 to 1920 pixels wide.
   at full height (below the rest in portrait), in the layout's order, the built-in one the latest commits, then the pull requests,
   then the issues, as the dashboard's side panel (`layout.md`, L5). Each section's header ends with the panel icon that hides it to
   its header and shows it again; the open ones share the column equally, each scrolling inside, and the pull requests and the issues
-  load more at their end as the commits do. The hidden kinds are kept in the cookie `scp-present-sections`, apart from the
+  load more at their end as the commits do. All three are drawn alike (owner, 2026-11-06; `column.tsx`): a panel with a small
+  uppercase label, the count that links its page and the hide button on one header line, rows edge to edge in the latest commits'
+  two lines: the repository (with `#number` for a pull request or an issue) in bold, who and when at the right; then the commit's
+  subject, or the state's dot and the title. A pull request's and an issue's time is when it was opened; the counts by state are
+  the strip's and their pages', not repeated here. The hidden kinds are kept in the cookie `scp-present-sections`, apart from the
   dashboard's (another screen), read by the server; hiding the last open one folds the column to a rail ("Show the side column")
   that brings every section back. A switched-off feature's section is not there.
 - **Latest commits**, a section of the side column: the author's avatar (initials) at the left while the column is at least
