@@ -33,6 +33,7 @@ export function SearchBox() {
 
   useEffect(() => {
     const focus = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || !input.current) return // the page's own shortcut took it, or there is no box (on /search)
       const target = e.target as HTMLElement | null
       const typing = target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "")
       if (

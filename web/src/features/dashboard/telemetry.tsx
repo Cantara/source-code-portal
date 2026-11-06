@@ -5,7 +5,7 @@ import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { count, plural } from "@/lib/format"
 import { by, has, kinds, type WorkKind } from "@/lib/preferences"
-import { activityRule, kindOf, levelLabel, window, type Rules } from "@/lib/rules"
+import { activityRule, kindOf, levelLabel, windowWords, type Rules } from "@/lib/rules"
 import { useRules } from "@/lib/rules-context"
 import { useNow } from "@/lib/clock"
 import Link from "next/link"
@@ -57,7 +57,7 @@ export function signals(data: Schemas["Dashboard"], rules: Rules, now = Date.now
   const f = data.freshness
   const checked = f.fresh + f.stale + f.error + f.unknown
   const h = data.health
-  const days = window(rules)
+  const days = windowWords(rules)
   const members = new Map<string, Schemas["ActivityLevel"]>()
   for (const g of data.groups) for (const m of g.members) members.set(m.address, m.activity)
   const at = (l: Schemas["ActivityLevel"]) => [...members.values()].filter((v) => v === l).length

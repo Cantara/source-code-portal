@@ -1,6 +1,6 @@
 "use client"
 
-import { useInfiniteQuery, type InfiniteData, type UseInfiniteQueryOptions } from "@tanstack/react-query"
+import { useInfiniteQuery, type InfiniteData, type QueryKey, type UseInfiniteQueryOptions } from "@tanstack/react-query"
 import { useEffect, useRef, useState, type RefObject } from "react"
 import { morePages } from "./api"
 
@@ -10,9 +10,8 @@ import { morePages } from "./api"
  * page, up to morePages pages, and items has them all once each (key). The caller holds end, the element after the list. done: nothing more to read, the page's link has the rest.
  * loaded: the first page is in. reset forgets the pages read (a list that went back to its top).
  */
-export function useMore<T, P extends { page: { number: number; pages: number } }>(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the options of any infinite query of pages
-  opts: UseInfiniteQueryOptions<P, Error, InfiniteData<P>, any, number>,
+export function useMore<T, P extends { page: { number: number; pages: number } }, K extends QueryKey>(
+  opts: UseInfiniteQueryOptions<P, Error, InfiniteData<P>, K, number>,
   first: T[],
   of: (p: P) => T[],
   key: (t: T) => string,

@@ -62,7 +62,15 @@ export function pageOf(path: string): Record<string, string> {
 export function safePath(p: unknown): string | undefined {
   if (typeof p !== "string" || !p.startsWith("/") || p.startsWith("//") || p.includes("\\") || p.length > 500) return undefined
   const u = new URL(p, "https://portal.invalid")
-  if (u.origin !== "https://portal.invalid" || u.pathname.startsWith("/admin") || u.pathname.startsWith("/auth")) return undefined
+  if (u.origin !== "https://portal.invalid") return undefined
+  // The server reads the path decoded (/%61uth is /auth): the guard reads it as the server does, and a path that does not decode is no path.
+  let path = u.pathname
+  try {
+    for (let i = 0; i < 3 && path.includes("%"); i++) path = decodeURIComponent(path)
+  } catch {
+    return undefined
+  }
+  if (path.includes("%") || /^\/(admin|auth)(\/|$)/i.test(path)) return undefined
   return u.pathname + u.search + u.hash
 }
 

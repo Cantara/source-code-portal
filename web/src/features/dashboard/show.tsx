@@ -7,7 +7,7 @@ import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { count } from "@/lib/format"
 import { by, commitsCookie, forget, kinds, remember, sameWork, type Work, type WorkKind } from "@/lib/preferences"
-import { window } from "@/lib/rules"
+import { windowWords } from "@/lib/rules"
 import { useRules } from "@/lib/rules-context"
 import { maintenance } from "./work"
 
@@ -112,7 +112,7 @@ export function ShowPicker({
         >
           <p className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
             <span className="font-medium tracking-widest uppercase">Show commits</span>
-            <span>last {window(rules)}</span>
+            <span>last {windowWords(rules)}</span>
           </p>
           <fieldset className="mt-2 flex flex-col gap-1">
             <legend className="sr-only">The kinds of work the latest commits show</legend>

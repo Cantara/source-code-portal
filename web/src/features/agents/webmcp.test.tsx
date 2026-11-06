@@ -126,6 +126,11 @@ describe("pages", () => {
       "javascript:alert(1)",
       "/admin",
       "/auth/logout",
+      "/%61uth/logout",
+      "/%61dmin",
+      "/%2561dmin",
+      "/ADMIN/x",
+      "/%zz",
       7,
     ])
       expect(safePath(bad)).toBeUndefined()

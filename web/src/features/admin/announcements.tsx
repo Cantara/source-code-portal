@@ -333,13 +333,16 @@ export function AnnouncementsCard() {
   const qc = useQueryClient()
   const now = useNow()
   const { data, error: loadError, refetch } = useQuery(announcementsQuery())
-  const [editing, setEditing] = useState<{ at: number; value: Stored } | null>(null)
+  // The one being edited is told by its id, not its place: the list may be read again (or changed by another admin) meanwhile.
+  const [editing, setEditing] = useState<{ id: string | null; value: Stored } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<ProblemError | null>(null)
   const titleId = useId()
   if (loadError) return <Alert variant="error">The announcements could not be read: {loadError.message}</Alert>
   if (!data) return null
-  const taken = (at: number) => [...data.configured, ...data.announcements.filter((_, i) => i !== at)].map((s) => s.id)
+  const at = editing?.id == null ? -1 : data.announcements.findIndex((s) => s.id === editing.id)
+  const gone = editing?.id != null && at < 0 // someone removed it while it was open
+  const taken = [...data.configured, ...data.announcements.filter((_, i) => i !== at)].map((s) => s.id)
   const write = async (list: Stored[]) => {
     setBusy(true)
     setError(null)
@@ -361,8 +364,9 @@ export function AnnouncementsCard() {
     if (!editing) return
     const value = { ...editing.value, id: editing.value.id || slug(editing.value.title) }
     const list = [...data.announcements]
-    if (editing.at < 0) list.push(value)
-    else list[editing.at] = value
+    if (editing.id === null) list.push(value)
+    else if (at >= 0) list[at] = value
+    else return
     void write(list)
   }
   const remove = (at: number) => {
@@ -375,13 +379,14 @@ export function AnnouncementsCard() {
     !value.title.trim() ||
     !(value.until || value.ends) ||
     !!value.link?.url !== !!value.link?.label ||
-    taken(editing.at).includes(value.id || slug(value.title))
+    gone ||
+    taken.includes(value.id || slug(value.title))
   return (
     <Card className="lg:col-span-2" aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle id={titleId}>Announcements</CardTitle>
         {!editing && (
-          <Button onClick={() => setEditing({ at: -1, value: blank() })} disabled={!data.writable}>
+          <Button onClick={() => setEditing({ id: null, value: blank() })} disabled={!data.writable}>
             New announcement
           </Button>
         )}
@@ -422,7 +427,7 @@ export function AnnouncementsCard() {
                 <Button
                   variant="outline"
                   className="min-h-7 px-2 text-xs"
-                  onClick={() => setEditing({ at: i, value: s })}
+                  onClick={() => setEditing({ id: s.id, value: s })}
                   disabled={busy}
                 >
                   Edit<span className="sr-only"> {s.title}</span>
@@ -442,10 +447,10 @@ export function AnnouncementsCard() {
       )}
       {editing && value && (
         <section
-          aria-label={editing.at < 0 ? "New announcement" : "Edit announcement"}
+          aria-label={editing.id === null ? "New announcement" : "Edit announcement"}
           className="mt-4 border-t border-border pt-4"
         >
-          <Editor value={value} taken={taken(editing.at)} onChange={(v) => setEditing({ ...editing, value: v })} />
+          <Editor value={value} taken={taken} onChange={(v) => setEditing({ ...editing, value: v })} />
           <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={save} disabled={invalid || busy || !data.writable}>
               Save

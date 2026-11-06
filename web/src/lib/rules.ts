@@ -82,5 +82,5 @@ export function levelRanges(rules: Rules): { level: Schemas["HealthLevel"]; labe
   }))
 }
 
-/** window is the activity counts' window in words: "30 days". */
-export const window = (rules: Rules) => `${rules.windowDays} days`
+/** windowWords is the activity counts' window in words: "30 days". */
+export const windowWords = (rules: Rules) => `${rules.windowDays} days`

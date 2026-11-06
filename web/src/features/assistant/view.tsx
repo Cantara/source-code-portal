@@ -119,7 +119,7 @@ export function AskView() {
           {status.model} and can be wrong; the conversation is kept in this page only.
         </p>
       </PageHeader>
-      <ol className="flex flex-col gap-3" aria-live="polite" aria-busy={busy}>
+      <ol className="flex flex-col gap-3" aria-busy={busy}>
         {shown.map((m, i) =>
           m.role === "user" ? (
             <li key={i} className="self-end rounded-lg bg-accent px-3 py-2 text-sm whitespace-pre-wrap">
@@ -150,6 +150,10 @@ export function AskView() {
           ),
         )}
       </ol>
+      {/* Told once, when the answer is whole: a live transcript would read out every word as it arrives. */}
+      <p role="status" className="sr-only">
+        {busy ? "" : (shown.findLast((m) => m.role === "assistant" && !m.failed)?.content ?? "")}
+      </p>
       {refused !== undefined && (
         <div className="mt-3">
           {refused instanceof ProblemError && refused.status === 429 ? (
