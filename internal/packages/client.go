@@ -2,7 +2,6 @@ package packages
 
 import (
 	"bytes"
-	"container/list"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	gosync "sync"
 	"time"
+
+	"github.com/cantara/source-code-portal/internal/lru"
 )
 
 const (
@@ -84,7 +85,7 @@ func NewClient(public, private http.RoundTripper, registries []Registry) *Client
 		registries: registries,
 		now:        time.Now,
 		hosts:      map[string]*host{},
-		cache:      &cache{order: list.New(), byURL: map[string]*list.Element{}},
+		cache:      newCache(),
 	}
 }
 
@@ -252,44 +253,24 @@ type answer struct {
 
 // cache keeps answers up to cacheMax bytes, the least recently used dropped first.
 type cache struct {
-	mu    gosync.Mutex
-	order *list.List // of *cached, the most recent at the front
-	byURL map[string]*list.Element
-	size  int
+	mu      gosync.Mutex
+	answers *lru.Cache[string, answer]
 }
 
-type cached struct {
-	key string
-	answer
+func newCache() *cache {
+	return &cache{answers: lru.New[string, answer](cacheMax, func(a answer) int { return len(a.body) })}
 }
 
 func (c *cache) get(key string) (answer, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	el, ok := c.byURL[key]
-	if !ok {
-		return answer{}, false
-	}
-	c.order.MoveToFront(el)
-	return el.Value.(*cached).answer, true //nolint:forcetypeassert // the only type stored
+	return c.answers.Get(key)
 }
 
 func (c *cache) put(key string, a answer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if el, ok := c.byURL[key]; ok {
-		c.size -= len(el.Value.(*cached).body) //nolint:forcetypeassert // the only type stored
-		c.order.Remove(el)
-	}
-	c.byURL[key] = c.order.PushFront(&cached{key: key, answer: a})
-	c.size += len(a.body)
-	for c.size > cacheMax {
-		el := c.order.Back()
-		old := el.Value.(*cached) //nolint:forcetypeassert // the only type stored
-		c.order.Remove(el)
-		delete(c.byURL, old.key)
-		c.size -= len(old.body)
-	}
+	c.answers.Put(key, a)
 }
 
 // Credential signs a request in to its registry: Basic with User and Secret (the password or a token), else the token in Secret,

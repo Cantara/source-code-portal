@@ -2,13 +2,14 @@ package github
 
 import (
 	"bytes"
-	"container/list"
 	"crypto/sha256"
 	"io"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/cantara/source-code-portal/internal/lru"
 )
 
 const maxCachedBody = 1 << 20
@@ -107,42 +108,24 @@ type cacheEntry struct {
 // etagCache is a bounded LRU of conditional-request entries.
 type etagCache struct {
 	mu    sync.Mutex
-	max   int
-	order *list.List // front = most recent; values are keys
-	items map[string]*list.Element
-	data  map[string]*cacheEntry
+	items *lru.Cache[string, *cacheEntry]
 }
 
 func newETagCache(max int) *etagCache {
-	return &etagCache{max: max, order: list.New(), items: map[string]*list.Element{}, data: map[string]*cacheEntry{}}
+	return &etagCache{items: lru.New[string, *cacheEntry](max, nil)}
 }
 
 func (c *etagCache) get(key string) *cacheEntry {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if el, ok := c.items[key]; ok {
-		c.order.MoveToFront(el)
-		return c.data[key]
-	}
-	return nil
+	e, _ := c.items.Get(key)
+	return e
 }
 
 func (c *etagCache) put(key string, e *cacheEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if el, ok := c.items[key]; ok {
-		c.order.MoveToFront(el)
-	} else {
-		c.items[key] = c.order.PushFront(key)
-	}
-	c.data[key] = e
-	for c.order.Len() > c.max {
-		oldest := c.order.Back()
-		k := oldest.Value.(string) //nolint:forcetypeassert // only strings are stored
-		c.order.Remove(oldest)
-		delete(c.items, k)
-		delete(c.data, k)
-	}
+	c.items.Put(key, e)
 }
 
 // rateBook holds the last core rate-limit headers seen for one credential.

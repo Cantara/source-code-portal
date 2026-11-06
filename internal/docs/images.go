@@ -2,7 +2,6 @@ package docs
 
 import (
 	"bytes"
-	lru "container/list"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
+	"github.com/cantara/source-code-portal/internal/lru"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
@@ -135,7 +135,8 @@ func (h *images) get(key string, fetch func(context.Context) (item, time.Duratio
 		h.cache.put(key, it, ttl, time.Now())
 		return it, nil
 	})
-	return v.(item) //nolint:forcetypeassert // the only type stored
+	it, _ := v.(item) // the only type the flight returns
+	return it
 }
 
 func (h *images) blob(ctx context.Context, repo snapshot.Repo, img Image) item {
@@ -209,21 +210,17 @@ type item struct {
 
 // cache holds answers by key up to a total size, least recently used out first.
 type cache struct {
-	mu    gosync.Mutex
-	max   int
-	size  int
-	order *lru.List // front: most recent
-	byKey map[string]*lru.Element
+	mu      gosync.Mutex
+	entries *lru.Cache[string, entry]
 }
 
 type entry struct {
-	key     string
 	it      item
 	expires time.Time // zero: until evicted
 }
 
 func newCache(maxBytes int) *cache {
-	return &cache{max: maxBytes, order: lru.New(), byKey: map[string]*lru.Element{}}
+	return &cache{entries: lru.New[string, entry](maxBytes, func(e entry) int { return weight(e.it) })}
 }
 
 func weight(it item) int {
@@ -236,42 +233,23 @@ func weight(it item) int {
 func (c *cache) get(key string, now time.Time) (item, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	el, ok := c.byKey[key]
+	en, ok := c.entries.Get(key)
 	if !ok {
 		return item{}, false
 	}
-	en := el.Value.(*entry) //nolint:forcetypeassert // the only type stored
 	if !en.expires.IsZero() && now.After(en.expires) {
-		c.remove(el)
+		c.entries.Remove(key)
 		return item{}, false
 	}
-	c.order.MoveToFront(el)
 	return en.it, true
 }
 
 func (c *cache) put(key string, it item, ttl time.Duration, now time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if el, ok := c.byKey[key]; ok {
-		c.remove(el)
-	}
-	if weight(it) > c.max {
-		return
-	}
-	en := &entry{key: key, it: it}
+	en := entry{it: it}
 	if ttl > 0 {
 		en.expires = now.Add(ttl)
 	}
-	c.byKey[key] = c.order.PushFront(en)
-	c.size += weight(it)
-	for c.size > c.max {
-		c.remove(c.order.Back())
-	}
-}
-
-func (c *cache) remove(el *lru.Element) {
-	en := el.Value.(*entry) //nolint:forcetypeassert // the only type stored
-	c.order.Remove(el)
-	delete(c.byKey, en.key)
-	c.size -= weight(en.it)
+	c.entries.Put(key, en)
 }
