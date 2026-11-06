@@ -463,7 +463,7 @@ finding. They need the App's *Issues* read permission (section 1); without it Gi
 ### 2.4.4 Releases
 
 **Releases** in the header (`/releases`) lists what the repositories published, newest first. The portal keeps each repository's 20
-newest published releases (drafts are never listed): it reads them when GitHub sends a *Release* event and once an hour as a safety
+newest published releases (drafts are never listed): it reads them when GitHub sends a *Release* event and every 6 hours as a safety
 net, as a conditional request that costs no rate limit when nothing changed. By default the page shows the latest stable release of
 each repository; the chips switch to every release, the stable ones or the pre-releases, each with its count. The product, a window
 (the last 7, 30, 90 days or year) and the order (newest, oldest, repository, product) are a form that works without JavaScript. A

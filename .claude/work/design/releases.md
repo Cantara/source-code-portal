@@ -19,9 +19,11 @@ the latest release is the newest stable one in this list, so a repository is rea
 - **Latest.** The newest non-prerelease by publication time. `badges.release`, the `release` facet, `badges.Repo`'s release and the
   group badge read it through the same hook (`cmd/scp` hands the facet to `badges.Options.Data`; features never import each other);
   the job `badges.release` and its `FromGitHub` go away (greenfield).
-- **Triggers.** The webhook event `release` (already normalised to `EventTag`, P-73) and a TTL of 1 hour, safety net only: a
-  release is published by a person, rarely, and the webhook is the primary path (P-80). An archived repository is read once.
-- **Cost at 1,000 repositories.** 1,000 conditional requests an hour, nearly all 304. Prerequisite (P-71): read access to
+- **Triggers.** The webhook event `release` (already normalised to `EventTag`, P-73) and a TTL of 6 hours, safety net only: a
+  release is published by a person, rarely, and the webhook is the primary path (P-80, with the delivery log's catch-up every two
+  minutes). A TTL of an hour was tried: a cold start of 1,000 repositories takes two hours, so every repository was read again before the
+  last one was first read. An archived repository is read once.
+- **Cost at 1,000 repositories.** 4,000 conditional requests a day, nearly all 304. Prerequisite (P-71): read access to
   *Contents* (already required), added to `prereq.Needs` with the documentation's table in the same commit.
 
 ## API

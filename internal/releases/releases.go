@@ -1,5 +1,5 @@
 // Package releases keeps every repository's recent releases (design/releases.md, P-82): the 20 newest published ones as a conditional
-// REST listing, read when a release is published and hourly as the net. The latest release (the newest stable one) that the badges, the
+// REST listing, read when a release is published and every 6 hours as the net. The latest release (the newest stable one) that the badges, the
 // repository summary and the search show is the first of this list, so a repository is read once.
 package releases
 
@@ -28,8 +28,10 @@ const Kind = "releases"
 const (
 	// Keep is how many of a repository's newest releases are kept.
 	Keep = 20
-	// ttl is the safety net: a release is published by a person, rarely, and the webhook is the way it is noticed (P-80).
-	ttl = time.Hour
+	// ttl is the safety net: a release is published by a person, rarely, and the webhook is the way it is noticed (P-80), with the App's
+	// delivery log read every two minutes for one that was missed. A shorter TTL makes a cold start read every repository again before it
+	// has read the last one.
+	ttl = 6 * time.Hour
 	// ConfirmAfter is when a run caused by an event reads again: GitHub's listing can be a few seconds behind the event.
 	ConfirmAfter = 30 * time.Second
 	maxName      = 200
