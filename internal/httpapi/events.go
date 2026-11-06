@@ -89,7 +89,7 @@ func (e *Events) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case <-e.done:
 			return
 		case <-tick.C:
-			if !send([]byte(": ping\n\n")) {
+			if !send([]byte("event: ping\ndata: {}\n\n")) {
 				return
 			}
 		case <-changed:

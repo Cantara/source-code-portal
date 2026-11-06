@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 	gosync "sync"
 	"sync/atomic"
@@ -366,6 +367,39 @@ func TestNotifyCoalesces(t *testing.T) {
 		time.Sleep(time.Second)
 		if got := runs.Load() - base; got != 2 {
 			t.Errorf("ten pushes while running gave %d runs, want 2 (the running one and one follow-up)", got)
+		}
+		r.stop()
+	})
+}
+
+// TestJobEvent: a run an event asked for says so (Job.Event), so a job can read again soon; the run that follows, asked for by its
+// own Again, does not, and the chain ends.
+func TestJobEvent(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var mu gosync.Mutex
+		var seen []bool
+		r, _ := catalogueRig(t, t.TempDir(), nil, func(_ context.Context, j Job) (Result, error) {
+			if j.Repo != "acme/a" {
+				return Result{}, nil
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			seen = append(seen, j.Event)
+			if j.Event {
+				return Result{Payload: []byte("c"), Again: 30 * time.Second}, nil
+			}
+			return Result{Payload: []byte("c")}, nil
+		})
+		r.run()
+		time.Sleep(time.Second)
+		r.eng.Notify(EventPush, "acme/a")
+		time.Sleep(time.Minute)
+		time.Sleep(10 * time.Minute)
+		mu.Lock()
+		defer mu.Unlock()
+		want := []bool{false, true, false}
+		if !slices.Equal(seen, want) {
+			t.Errorf("runs asked for by an event = %v, want %v (start, the event, its confirmation)", seen, want)
 		}
 		r.stop()
 	})

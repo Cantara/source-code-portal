@@ -358,14 +358,14 @@ catalog:
 		t.Fatal(err)
 	}
 	cfg.Server.PublicAddr, cfg.Server.AdminAddr = "127.0.0.1:0", "127.0.0.1:0"
-	push := func(public, delivery, name string) {
+	deliver := func(public, event, delivery, name string) {
 		t.Helper()
 		body := `{"ref":"refs/heads/main","repository":{"name":"` + name + `","default_branch":"main","owner":{"login":"acme"}}}`
 		m := hmac.New(sha256.New, []byte("hooks"))
 		m.Write([]byte(body))
 		req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, public+"/webhooks/github", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-GitHub-Event", "push")
+		req.Header.Set("X-GitHub-Event", event)
 		req.Header.Set("X-GitHub-Delivery", delivery)
 		req.Header.Set("X-Hub-Signature-256", "sha256="+hex.EncodeToString(m.Sum(nil)))
 		resp, err := client.Do(req)
@@ -377,6 +377,7 @@ catalog:
 			t.Fatalf("webhook: %d", resp.StatusCode)
 		}
 	}
+	push := func(public, delivery, name string) { t.Helper(); deliver(public, "push", delivery, name) }
 	gh.Fail("GET /", http.StatusBadGateway, 1<<20, 0)
 	stop, public, admin = serve()
 	waitReady(admin)
@@ -400,6 +401,27 @@ catalog:
 	if d := time.Since(start); d > 5*time.Second {
 		t.Errorf("the push took %v to show", d)
 	}
+
+	// A new issue and a new pull request, each announced by a signed webhook, show in their listings within seconds (in a repository
+	// no push has just read: a run settles for a minute after the last one).
+	opened := time.Now().UTC().Add(-time.Minute)
+	gh.SetIssues(tool, githubtest.Issue{Number: 26, Title: "Sign-in loops on refresh", Author: "ann", Created: opened, Updated: opened})
+	gh.SetPulls(tool, githubtest.Pull{Number: 27, Title: "Keep the session", Author: "bo", Created: opened, Updated: opened, Base: "main",
+		Head: "keep", HeadSHA: strings.Repeat("9", 40), Checks: "SUCCESS"})
+	start = time.Now()
+	deliver(public, "issues", "issue-26", "tool")
+	deliver(public, "pull_request", "pull-27", "tool")
+	waitFor("the new issue", func() bool {
+		var r struct{ Issues []struct{ Number int } }
+		return fetch(public+"/api/v1/issues", &r) == http.StatusOK && len(r.Issues) == 1 && r.Issues[0].Number == 26
+	})
+	waitFor("the new pull request", func() bool {
+		var r struct{ Pulls []struct{ Number int } }
+		return fetch(public+"/api/v1/pulls", &r) == http.StatusOK && len(r.Pulls) == 1 && r.Pulls[0].Number == 27
+	})
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("the issue and the pull request took %v to show", d)
+	}
 	exposition := read(admin + "/metrics")
 	for _, want := range []string{`scp_http_requests_total{code="200",listener="public",method="GET",pattern="GET /api/v1/repos/{owner}/{name}"}`,
 		`scp_webhook_deliveries_total{event="push",result="accepted"} 2`, `scp_sync_jobs_total{kind="commits",result="ok"}`,
@@ -414,7 +436,7 @@ catalog:
 		Sources []struct{ ID string }
 		Webhook struct{ Deliveries map[string]int }
 	}
-	if code := fetch(admin+"/api/v1/status", &st); code != 200 || !st.Ready || len(st.Sources) != 1 || st.Webhook.Deliveries["accepted"] != 2 {
+	if code := fetch(admin+"/api/v1/status", &st); code != 200 || !st.Ready || len(st.Sources) != 1 || st.Webhook.Deliveries["accepted"] != 4 {
 		t.Errorf("status: %d %+v", code, st)
 	}
 	if code := fetch(admin+"/debug/pprof/", nil); code != http.StatusNotFound {

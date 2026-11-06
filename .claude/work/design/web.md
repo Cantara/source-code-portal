@@ -92,7 +92,7 @@ contrast in both themes. The header shows whether the live stream is open (`Live
 1. Queries: `staleTime` 10 s, `gcTime` 5 min, retry network/429/5xx at most twice (honour `Retry-After`), refetch on window focus,
    previous data kept on error.
 2. Snapshot sync: one `useSnapshotSync()` in the providers opens an `EventSource` on `/api/v1/events`; each `snapshot` event replaces
-   the snapshot query's data. While the stream is not open it polls `GET /api/v1/snapshot` every 30 s while the tab is visible. A
+   the snapshot query's data. The stream keeps itself open: the server's `ping` event every 25 s is the proof of life, 65 s without a word and it is opened again; one the browser gave up on (an error answer) is opened again after 2 s, doubling to 60 s; coming back to the tab or the network opens it at once, and its first event is the current snapshot. While the stream is not open it polls `GET /api/v1/snapshot` every 30 s while the tab is visible. A
    different `version` (equality) invalidates every other query but who the viewer is (`me`); active ones refetch, at once if the last refresh is older than 15 s, else once at its end (`refreshEvery`), so a run of snapshots is one refresh. Links in dense lists (the fleet map, rows of commits, pull requests and issues, the product cards' repositories) do not prefetch (`prefetch={false}`). Readiness `warming` shows a banner.
 3. Commit logs come in numbered pages (`shared/pager.tsx`, `lib/paging.ts`): the pager above and below the list, links that load in
    place with `pushState` and work as plain links without JavaScript; the page size is the reader's choice (25, 50, 100, 200; 50 in

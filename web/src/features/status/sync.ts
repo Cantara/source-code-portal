@@ -21,9 +21,20 @@ export function keep(q: Query): boolean {
   return q.meta?.keepPaged === true && (number ?? 1) > 1
 }
 
+/** silenceLimit is how long a stream may be silent before it is taken for dead: the server pings every 25 s. */
+export const silenceLimit = 65_000
+
+/** The wait before the stream is opened again after the browser gave up on it: doubled from the first, to the last. */
+export const retryFirst = 2_000
+export const retryLast = 60_000
+
 /**
  * useLiveSnapshot listens to /api/v1/events: every snapshot event replaces the snapshot query's data. It reports whether the
- * stream is open; the browser reconnects after an error.
+ * stream is open, and keeps it so: the browser reconnects after a drop, but not after an error answer (a full server, a proxy's 502),
+ * and nothing tells it a stream that went silent without closing (a proxy that holds the connection, a sleeping laptop). So the
+ * server's ping is the proof of life: no word for silenceLimit and the stream is opened again; a closed one is opened again with a
+ * growing wait; coming back to the tab or the network opens it at once, and the first event is the current snapshot. Meanwhile the
+ * snapshot is polled (useSnapshotSync).
  */
 function useLiveSnapshot(): boolean {
   const qc = useQueryClient()
@@ -31,13 +42,53 @@ function useLiveSnapshot(): boolean {
   useEffect(() => setLive(open), [open])
   useEffect(() => {
     if (typeof EventSource === "undefined") return
-    const source = new EventSource("/api/v1/events")
-    source.onopen = () => setOpen(true)
-    source.onerror = () => setOpen(false)
-    source.addEventListener("snapshot", (e) => {
-      qc.setQueryData(snapshotKey, JSON.parse((e as MessageEvent<string>).data) as SnapshotInfo)
-    })
-    return () => source.close()
+    let source: EventSource | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let failures = 0
+    let stopped = false
+    const wait = (ms: number, then: () => void) => {
+      clearTimeout(timer)
+      timer = setTimeout(then, ms)
+    }
+    const close = () => {
+      clearTimeout(timer)
+      source?.close()
+      source = undefined
+    }
+    const connect = () => {
+      close()
+      if (stopped) return
+      const s = new EventSource("/api/v1/events")
+      source = s
+      const alive = () => wait(silenceLimit, connect)
+      s.onopen = () => {
+        failures = 0
+        setOpen(true)
+        alive()
+      }
+      s.onerror = () => {
+        setOpen(false)
+        if (s.readyState === EventSource.CLOSED) wait(Math.min(retryLast, retryFirst * 2 ** failures++), connect)
+        else alive() // the browser is retrying: if it never gets through, start over
+      }
+      s.addEventListener("snapshot", (e) => {
+        alive()
+        qc.setQueryData(snapshotKey, JSON.parse((e as MessageEvent<string>).data) as SnapshotInfo)
+      })
+      s.addEventListener("ping", alive)
+    }
+    const back = () => {
+      if (document.visibilityState === "visible") connect()
+    }
+    connect()
+    document.addEventListener("visibilitychange", back)
+    window.addEventListener("online", back)
+    return () => {
+      stopped = true
+      close()
+      document.removeEventListener("visibilitychange", back)
+      window.removeEventListener("online", back)
+    }
   }, [qc])
   return open
 }
