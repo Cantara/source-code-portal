@@ -736,11 +736,11 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
               <p>
                 <strong className="text-foreground">Releases</strong> lists what was shipped: the latest stable release of each
                 repository, or every release the portal holds (the 20 newest of each), only the stable ones or only the
-                pre-releases, newest first or in the order of your choice, within the days you pick.{" "}
-                <strong className="text-foreground">Alumni</strong> keeps the retired repositories apart from the live products:
-                the archived ones, and those whose <code>scp.yaml</code> says <code>lifecycle: deprecated</code>, each with when
-                it was last active, how many people worked on it (counted, never named) and how many repositories still depend on
-                it.
+                pre-releases, newest first or in the order of your choice, within the days you pick; a repository&apos;s and a
+                product&apos;s page show their own. <strong className="text-foreground">Alumni</strong> keeps the retired
+                repositories apart from the live products: the archived ones, and those whose <code>scp.yaml</code> says{" "}
+                <code>lifecycle: deprecated</code>, each with when it was last active, how many people worked on it (counted,
+                never named) and how many repositories still depend on it.
               </p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 # Alumni: the retired repositories (AL1, AL2)
 
-Status: AL1 built, AL2 in progress (the tool, llms, docs and the Guide are built; the group's `N retired` link is left) (plan.md section 4, P-81). Binding order: ../plan.md > this note > `catalog.md`, `health.md`, `layout.md`.
+Status: AL1 and AL2 built (plan.md section 4, P-81) (plan.md section 4, P-81). Binding order: ../plan.md > this note > `catalog.md`, `health.md`, `layout.md`.
 
 A catalogue only grows. A repository that was archived, or that its owners marked deprecated, is no longer work in progress, but it
 is still a record: what it was, who built it, when it last moved, what it last released, and what still depends on it. The portal

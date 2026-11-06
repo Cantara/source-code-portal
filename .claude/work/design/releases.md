@@ -1,6 +1,6 @@
 # Releases: what was shipped and when (RL1 to RL3)
 
-Status: RL1 and RL2 built, RL3 in progress (the tool, the search kind, llms, docs and the Guide are built; the repository's and the group's panel and the dashboard element are left) (plan.md section 4, P-82). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
+Status: RL1 to RL3 built (plan.md section 4, P-82, P-84). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
 
 The portal holds only the **latest** release of a repository (the badge's job, `badges.release`). A team that wants to know what the
 fleet shipped this week has nothing to look at. The portal lists the recent releases of the fleet, a product and a repository, newest
@@ -38,8 +38,9 @@ viewer's view; the leak test lists the route.
 
 `/releases` in the header: the variants as chips and the sorts as links, a GET form without JavaScript, a row per release (repository,
 tag, name, how long ago with the exact time in a hint, a *pre-release* chip, the link to GitHub). A repository page gets a *Releases*
-panel (its last ten); a group page its group's (RL3). Server-rendered, canonical, in the sitemap. RL3 adds the `releases` element to the
-dashboard's elements catalogue (a section of the side panel and of `/present`'s column, as the pull requests).
+panel (its last ten); a group page the latest of each of its repositories, with the way to its retired repositories. Server-rendered, canonical, in the sitemap. There is no `releases` element on the
+dashboard or `/present` (P-84): the side panel already shares its height among three sections and the work-that-counts lens does not apply
+to a release.
 
 ## Agents and the rest (RL3)
 

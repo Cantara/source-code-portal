@@ -25,11 +25,12 @@ import { Hint } from "@/shared/hint"
 import { cn } from "@/lib/cn"
 import { FindingList, HealthScore } from "@/entities/health/findings"
 import { VisibilityBadge } from "@/entities/repo/visibility-badge"
-import { groupQuery, issuesQuery, pullsQuery } from "@/lib/api/queries"
+import { alumniQuery, groupQuery, issuesQuery, pullsQuery, releasesQuery } from "@/lib/api/queries"
 import { useFeatures } from "@/lib/rules-context"
 import { PullList } from "@/entities/pull/pull"
+import { ReleaseList } from "@/entities/release/release"
 import { IssueList } from "@/entities/issue/issue"
-import { groupCommitsQuery, groupIssues, groupPulls } from "./api"
+import { groupCommitsQuery, groupIssues, groupPulls, groupReleases, groupRetired } from "./api"
 import { validateGroupSearch, type GroupSearch, type SortKey } from "./search"
 
 /** Column is one column of the repository table: its header, how it sorts and how a row draws it. */
@@ -312,6 +313,9 @@ export function GroupView({ group }: { group: string }) {
               </PanelBoundary>
             )}
             <PanelBoundary>
+              <GroupReleases group={group} />
+            </PanelBoundary>
+            <PanelBoundary>
               <LatestCommits group={group} />
             </PanelBoundary>
           </div>
@@ -375,6 +379,34 @@ function GroupIssues({ group }: { group: string }) {
       <Link href={`/issues?group=${encodeURIComponent(group)}`} className="mt-2 inline-block text-sm hover:underline">
         {data ? `All ${count(data.counts.open)} open` : "All open issues"}
       </Link>
+    </Card>
+  )
+}
+
+/** GroupReleases is the group's latest release of each repository, the newest five, the way to all of them on /releases and, when
+ * some of its repositories are retired, the way to them on /alumni; a group with neither: nothing. */
+function GroupReleases({ group }: { group: string }) {
+  const { data, error } = useQuery(releasesQuery(api, groupReleases(group)))
+  const retired = useQuery(alumniQuery(api, groupRetired(group))).data?.counts.total ?? 0
+  if (data && data.counts.all === 0 && retired === 0) return null
+  return (
+    <Card aria-labelledby="releases">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <CardTitle id="releases">Releases</CardTitle>
+        {data && <FreshnessBadge freshness={data.freshness} />}
+      </div>
+      {error && !data && <ProblemAlert error={error} />}
+      {data && <ReleaseList releases={data.releases} empty="None published" />}
+      <div className="mt-2 flex flex-wrap gap-x-4 text-sm">
+        <Link href={`/releases?group=${encodeURIComponent(group)}`} className="hover:underline">
+          All releases
+        </Link>
+        {retired > 0 && (
+          <Link href={`/alumni?group=${encodeURIComponent(group)}`} className="text-muted-foreground hover:underline">
+            {count(retired)} retired
+          </Link>
+        )}
+      </div>
     </Card>
   )
 }
