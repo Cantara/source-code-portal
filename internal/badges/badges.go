@@ -1,12 +1,10 @@
-// Package badges serves local SVG badges for repositories and groups, and keeps the latest release of every repository.
+// Package badges serves local SVG badges for repositories and groups.
 package badges
 
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,17 +12,10 @@ import (
 
 	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/httpapi"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/store"
-	"github.com/cantara/source-code-portal/internal/sync"
 )
 
-// ReleaseKind is the job kind that reads a repository's latest release.
-const ReleaseKind = "badges.release"
-
 const (
-	releaseTTL    = 24 * time.Hour // tag pushes notify the job
 	dataMaxAge    = 5 * time.Minute
 	unknownMaxAge = time.Minute
 	csp           = "default-src 'none'; sandbox"
@@ -38,66 +29,11 @@ type Release struct {
 	Published time.Time `json:"published"`
 }
 
-// facet is the latest release: nil when there is none or it is not known yet (the freshness tells which).
-const facet snapshot.Facet[*Release] = "release"
-
-// ReleaseOf is a repository's latest release (nil when there is none or it is not known yet) and its freshness.
-func ReleaseOf(e *snapshot.RepoEntry) (*Release, snapshot.Freshness) { return facet.Get(e) }
-
-// Repo adds the latest release to a repository summary.
-func Repo(_ *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
-	if rel, _ := facet.Get(e); rel != nil {
-		r.Release = &oapi.Release{Tag: rel.Tag, Url: rel.URL, PublishedAt: rel.Published.UTC()}
-	}
-}
-
-// Badges is the badges feature.
-type Badges struct {
-	sources map[string]Releases
-}
-
-// New returns the feature for one Releases per source id.
-func New(sources map[string]Releases) *Badges { return &Badges{sources: sources} }
-
-// ReleaseSpec is the per-repository latest-release job.
-func (b *Badges) ReleaseSpec() sync.Spec {
-	return sync.Spec{Kind: ReleaseKind, Prio: sync.PrioScheduled, TTL: releaseTTL, On: []sync.Event{sync.EventTag}, Run: b.run,
-		Publish: publish}
-}
-
-func (b *Badges) run(ctx context.Context, j sync.Job) (sync.Result, error) {
-	src := b.sources[j.Source]
-	if src == nil {
-		return sync.Result{}, errors.New("badges: unknown source " + j.Source)
-	}
-	owner, name, _ := strings.Cut(string(j.Repo), "/")
-	rel, err := src.LatestRelease(ctx, owner, name)
-	if err != nil && !errors.Is(err, ErrNoRelease) {
-		return sync.Result{}, err
-	}
-	state, payload := snapshot.StateNotFound, []byte(nil)
-	if err == nil {
-		if payload, err = json.Marshal(rel); err != nil {
-			return sync.Result{}, err
-		}
-		state = snapshot.StateOK
-	}
-	return sync.Result{State: state, Payload: payload, Unchanged: j.Prev.State == state && string(j.Prev.Payload) == string(payload)}, nil
-}
-
-func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
-	var rel *Release
-	if it.State == snapshot.StateOK {
-		rel = &Release{}
-		if json.Unmarshal(it.Payload, rel) != nil {
-			rel = nil
-		}
-	}
-	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, rel, fresh) })
-}
-
 // Data is what the badges read from other features, wired in cmd/scp.
 type Data struct {
+	// Release is a repository's latest stable release (nil when there is none or it is not known yet) and the freshness of its releases;
+	// a repository read to have none is not found.
+	Release func(*snapshot.RepoEntry) (*Release, snapshot.Freshness)
 	// LastCommit is a repository's newest commit time (zero when there is none) and the freshness of its commits.
 	LastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)
 	// Health is a repository's health at now.
@@ -153,7 +89,7 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 		at, fresh := h.LastCommit(e)
 		b, data = h.age(at, read(fresh))
 	case "release":
-		rel, fresh := facet.Get(e)
+		rel, fresh := h.Release(e)
 		b, data = release(rel, fresh.State == snapshot.StateNotFound)
 	case "health":
 		r := h.Health(s, e, h.now())
@@ -220,7 +156,7 @@ func (h handler) group(w http.ResponseWriter, r *http.Request) {
 		b, data = h.age(newest, known)
 		b.label = "last commit"
 	case "release":
-		b, data = release(groupRelease(s, g))
+		b, data = release(h.groupRelease(s, g))
 	case "pulls":
 		if h.Pulls == nil {
 			h.write(w, r, unknown(""), http.StatusNotFound, false)
@@ -299,9 +235,9 @@ func release(rel *Release, none bool) (badge, bool) {
 
 // groupRelease is the default repository's latest release, else the newest release among the members; none when every member is known
 // to have none.
-func groupRelease(s *snapshot.Snapshot, g snapshot.Group) (*Release, bool) {
+func (h handler) groupRelease(s *snapshot.Snapshot, g snapshot.Group) (*Release, bool) {
 	if e := s.Repos[g.DefaultRepo]; e != nil {
-		if rel, _ := facet.Get(e); rel != nil {
+		if rel, _ := h.Release(e); rel != nil {
 			return rel, false
 		}
 	}
@@ -312,7 +248,7 @@ func groupRelease(s *snapshot.Snapshot, g snapshot.Group) (*Release, bool) {
 		if e == nil {
 			continue
 		}
-		rel, fresh := facet.Get(e)
+		rel, fresh := h.Release(e)
 		if rel != nil && (newest == nil || rel.Published.After(newest.Published)) {
 			newest = rel
 		}

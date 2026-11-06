@@ -135,8 +135,10 @@ func TestLoad1000(t *testing.T) {
 		if limited >= 0 {
 			t.Errorf("the rate limit was hit: %s", ledger[limited])
 		}
-		// Per repository: the listing share, commits, branches, tags, README, descriptor, release and the long histories' pages.
-		if charged > 7*loadRepos {
+		// Per repository: the listing share, commits, branches, tags, README, descriptor, the open pull requests and issues, the manifests'
+		// tree, the release listing and the long histories' pages. Jobs due together run in the order of their keys, so the release listing
+		// (kind "releases") is among the last to be first read and a complete cold start has read the pull requests and issues too.
+		if charged > 10*loadRepos {
 			t.Errorf("cold start was charged %d calls, want at most %d", charged, 7*loadRepos)
 		}
 	})
@@ -219,7 +221,7 @@ func complete(s *snapshot.Snapshot) bool {
 		for kind, f := range e.Facets() {
 			fresh[kind] = f.Derive(now) == snapshot.StatusFresh
 		}
-		for _, kind := range []string{"commits", "docs", "descriptor", "release"} {
+		for _, kind := range []string{"commits", "docs", "descriptor", "releases"} {
 			if !fresh[kind] {
 				return false
 			}

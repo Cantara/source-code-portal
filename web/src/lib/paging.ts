@@ -4,7 +4,7 @@ import { remember } from "./preferences"
 export const pageSizes = [25, 50, 100, 200] as const
 
 /** PagedList names a list whose page size the reader's browser remembers, in the cookie `scp-per-<list>`. */
-export type PagedList = "commits" | "history" | "pulls" | "issues" | "alumni"
+export type PagedList = "commits" | "history" | "pulls" | "issues" | "releases" | "alumni"
 
 export const sizeCookie = (list: PagedList) => `scp-per-${list}`
 

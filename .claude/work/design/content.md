@@ -6,8 +6,8 @@ Status: as built. Binding order: ../plan.md > this note.
   the image proxy (images-events.md).
 - `internal/safehtml`: the `SafeHTML` type and the single sanitiser policy.
 - `internal/commits`: the latest 30 default-branch commits per repository and `GET /api/v1/commits` over the merged feeds.
-- `internal/badges`: local flat SVG badges `last-commit`, `release`, `license`, `issues` per repository and `repos` per group; the
-  latest-release job.
+- `internal/badges`: local flat SVG badges `last-commit`, `release`, `license`, `issues` per repository and `repos` per group; the latest
+  release comes from `internal/releases` (`releases.md`).
 - The `scp.yaml` descriptor is owned by `catalog.md`.
 
 ## Decisions
@@ -121,7 +121,7 @@ each with its freshness (sync-snapshot-store.md). The merged feeds are `Latest` 
 ### Badges
 1. Routes: `GET /badges/repos/{owner}/{name}/{kind}.svg` (`last-commit`, `release`, `license`, `issues`, `health`) and
    `GET /badges/groups/{group}/{kind}.svg` (`repos`, `health`, `last-commit`, `release`; health.md).
-2. Job `badges.release` per repository: TTL 24 h, plus `EventTag`; the latest release (`badges.FromGitHub`), 404 means "no release" (`not_found`).
+2. The latest release is the newest stable one of the `releases` job (`releases.md`), handed to the handler through `Data.Release`; a repository read to have none is `not_found`, which the badge says as `none`.
 3. Messages: `last-commit` `today`/`yesterday`/`N days ago` (2..13)/`N weeks ago`/`N months ago`/`N years ago` by UTC calendar days, green up
    to 90 days, blue to 365, amber beyond; `release` tag name; `license` SPDX id (`NOASSERTION`/`OTHER` -> `other`); `issues` `{n} open`
    (green at 0); `repos` member count. Counts: 0..999, then `1.2k`, `12k`, `1.2M` (truncated).

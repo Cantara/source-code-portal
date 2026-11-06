@@ -17,6 +17,7 @@ export const crumbs = {
   commits: (): Crumb[] => [dashboard, { name: "Commits", path: "/commits" }],
   search: (): Crumb[] => [dashboard, { name: "Search", path: "/search" }],
   pulls: (): Crumb[] => [dashboard, { name: "Pull requests", path: "/pulls" }],
+  releases: (): Crumb[] => [dashboard, { name: "Releases", path: "/releases" }],
   alumni: (): Crumb[] => [dashboard, { name: "Alumni", path: "/alumni" }],
   issues: (): Crumb[] => [dashboard, { name: "Issues", path: "/issues" }],
   group: (id: string, name: string): Crumb[] => [dashboard, { name, path: groupPath(id) }],

@@ -10,6 +10,7 @@ import { GroupView } from "@/features/groups/view"
 import { IssuesView } from "@/features/issues/view"
 import { AlumniView } from "@/features/alumni/view"
 import { PullsView } from "@/features/pulls/view"
+import { ReleasesView } from "@/features/releases/view"
 import { repoRoute } from "@/features/repos/route"
 import { RepoView } from "@/features/repos/view"
 import type { Ctx } from "@/lib/page"
@@ -46,6 +47,27 @@ describe("pages", () => {
     expect(chips.queryByRole("link", { name: /Failing checks/ })).toBeNull()
     expect(screen.getByRole("link", { name: "Change 1" })).toHaveAttribute("href", "https://github.com/acme/core/pull/1")
     expect(screen.getByRole("form", { name: "Filter pull requests" })).toHaveAttribute("action", "/pulls")
+  })
+
+  it("lists the recent releases, the variants as filters with their counts", async () => {
+    show(<ReleasesView defaultSize={50} />, "/releases")
+    expect(await screen.findByRole("heading", { level: 1, name: "Releases" })).toBeInTheDocument()
+    const chips = within(await screen.findByRole("navigation", { name: "By variant" }))
+    expect(chips.getByRole("link", { name: /Latest per repository 2/ })).toHaveAttribute("aria-current", "true")
+    expect(chips.getByRole("link", { name: /Every release 3/ })).toHaveAttribute("href", "/releases?variant=all")
+    expect(chips.getByRole("link", { name: /Pre-releases 1/ })).toHaveAttribute("href", "/releases?variant=pre")
+    const rows = within(screen.getByRole("list", { name: "Release list" })).getAllByRole("listitem")
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent("acme/core")
+    expect(rows[0]).toHaveTextContent("Pre-release")
+    expect(rows[0]).toHaveTextContent("Faster login")
+    expect(screen.getByRole("link", { name: "v2.1.0-rc1" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/core/releases/tag/v2.1.0-rc1",
+    )
+    expect(rows[1]).toHaveTextContent("(automation)")
+    expect(rows[1]).not.toHaveTextContent("Pre-release")
+    expect(screen.getByRole("form", { name: "Filter the releases" })).toHaveAttribute("action", "/releases")
   })
 
   it("lists the retired repositories with why, when they were last active and what still depends on them", async () => {

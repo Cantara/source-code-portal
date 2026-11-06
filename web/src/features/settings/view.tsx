@@ -16,6 +16,7 @@ type Settings = {
   history: number
   pulls: number
   issues: number
+  releases: number
   alumni: number
 }
 
@@ -174,6 +175,7 @@ export function SettingsView({ initial }: { initial: Settings }) {
           {size("history", "Repository histories")}
           {features.pulls && size("pulls", "Pull requests")}
           {features.issues && size("issues", "Issues")}
+          {size("releases", "Releases")}
           {size("alumni", "Alumni")}
         </Section>
         <Section title="Theme" about="As the system is set, dark or light.">

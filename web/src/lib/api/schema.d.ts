@@ -91,6 +91,30 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/releases": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Recent releases across repositories, newest first, one page at a time
+     * @description The releases of the viewer's view (design/releases.md), from each repository's 20 newest published ones. `variant` chooses what is
+     *     listed: `latest` (the default) is one row per repository, its newest stable release; `all` every kept release; `stable` the
+     *     non-pre-releases; `pre` the pre-releases. `since` keeps the releases published at or after a time, an RFC 3339 time or a number
+     *     of days such as `30d`. `group` and `repo` intersect. `counts` cover the scope and `since` whatever the variant, so the variants
+     *     can be offered as filters.
+     */
+    get: operations["listReleases"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/alumni": {
     parameters: {
       query?: never
@@ -1077,6 +1101,51 @@ export interface components {
       freshness: components["schemas"]["Freshness"]
     }
     /**
+     * @description latest: one row per repository, its newest stable release (default); all; stable; pre
+     * @enum {string}
+     */
+    ReleaseVariant: "latest" | "all" | "stable" | "pre"
+    /**
+     * @description newest first (default); oldest first; by repository; by product, then newest
+     * @enum {string}
+     */
+    ReleaseSort: "newest" | "oldest" | "repo" | "group"
+    ReleaseEntry: {
+      /** @description Lower-case owner/name, used in URLs */
+      repo: string
+      /** @description The repository's name */
+      name: string
+      /** @description Group ids in configuration order */
+      groups: string[]
+      tag: string
+      /** @description The release's name; empty when it has none */
+      title: string
+      /** @description The first line of its notes, cleaned; empty when it has none */
+      summary: string
+      url: string
+      /** Format: date-time */
+      publishedAt: string
+      prerelease: boolean
+      /** @description Empty when GitHub names none */
+      author: string
+      /** @description Published by automation */
+      bot: boolean
+      assets: number
+    }
+    ReleaseCounts: {
+      /** @description Repositories with a stable release */
+      latest: number
+      all: number
+      stable: number
+      pre: number
+    }
+    ReleasePage: {
+      releases: components["schemas"]["ReleaseEntry"][]
+      counts: components["schemas"]["ReleaseCounts"]
+      page: components["schemas"]["Page"]
+      freshness: components["schemas"]["Freshness"]
+    }
+    /**
      * @description Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
      * @enum {string}
      */
@@ -1685,6 +1754,41 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["IssuePage"]
+        }
+      }
+      304: components["responses"]["NotModified"]
+      400: components["responses"]["BadRequest"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  listReleases: {
+    parameters: {
+      query?: {
+        group?: string
+        /** @description owner/name */
+        repo?: string
+        variant?: components["schemas"]["ReleaseVariant"]
+        /** @description An RFC 3339 time or days such as 30d */
+        since?: string
+        sort?: components["schemas"]["ReleaseSort"]
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description One page of releases */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ReleasePage"]
         }
       }
       304: components["responses"]["NotModified"]

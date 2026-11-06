@@ -52,7 +52,7 @@ type Server struct {
 	branches map[int64]map[string][]Commit // by repository id: branch name -> its own commits, newest first
 	tags     map[int64]map[string]string   // by repository id: tag name -> commit SHA
 	files    map[int64]map[string]string   // by repository id: path -> content
-	releases map[int64]*gh.RepositoryRelease
+	releases map[int64][]*gh.RepositoryRelease
 	pulls    map[int64][]Pull // by repository id
 	issues   map[int64][]Issue
 	treeMax  int // entries of a recursive tree before it is truncated, as GitHub's 100,000; 0: never
@@ -80,7 +80,7 @@ func New(t testing.TB) *Server {
 	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, t: t, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
 		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
-		releases: map[int64]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
+		releases: map[int64][]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
 	mux.HandleFunc("GET /app/hook/deliveries", s.listDeliveries)
@@ -97,7 +97,7 @@ func New(t testing.TB) *Server {
 	mux.HandleFunc("GET /repos/{owner}/{name}/tags", s.listRefs)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/trees/{ref}", s.getTree)
 	mux.HandleFunc("GET /repos/{owner}/{name}/git/blobs/{sha}", s.getBlob)
-	mux.HandleFunc("GET /repos/{owner}/{name}/releases/latest", s.latestRelease)
+	mux.HandleFunc("GET /repos/{owner}/{name}/releases", s.listReleases)
 	mux.HandleFunc("GET /repos/{owner}/{name}/pulls", s.listPulls)
 	mux.HandleFunc("GET /repos/{owner}/{name}/issues", s.listIssues)
 	mux.HandleFunc("POST /graphql", s.graphQL)
@@ -643,34 +643,64 @@ func (s *Server) SetTreeLimit(n int) {
 	s.treeMax = n
 }
 
-// SetRelease sets the latest release of the repository with id; an empty tag removes it.
+// Release is a release as GitHub lists it (SetReleases).
+type Release struct {
+	Tag, Name, Body, Author string
+	Published               time.Time
+	Pre, Draft              bool
+}
+
+// SetRelease sets the one release of the repository with id; an empty tag removes it.
 func (s *Server) SetRelease(id int64, tag, name string, published time.Time) {
+	if tag == "" {
+		s.SetReleases(id)
+		return
+	}
+	s.SetReleases(id, Release{Tag: tag, Name: name, Published: published})
+}
+
+// SetReleases sets the releases of the repository with id, replacing its earlier ones; GitHub lists them newest first.
+func (s *Server) SetReleases(id int64, rels ...Release) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if tag == "" {
+	list := make([]*gh.RepositoryRelease, 0, len(rels))
+	for _, r := range rels {
+		x := &gh.RepositoryRelease{TagName: r.Tag, Name: new(r.Name), Body: new(r.Body), Prerelease: r.Pre, Draft: r.Draft,
+			PublishedAt: &gh.Timestamp{Time: r.Published}, HTMLURL: fmt.Sprintf("https://github.com/releases/%d/%s", id, r.Tag),
+			Assets: []*gh.ReleaseAsset{{Name: new("asset")}}}
+		if r.Author != "" {
+			x.Author = &gh.User{Login: new(r.Author)}
+		}
+		list = append(list, x)
+	}
+	slices.SortStableFunc(list, func(x, y *gh.RepositoryRelease) int { return y.GetPublishedAt().Compare(x.GetPublishedAt().Time) })
+	if len(list) == 0 {
 		delete(s.releases, id)
 		return
 	}
-	s.releases[id] = &gh.RepositoryRelease{TagName: tag, Name: new(name), PublishedAt: &gh.Timestamp{Time: published},
-		HTMLURL: fmt.Sprintf("https://github.com/releases/%d/%s", id, tag)}
+	s.releases[id] = list
 }
 
-func (s *Server) latestRelease(w http.ResponseWriter, req *http.Request) {
+func (s *Server) listReleases(w http.ResponseWriter, req *http.Request) {
 	cred := s.charge(w, req)
 	if cred == "" {
 		return
 	}
 	s.mu.Lock()
-	var rel *gh.RepositoryRelease
-	if r := s.lookup(req.PathValue("owner"), req.PathValue("name")); r != nil {
-		rel = s.releases[r.GetID()]
+	r := s.lookup(req.PathValue("owner"), req.PathValue("name"))
+	var rels []*gh.RepositoryRelease
+	if r != nil {
+		rels = s.releases[r.GetID()]
 	}
 	s.mu.Unlock()
-	if rel == nil {
+	if r == nil {
 		writeError(w, http.StatusNotFound, "Not Found")
 		return
 	}
-	s.respond(w, req, cred, rel)
+	if n, err := strconv.Atoi(req.URL.Query().Get("per_page")); err == nil && n > 0 && n < len(rels) {
+		rels = rels[:n]
+	}
+	s.respond(w, req, cred, append([]*gh.RepositoryRelease{}, rels...))
 }
 
 // lookup returns the repository at owner/name. Callers hold s.mu.

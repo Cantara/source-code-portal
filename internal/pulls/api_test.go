@@ -79,7 +79,7 @@ func TestListPulls(t *testing.T) {
 	if got := numbers(g); !slices.Equal(got, []int{4}) || g.Counts.Open != 2 || g.Freshness.Status != "stale" {
 		t.Errorf("group: %v, %+v, %s", got, g.Counts, g.Freshness.Status)
 	}
-	if got := numbers(list(oapi.ListPullsParams{Sort: new(oapi.Updated), Limit: new(2), Page: new(2)})); !slices.Equal(got, []int{2, 3}) {
+	if got := numbers(list(oapi.ListPullsParams{Sort: new(oapi.QueueSortUpdated), Limit: new(2), Page: new(2)})); !slices.Equal(got, []int{2, 3}) {
 		t.Errorf("updated, page 2: %v", got)
 	}
 	if res, _ := (API{Current: a.Current, Off: true}).ListPulls(t.Context(), oapi.ListPullsRequestObject{}); res == nil {

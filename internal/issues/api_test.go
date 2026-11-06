@@ -76,7 +76,7 @@ func TestListIssues(t *testing.T) {
 	if got := numbers(g); !slices.Equal(got, []int{5, 4}) || g.Counts.Open != 2 || g.Freshness.Status != "stale" {
 		t.Errorf("group: %v, %+v, %s", got, g.Counts, g.Freshness.Status)
 	}
-	if got := numbers(list(oapi.ListIssuesParams{Sort: new(oapi.Newest), Limit: new(2)})); !slices.Equal(got, []int{1, 3}) {
+	if got := numbers(list(oapi.ListIssuesParams{Sort: new(oapi.QueueSortNewest), Limit: new(2)})); !slices.Equal(got, []int{1, 3}) {
 		t.Errorf("newest: %v", got)
 	}
 	if res, _ := (API{Current: a.Current, Off: true}).ListIssues(t.Context(), oapi.ListIssuesRequestObject{}); res == nil {

@@ -114,7 +114,7 @@ API version header, conditional cache, rate observer), then `http.Transport`. `s
    - `catalog.descriptor` (catalog.md): the `HEAD` tree (and `.github` when needed), `Blob` when the descriptor SHA changed.
    - `manifests` (manifests.md): `Files`: one recursive `HEAD` tree, or, when GitHub truncated it, the kept directories one by one
      (at most 100 calls); `Blob` for manifests whose SHA changed.
-   - `badges.release` (content.md): `Repositories.GetLatestRelease`, in `badges`; 404 means "no release".
+   - `releases` (releases.md): `Repositories.ListReleases`, the 20 newest, in `releases`; 404 or none means "no release".
 9. **Webhook events handled** (verified and deduplicated first, `http-api.md` behaviour 4; `webhook.Normalise` maps them, the `cmd/scp`
    sink calls `Notify` for a repository or `NotifySource` for an owner):
 

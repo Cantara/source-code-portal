@@ -1,6 +1,6 @@
 # Releases: what was shipped and when (RL1 to RL3)
 
-Status: in progress (plan.md section 4, P-82). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
+Status: RL1 built, RL2 and RL3 in progress (plan.md section 4, P-82). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
 
 The portal holds only the **latest** release of a repository (the badge's job, `badges.release`). A team that wants to know what the
 fleet shipped this week has nothing to look at. The portal lists the recent releases of the fleet, a product and a repository, newest
@@ -19,16 +19,18 @@ the latest release is the newest stable one in this list, so a repository is rea
 - **Latest.** The newest non-prerelease by publication time. `badges.release`, the `release` facet, `badges.Repo`'s release and the
   group badge read it through the same hook (`cmd/scp` hands the facet to `badges.Options.Data`; features never import each other);
   the job `badges.release` and its `FromGitHub` go away (greenfield).
-- **Triggers.** The webhook event `release` (already normalised to `EventTag`, P-73) and a TTL of 1 hour, safety net only: a
-  release is published by a person, rarely, and the webhook is the primary path (P-80). An archived repository is read once.
-- **Cost at 1,000 repositories.** 1,000 conditional requests an hour, nearly all 304. Prerequisite (P-71): read access to
+- **Triggers.** The webhook event `release` (already normalised to `EventTag`, P-73) and a TTL of 6 hours, safety net only: a
+  release is published by a person, rarely, and the webhook is the primary path (P-80, with the delivery log's catch-up every two
+  minutes). A TTL of an hour was tried: a cold start of 1,000 repositories takes two hours, so every repository was read again before the
+  last one was first read. An archived repository is read once.
+- **Cost at 1,000 repositories.** 4,000 conditional requests a day, nearly all 304. Prerequisite (P-71): read access to
   *Contents* (already required), added to `prereq.Needs` with the documentation's table in the same commit.
 
 ## API
 
 `GET /api/v1/releases` (contract): `group`, `repo` (as `scope.Params`), `variant` (`latest`: one row per repository, its newest
 stable release, **the default**; `all`: every kept release; `stable`; `pre`: pre-releases only), `since` (an RFC 3339 time or a number
-of days, `30d`), `sort` (`newest` the default, `oldest`, `repo`, `group`, `name`), numbered pages. The answer has the rows (repository
+of days, `30d`), `sort` (`newest` the default, `oldest`, `repo`, `group`), numbered pages. The answer has the rows (repository
 summary, group, release), the totals per variant (so the chips show their counts) and the scope's freshness. Per request from the
 viewer's view; the leak test lists the route.
 

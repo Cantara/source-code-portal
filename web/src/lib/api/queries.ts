@@ -34,6 +34,17 @@ export const keys = {
       f.size ?? 50,
       f.page ?? 1,
     ] as const,
+  releases: (f: ReleaseFilter) =>
+    [
+      "releases",
+      f.group ?? "",
+      f.repo ?? "",
+      f.variant ?? "latest",
+      f.since ?? "",
+      f.sort ?? "newest",
+      f.size ?? 50,
+      f.page ?? 1,
+    ] as const,
   alumni: (f: AlumniFilter) =>
     ["alumni", f.group ?? "", f.q ?? "", f.reason ?? "", f.used ?? false, f.sort ?? "active", f.size ?? 50, f.page ?? 1] as const,
   issues: (f: IssueFilter) =>
@@ -111,6 +122,41 @@ export interface PullFilter {
   page?: number
   size?: number
 }
+
+/** ReleaseFilter is a list of releases (GET /releases): its scope, variant, window and order, and the page. */
+export interface ReleaseFilter {
+  group?: string
+  repo?: string
+  variant?: Schemas["ReleaseVariant"]
+  since?: string
+  sort?: Schemas["ReleaseSort"]
+  page?: number
+  size?: number
+}
+
+/** releasesQuery is one page of releases, newest first; /releases and the repository's and group's panels read it. */
+export const releasesQuery = (api: Api, f: ReleaseFilter) =>
+  queryOptions({
+    queryKey: keys.releases(f),
+    queryFn: ({ signal }) =>
+      unwrap(
+        api.GET("/releases", {
+          params: {
+            query: {
+              group: f.group,
+              repo: f.repo,
+              variant: f.variant,
+              since: f.since,
+              sort: f.sort,
+              page: f.page,
+              limit: f.size,
+            },
+          },
+          signal,
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  })
 
 /** AlumniFilter is a list of retired repositories (GET /alumni): its group, name text, reason, whether still used, the order and the page. */
 export interface AlumniFilter {

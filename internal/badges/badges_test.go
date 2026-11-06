@@ -15,8 +15,6 @@ import (
 
 	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/store"
-	"github.com/cantara/source-code-portal/internal/sync"
 )
 
 func TestRenderGolden(t *testing.T) {
@@ -83,12 +81,9 @@ func TestFormat(t *testing.T) {
 func testSnapshot(t *testing.T) *snapshot.Snapshot {
 	t.Helper()
 	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
-	fresh := snapshot.Freshness{State: snapshot.StateOK}
 	x := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x", License: "Apache-2.0",
 		OpenIssues: 1234}}
-	facet.Set(x, &Release{Tag: "v1.2.3"}, fresh)
 	newRepo := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 2}, Owner: "acme", Name: "new"}}
-	facet.Set(newRepo, nil, snapshot.Freshness{State: snapshot.StateNotFound})
 	p.Update(func(b *snapshot.Builder) {
 		b.ReplaceSource("gh", []*snapshot.RepoEntry{x, newRepo}, map[snapshot.RepoKey]snapshot.RepoKey{"acme/old": "acme/x"}, snapshot.SourceStatus{ID: "gh"})
 		b.SetGroups([]snapshot.Group{{ID: "g", Members: []snapshot.RepoKey{"acme/new", "acme/x"}}})
@@ -106,8 +101,19 @@ func lastCommit(e *snapshot.RepoEntry) (time.Time, snapshot.Freshness) {
 	return time.Time{}, snapshot.Freshness{}
 }
 
+// releaseOf stands in for the releases feature: acme/x has v1.2.3, acme/new is read to have none, the rest are not known yet.
+func releaseOf(e *snapshot.RepoEntry) (*Release, snapshot.Freshness) {
+	switch e.Repo.Name {
+	case "x":
+		return &Release{Tag: "v1.2.3"}, snapshot.Freshness{State: snapshot.StateOK}
+	case "new":
+		return nil, snapshot.Freshness{State: snapshot.StateNotFound}
+	}
+	return nil, snapshot.Freshness{}
+}
+
 // data stands in for the other features: acme/x scores 72, acme/new is not counted, the group scores 41.
-var data = Data{LastCommit: lastCommit, //nolint:gochecknoglobals // test double
+var data = Data{LastCommit: lastCommit, Release: releaseOf, //nolint:gochecknoglobals // test double
 	Health: func(_ *snapshot.Snapshot, e *snapshot.RepoEntry, _ time.Time) health.Repo {
 		if e.Repo.Name == "x" {
 			return health.Repo{Counted: true, Score: 72, Level: health.Watch}
@@ -197,46 +203,12 @@ func TestHandler(t *testing.T) {
 	}
 }
 
-type releases struct {
-	rel *Release
-	err error
-}
-
-func (r releases) LatestRelease(context.Context, string, string) (*Release, error) {
-	return r.rel, r.err
-}
-
-func TestReleaseJob(t *testing.T) {
-	for name, tc := range map[string]struct {
-		src   releases
-		state snapshot.State
-		err   bool
-	}{
-		"release": {releases{rel: &Release{Tag: "v1"}}, snapshot.StateOK, false},
-		"none":    {releases{err: ErrNoRelease}, snapshot.StateNotFound, false},
-		"failing": {releases{err: errors.New("boom")}, "", true},
-	} {
-		spec := New(map[string]Releases{"gh": tc.src}).ReleaseSpec()
-		res, err := spec.Run(t.Context(), sync.Job{Key: ReleaseKind + "/acme/x", Source: "gh", Repo: "acme/x"})
-		if (err != nil) != tc.err || res.State != tc.state {
-			t.Errorf("%s: %+v, %v", name, res, err)
-		}
-		if err == nil {
-			again, _ := spec.Run(t.Context(), sync.Job{Key: ReleaseKind + "/acme/x", Source: "gh", Repo: "acme/x",
-				Prev: store.Item{State: res.State, Payload: res.Payload}})
-			if !again.Unchanged {
-				t.Errorf("%s: the same release again is not Unchanged", name)
-			}
-		}
-	}
-}
-
 func TestGroupRelease(t *testing.T) {
-	s := testSnapshot(t)
-	if rel, _ := groupRelease(s, snapshot.Group{DefaultRepo: "acme/new", Members: []snapshot.RepoKey{"acme/new", "acme/x"}}); rel == nil || rel.Tag != "v1.2.3" {
+	s, h := testSnapshot(t), handler{Data: data}
+	if rel, _ := h.groupRelease(s, snapshot.Group{DefaultRepo: "acme/new", Members: []snapshot.RepoKey{"acme/new", "acme/x"}}); rel == nil || rel.Tag != "v1.2.3" {
 		t.Fatalf("a default without a release falls back to the newest: %+v", rel)
 	}
-	if rel, none := groupRelease(s, snapshot.Group{Members: []snapshot.RepoKey{"acme/new"}}); rel != nil || !none {
+	if rel, none := h.groupRelease(s, snapshot.Group{Members: []snapshot.RepoKey{"acme/new"}}); rel != nil || !none {
 		t.Fatalf("no member has a release: %+v %v", rel, none)
 	}
 	if b, _ := score(true, 30, health.Attention); b.color != dangerColor || b.message != "30" {
