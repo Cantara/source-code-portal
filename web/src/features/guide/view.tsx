@@ -865,19 +865,35 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
             <Step n={2} title="Create the App">
               <p>
                 In your organisation&apos;s <em>Settings</em>, <em>Developer settings</em>, <em>GitHub Apps</em>,{" "}
-                <em>New GitHub App</em>. Repository permissions, read-only, nothing else: <em>Contents</em>, <em>Metadata</em>,{" "}
-                <em>Issues</em>, <em>Pull requests</em>, <em>Checks</em> and <em>Commit statuses</em>. Webhook URL{" "}
-                <code className="font-mono text-xs">https://your-portal/webhooks/github</code> with the text of{" "}
-                <code className="font-mono text-xs">secrets/webhook-secret</code> as its secret; events <em>Push</em>,{" "}
-                <em>Release</em>, <em>Repository</em>, <em>Issues</em>, <em>Pull request</em> and <em>Pull request review</em>.
-                Install it only on this account.
+                <em>New GitHub App</em>. Install it only on this account.
               </p>
+              <Grants
+                title="Repository permissions"
+                note="each Read-only, nothing else"
+                items={[
+                  [["Contents", "Metadata"], "the repositories, documents and commits"],
+                  [["Issues"], "the open issues"],
+                  [["Pull requests", "Checks", "Commit statuses"], "the open pull requests"],
+                ]}
+              />
               <p>
-                Each permission serves a part of the portal: <em>Contents</em> and <em>Metadata</em> the repositories, documents
-                and commits, <em>Issues</em> the open issues, and <em>Pull requests</em>, <em>Checks</em> and{" "}
-                <em>Commit statuses</em> the open pull requests. Without one, that part stays empty, and the portal says so on its
-                page and on the <em>Admin</em> page. Permissions added later take effect once an owner of the organisation accepts
-                them on the installation.
+                <strong className="font-semibold text-foreground">Webhook</strong>: the URL{" "}
+                <code className="font-mono text-xs">https://your-portal/webhooks/github</code>, with the text of{" "}
+                <code className="font-mono text-xs">secrets/webhook-secret</code> as its secret.
+              </p>
+              <Grants
+                title="Subscribe to events"
+                note="updates within seconds"
+                items={[
+                  [["Push", "Release", "Repository"], "the repositories, documents and commits"],
+                  [["Issues"], "the open issues"],
+                  [["Pull request", "Pull request review"], "the open pull requests"],
+                ]}
+              />
+              <p>
+                Without a permission, its part of the portal stays empty, and the portal says so on that page and on the{" "}
+                <em>Admin</em> page; without an event, it updates on its schedule instead. Permissions added later take effect
+                once an owner of the organisation accepts them on the installation.
               </p>
             </Step>
             <Step n={3} title="Keep its key and install it">
@@ -1209,6 +1225,30 @@ claude mcp add --transport http scp https://portal.example.org/mcp \
 }
 
 /** Step is one step of running a portal; its children are blocks (paragraphs, code). */
+// Grants lists GitHub settings to tick, by their names on GitHub's page, with the part of the portal each serves.
+function Grants({ title, note, items }: { title: string; note: string; items: [string[], string][] }) {
+  return (
+    <div className="rounded-md border bg-muted/40 p-3">
+      <p className="text-foreground">
+        <span className="font-semibold">{title}</span> <span className="text-muted-foreground">({note})</span>
+      </p>
+      <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5 marker:text-primary">
+        {items.map(([names, serves]) => (
+          <li key={names.join()}>
+            {names.map((name, i) => (
+              <span key={name}>
+                {i > 0 && ", "}
+                <strong className="font-semibold text-foreground">{name}</strong>
+              </span>
+            ))}
+            <span>: {serves}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <li className="flex gap-4">
