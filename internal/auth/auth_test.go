@@ -354,3 +354,35 @@ func TestSessionEndsAtItsMaximum(t *testing.T) {
 		}
 	}
 }
+
+// A session from before sessions carried Began is counted from when it was first issued: its renewal keeps that time.
+func TestRenewalKeepsWhenAnOldSessionWasIssued(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	a := newPortal(t, Options{SessionKey: key(), SessionTTL: time.Hour, Now: func() time.Time { return now }}).auth
+	first := now
+	rec := httptest.NewRecorder()
+	if err := a.start(rec, session{Subject: "u-1", Name: "Ada"}); err != nil {
+		t.Fatal(err)
+	}
+	var old session // as an older release sealed it: no Began
+	if !a.sessions.open(a.session, rec.Result().Cookies()[0].Value, &old) {
+		t.Fatal("session not readable")
+	}
+	old.Began = 0
+	v, err := a.sessions.seal(a.session, old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cookie := &http.Cookie{Name: a.session, Value: v}
+	now = now.Add(31 * time.Minute)
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	if _, ok, _ := a.Identify(w, r); !ok || len(w.Result().Cookies()) != 1 {
+		t.Fatal("the old session was not renewed")
+	}
+	var renewed session
+	if !a.sessions.open(a.session, w.Result().Cookies()[0].Value, &renewed) || renewed.Began != first.Unix() {
+		t.Errorf("Began = %d, want the first issue %d", renewed.Began, first.Unix())
+	}
+}
