@@ -17,7 +17,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	github.com/spf13/viper v1.21.0
-	github.com/yuin/goldmark/v2 v2.1.12
+	github.com/yuin/goldmark/v2 v2.1.15
 	go.uber.org/goleak v1.3.0
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/mod v0.42.0
@@ -25,7 +25,7 @@ require (
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.43.0
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.61.1
 	rsc.io/qr v0.2.0
 )
 
@@ -55,7 +55,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
-	github.com/oapi-codegen/oapi-codegen/v2 v2.8.1 // indirect
+	github.com/oapi-codegen/oapi-codegen/v2 v2.8.2 // indirect
 	github.com/oasdiff/yaml v0.1.1 // indirect
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect

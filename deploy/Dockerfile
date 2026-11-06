@@ -3,7 +3,7 @@
 #   docker build -f deploy/Dockerfile --build-arg VERSION=2.0.0 --build-arg BUILD_ID=$(git rev-parse HEAD) -t scp:dev .
 
 FROM node:26.13.0-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS web
-ARG PNPM_VERSION=12.17.0
+ARG PNPM_VERSION=12.18.0
 RUN npm install --global --ignore-scripts pnpm@${PNPM_VERSION}
 WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./

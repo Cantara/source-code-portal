@@ -116,7 +116,7 @@ a test waits on what happened (an event, a channel), never on sleeps or real int
 Nothing is queued: the owner's next wish comes first. Search stays an in-memory index of what the portal holds, no source code
 search and no external store (owner). E1 to E4 (`design/embed.md`) are dequeued: never start or propose them until the owner returns to them. The owner's cosmetic changes come first when given, and
 a release only on the owner's go. New work starts with its design note and a row in `plan.md` section 4.
-Local web commands: `npx -y pnpm@12.17.0 -C web <script>` when the global pnpm is older; `make e2e` needs
+Local web commands: `npx -y pnpm@12.18.0 -C web <script>` when the global pnpm is older; `make e2e` needs
 `pnpm -C web exec playwright install chromium`; `rm -rf web/.next` after a `next dev` run before `pnpm build` (stale dev route types);
 the Hazelcast tests: `docker run -d -p 127.0.0.1:5701:5701 -e HZ_NETWORK_PUBLICADDRESS=127.0.0.1:5701 hazelcast/hazelcast:5.7` and
 `TEST_HAZELCAST=127.0.0.1:5701`.
