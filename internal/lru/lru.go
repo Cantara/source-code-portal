@@ -13,11 +13,12 @@ type Cache[K comparable, V any] struct {
 }
 
 type entry[K comparable, V any] struct {
-	key K
-	val V
+	key    K
+	val    V
+	weight int // as it was counted when it came in
 }
 
-// New is an empty cache of at most max in total weight. A nil weigh counts each value as 1: max is then a number of values.
+// New is an empty cache of at most max in total weight (at least 1 each). A nil weigh counts each value as 1: max is then a number of values.
 func New[K comparable, V any](max int, weigh func(V) int) *Cache[K, V] {
 	if weigh == nil {
 		weigh = func(V) int { return 1 }
@@ -37,14 +38,15 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 }
 
 // Put holds val for key, replacing what was there, and drops the least recently used values past the maximum weight. A value
-// heavier than the maximum is not held (and leaves nothing else out).
+// heavier than the maximum is not held (and leaves nothing else out). Every value weighs at least 1, so the number of values is
+// bounded too, whatever weigh says of an empty one.
 func (c *Cache[K, V]) Put(key K, val V) {
 	c.Remove(key)
-	w := c.weigh(val)
+	w := max(1, c.weigh(val))
 	if w > c.max {
 		return
 	}
-	c.byKey[key] = c.order.PushFront(&entry[K, V]{key: key, val: val})
+	c.byKey[key] = c.order.PushFront(&entry[K, V]{key: key, val: val, weight: w})
 	c.size += w
 	for c.size > c.max {
 		c.removeElement(c.order.Back())
@@ -66,7 +68,7 @@ func (c *Cache[K, V]) removeElement(el *list.Element) {
 	e := of[K, V](el)
 	c.order.Remove(el)
 	delete(c.byKey, e.key)
-	c.size -= c.weigh(e.val)
+	c.size -= e.weight
 }
 
 // of is the entry of an element: the list holds nothing else.
