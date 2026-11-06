@@ -8,7 +8,7 @@ import { ago, count, plural } from "@/lib/format"
 import { groupPath } from "@/lib/paths"
 import { levels } from "@/entities/health/health"
 import { FindingMark } from "@/entities/health/findings"
-import { levelLabel, window } from "@/lib/rules"
+import { levelLabel, windowWords } from "@/lib/rules"
 import { useRules } from "@/lib/rules-context"
 import { Hint } from "@/shared/hint"
 import { healthCell } from "./fleet-map"
@@ -167,7 +167,7 @@ function Tall({ g, work: w, now }: { g: Group; work: Work; now: number }) {
       </p>
       <Sparkline parts={series(a, w)} label={weekly(a, w)} className="h-6 w-full" />
       <p className="truncate text-sm">
-        {a.authorCount > 0 ? people(a) : <span className="text-muted-foreground">no one in {window(rules)}</span>}
+        {a.authorCount > 0 ? people(a) : <span className="text-muted-foreground">no one in {windowWords(rules)}</span>}
       </p>
     </li>
   )
@@ -291,7 +291,10 @@ export function ProductTiles({
   const grid = useRef<HTMLUListElement>(null)
   const all = { steps: 0, good: ordered.length, tall: 0 }
   const [choice, setChoice] = useState<Choice>(all)
-  const key = ordered.map((g) => `${g.id}:${g.health?.level ?? ""}`).join(",")
+  // What the order and the plan read, as one string: `ordered` is a new array each render, the effect must not run for that.
+  const key = ordered
+    .map((g) => `${g.id}:${g.health?.level ?? ""}:${g.health?.score ?? ""}:${g.activity.lastAuthoredAt ?? ""}`)
+    .join(",")
 
   useLayoutEffect(() => {
     if (!fold || !box.current || !grid.current) return
@@ -314,7 +317,7 @@ export function ProductTiles({
       sized.disconnect()
       drawn.disconnect()
     }
-    // ordered is recomputed each render; key names what it holds.
+    // `ordered` is not a dependency (see key).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fold, key])
 

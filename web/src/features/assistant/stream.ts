@@ -27,6 +27,7 @@ export async function* frames(body: ReadableStream<Uint8Array>): AsyncGenerator<
       buf += decoder.decode(value, { stream: true })
       let nl: number
       while ((nl = buf.search(/\r\n|\r|\n/)) >= 0) {
+        if (buf[nl] === "\r" && nl === buf.length - 1) break // a CR at the end of a chunk may be the first half of a CRLF: wait
         const line = buf.slice(0, nl)
         buf = buf.slice(nl + (buf.startsWith("\r\n", nl) ? 2 : 1))
         if (line === "") {
@@ -75,7 +76,12 @@ export async function* ask(turns: Turn[], signal: AbortSignal): AsyncGenerator<A
     )
   }
   for await (const f of frames(response.body)) {
-    const d = JSON.parse(f.data) as Record<string, unknown>
+    let d: Record<string, unknown>
+    try {
+      d = JSON.parse(f.data) as Record<string, unknown>
+    } catch {
+      continue // a frame that is not JSON is not one of the portal's: skipped, the answer goes on
+    }
     switch (f.event) {
       case "text":
         yield { kind: "text", text: String(d.text ?? "") }

@@ -37,7 +37,7 @@ export function useWall() {
     let lock: WakeLockSentinel | undefined
     let gone = false
     const ask = () => {
-      if (document.visibilityState !== "visible") return
+      if (document.visibilityState !== "visible" || (lock && !lock.released)) return // one lock at a time: a second would be orphaned
       navigator.wakeLock.request("screen").then(
         (l) => {
           if (gone) void l.release()

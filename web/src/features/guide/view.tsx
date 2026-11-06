@@ -5,7 +5,7 @@ import { kinds } from "@/lib/preferences"
 import { CloudCheckIcon, CommitIcon, FlagIcon, GridIcon, PulseIcon } from "@/components/ui/icons"
 import { levels } from "@/entities/health/health"
 import { FindingIcon, ScoreRing, severities } from "@/entities/health/kinds"
-import { activityRule, levelRanges, severityOf, span, window, type Rules } from "@/lib/rules"
+import { activityRule, levelRanges, severityOf, span, windowWords, type Rules } from "@/lib/rules"
 import shots from "./shots.json"
 
 /**
@@ -46,8 +46,8 @@ const cardRows = (rules: Rules): { at: Callout; title: string; body: ReactNode }
     title: "The work",
     body: (
       <>
-        The commits of the work that counts in the last {window(rules)}, then every kind: by hand, with AI (and the assistants it
-        names), by automation and in sweeps. A coloured square marks each kind that counts.
+        The commits of the work that counts in the last {windowWords(rules)}, then every kind: by hand, with AI (and the
+        assistants it names), by automation and in sweeps. A coloured square marks each kind that counts.
       </>
     ),
   },
@@ -59,7 +59,7 @@ const cardRows = (rules: Rules): { at: Callout; title: string; body: ReactNode }
   {
     at: "people",
     title: "Who, and when",
-    body: `The people behind the work, by GitHub login (the full name on hover), most commits first. The light is on while someone worked in the last ${window(rules)}; below it, the last change.`,
+    body: `The people behind the work, by GitHub login (the full name on hover), most commits first. The light is on while someone worked in the last ${windowWords(rules)}; below it, the last change.`,
   },
   {
     at: "recent",
@@ -336,7 +336,7 @@ const dots = { hand: "bg-primary", ai: "bg-[var(--ai)]", automation: "bg-muted-f
 /** GuideView is the guide; version is the portal's release, for the commands (a placeholder on a development build). */
 export function GuideView({ version, rules = none }: { version: string; rules?: Rules }) {
   const card = cardRows(rules)
-  const days = window(rules)
+  const days = windowWords(rules)
   const dormant = rules.findings.find((k) => k.code === "dormant")?.penalties[0]?.points
   const severityRanges = [...rules.severities]
     .sort((a, b) => b.from - a.from)

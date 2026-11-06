@@ -46,7 +46,9 @@ const searchId = "history-search"
 
 /** NavigatorView is a repository's history as a git graph in numbered pages: filters, the rows, the selected commit's details. */
 export function NavigatorView({ owner, name, defaultSize }: { owner: string; name: string; defaultSize: number }) {
-  const st = historyState(Object.fromEntries(useSearchParams()), defaultSize)
+  // The state of the address, made again only when the address changes: the effects below depend on its filter.
+  const query = useSearchParams().toString()
+  const st = useMemo(() => historyState(Object.fromEntries(new URLSearchParams(query)), defaultSize), [query, defaultSize])
   const detail = useQuery(repoQuery(api, owner, name)).data
   const repo = detail?.repo
   const open = useQuery(pullsQuery(api, { repo: `${owner}/${name}`.toLowerCase(), drafts: true, size: 100 })).data
@@ -128,11 +130,12 @@ function Navigator({
     const onKey = (e: globalThis.KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || t?.closest("input, textarea, select")) return
-      e.preventDefault()
+      e.preventDefault() // the header's search box sees it taken
       document.getElementById(searchId)?.focus()
     }
-    document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
+    // Captured: this page's search is asked before the header's.
+    document.addEventListener("keydown", onKey, true)
+    return () => document.removeEventListener("keydown", onKey, true)
   }, [])
 
   // The URL is the state: filters and pages are pushed (back returns to them), the selection replaced; no server round trip.

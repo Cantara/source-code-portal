@@ -186,7 +186,10 @@ export function Bar({
         <button
           type="button"
           className={button}
-          onClick={() => void (full ? document.exitFullscreen() : document.documentElement.requestFullscreen())}
+          onClick={() => {
+            // The browser may refuse (not allowed here, the gesture is old): the button then does what it can, quietly.
+            void (full ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => undefined)
+          }}
         >
           {full ? "Leave full screen" : "Full screen"}
         </button>

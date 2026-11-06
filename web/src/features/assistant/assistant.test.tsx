@@ -45,6 +45,22 @@ describe("the stream", () => {
       { event: "message", data: "a\nb" },
     ])
   })
+
+  it("does not split a CRLF that falls between two chunks", async () => {
+    const parts = ["event: text\r\ndata: one\r", "\n\r", "\nevent: text\r\ndata: two\r\n\r\n"]
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        for (const p of parts) c.enqueue(new TextEncoder().encode(p))
+        c.close()
+      },
+    })
+    const out = []
+    for await (const f of frames(stream)) out.push(f)
+    expect(out).toEqual([
+      { event: "text", data: "one" },
+      { event: "text", data: "two" },
+    ])
+  })
 })
 
 describe("the conversation", () => {
