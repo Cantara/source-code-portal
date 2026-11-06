@@ -17,7 +17,8 @@ import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
 import { Pager, PageSizeField } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
-import { groupQuery, groupsQuery } from "@/lib/api/queries"
+import { groupQuery } from "@/lib/api/queries"
+import { ProductField, RepoField } from "@/shared/filter-fields"
 import { commitLogQuery, logSearch, logState, type LogState } from "./api"
 
 /**
@@ -80,11 +81,8 @@ export function GroupCommitsView({ group, defaultSize }: { group: string; defaul
   )
 }
 
-const field = "mt-1 min-h-9 rounded-md border border-input bg-background px-2"
-
 function FilterForm({ st, defaultSize }: { st: LogState; defaultSize: number }) {
   const router = useRouter()
-  const groups = useQuery(groupsQuery(api))
   const filter = st.filter
   const [repoText, setRepoText] = useState(filter.repo ?? "")
   function submit(e: FormEvent<HTMLFormElement>) {
@@ -105,21 +103,8 @@ function FilterForm({ st, defaultSize }: { st: LogState; defaultSize: number }) 
   }
   return (
     <form onSubmit={submit} action="/commits" className="flex flex-wrap items-end gap-3 text-sm" aria-label="Filter commits">
-      <label className="flex flex-col">
-        Product
-        <select name="group" defaultValue={filter.group ?? ""} className={field}>
-          <option value="">All products</option>
-          {groups.data?.groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col">
-        Repository (owner/name)
-        <input name="repo" value={repoText} onChange={(e) => setRepoText(e.target.value)} className={field} />
-      </label>
+      <ProductField value={filter.group} />
+      <RepoField value={repoText} onChange={setRepoText} />
       <label className="flex min-h-9 items-center gap-2">
         <input type="checkbox" name="automation" value="false" defaultChecked={filter.automation === false} />
         Hide automation

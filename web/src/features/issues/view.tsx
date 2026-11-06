@@ -14,7 +14,8 @@ import { PageHeader } from "@/shared/page-header"
 import { Pager } from "@/shared/pager"
 import { PrerequisiteNotice } from "@/shared/prerequisites"
 import { ProblemAlert } from "@/shared/problem-alert"
-import { QueueChips, QueueForm, queueField } from "@/shared/queue"
+import { filterField } from "@/shared/filter-fields"
+import { QueueChips, QueueForm } from "@/shared/queue"
 import { RelativeTime } from "@/shared/relative-time"
 import { IssueList, issueKinds, issueStates } from "@/entities/issue/issue"
 import { issuesSearch, issuesState } from "./api"
@@ -51,7 +52,7 @@ export function IssuesView({ defaultSize }: { defaultSize: number }) {
           before={
             <label className="flex flex-col">
               Kind
-              <select name="kind" defaultValue={st.filter.kind ?? ""} className={queueField}>
+              <select name="kind" defaultValue={st.filter.kind ?? ""} className={filterField}>
                 <option value="">Every kind</option>
                 {issueKinds.map((k) => (
                   <option key={k.kind} value={k.kind}>

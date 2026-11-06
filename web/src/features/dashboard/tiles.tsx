@@ -101,6 +101,18 @@ function Wide({ g, work: w, now }: { g: Group; work: Work; now: number }) {
   )
 }
 
+/** GroupTitle is a tile's first line: the product's light and its name, linking its page. */
+function GroupTitle({ g }: { g: Group }) {
+  return (
+    <h3 className="flex min-w-0 items-center gap-2 text-[0.9375rem] leading-tight font-semibold">
+      <span aria-hidden="true" className="led" />
+      <Link href={groupPath(g.id)} className="truncate hover:underline">
+        {g.name}
+      </Link>
+    </h3>
+  )
+}
+
 function Narrow({ g, work: w, now }: { g: Group; work: Work; now: number }) {
   const rules = useRules()
   const a = g.activity
@@ -108,12 +120,7 @@ function Narrow({ g, work: w, now }: { g: Group; work: Work; now: number }) {
     <li
       className={cn("panel flex min-w-0 flex-col justify-center gap-0.5 px-3 py-2", g.health && levels[g.health.level].className)}
     >
-      <h3 className="flex min-w-0 items-center gap-2 text-[0.9375rem] leading-tight font-semibold">
-        <span aria-hidden="true" className="led" />
-        <Link href={groupPath(g.id)} className="truncate hover:underline">
-          {g.name}
-        </Link>
-      </h3>
+      <GroupTitle g={g} />
       <p className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
         <span className="truncate">
           {g.health && g.health.level !== "good" && (
@@ -150,12 +157,7 @@ function Tall({ g, work: w, now }: { g: Group; work: Work; now: number }) {
         g.health && levels[g.health.level].className,
       )}
     >
-      <h3 className="flex min-w-0 items-center gap-2 text-[0.9375rem] leading-tight font-semibold">
-        <span aria-hidden="true" className="led" />
-        <Link href={groupPath(g.id)} className="truncate hover:underline">
-          {g.name}
-        </Link>
-      </h3>
+      <GroupTitle g={g} />
       <p className="flex items-baseline justify-between gap-2 text-sm text-muted-foreground">
         <span className="min-w-0 truncate">
           <span className="font-mono text-base font-semibold text-foreground tabular-nums">{count(counted(a, w))}</span>{" "}
