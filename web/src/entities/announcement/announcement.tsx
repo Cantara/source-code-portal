@@ -18,12 +18,20 @@ export function asWritten(iso: string): Written | undefined {
 }
 
 const at = (w: Written) => new Date(Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute))
+/** formats keeps the formatters made: building one is the costly part, and a card asks for the same few on every render. */
+const formats = new Map<string, Intl.DateTimeFormat>()
 const fmt = (lang: string | undefined, o: Intl.DateTimeFormatOptions) => {
-  try {
-    return new Intl.DateTimeFormat(lang ?? "en", { ...o, timeZone: "UTC" })
-  } catch {
-    return new Intl.DateTimeFormat("en", { ...o, timeZone: "UTC" })
+  const key = `${lang ?? "en"}|${JSON.stringify(o)}`
+  let f = formats.get(key)
+  if (!f) {
+    try {
+      f = new Intl.DateTimeFormat(lang ?? "en", { ...o, timeZone: "UTC" })
+    } catch {
+      f = new Intl.DateTimeFormat("en", { ...o, timeZone: "UTC" })
+    }
+    formats.set(key, f)
   }
+  return f
 }
 
 /** when is the announcement's time in its own language: "tor. 26. nov. 18:00–23:00", a second date when it ends another day. */

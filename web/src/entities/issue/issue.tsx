@@ -5,6 +5,7 @@ import { addressPath } from "@/lib/paths"
 import { EmptyState } from "@/shared/empty-state"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { RelativeTime } from "@/shared/relative-time"
+import { StateChip } from "@/shared/state-chip"
 
 export type Issue = Schemas["Issue"]
 export type IssueState = Schemas["IssueState"]
@@ -42,20 +43,7 @@ export const issueStateOf = (s: IssueState) => issueStates.find((x) => x.state =
 
 /** IssueStateChip is where an issue stands: its dot and its words, with what it waits for for a screen reader and on hover. */
 export function IssueStateChip({ state, className }: { state: IssueState; className?: string }) {
-  const s = issueStateOf(state)
-  return (
-    <span
-      title={`${s.label}: ${s.waits}`}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2 py-px text-xs font-medium whitespace-nowrap text-foreground",
-        className,
-      )}
-    >
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", s.dot)} />
-      {s.label}
-      <span className="sr-only">, {s.waits}</span>
-    </span>
-  )
+  return <StateChip state={issueStateOf(state)} className={className} />
 }
 
 /**

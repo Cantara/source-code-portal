@@ -30,7 +30,7 @@ import { PageHeader } from "@/shared/page-header"
 import { Pager, PageSizeField } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
-import { DiffStat, said } from "@/entities/commit/diffstat"
+import { DiffStat, said } from "@/shared/diffstat"
 import {
   historyQuery,
   historyState,
