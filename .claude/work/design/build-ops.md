@@ -123,7 +123,7 @@ Makefile (each target is one command that CI also runs; `PNPM`, `VERSION`, `CONF
 | `dev` | `go run ./cmd/scp serve` on :9090 plus `next dev` on :3000 |
 | `clean` | removes `bin/`, `dist/`, `web/.next`, `web/bundle`, the Playwright reports |
 
-CI (`ci.yml` on pull request, push and merge queue; `permissions: {}` with `contents: read` per job; actions pinned by SHA;
+CI (`ci.yml` on pull request, push and merge queue, but not for a change of only documents, plans and the operators' plugin (`docs/`, `.claude/`, `plugins/`, the root's Markdown and licence; P-78), while the documents `TestPrerequisitesDocumented` reads still run it; `permissions: {}` with `contents: read` per job; actions pinned by SHA;
 `GOTOOLCHAIN=local`): job `go` (no service containers: mod verify and tidy, `go generate` drift, golangci-lint action, vet,
 `go test -race`, govulncheck); job `web` (Node from `web/.node-version`, pinned pnpm, frozen install, `gen` drift, lint, typecheck,
 format, `vitest`, build); job `e2e` (Playwright Chromium, bundle build, `pnpm -C web e2e`); job `image` (`make image`, then

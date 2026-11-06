@@ -2,10 +2,47 @@
 # the token is read-only.
 name: ci
 
+# A change of only documents runs nothing (the paths below); the documents a test reads still do.
 on:
   pull_request:
+    paths:
+      - "**"
+      # Documents, plans and the operators' plugin build nothing: a change of only these runs no CI.
+      - "!docs/**"
+      - "!.claude/**"
+      - "!plugins/**"
+      - "!.claude-plugin/**"
+      - "!README.md"
+      - "!CHANGELOG.md"
+      - "!SECURITY.md"
+      - "!AGENTS.md"
+      - "!LICENSE"
+      # but the documents a test reads (cmd/scp TestPrerequisitesDocumented): they must agree with the code.
+      - "docs/operator-guide.md"
+      - "docs/production.md"
+      - "docs/security-model.md"
+      - "plugins/scp/skills/run-scp/SKILL.md"
+      - ".claude/skills/configure-scp/SKILL.md"
   push:
     branches: [main]
+    paths:
+      - "**"
+      # The same as for a pull request. Documents, plans and the operators' plugin build nothing: a change of only these runs no CI.
+      - "!docs/**"
+      - "!.claude/**"
+      - "!plugins/**"
+      - "!.claude-plugin/**"
+      - "!README.md"
+      - "!CHANGELOG.md"
+      - "!SECURITY.md"
+      - "!AGENTS.md"
+      - "!LICENSE"
+      # but the documents a test reads (cmd/scp TestPrerequisitesDocumented): they must agree with the code.
+      - "docs/operator-guide.md"
+      - "docs/production.md"
+      - "docs/security-model.md"
+      - "plugins/scp/skills/run-scp/SKILL.md"
+      - ".claude/skills/configure-scp/SKILL.md"
   merge_group:
 
 permissions: {}
