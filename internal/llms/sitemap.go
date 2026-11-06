@@ -43,7 +43,7 @@ func (l *LLMs) Sitemap() http.Handler {
 				return
 			}
 		}
-		serveAs(w, r, "application/xml; charset=utf-8", machineCache, files[i])
+		serveAs(w, r, "application/xml; charset=utf-8", l.cacheFor(), files[i])
 	})
 }
 
@@ -51,7 +51,7 @@ func (l *LLMs) Sitemap() http.Handler {
 func (l *LLMs) Robots() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body := fmt.Sprintf("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /search\n\nSitemap: %s/sitemap.xml\n", l.originOf(r))
-		serveAs(w, r, "text/plain; charset=utf-8", machineCache, []byte(body))
+		serveAs(w, r, "text/plain; charset=utf-8", l.cacheFor(), []byte(body))
 	})
 }
 
@@ -66,8 +66,17 @@ func (l *LLMs) OpenSearch() http.Handler {
 			`<Url type="text/html" method="get" template="` + origin + `/search?q={searchTerms}"/>` + "\n" +
 			`<Url type="application/json" method="get" template="` + origin + `/api/v1/search?q={searchTerms}"/>` + "\n" +
 			"</OpenSearchDescription>\n"
-		serveAs(w, r, "application/opensearchdescription+xml", machineCache, []byte(body))
+		serveAs(w, r, "application/opensearchdescription+xml", l.cacheFor(), []byte(body))
 	})
+}
+
+// cacheFor is how these files are cached: shared caches keep them only when the portal says its own address (server.public_url);
+// built from the Host header a request names, they must not be kept for the next reader.
+func (l *LLMs) cacheFor() string {
+	if l.base == "" {
+		return "no-store"
+	}
+	return machineCache
 }
 
 func (l *LLMs) originOf(r *http.Request) string {

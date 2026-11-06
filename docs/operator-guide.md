@@ -696,7 +696,7 @@ Metrics:
 |---|---|---|
 | `scp_http_requests_total` | `listener`, `pattern`, `method`, `code` | requests served |
 | `scp_http_request_duration_seconds` | `listener`, `pattern` | time to serve a request |
-| `scp_webhook_deliveries_total` | `event`, `result` | webhook deliveries: `accepted`, `ignored`, `duplicate`, `ping`, `invalid_signature`, `malformed`, `too_large`, `unsupported_media_type` |
+| `scp_webhook_deliveries_total` | `event`, `result` | webhook deliveries: `accepted`, `ignored`, `duplicate`, `ping`, `invalid_signature`, `malformed`, `too_large`, `busy`, `unsupported_media_type` |
 | `scp_sync_jobs_total` | `kind`, `result` | finished GitHub jobs: `ok`, `not_modified`, `error`, `rate_limited` |
 | `scp_sync_job_duration_seconds` | `kind` | time a job ran |
 | `scp_sync_queue_depth`, `scp_sync_running` | | jobs due and waiting, jobs running |

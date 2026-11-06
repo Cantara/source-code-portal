@@ -31,6 +31,7 @@ const (
 	readTimeout = 8 * time.Second
 	dedupeTTL   = 15 * time.Minute
 	dedupeMax   = 10_000
+	bodies      = 4 // payloads read at once: a body is held whole before its signature can be checked
 )
 
 var (
@@ -52,6 +53,7 @@ type Receiver struct {
 	seen    *dedupe
 	first   func(ctx context.Context, id string) (bool, error) // shared de-duplication; nil: local only
 	observe func(event, result string)
+	reading chan struct{} // a slot per body being read
 }
 
 // New returns a receiver verifying with secret, then previous (may be empty).
@@ -60,11 +62,12 @@ func New(secret, previous []byte, sink Sink, log *slog.Logger) *Receiver {
 	if len(previous) > 0 {
 		secrets = append(secrets, previous)
 	}
-	return &Receiver{secrets: secrets, sink: sink, log: log, seen: &dedupe{at: map[string]time.Time{}}, observe: func(string, string) {}}
+	return &Receiver{secrets: secrets, sink: sink, log: log, seen: &dedupe{at: map[string]time.Time{}}, observe: func(string, string) {},
+		reading: make(chan struct{}, bodies)}
 }
 
 // Observe sets fn to receive every delivery's event (empty before the signature is verified) and result: accepted, duplicate, ping,
-// ignored, invalid_signature, too_large, malformed or unsupported_media_type.
+// ignored, invalid_signature, too_large, malformed, busy or unsupported_media_type.
 func (rc *Receiver) Observe(fn func(event, result string)) { rc.observe = fn }
 
 // Dedupe sets fn to tell whether a delivery id is new across instances. When fn fails, the receiver de-duplicates locally.
@@ -98,6 +101,17 @@ func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.ContentLength > MaxBody {
 		rc.observe("", "too_large")
 		httpapi.WriteProblem(w, http.StatusRequestEntityTooLarge, "too-large", "The payload is too large.")
+		return
+	}
+	// The signature covers the whole body, so it is held before it can be checked: only a few at once, or an unsigned flood of large
+	// bodies would be held in memory together. GitHub's own deliveries are few and can be redelivered.
+	select {
+	case rc.reading <- struct{}{}:
+		defer func() { <-rc.reading }()
+	default:
+		rc.observe("", "busy")
+		w.Header().Set("Retry-After", "5")
+		httpapi.WriteProblem(w, http.StatusServiceUnavailable, "busy", "Too many deliveries are being read; try again shortly.")
 		return
 	}
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(readTimeout))

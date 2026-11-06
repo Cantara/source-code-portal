@@ -2,6 +2,7 @@ package packages
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -175,5 +176,16 @@ func TestGradle(t *testing.T) {
 		Options{Providers: []Provider{Maven{Central: reg.URL + "/maven2/"}}, Client: NewClient(reg.Client().Transport, nil, nil), Public: true, Repo: public})
 	if _, got := run(t, p, store.Item{}); len(got.Packages) != 0 {
 		t.Errorf("an application build is a package: %+v", got.Packages)
+	}
+}
+
+// The hosts a build file names are not remembered without bound.
+func TestIdleHostsAreForgotten(t *testing.T) {
+	c := NewClient(nil, nil, nil)
+	for i := range 3 * hostsMax {
+		c.host(fmt.Sprintf("registry-%d.example", i))
+	}
+	if n := len(c.hosts); n > hostsMax {
+		t.Errorf("%d hosts kept, want at most %d", n, hostsMax)
 	}
 }
