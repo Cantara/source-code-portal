@@ -29,6 +29,9 @@ const (
 // ErrNotFound is a registry's answer that it does not hold what was asked for: the next registry's turn.
 var ErrNotFound = errors.New("packages: not at this registry")
 
+// ErrNoRelease is a provider's answer that the package has no release to show: no version and no problem.
+var ErrNoRelease = errors.New("packages: no release")
+
 // RegistryError is a registry's failure: its host and status (0 when it could not be reached). The message never holds a credential.
 type RegistryError struct {
 	Host   string

@@ -138,7 +138,7 @@ func (Go) tagged(l *Lookup, c Coordinate) (*Version, error) {
 			return &Version{Version: v, Registry: "tags", URL: tagURL(l, t)}, nil
 		}
 	}
-	return nil, nil //nolint:nilnil // no tagged release
+	return nil, ErrNoRelease // no tagged release
 }
 
 // escapeModule is a module path as the proxies address it: an upper-case letter as '!' and its lower case.
@@ -191,7 +191,7 @@ func (Swift) Latest(_ context.Context, l *Lookup, _ Coordinate) (*Version, error
 	if t := stableTags(tags, ""); len(t) > 0 {
 		return &Version{Version: t[0], Registry: "tags", URL: tagURL(l, t[0])}, nil
 	}
-	return nil, nil //nolint:nilnil // no tagged release
+	return nil, ErrNoRelease // no tagged release
 }
 
 // CocoaPods is the provider of CocoaPods: a podspec at the root names the pod, CocoaPods trunk says its versions.
@@ -223,7 +223,7 @@ func (CocoaPods) Coordinates(files []File) []Coordinate {
 // Latest asks trunk for the pod, for a public repository only: trunk is the one CocoaPods registry.
 func (c CocoaPods) Latest(ctx context.Context, l *Lookup, co Coordinate) (*Version, error) {
 	if !l.Public() {
-		return nil, nil //nolint:nilnil // trunk is public: a private repository's pod is not named there
+		return nil, ErrNoRelease // trunk is public: a private repository's pod is not named there
 	}
 	var pod struct {
 		Versions []struct {
@@ -235,7 +235,7 @@ func (c CocoaPods) Latest(ctx context.Context, l *Lookup, co Coordinate) (*Versi
 		return json.NewDecoder(io.LimitReader(r, maxMetadata)).Decode(&pod)
 	})
 	if errors.Is(err, ErrNotFound) {
-		return nil, nil //nolint:nilnil // not on trunk
+		return nil, ErrNoRelease // not on trunk
 	}
 	if err != nil {
 		return nil, err
@@ -246,7 +246,7 @@ func (c CocoaPods) Latest(ctx context.Context, l *Lookup, co Coordinate) (*Versi
 	}
 	v := newestStable(names)
 	if v == "" {
-		return nil, nil //nolint:nilnil // no stable version
+		return nil, ErrNoRelease // no stable version
 	}
 	out := &Version{Version: v, Registry: "cocoapods.org", URL: cocoaBrowse + url.PathEscape(co.Name)}
 	for _, pv := range pod.Versions {

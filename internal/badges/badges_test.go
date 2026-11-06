@@ -213,7 +213,7 @@ func TestReleaseJob(t *testing.T) {
 		err   bool
 	}{
 		"release": {releases{rel: &Release{Tag: "v1"}}, snapshot.StateOK, false},
-		"none":    {releases{}, snapshot.StateNotFound, false},
+		"none":    {releases{err: ErrNoRelease}, snapshot.StateNotFound, false},
 		"failing": {releases{err: errors.New("boom")}, "", true},
 	} {
 		spec := New(map[string]Releases{"gh": tc.src}).ReleaseSpec()

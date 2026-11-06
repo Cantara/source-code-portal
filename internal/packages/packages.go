@@ -160,6 +160,7 @@ func (p *Packages) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 			switch {
 			case err != nil && ctx.Err() != nil:
 				return ctx.Err()
+			case errors.Is(err, ErrNoRelease): // no release, no problem: Latest stays empty
 			case err != nil:
 				pk.Latest, pk.Problem = known[c.Ecosystem+" "+c.Name], problem(err)
 			default:
@@ -192,7 +193,7 @@ type none struct{}
 func (none) Ecosystem() string                                             { return "" }
 func (none) Wants(string) bool                                             { return false }
 func (none) Coordinates([]File) []Coordinate                               { return nil }
-func (none) Latest(context.Context, *Lookup, Coordinate) (*Version, error) { return nil, nil } //nolint:nilnil // no provider, no release
+func (none) Latest(context.Context, *Lookup, Coordinate) (*Version, error) { return nil, ErrNoRelease } // no provider, no release
 
 // searched reports whether build files are looked for in dir: at most maxDirDepth deep, not in vendored code, tests, examples,
 // documents or a hidden directory.

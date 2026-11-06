@@ -72,11 +72,11 @@ func (b *Badges) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	}
 	owner, name, _ := strings.Cut(string(j.Repo), "/")
 	rel, err := src.LatestRelease(ctx, owner, name)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrNoRelease) {
 		return sync.Result{}, err
 	}
 	state, payload := snapshot.StateNotFound, []byte(nil)
-	if rel != nil {
+	if err == nil {
 		if payload, err = json.Marshal(rel); err != nil {
 			return sync.Result{}, err
 		}

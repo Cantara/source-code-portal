@@ -18,7 +18,7 @@ type Provider interface {
 	Wants(path string) bool
 	// Coordinates reads what the repository publishes from its build files; a package its build file marks private is left out.
 	Coordinates(files []File) []Coordinate
-	// Latest asks the registries for c's newest release; nil when no registry holds one.
+	// Latest asks the registries for c's newest release; ErrNoRelease when none is to show (no registry holds one).
 	Latest(ctx context.Context, l *Lookup, c Coordinate) (*Version, error)
 }
 
