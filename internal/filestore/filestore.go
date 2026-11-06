@@ -48,6 +48,7 @@ type File[T any] struct {
 	mod     time.Time
 	size    int64
 	present bool
+	unread  bool // the last stat or read failed: the next reload reads the file again, however it looks
 }
 
 // Open reads `<dir>/<name>.json` with parse; without a file (or without dir) it holds fallback. An empty dir is a store that only
@@ -83,7 +84,8 @@ func (f *File[T]) Save(b []byte, revision string) (string, error) {
 	if err := writeAtomic(f.path(), b); err != nil {
 		return "", err
 	}
-	f.setLocked(b)
+	info, _ := f.stat(f.path())
+	f.setLocked(b, info)
 	return Digest(b), nil
 }
 
@@ -122,17 +124,17 @@ func (f *File[T]) Reload() {
 		}
 		return
 	case err != nil:
-		f.cur.Problem = err.Error()
+		f.cur.Problem, f.unread = err.Error(), true
 		return
-	case f.present && info.ModTime().Equal(f.mod) && info.Size() == f.size:
+	case f.present && !f.unread && info.ModTime().Equal(f.mod) && info.Size() == f.size:
 		return
 	}
 	b, err := os.ReadFile(f.path())
 	if err != nil {
-		f.cur.Problem = err.Error()
+		f.cur.Problem, f.unread = err.Error(), true
 		return
 	}
-	f.setLocked(b)
+	f.setLocked(b, info) // the file as it was before it was read: a write in between is seen at the next reload
 	if f.cur.Problem != "" {
 		f.log.Warn("file not served", "file", f.path(), "err", f.cur.Problem)
 	}
@@ -152,11 +154,11 @@ func (f *File[T]) revisionOnDisk() (string, error) {
 	return Digest(b), nil
 }
 
-// setLocked records the file's content b: its value when it parses, else the last good value with the problem. The revision is
+// setLocked records the file's content b, read when the file was as info says: its value when it parses, else the last good value with the problem. The revision is
 // b's either way, so an admin can save over a broken file.
-func (f *File[T]) setLocked(b []byte) {
-	f.present = true
-	if info, err := f.stat(f.path()); err == nil {
+func (f *File[T]) setLocked(b []byte, info fs.FileInfo) {
+	f.present, f.unread = true, false
+	if info != nil {
 		f.mod, f.size = info.ModTime(), info.Size()
 	}
 	f.cur.Revision = Digest(b)

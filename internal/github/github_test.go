@@ -228,7 +228,7 @@ func TestCanceledIsNotClassified(t *testing.T) {
 }
 
 func TestETagCacheEvicts(t *testing.T) {
-	c := newETagCache(2)
+	c := newETagCache(2 * entryOverhead) // two empty entries
 	for _, k := range []string{"a", "b"} {
 		c.put(k, &cacheEntry{etag: k})
 	}

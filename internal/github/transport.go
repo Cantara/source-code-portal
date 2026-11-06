@@ -3,6 +3,7 @@ package github
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -12,7 +13,10 @@ import (
 	"github.com/cantara/source-code-portal/internal/lru"
 )
 
-const maxCachedBody = 1 << 20
+const (
+	maxCachedBody = 1 << 20
+	entryOverhead = 1 << 10 // an entry's key, headers and etag, about
+)
 
 // notModifiedHeader marks a response replayed from the conditional cache after a 304.
 const notModifiedHeader = "X-Scp-Not-Modified"
@@ -41,7 +45,7 @@ func (t *scpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	key := ""
 	var cached *cacheEntry
 	if req.Method == http.MethodGet {
-		key = cacheKey(req)
+		key = cacheKey(t.rate, req)
 		if cached = t.cache.get(key); cached != nil {
 			req.Header.Set("If-None-Match", cached.etag)
 		}
@@ -89,10 +93,11 @@ func (t *scpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// cacheKey binds an entry to the credential: GitHub's ETags depend on the Authorization header.
-func cacheKey(req *http.Request) string {
+// cacheKey binds an entry to the credential (its rate book: one per token and per App installation), as GitHub's ETags depend on who
+// asks. It is not the Authorization header: an installation's token changes about hourly, which would strand every entry.
+func cacheKey(credential *rateBook, req *http.Request) string {
 	h := sha256.New()
-	for _, s := range []string{req.Header.Get("Authorization"), req.URL.String(), req.Header.Get("Accept")} {
+	for _, s := range []string{fmt.Sprintf("%p", credential), req.URL.String(), req.Header.Get("Accept")} {
 		h.Write([]byte(s))
 		h.Write([]byte{0})
 	}
@@ -111,8 +116,9 @@ type etagCache struct {
 	items *lru.Cache[string, *cacheEntry]
 }
 
+// newETagCache holds answers up to max bytes of body (and a fixed cost for the rest of each entry).
 func newETagCache(max int) *etagCache {
-	return &etagCache{items: lru.New[string, *cacheEntry](max, nil)}
+	return &etagCache{items: lru.New[string, *cacheEntry](max, func(e *cacheEntry) int { return len(e.body) + entryOverhead })}
 }
 
 func (c *etagCache) get(key string) *cacheEntry {

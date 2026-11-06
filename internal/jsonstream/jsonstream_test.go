@@ -180,3 +180,20 @@ func abs(n int) int {
 	}
 	return n
 }
+
+// A surrogate escape takes the next escape only when it is its low half; anything else is read as it is, as encoding/json does.
+func TestSurrogateEscapes(t *testing.T) {
+	for in, want := range map[string]string{
+		`😀`:             "😀",
+		`\ud800A`:       "�A",
+		`\udc00A`:       "�A",
+		`\ud800x`:       "�x",
+		`\ud800\ud800A`: "��A",
+		`aéb`:           "aéb",
+	} {
+		starts, _, _ := read(t, `[{"s":"`+in+`"}]`, 50, 50)
+		if starts[0] != want {
+			t.Errorf("%s = %q, want %q", in, starts[0], want)
+		}
+	}
+}

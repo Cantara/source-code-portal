@@ -43,3 +43,13 @@ func TestWeightBound(t *testing.T) {
 		t.Errorf("size after remove = %d, want 5", c.Size())
 	}
 }
+
+func TestEmptyValuesAreBounded(t *testing.T) {
+	c := New[int, string](3, func(s string) int { return len(s) })
+	for i := range 100 {
+		c.Put(i, "")
+	}
+	if c.Len() != 3 {
+		t.Errorf("zero-weight values were not bounded: %d held", c.Len())
+	}
+}

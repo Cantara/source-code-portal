@@ -69,6 +69,9 @@ func New(ts ...Tool) (*Catalogue, error) {
 		case t.Schema["type"] != "object":
 			return nil, fmt.Errorf("tools: %s's schema is not an object", t.Name)
 		}
+		if err := checkSchema(t.Schema); err != nil {
+			return nil, fmt.Errorf("tools: %s's schema: %w", t.Name, err)
+		}
 		c.byName[t.Name] = i
 		c.list = append(c.list, t)
 	}
@@ -109,6 +112,41 @@ func (c *Catalogue) Call(ctx context.Context, name string, input map[string]any,
 	}
 	res.Text = Truncate(res.Text, maxText)
 	return res, nil
+}
+
+// checkSchema refuses a schema whose constraints Check would skip for want of the Go type it reads (required and enum as []string,
+// minimum and maximum as int): a constraint that is not enforced is worse than none.
+func checkSchema(s map[string]any) error {
+	if v, ok := s["required"]; ok {
+		if _, ok := v.([]string); !ok {
+			return errors.New(`"required" must be a []string`)
+		}
+	}
+	if v, ok := s["enum"]; ok {
+		if _, ok := v.([]string); !ok {
+			return errors.New(`"enum" must be a []string`)
+		}
+	}
+	for _, k := range []string{"minimum", "maximum"} {
+		if v, ok := s[k]; ok {
+			if _, ok := v.(int); !ok {
+				return fmt.Errorf("%q must be an int", k)
+			}
+		}
+	}
+	if props, ok := s["properties"].(map[string]any); ok {
+		for k, v := range props {
+			if p, ok := v.(map[string]any); ok {
+				if err := checkSchema(p); err != nil {
+					return fmt.Errorf("%s: %w", k, err)
+				}
+			}
+		}
+	}
+	if items, ok := s["items"].(map[string]any); ok {
+		return checkSchema(items)
+	}
+	return nil
 }
 
 // Check checks input against the subset of JSON Schema the tools use: an object of string, integer and boolean properties, required

@@ -47,7 +47,9 @@ func Strip(s string) string {
 	}, s)
 }
 
+// invisible is what a reader cannot see but a model reads: control characters and every format character (Cf: bidirectional
+// controls, zero-width characters, the soft hyphen, the tag block U+E0000 that spells ASCII invisibly), and the variation selectors
+// supplement. The emoji variation selectors U+FE00 to U+FE0F stay.
 func invisible(r rune) bool {
-	return unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r) || unicode.Is(unicode.Join_Control, r) ||
-		r == '\u200b' || r == '\u2060' || r == '\ufeff'
+	return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r >= 0xe0100 && r <= 0xe01ef
 }

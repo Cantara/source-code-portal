@@ -26,8 +26,8 @@ const (
 	requestTimeout = 30 * time.Second
 	maxPages       = 100
 	perPage        = 100
-	inFlight       = 4 // requests at once per source
-	etagEntries    = 5000
+	inFlight       = 4        // requests at once per source
+	etagBytes      = 64 << 20 // of answers kept for conditional requests, per source
 	userAgent      = "source-code-portal"
 )
 
@@ -132,7 +132,7 @@ type account struct {
 }
 
 func newSource(sc config.Source, base http.RoundTripper, log *slog.Logger) (*Source, error) {
-	s := &Source{id: sc.ID, cfg: sc, log: log, cache: newETagCache(etagEntries), sem: make(chan struct{}, inFlight), base: base,
+	s := &Source{id: sc.ID, cfg: sc, log: log, cache: newETagCache(etagBytes), sem: make(chan struct{}, inFlight), base: base,
 		owners: map[string]*credential{}, accounts: map[string]account{}}
 	if sc.App == nil {
 		rate := &rateBook{}

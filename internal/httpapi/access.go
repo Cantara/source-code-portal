@@ -155,16 +155,20 @@ func SameOrigin(r *http.Request, publicURL string) bool {
 	if origin == "" {
 		return false
 	}
-	want := publicURL
-	if want == "" {
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		want = scheme + "://" + r.Host
+	return strings.EqualFold(strings.TrimSuffix(origin, "/"), PortalOrigin(r, publicURL))
+}
+
+// PortalOrigin is the origin the portal answers as: the public URL's, else the request's own (https when it came in over TLS). The
+// guards that compare a browser's Origin with it share this one.
+func PortalOrigin(r *http.Request, publicURL string) string {
+	if u, err := url.Parse(publicURL); err == nil && u.Host != "" {
+		return u.Scheme + "://" + u.Host
 	}
-	u, err := url.Parse(want)
-	return err == nil && origin == u.Scheme+"://"+u.Host
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + r.Host
 }
 
 // AdminOnly answers 401 to an anonymous viewer and 403 to a viewer who is not an admin; admins reach h.
