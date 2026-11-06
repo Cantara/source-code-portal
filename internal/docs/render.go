@@ -206,12 +206,12 @@ func blockStart(t []byte) bool {
 func (r *pipeline) markdown(body []byte, l links) (safehtml.SafeHTML, string, string, []Heading, error) {
 	hl := &highlighter{deadline: time.Now().Add(highlightBudget)}
 	p := parser.New(
-		parser.WithExtensions(extension.GFMParser, extension.FootnoteParser),
+		parser.WithExtensions(extension.NewGFMParser(), extension.NewFootnoteParser()),
 		parser.WithAutoHeadingID(),
 		parser.WithASTTransformers(util.Prioritized[parser.ASTTransformer](alerts{}, 100)),
 	)
 	md := gmhtml.New(
-		gmhtml.WithExtensions(extension.GFMHTMLRenderer, extension.FootnoteHTMLRenderer),
+		gmhtml.WithExtensions(extension.NewGFMHTMLRenderer(), extension.NewFootnoteHTMLRenderer()),
 		gmhtml.WithUnsafe(),
 		gmhtml.WithNodeRendererDecorator(ast.KindCodeBlock, func(gmhtml.NodeRenderer) gmhtml.NodeRenderer {
 			return renderer.NodeRendererFunc(hl.render)
