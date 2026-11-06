@@ -481,6 +481,18 @@ recent commits, counted and never named. The reasons are filters; the product, a
 that works without JavaScript. The page needs no setting and nothing from GitHub that the portal does not already read, and a
 private alumnus is shown only to those who may see the repository.
 
+### 2.4.6 Insights
+
+**Insights** in the header (`/insights`, and a product's page links to its own) answers five questions from what the portal already
+holds; it reads nothing more from GitHub and needs no setting. *How often does the fleet ship?* counts the stable releases of the
+last 12 months and gives each product's median days between its last five (a product that ships weekly is not better than one that
+ships quarterly). *What is it built on?* counts the languages and build tools the manifests name and the oldest and newest runtime
+version each names. *What does it lean on?* lists the internal libraries with the most dependants, marking a retired one that is
+still used. *Where does knowledge sit with one person?* lists the repositories where one person wrote 90% or more of the last
+people's commits (at least 20 held; automation and sweeps do not count): it names repositories and never the person. *What has gone
+quiet?* counts the repositories by how long ago they changed and lists the dormant ones, the candidates for retirement. Retired
+repositories are left out of all of them but the libraries. A private repository counts only for those who may see it.
+
 ### 2.5 Published packages
 
 A repository's release is often a package, not a GitHub release: a Java library published to a Maven repository by a CI server, a
