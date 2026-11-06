@@ -13,4 +13,4 @@ Instructions for coding agents working in this repository (Source Code Portal, G
   packages arrive with the code that uses them.
 - Gate: `make check` (needs golangci-lint 2.14.0, Go 1.27.3, Node 24, pnpm 12 and the Playwright Chromium: `pnpm -C web exec playwright install chromium`). Single test: `go test -race -run TestName ./internal/<pkg>/`.
 - Tests never touch the network: loopback listeners only, the fake GitHub in `internal/github/githubtest` and recorded fixtures.
-- Commits: Conventional Commits, to `main` locally only, never pushed; one PR per completed feature, and CI runs on the PR. Generated files are regenerated with `make gen`, never edited by hand.
+- Commits: Conventional Commits, to `main` locally only, never pushed; one PR per completed feature, and CI runs on the PR; when the owner explicitly asks to push directly, `main` is pushed itself. Generated files are regenerated with `make gen`, never edited by hand.

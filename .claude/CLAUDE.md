@@ -31,7 +31,8 @@ never modify it, push to it or open issues or pull requests on it.
 - **Greenfield**: no data needs keeping. Change code, contract, config keys, the store schema
   (`internal/store/migrations/0001_init.sql`) and documents in place; no compatibility layers, shims, deprecations or extra migrations.
   Commit to `main` locally only (Conventional Commits, a few per feature, not one per step) and never push `main`. When a feature is
-  complete, open one PR for it (its commits pushed to a branch); CI runs once, on the PR. Between changes run only the tests of what
+  complete, open one PR for it (its commits pushed to a branch); CI runs once, on the PR. When the owner explicitly asks to commit and push
+  directly, push `main` itself (no branch, no PR): his instruction wins, for that request. Between changes run only the tests of what
   changed; the full `make check` once, before the PR. Never rerun a flaky job: fix the test.
 - **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
   for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
