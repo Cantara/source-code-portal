@@ -22,7 +22,12 @@ async (page) => {
     await shot(p.getByRole("region", { name: "Fleet" }), "fleet")
     await shot(card("Payments"), "card")
     await shot(card("Developer tools"), "card-watch")
-    // The latest commits, cut after the fifth.
+    // The latest commits, cut after the fifth: the other sections of the side panel folded first, so they have the panel's height.
+    for (const name of ["Hide pull requests", "Hide issues"]) {
+      const hide = p.getByRole("button", { name })
+      if (await hide.count()) await hide.click()
+    }
+    await p.waitForTimeout(300)
     const latest = p.locator('[aria-labelledby="latest"]')
     await latest.scrollIntoViewIfNeeded()
     const top = await latest.boundingBox()

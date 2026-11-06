@@ -2,7 +2,7 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 import { cn } from "@/lib/cn"
 import { kinds } from "@/lib/preferences"
-import { CloudCheckIcon, CommitIcon, FlagIcon, GridIcon, PulseIcon } from "@/components/ui/icons"
+import { CloudCheckIcon, CommitIcon, FlagIcon, GridIcon, PullIcon, PulseIcon } from "@/components/ui/icons"
 import { levels } from "@/entities/health/health"
 import { FindingIcon, ScoreRing, severities } from "@/entities/health/kinds"
 import { activityRule, levelRanges, severityOf, span, windowWords, type Rules } from "@/lib/rules"
@@ -422,12 +422,12 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
           id="telemetry"
           n={2}
           title="The fleet at a glance"
-          lede="The row of tiles at the top of the dashboard, and the line at the top of the presentation page: the same seven signals, each with its icon. A commit with a badge counts commits of one kind of work; the others are coloured by their state. Point at one, or tap it, for its parts."
+          lede="The row of tiles at the top of the dashboard, and the line at the top of the presentation page: the same eight signals, each with its icon. A commit with a badge counts commits of one kind of work; the others are coloured by their state. Point at one, or tap it, for its parts."
         >
           <Figure caption="The telemetry of a portal with three products and thirteen repositories.">
             <Shot
               name="telemetry"
-              alt="Seven tiles: 16 commits by hand by 5 people, 36 commits with AI, 69 commits by automation with 12 in sweeps, 12 active of 13 repositories, 8 findings with 1 of 3 products to watch, 3 products holding 13 repositories, 100% in sync."
+              alt="Eight tiles: 16 commits by hand by 5 people, 36 commits with AI, 69 commits by automation with 12 in sweeps, 12 active of 13 repositories, 10 findings with 1 of 3 products to watch, 5 open pull requests with 3 waiting for a review, 3 products holding 13 repositories, 100% in sync."
             />
           </Figure>
           <Terms
@@ -466,6 +466,13 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                   Findings
                 </>,
                 "Everything the health checks found, and how many of the products need a look.",
+              ],
+              [
+                <>
+                  <PullIcon className="size-4 text-primary" />
+                  Pull requests
+                </>,
+                "The open pull requests of the work that counts, how many wait for a review and how long the oldest has waited; it opens the list, whose turn first.",
               ],
               [
                 <>
@@ -689,14 +696,14 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
           <Figure caption="The products as a table: every column sorts. The choice of cards or table is remembered.">
             <Shot
               name="table"
-              alt="The products table with columns for repositories, commits, share with AI, automation, people, last change, findings and health."
+              alt="The products table with columns for repositories, commits, share with AI, automation, people, last change, pull requests, findings and health."
             />
           </Figure>
           <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,26rem)_1fr]">
             <Figure caption="The latest commits, beside the products on a wide screen.">
               <Shot
                 name="latest"
-                alt="The latest commits: subject, repository, author and age, the newest five by dependency and CI bots."
+                alt="The latest commits: subject, repository, author and age, the newest five, by dependency and CI bots."
               />
             </Figure>
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
@@ -777,7 +784,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
             <Figure caption="The presentation page on an iPad in landscape: the fleet's numbers and how current they are, every repository's health, a wide tile for the product to watch, one line for each good one, and the newest commits at the right.">
               <Shot
                 name="present"
-                alt="The presentation page: SCP and the seven signals as icons and values in one line, live; the fleet health with each product's squares in an outline, 3 to watch and 9 good; Developer tools as a wide tile at watch with its findings as icons, Payments and Identity as small tiles; the latest commits in a column at the right."
+                alt="The presentation page: SCP and the eight signals as icons and values in one line, live; the fleet health with each product's squares in an outline, 3 repositories to watch and 9 good; Developer tools as a wide tile at watch with its findings as icons, Payments and Identity as small tiles; the latest commits, the pull requests and the issues as three sections in a column at the right."
               />
             </Figure>
             <div className="grid gap-6 lg:grid-cols-2">

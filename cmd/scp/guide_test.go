@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -149,6 +150,12 @@ func TestServeForGuide(t *testing.T) {
 		issue(45, "Pay by bank transfer", "ada", 60, 5, githubtest.Issue{Type: "Feature", Assignees: []string{"bo"}, Milestone: "Q1"}),
 		issue(3, "Dependency Dashboard", "renovate[bot]", 200, 1, githubtest.Issue{}))
 	gh.SetIssues(identity, issue(22, "Sessions end after a deploy", "bo", 3, 1, githubtest.Issue{Labels: []string{"bug"}, Assignees: []string{"chen"}}))
+	// The command line's backlog: the Backlog finding judges the issues the portal read, not GitHub's count.
+	backlog := make([]githubtest.Issue, 0, 56)
+	for n := 1; n <= 56; n++ {
+		backlog = append(backlog, issue(n, "Handbook page "+strconv.Itoa(n)+" is out of date", "dana", float64(20+n), float64(10+n), githubtest.Issue{}))
+	}
+	gh.SetIssues(cli, backlog...)
 	repo("ci-templates", "Shared CI workflows", "", []work{{"ada", 1, 110, 100}, {"github-actions[bot]", 24, 30, 0}}, true,
 		gogh.Repository{})
 	repo("handbook", "How the team works", "", []work{{"dana", 4, 45, 6}}, true, gogh.Repository{})
