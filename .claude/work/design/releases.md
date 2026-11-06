@@ -1,6 +1,6 @@
 # Releases: what was shipped and when (RL1 to RL3)
 
-Status: RL1 built, RL2 and RL3 in progress (plan.md section 4, P-82). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
+Status: RL1 and RL2 built, RL3 in progress (the tool, the search kind, llms, docs and the Guide are built; the repository's and the group's panel and the dashboard element are left) (plan.md section 4, P-82). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
 
 The portal holds only the **latest** release of a repository (the badge's job, `badges.release`). A team that wants to know what the
 fleet shipped this week has nothing to look at. The portal lists the recent releases of the fleet, a product and a repository, newest
@@ -38,13 +38,14 @@ viewer's view; the leak test lists the route.
 
 `/releases` in the header: the variants as chips and the sorts as links, a GET form without JavaScript, a row per release (repository,
 tag, name, how long ago with the exact time in a hint, a *pre-release* chip, the link to GitHub). A repository page gets a *Releases*
-panel (its last ten); a group page its group's. Server-rendered, canonical, in the sitemap. RL3 adds the `releases` element to the
+panel (its last ten); a group page its group's (RL3). Server-rendered, canonical, in the sitemap. RL3 adds the `releases` element to the
 dashboard's elements catalogue (a section of the side panel and of `/present`'s column, as the pull requests).
 
 ## Agents and the rest (RL3)
 
-The tool `recent_releases` (same parameters), the search kind `release` (tag and name, a hit opens the repository's release), the
-`llms.txt` line per repository's latest release, the badges unchanged in address. Docs, the Guide, the plugin.
+Built: the tool `recent_releases` (same parameters), the search kind `release` (tag, title and the first line of the notes; a hit opens
+the repository's releases, `/releases?repo=&variant=all`), the repository Markdown page's *Latest release* section and, in `llms.txt`, the
+JSON links to the releases and the retired repositories; the badges are unchanged in address. Docs, the Guide, the plugin.
 
 ## Tests
 

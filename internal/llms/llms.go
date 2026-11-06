@@ -44,8 +44,18 @@ type Options struct {
 	Pulls func(*snapshot.RepoEntry) (open, review int)
 	// Issues is a repository's open issues and how many need triage (open -1 when not read); nil: not said.
 	Issues func(*snapshot.RepoEntry) (open, triage int)
+	// Release is a repository's latest stable release; ok false when it has none or it is not read; nil: not said.
+	Release func(*snapshot.RepoEntry) (rel Release, ok bool)
+	// Retired says why a repository is retired (archived, deprecated); "" when it is not; nil: not said.
+	Retired func(*snapshot.RepoEntry) string
 	// Origin is the request's public origin, for the sitemap's absolute URLs when there is no server.public_url.
 	Origin func(*http.Request) string
+}
+
+// Release is a repository's latest release as the surface says it.
+type Release struct {
+	Tag, URL  string
+	Published time.Time
 }
 
 // Doc is a document as the surface serves it.
@@ -154,6 +164,7 @@ func (l *LLMs) Repo() http.Handler {
 			fmt.Fprintf(&b, "---\nscp:\n  repo: %s\n---\n\n# %s\n", quote(string(e.Repo.Key())), line(e.Repo.Owner+"/"+e.Repo.Name, maxDescription))
 		}
 		b.WriteString(l.technology(l.current(r.Context()), e))
+		b.WriteString(l.release(e))
 		b.WriteString(l.pulls(e))
 		b.WriteString(l.issues(e))
 		serve(w, r, "text/markdown; charset=utf-8", b.Bytes())
@@ -188,6 +199,19 @@ func (l *LLMs) technology(s *snapshot.Snapshot, e *snapshot.RepoEntry) string {
 		return ""
 	}
 	return "\n## Technology and dependencies\n\nRead by the portal from the repository's package manifests.\n\n" + b.String()
+}
+
+// release is the portal's line on a repository's latest release; empty when it has none or Options.Release is unset.
+func (l *LLMs) release(e *snapshot.RepoEntry) string {
+	if l.opts.Release == nil {
+		return ""
+	}
+	rel, ok := l.opts.Release(e)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("\n## Latest release\n\n[%s](%s), published %s: [the recent releases](%s).\n", line(rel.Tag, maxDescription), rel.URL,
+		rel.Published.UTC().Format("2006-01-02"), l.url("/releases?repo="+url.QueryEscape(string(e.Repo.Key()))+"&variant=all"))
 }
 
 // pulls is the portal's line on a repository's open pull requests; empty when they are not read or Options.Pulls is unset.
@@ -320,9 +344,10 @@ func (l *LLMs) buildIndex(s *snapshot.Snapshot) []byte {
 		repos.WriteString(l.repoLine(s.Repos[k]))
 	}
 	optional := fmt.Sprintf("\n## Optional\n\n- [llms-full.txt](%s): every README in one file\n- [OpenAPI](%s): the JSON API contract\n"+
-		"- [Repositories](%s): every repository as JSON\n- [Search](%s): repositories, documents, dependencies, packages and commits by "+
+		"- [Repositories](%s): every repository as JSON\n- [Releases](%s): the recent releases as JSON\n- [Retired repositories](%s): archived and deprecated "+
+		"ones as JSON\n- [Search](%s): repositories, documents, dependencies, packages and commits by "+
 		"words and filters, as JSON (`?q=`)\n- [MCP](%s): the portal's read-only tools for agents (Model Context Protocol, Streamable HTTP; "+
-		"listed as JSON at %s)\n", l.url("/llms-full.txt"), l.url("/api/v1/openapi.yaml"), l.url("/api/v1/repos"), l.url("/api/v1/search"),
+		"listed as JSON at %s)\n", l.url("/llms-full.txt"), l.url("/api/v1/openapi.yaml"), l.url("/api/v1/repos"), l.url("/api/v1/releases"), l.url("/api/v1/alumni"), l.url("/api/v1/search"),
 		l.url("/mcp"), l.url("/api/v1/tools"))
 	if b.Len()+repos.Len()+len(optional) <= maxIndexBytes {
 		b.Write(repos.Bytes())
@@ -346,6 +371,11 @@ func (l *LLMs) repoLine(e *snapshot.RepoEntry) string {
 	var notes []string
 	if about.Lifecycle != "" {
 		notes = append(notes, about.Lifecycle)
+	}
+	if l.opts.Retired != nil {
+		if why := l.opts.Retired(e); why != "" && why != about.Lifecycle {
+			notes = append(notes, why)
+		}
 	}
 	if len(about.Owners) > 0 {
 		notes = append(notes, line(strings.Join(about.Owners, ", "), maxDescription))

@@ -733,6 +733,15 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                 or a question, comes from GitHub&apos;s issue type or its labels. What nobody has looked at comes first; a
                 group&apos;s and a repository&apos;s page show the ones waiting longest.
               </p>
+              <p>
+                <strong className="text-foreground">Releases</strong> lists what was shipped: the latest stable release of each
+                repository, or every release the portal holds (the 20 newest of each), only the stable ones or only the
+                pre-releases, newest first or in the order of your choice, within the days you pick.{" "}
+                <strong className="text-foreground">Alumni</strong> keeps the retired repositories apart from the live products:
+                the archived ones, and those whose <code>scp.yaml</code> says <code>lifecycle: deprecated</code>, each with when
+                it was last active, how many people worked on it (counted, never named) and how many repositories still depend on
+                it.
+              </p>
             </div>
           </div>
         </Section>
@@ -741,7 +750,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
           id="search"
           n={8}
           title="Search"
-          lede="One box finds what the portal holds: repositories, groups, the sections of their documents, their dependencies and packages, their commits, open pull requests and issues."
+          lede="One box finds what the portal holds: repositories, groups, the sections of their documents, their dependencies and packages, their commits, releases, open pull requests and issues."
         >
           <div className="grid items-start gap-8 lg:grid-cols-2">
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
@@ -765,7 +774,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                 ["session timeout", "Every word, anywhere."],
                 ["\u201csession timeout\u201d", "The words next to each other."],
                 ["oauth -legacy, oauth OR saml", "Without a word; either word."],
-                ["in:doc, in:issue", "One kind: repo, group, doc, dep, package, commit, pull, issue."],
+                ["in:doc, in:issue", "One kind: repo, group, doc, dep, package, commit, pull, issue, release."],
                 ["group:iam lang:java", "Within a product; a language, topic: or lifecycle:."],
                 ["dep:slf4j", "The repositories that depend on a package."],
                 ["author:ann kind:ai after:2026-10-01", "Commits by a person, of a kind of work, in a time."],

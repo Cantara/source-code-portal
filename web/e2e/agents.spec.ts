@@ -48,8 +48,10 @@ test("the pages offer a browser's agent the portal's tools, which answer from th
       "open_page",
       "open_pull_requests",
       "recent_commits",
+      "recent_releases",
       "repository_health",
       "repository_packages",
+      "retired_repositories",
       "search",
       "set_preferences",
     ])

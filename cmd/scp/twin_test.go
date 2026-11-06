@@ -123,8 +123,10 @@ func toolInputs(name string) []string {
 	case "get_document":
 		return []string{`{"input":{"owner":"acme","name":"open","path":"README.md"}}`,
 			`{"input":{"owner":"acme","name":"zq-hidden","path":"docs/guide.md"}}`}
-	case "recent_commits", "open_pull_requests", "open_issues":
+	case "recent_commits", "open_pull_requests", "open_issues", "recent_releases":
 		return []string{`{"input":{}}`, `{"input":{"repo":"acme/open"}}`, `{"input":{"repo":"acme/zq-hidden"}}`}
+	case "retired_repositories":
+		return []string{`{"input":{}}`, `{"input":{"q":"open"}}`, `{"input":{"q":"zq-hidden"}}`}
 	}
 	return []string{`{"input":{"owner":"acme","name":"open"}}`, `{"input":{"owner":"acme","name":"zq-hidden"}}`}
 }

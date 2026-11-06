@@ -17,6 +17,7 @@ export const kinds: { kind: Kind; tab: string; one: string }[] = [
   { kind: "commit", tab: "Commits", one: "Commit" },
   { kind: "pull", tab: "Pull requests", one: "Pull request" },
   { kind: "issue", tab: "Issues", one: "Issue" },
+  { kind: "release", tab: "Releases", one: "Release" },
 ]
 
 /** searchSize is the hits on a page. */

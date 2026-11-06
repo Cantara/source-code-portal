@@ -153,7 +153,7 @@ triggers come from repository text and are cleaned the same way; the manifest is
 
 `GET /api/v1/search?q=` searches what the portal holds, from the viewer's view: repositories (names, descriptors, topics,
 descriptions), groups, the sections of READMEs and `docs/` documents, manifests with their dependencies, published packages and
-default-branch commits, open pull requests (by title, author and branch; `in:pull`) and open issues (by title, labels and author; `in:issue`). It does not search source code. The page `/search` and the header's box (`/` or Ctrl/⌘ K) use it.
+default-branch commits, releases (by tag, title and the first line of the notes; `in:release`), open pull requests (by title, author and branch; `in:pull`) and open issues (by title, labels and author; `in:issue`). It does not search source code. The page `/search` and the header's box (`/` or Ctrl/⌘ K) use it.
 
 | In `q` | Finds |
 |---|---|
@@ -183,7 +183,7 @@ box. `/opensearch.xml` describes the search for browsers, which offer to add the
 
 The portal offers agents its own read-only tools, the ones its assistant uses: search (as below), list and read groups, read a
 repository's README and technology, read a document, the recent commits (with the work that counts), the open pull requests and whose
-turn each is, the open issues and where each stands, a repository's health and its published packages. Every call answers from the caller's view, exactly as the pages do.
+turn each is, the open issues and where each stands, the recent releases (newest first, the latest of each repository, all, stable or pre-releases), the retired repositories (archived or deprecated, with who still depends on them), a repository's health and its published packages. Every call answers from the caller's view, exactly as the pages do.
 
 **MCP.** `/mcp` speaks the [Model Context Protocol](https://modelcontextprotocol.io) over Streamable HTTP (stateless, JSON answers,
 the newest protocol version and the earlier ones). Without a token it answers from the public view; with an access token of

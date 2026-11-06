@@ -187,6 +187,44 @@ func TestRepoPage(t *testing.T) {
 	}
 }
 
+// TestReleaseAndRetired: a repository page says its latest release and links the recent ones; the index marks a retired repository
+// with its reason (once when it is also the lifecycle) and says nothing where the options are not set.
+func TestReleaseAndRetired(t *testing.T) {
+	cur := func(context.Context) *snapshot.Snapshot { return fixture() }
+	repoPage := func(o Options) http.Handler {
+		mux := http.NewServeMux()
+		mux.Handle("GET /repos/{owner}/{name}", New(cur, "https://scp.example", o).Repo())
+		return mux
+	}
+	plain := get(repoPage(options()), "/repos/acme/core").Body.String()
+	if strings.Contains(plain, "Latest release") {
+		t.Errorf("no release option, no release line:\n%s", plain)
+	}
+	o := options()
+	o.Release = func(e *snapshot.RepoEntry) (Release, bool) {
+		return Release{Tag: "v1.2.0", URL: "https://github.com/acme/core/releases/v1.2.0", Published: time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)}, e.Repo.Name == "Core"
+	}
+	o.Retired = func(e *snapshot.RepoEntry) string {
+		if e.Repo.Name == "evil" {
+			return "archived"
+		}
+		return ""
+	}
+	page := get(repoPage(o), "/repos/acme/core").Body.String()
+	for _, want := range []string{"## Latest release", "[v1.2.0](https://github.com/acme/core/releases/v1.2.0), published 2026-10-03",
+		"(https://scp.example/releases?repo=acme%2Fcore&variant=all)"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("core page misses %q:\n%s", want, page)
+		}
+	}
+	if evil := get(repoPage(o), "/repos/acme/evil").Body.String(); strings.Contains(evil, "Latest release") {
+		t.Errorf("a repository without a release has no line:\n%s", evil)
+	}
+	if idx := get(handler(New(cur, "https://scp.example", o)), "/llms.txt").Body.String(); !strings.Contains(idx, "readme.md): plain (archived)") {
+		t.Errorf("index does not mark the retired repository:\n%s", idx)
+	}
+}
+
 func TestKCP(t *testing.T) {
 	s := fixture()
 	techFacet.Set(s.Repos["acme/evil"], Technology{Uses: []snapshot.RepoKey{"acme/core", "acme/none"}}, snapshot.Freshness{})
