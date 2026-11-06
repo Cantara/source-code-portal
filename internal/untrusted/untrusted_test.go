@@ -31,7 +31,7 @@ func TestFirstLine(t *testing.T) {
 
 // Tag characters spell ASCII a reader cannot see: ASCII smuggling.
 func TestInvisibleTextIsStripped(t *testing.T) {
-	smuggled := "ok" + string([]rune{0xe0049, 0xe0067, 0xe006e}) + "­" + string(rune(0xe0100)) + "⁡!"
+	smuggled := "ok" + string([]rune{0xe0049, 0xe0067, 0xe006e, 0x00ad, 0xe0100, 0x2061}) + "!"
 	if got := Text(smuggled, 100); got != "ok!" {
 		t.Errorf("Text = %q, want ok!", got)
 	}
