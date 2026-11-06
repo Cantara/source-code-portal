@@ -280,6 +280,43 @@ export const defaults = [
       freshness: fresh,
     }),
   ),
+  http.get("/releases", ({ response }) =>
+    response(200).json({
+      releases: [
+        {
+          repo: "acme/core",
+          name: "core",
+          groups: ["iam"],
+          tag: "v2.1.0-rc1",
+          title: "Release candidate",
+          summary: "Faster login",
+          url: "https://github.com/acme/core/releases/tag/v2.1.0-rc1",
+          publishedAt: "2026-11-05T10:00:00Z",
+          prerelease: true,
+          author: "ann",
+          bot: false,
+          assets: 2,
+        },
+        {
+          repo: "acme/web",
+          name: "web",
+          groups: [],
+          tag: "v0.3.0",
+          title: "",
+          summary: "",
+          url: "https://github.com/acme/web/releases/tag/v0.3.0",
+          publishedAt: "2026-11-01T10:00:00Z",
+          prerelease: false,
+          author: "renovate[bot]",
+          bot: true,
+          assets: 0,
+        },
+      ],
+      counts: { latest: 2, all: 3, stable: 2, pre: 1 },
+      page: { number: 1, size: 50, total: 2, pages: 1 },
+      freshness: fresh,
+    }),
+  ),
   http.get("/alumni", ({ response }) =>
     response(200).json({
       alumni: [

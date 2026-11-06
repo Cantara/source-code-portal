@@ -105,6 +105,34 @@ paths:
         "304": { $ref: "#/components/responses/NotModified" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /releases:
+    get:
+      operationId: listReleases
+      summary: Recent releases across repositories, newest first, one page at a time
+      description: |
+        The releases of the viewer's view (design/releases.md), from each repository's 20 newest published ones. `variant` chooses what is
+        listed: `latest` (the default) is one row per repository, its newest stable release; `all` every kept release; `stable` the
+        non-pre-releases; `pre` the pre-releases. `since` keeps the releases published at or after a time, an RFC 3339 time or a number
+        of days such as `30d`. `group` and `repo` intersect. `counts` cover the scope and `since` whatever the variant, so the variants
+        can be offered as filters.
+      parameters:
+        - { name: group, in: query, required: false, schema: { type: string } }
+        - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
+        - { name: variant, in: query, required: false, schema: { $ref: "#/components/schemas/ReleaseVariant" } }
+        - { name: since, in: query, required: false, description: "An RFC 3339 time or days such as 30d", schema: { type: string, maxLength: 40 } }
+        - { name: sort, in: query, required: false, schema: { $ref: "#/components/schemas/ReleaseSort" } }
+        - { $ref: "#/components/parameters/PageNumber" }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: One page of releases
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReleasePage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /alumni:
     get:
       operationId: listAlumni
@@ -1041,6 +1069,40 @@ components:
       properties:
         pulls: { type: array, items: { $ref: "#/components/schemas/PullRequest" } }
         counts: { $ref: "#/components/schemas/PullCounts" }
+        page: { $ref: "#/components/schemas/Page" }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    ReleaseVariant: { type: string, enum: [latest, all, stable, pre], description: "latest: one row per repository, its newest stable release (default); all; stable; pre" }
+    ReleaseSort: { type: string, enum: [newest, oldest, repo, group], description: "newest first (default); oldest first; by repository; by product, then newest" }
+    ReleaseEntry:
+      type: object
+      required: [repo, name, groups, tag, title, summary, url, publishedAt, prerelease, author, bot, assets]
+      properties:
+        repo: { type: string, description: "Lower-case owner/name, used in URLs" }
+        name: { type: string, description: The repository's name }
+        groups: { type: array, items: { type: string }, description: Group ids in configuration order }
+        tag: { type: string }
+        title: { type: string, description: "The release's name; empty when it has none" }
+        summary: { type: string, description: "The first line of its notes, cleaned; empty when it has none" }
+        url: { type: string }
+        publishedAt: { type: string, format: date-time }
+        prerelease: { type: boolean }
+        author: { type: string, description: Empty when GitHub names none }
+        bot: { type: boolean, description: Published by automation }
+        assets: { type: integer }
+    ReleaseCounts:
+      type: object
+      required: [latest, all, stable, pre]
+      properties:
+        latest: { type: integer, description: Repositories with a stable release }
+        all: { type: integer }
+        stable: { type: integer }
+        pre: { type: integer }
+    ReleasePage:
+      type: object
+      required: [releases, counts, page, freshness]
+      properties:
+        releases: { type: array, items: { $ref: "#/components/schemas/ReleaseEntry" } }
+        counts: { $ref: "#/components/schemas/ReleaseCounts" }
         page: { $ref: "#/components/schemas/Page" }
         freshness: { $ref: "#/components/schemas/Freshness" }
     AlumniReason: { type: string, enum: [archived, deprecated], description: "Archived on GitHub, or `lifecycle: deprecated` in scp.yaml" }

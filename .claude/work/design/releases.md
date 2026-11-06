@@ -28,7 +28,7 @@ the latest release is the newest stable one in this list, so a repository is rea
 
 `GET /api/v1/releases` (contract): `group`, `repo` (as `scope.Params`), `variant` (`latest`: one row per repository, its newest
 stable release, **the default**; `all`: every kept release; `stable`; `pre`: pre-releases only), `since` (an RFC 3339 time or a number
-of days, `30d`), `sort` (`newest` the default, `oldest`, `repo`, `group`, `name`), numbered pages. The answer has the rows (repository
+of days, `30d`), `sort` (`newest` the default, `oldest`, `repo`, `group`), numbered pages. The answer has the rows (repository
 summary, group, release), the totals per variant (so the chips show their counts) and the scope's freshness. Per request from the
 viewer's view; the leak test lists the route.
 

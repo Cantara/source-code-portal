@@ -673,7 +673,7 @@ func (s *Server) SetReleases(id int64, rels ...Release) {
 		}
 		list = append(list, x)
 	}
-	slices.SortStableFunc(list, func(x, y *gh.RepositoryRelease) int { return y.GetPublishedAt().Time.Compare(x.GetPublishedAt().Time) })
+	slices.SortStableFunc(list, func(x, y *gh.RepositoryRelease) int { return y.GetPublishedAt().Compare(x.GetPublishedAt().Time) })
 	if len(list) == 0 {
 		delete(s.releases, id)
 		return

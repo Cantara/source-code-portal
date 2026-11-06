@@ -87,6 +87,7 @@ type (
 	commitsAPI   = commits.API
 	pullsAPI     = pulls.API
 	issuesAPI    = issues.API
+	releasesAPI  = releases.API
 	docsAPI      = docs.API
 	manifestsAPI = manifests.API
 	layoutAPI    = layout.API
@@ -97,6 +98,7 @@ type (
 		commitsAPI
 		pullsAPI
 		issuesAPI
+		releasesAPI
 		docsAPI
 		manifestsAPI
 		layoutAPI
@@ -344,7 +346,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
-	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, docs.API{Current: view}, manifests.API{Current: view},
+	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, releases.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For, Off: offElements(f)},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{f}, s.prereqs}
 	if s.web != nil {

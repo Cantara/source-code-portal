@@ -700,19 +700,67 @@ func (e PullState) Valid() bool {
 
 // Defines values for QueueSort.
 const (
-	Newest  QueueSort = "newest"
-	Updated QueueSort = "updated"
-	Waiting QueueSort = "waiting"
+	QueueSortNewest  QueueSort = "newest"
+	QueueSortUpdated QueueSort = "updated"
+	QueueSortWaiting QueueSort = "waiting"
 )
 
 // Valid indicates whether the value is a known member of the QueueSort enum.
 func (e QueueSort) Valid() bool {
 	switch e {
-	case Newest:
+	case QueueSortNewest:
 		return true
-	case Updated:
+	case QueueSortUpdated:
 		return true
-	case Waiting:
+	case QueueSortWaiting:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReleaseSort.
+const (
+	ReleaseSortGroup  ReleaseSort = "group"
+	ReleaseSortNewest ReleaseSort = "newest"
+	ReleaseSortOldest ReleaseSort = "oldest"
+	ReleaseSortRepo   ReleaseSort = "repo"
+)
+
+// Valid indicates whether the value is a known member of the ReleaseSort enum.
+func (e ReleaseSort) Valid() bool {
+	switch e {
+	case ReleaseSortGroup:
+		return true
+	case ReleaseSortNewest:
+		return true
+	case ReleaseSortOldest:
+		return true
+	case ReleaseSortRepo:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReleaseVariant.
+const (
+	All    ReleaseVariant = "all"
+	Latest ReleaseVariant = "latest"
+	Pre    ReleaseVariant = "pre"
+	Stable ReleaseVariant = "stable"
+)
+
+// Valid indicates whether the value is a known member of the ReleaseVariant enum.
+func (e ReleaseVariant) Valid() bool {
+	switch e {
+	case All:
+		return true
+	case Latest:
+		return true
+	case Pre:
+		return true
+	case Stable:
 		return true
 	default:
 		return false
@@ -1928,6 +1976,60 @@ type Release struct {
 	Url         string    `json:"url"`
 }
 
+// ReleaseCounts defines model for ReleaseCounts.
+type ReleaseCounts struct {
+	All int `json:"all"`
+
+	// Latest Repositories with a stable release
+	Latest int `json:"latest"`
+	Pre    int `json:"pre"`
+	Stable int `json:"stable"`
+}
+
+// ReleaseEntry defines model for ReleaseEntry.
+type ReleaseEntry struct {
+	Assets int `json:"assets"`
+
+	// Author Empty when GitHub names none
+	Author string `json:"author"`
+
+	// Bot Published by automation
+	Bot bool `json:"bot"`
+
+	// Groups Group ids in configuration order
+	Groups []string `json:"groups"`
+
+	// Name The repository's name
+	Name        string    `json:"name"`
+	Prerelease  bool      `json:"prerelease"`
+	PublishedAt time.Time `json:"publishedAt"`
+
+	// Repo Lower-case owner/name, used in URLs
+	Repo string `json:"repo"`
+
+	// Summary The first line of its notes, cleaned; empty when it has none
+	Summary string `json:"summary"`
+	Tag     string `json:"tag"`
+
+	// Title The release's name; empty when it has none
+	Title string `json:"title"`
+	Url   string `json:"url"`
+}
+
+// ReleasePage defines model for ReleasePage.
+type ReleasePage struct {
+	Counts    ReleaseCounts  `json:"counts"`
+	Freshness Freshness      `json:"freshness"`
+	Page      Page           `json:"page"`
+	Releases  []ReleaseEntry `json:"releases"`
+}
+
+// ReleaseSort newest first (default); oldest first; by repository; by product, then newest
+type ReleaseSort string
+
+// ReleaseVariant latest: one row per repository, its newest stable release (default); all; stable; pre
+type ReleaseVariant string
+
 // Repo defines model for Repo.
 type Repo struct {
 	// Address Lower-case owner/name, used in URLs
@@ -2301,6 +2403,23 @@ type ListPullsParams struct {
 // ListPullsParamsBy defines parameters for ListPulls.
 type ListPullsParamsBy string
 
+// ListReleasesParams defines parameters for ListReleases.
+type ListReleasesParams struct {
+	Group *string `form:"group,omitempty" json:"group,omitempty"`
+
+	// Repo owner/name
+	Repo    *string         `form:"repo,omitempty" json:"repo,omitempty"`
+	Variant *ReleaseVariant `form:"variant,omitempty" json:"variant,omitempty"`
+
+	// Since An RFC 3339 time or days such as 30d
+	Since *string      `form:"since,omitempty" json:"since,omitempty"`
+	Sort  *ReleaseSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListReposParams defines parameters for ListRepos.
 type ListReposParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
@@ -2380,6 +2499,9 @@ type ServerInterface interface {
 	// ListPulls Open pull requests across repositories, whose turn first, one page at a time
 	// (GET /pulls)
 	ListPulls(w http.ResponseWriter, r *http.Request, params ListPullsParams)
+	// ListReleases Recent releases across repositories, newest first, one page at a time
+	// (GET /releases)
+	ListReleases(w http.ResponseWriter, r *http.Request, params ListReleasesParams)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(w http.ResponseWriter, r *http.Request, params ListReposParams)
@@ -3022,6 +3144,117 @@ func (siw *ServerInterfaceWrapper) ListPulls(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ListReleases operation middleware
+func (siw *ServerInterfaceWrapper) ListReleases(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListReleasesParams
+
+	// ------------- Optional query parameter "group" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group", r.URL.Query(), &params.Group, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "repo" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "repo", r.URL.Query(), &params.Repo, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "repo"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "repo", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "variant" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "variant", r.URL.Query(), &params.Variant, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "variant"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "variant", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "since" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "since", r.URL.Query(), &params.Since, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "since"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "since", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReleases(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRepos operation middleware
 func (siw *ServerInterfaceWrapper) ListRepos(w http.ResponseWriter, r *http.Request) {
 
@@ -3604,6 +3837,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commits", wrapper.ListCommits)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pulls", wrapper.ListPulls)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues", wrapper.ListIssues)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/releases", wrapper.ListReleases)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/alumni", wrapper.ListAlumni)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prerequisites", wrapper.GetPrerequisites)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
@@ -4163,6 +4397,77 @@ type ListPulls404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ListPulls404ApplicationProblemPlusJSONResponse) VisitListPullsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReleasesRequestObject struct {
+	Params ListReleasesParams
+}
+
+type ListReleasesResponseObject interface {
+	VisitListReleasesResponse(w http.ResponseWriter) error
+}
+
+type ListReleases200ResponseHeaders struct {
+	ETag *string
+}
+
+type ListReleases200JSONResponse struct {
+	Body    ReleasePage
+	Headers ListReleases200ResponseHeaders
+}
+
+func (response ListReleases200JSONResponse) VisitListReleasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReleases304Response = NotModifiedResponse
+
+func (response ListReleases304Response) VisitListReleasesResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type ListReleases400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListReleases400ApplicationProblemPlusJSONResponse) VisitListReleasesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReleases404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListReleases404ApplicationProblemPlusJSONResponse) VisitListReleasesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4809,6 +5114,9 @@ type StrictServerInterface interface {
 	// ListPulls Open pull requests across repositories, whose turn first, one page at a time
 	// (GET /pulls)
 	ListPulls(ctx context.Context, request ListPullsRequestObject) (ListPullsResponseObject, error)
+	// ListReleases Recent releases across repositories, newest first, one page at a time
+	// (GET /releases)
+	ListReleases(ctx context.Context, request ListReleasesRequestObject) (ListReleasesResponseObject, error)
 	// ListRepos All repositories sorted by address, optionally of one group
 	// (GET /repos)
 	ListRepos(ctx context.Context, request ListReposRequestObject) (ListReposResponseObject, error)
@@ -5154,6 +5462,32 @@ func (sh *strictHandler) ListPulls(w http.ResponseWriter, r *http.Request, param
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListPullsResponseObject); ok {
 		if err := validResponse.VisitListPullsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReleases operation middleware
+func (sh *strictHandler) ListReleases(w http.ResponseWriter, r *http.Request, params ListReleasesParams) {
+	var request ListReleasesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReleases(ctx, request.(ListReleasesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReleases")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReleasesResponseObject); ok {
+		if err := validResponse.VisitListReleasesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

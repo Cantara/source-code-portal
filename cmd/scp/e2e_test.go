@@ -104,7 +104,8 @@ func TestServeForPlaywright(t *testing.T) {
 		"<dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId><version>2.0.17</version></dependency></dependencies></project>")
 	gh.SetFile(sso, "pom.xml", "<project><groupId>no.acme</groupId><artifactId>whydah-sso</artifactId><dependencies>"+
 		"<dependency><groupId>no.acme</groupId><artifactId>whydah-core</artifactId><version>1.0</version></dependency></dependencies></project>")
-	gh.SetRelease(core, "v1.2.0", "1.2.0", start)
+	gh.SetReleases(core, githubtest.Release{Tag: "v1.2.0", Name: "1.2.0", Body: "## Highlights\n\n- Single sign-on\n", Published: start, Author: "ann"},
+		githubtest.Release{Tag: "v1.3.0-rc1", Name: "1.3.0 candidate", Pre: true, Published: start.Add(time.Hour), Author: "ann"})
 	// Open pull requests (design/pulls.md): one waiting for a review on the SSO branch, one ready, one failing, a draft and
 	// Renovate's update.
 	gh.SetPulls(core,

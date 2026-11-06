@@ -76,7 +76,7 @@ type fetcher struct {
 func (f fetcher) Releases(context.Context, string, string) ([]Release, error) { return f.rels, f.err }
 
 func TestJob(t *testing.T) {
-	hostile := "Name ‮ with bidi\n"
+	hostile := "Name \u202e with bidi\n"
 	rels := []Release{
 		{Tag: "v1.0.0", Name: "One", URL: "https://github.com/acme/x/releases/v1.0.0", Published: day(1), Author: "ann"},
 		{Tag: "v1.1.0", Name: hostile, Summary: hostile, Published: day(3), Author: "dependabot[bot]"},
@@ -106,7 +106,7 @@ func TestJob(t *testing.T) {
 	if tags := fmt.Sprint(set.Releases[0].Tag, set.Releases[1].Tag, set.Releases[2].Tag); tags != "v1.2.0-rc1v1.1.0v1.0.0" {
 		t.Errorf("newest first: %s", tags)
 	}
-	if r := set.Releases[1]; strings.ContainsRune(r.Name+r.Summary, '‮') || !r.Bot || strings.Contains(r.Name, "\n") {
+	if r := set.Releases[1]; strings.ContainsRune(r.Name+r.Summary, '\u202e') || !r.Bot || strings.Contains(r.Name, "\n") {
 		t.Errorf("repository text is cleaned and a bot author told: %+v", r)
 	}
 	if latest, f := Latest(e); latest == nil || latest.Tag != "v1.1.0" || f.State != snapshot.StateOK {

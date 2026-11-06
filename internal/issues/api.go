@@ -70,9 +70,9 @@ func (a API) ListIssues(ctx context.Context, req oapi.ListIssuesRequestObject) (
 	}
 	if p.Sort != nil {
 		switch *p.Sort {
-		case oapi.Newest:
+		case oapi.QueueSortNewest:
 			kept = slices.SortedStableFunc(slices.Values(kept), compareNewest)
-		case oapi.Updated:
+		case oapi.QueueSortUpdated:
 			kept = slices.SortedStableFunc(slices.Values(kept), compareUpdated)
 		}
 	}
