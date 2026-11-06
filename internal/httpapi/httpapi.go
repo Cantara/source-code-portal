@@ -147,14 +147,18 @@ func (a MeAPI) GetMe(ctx context.Context, _ oapi.GetMeRequestObject) (oapi.GetMe
 	return oapi.GetMe200JSONResponse(out), nil
 }
 
-// JSONBody reads r's body into v when it is application/json, with no field v does not have; otherwise it has answered with a
-// problem (415 for another media type, 400 with badBody for a body that is not v) and says false. what is "the layout", "the
-// announcements": what the caller is sent.
-func JSONBody(w http.ResponseWriter, r *http.Request, v any, what, badBody string) bool {
+// RequireJSON says whether r's body is application/json; otherwise it has answered 415. what is "the layout", "the announcements":
+// what the caller is sent.
+func RequireJSON(w http.ResponseWriter, r *http.Request, what string) bool {
 	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
 		WriteProblem(w, http.StatusUnsupportedMediaType, "unsupported-media-type", "Send "+what+" as application/json.")
 		return false
 	}
+	return true
+}
+
+// DecodeStrict reads r's body into v, with no field v does not have; otherwise it has answered 400 with badBody.
+func DecodeStrict(w http.ResponseWriter, r *http.Request, v any, badBody string) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {

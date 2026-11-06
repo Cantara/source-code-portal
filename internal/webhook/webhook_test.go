@@ -202,7 +202,8 @@ func TestSharedDedupe(t *testing.T) {
 	}
 }
 
-// Bodies are held whole until their signature can be checked: past a few at once a delivery is told to come back.
+// Large bodies are held whole until their signature can be checked: past a few at once a large delivery is told to come back; a small
+// one is not held up by them.
 func TestBusyReceiverTurnsDeliveriesAway(t *testing.T) {
 	var results []string
 	rc := New([]byte("s"), nil, func(sync.Event, string, string) {}, slog.New(slog.DiscardHandler))
@@ -211,11 +212,20 @@ func TestBusyReceiverTurnsDeliveriesAway(t *testing.T) {
 		rc.reading <- struct{}{}
 	}
 	req := httptest.NewRequest(http.MethodPost, Pattern[len("POST "):], strings.NewReader("{}"))
+	req.ContentLength = smallBody + 1 // a large delivery: it waits for a slot
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Hub-Signature-256", "sha256="+strings.Repeat("0", 64))
 	rec := httptest.NewRecorder()
 	rc.ServeHTTP(rec, req)
 	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" || len(results) != 1 || results[0] != "busy" {
 		t.Errorf("%d, Retry-After %q, results %v", rec.Code, rec.Header().Get("Retry-After"), results)
+	}
+	small := httptest.NewRequest(http.MethodPost, Pattern[len("POST "):], strings.NewReader("{}"))
+	small.Header.Set("Content-Type", "application/json")
+	small.Header.Set("X-Hub-Signature-256", "sha256="+strings.Repeat("0", 64))
+	rec = httptest.NewRecorder()
+	rc.ServeHTTP(rec, small)
+	if rec.Code == http.StatusServiceUnavailable {
+		t.Errorf("a small delivery was turned away while large ones were being read")
 	}
 }

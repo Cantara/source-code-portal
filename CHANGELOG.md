@@ -14,7 +14,7 @@ Fixes from a review of the code; no configuration change.
 - An instance that cannot read the cluster's state map does not take the lead.
 - Text from repositories loses every invisible format character (the tag block spells invisible text); the sitemap, `robots.txt`
   and `opensearch.xml` are not cached by shared caches when `server.public_url` is not set; the webhook receiver reads at most four
-  bodies at once (`busy`, 503); an OIDC `email_verified` of the string `"false"` is not verified; a tool schema whose constraints
+  deliveries over 1 MiB at once (`busy`, 503); an OIDC `email_verified` of the string `"false"` is not verified; a tool schema whose constraints
   could not be enforced is refused.
 - The web UI: an agent's `open_page` cannot reach `/admin` or `/auth` by a percent-encoded path; an announcement being edited is
   found by its id, not its place; the assistant's answer is read out once whole and a broken stream frame is skipped; a screen's

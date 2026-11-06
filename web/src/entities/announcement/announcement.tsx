@@ -29,6 +29,7 @@ const fmt = (lang: string | undefined, o: Intl.DateTimeFormatOptions) => {
     } catch {
       f = new Intl.DateTimeFormat("en", { ...o, timeZone: "UTC" })
     }
+    if (formats.size >= 50) formats.clear() // the languages are what the admins typed: the cache is not theirs to grow
     formats.set(key, f)
   }
   return f

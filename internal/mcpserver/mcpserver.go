@@ -70,7 +70,6 @@ func guard(o Options, next http.Handler) http.Handler {
 	})
 }
 
-// sameOrigin reports whether origin is the portal's: its public URL's, else the request's own host.
 func handler(c *tools.Catalogue, name string) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		input := map[string]any{}

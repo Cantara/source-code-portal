@@ -157,7 +157,8 @@ func (a *Auth) Identify(w http.ResponseWriter, r *http.Request) (httpapi.Identit
 		id = t.identity()
 	}
 	if now.Sub(time.Unix(s.Issued, 0)) > a.o.SessionTTL/2 {
-		_ = a.start(w, s) // a failure keeps the current session until it ends
+		s.Began = cmp.Or(s.Began, s.Issued) // a session from before Began: the renewal keeps the time it was first issued
+		_ = a.start(w, s)                   // a failure keeps the current session until it ends
 	}
 	return id, true, nil
 }

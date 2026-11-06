@@ -59,6 +59,9 @@ func (h admin) get(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h admin) put(w http.ResponseWriter, r *http.Request) {
+	if !httpapi.RequireJSON(w, r, "the announcements") {
+		return
+	}
 	switch {
 	case !httpapi.SameOrigin(r, h.publicURL):
 		httpapi.WriteProblem(w, http.StatusForbidden, "cross-origin", "Change the announcements from the portal's own pages.")
@@ -68,7 +71,7 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body saveBody
-	if !httpapi.JSONBody(w, r, &body, "the announcements", "The body is not a list of announcements.") {
+	if !httpapi.DecodeStrict(w, r, &body, "The body is not a list of announcements.") {
 		return
 	}
 	b, err := h.n.check(body.Announcements)

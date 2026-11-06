@@ -137,8 +137,12 @@ func (s *Snapshot) index(before map[string]any, log *slog.Logger) {
 	for _, ix := range s.indexers {
 		v, err := buildIndex(ix, s)
 		if err != nil {
+			prev, ok := before[ix.name]
+			if !ok { // nothing to keep (the first build, a new index): no half-built snapshot is served; the build fails as a whole
+				panic(fmt.Sprintf("index %s: %v", ix.name, err))
+			}
 			log.Error("index not built; the last good one is kept", "index", ix.name, "err", err)
-			v = before[ix.name]
+			v = prev
 		}
 		s.indexes[ix.name] = v
 	}

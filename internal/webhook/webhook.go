@@ -31,7 +31,8 @@ const (
 	readTimeout = 8 * time.Second
 	dedupeTTL   = 15 * time.Minute
 	dedupeMax   = 10_000
-	bodies      = 4 // payloads read at once: a body is held whole before its signature can be checked
+	smallBody   = 1 << 20 // a delivery up to this size is read without waiting for a slot
+	bodies      = 4       // larger ones read at once: a body is held whole before its signature can be checked
 )
 
 var (
@@ -103,16 +104,18 @@ func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, http.StatusRequestEntityTooLarge, "too-large", "The payload is too large.")
 		return
 	}
-	// The signature covers the whole body, so it is held before it can be checked: only a few at once, or an unsigned flood of large
-	// bodies would be held in memory together. GitHub's own deliveries are few and can be redelivered.
-	select {
-	case rc.reading <- struct{}{}:
-		defer func() { <-rc.reading }()
-	default:
-		rc.observe("", "busy")
-		w.Header().Set("Retry-After", "5")
-		httpapi.WriteProblem(w, http.StatusServiceUnavailable, "busy", "Too many deliveries are being read; try again shortly.")
-		return
+	// The signature covers the whole body, so it is held before it can be checked. Usual deliveries are small; the rare large one (or
+	// one that does not say its size) takes one of a few slots, so an unsigned flood of large bodies is not held in memory together.
+	if r.ContentLength < 0 || r.ContentLength > smallBody {
+		select {
+		case rc.reading <- struct{}{}:
+			defer func() { <-rc.reading }()
+		default:
+			rc.observe("", "busy")
+			w.Header().Set("Retry-After", "5")
+			httpapi.WriteProblem(w, http.StatusServiceUnavailable, "busy", "Too many large deliveries are being read; try again shortly.")
+			return
+		}
 	}
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(readTimeout))
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, MaxBody))

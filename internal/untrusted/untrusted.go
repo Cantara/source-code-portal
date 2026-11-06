@@ -47,9 +47,16 @@ func Strip(s string) string {
 	}, s)
 }
 
-// invisible is what a reader cannot see but a model reads: control characters and every format character (Cf: bidirectional
-// controls, zero-width characters, the soft hyphen, the tag block U+E0000 that spells ASCII invisibly), and the variation selectors
-// supplement. The emoji variation selectors U+FE00 to U+FE0F stay.
+// invisible is what a reader cannot see but a model reads: control characters, the format characters (Cf: bidirectional controls,
+// zero-width characters, the soft hyphen, the tag block U+E0000 that spells ASCII invisibly) and the variation selectors supplement.
+// The format characters that are written (the Arabic and Syriac signs that precede a number or end a verse) and the emoji variation
+// selectors U+FE00 to U+FE0F stay.
 func invisible(r rune) bool {
-	return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r >= 0xe0100 && r <= 0xe01ef
+	return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) && !written(r) || r >= 0xe0100 && r <= 0xe01ef
+}
+
+// written is a format character that draws something: the Arabic number signs U+0600 to U+0605, the end of ayah U+06DD, the Syriac
+// abbreviation mark U+070F, the Arabic pound and piastre marks U+0890 and U+0891, U+08E2.
+func written(r rune) bool {
+	return r >= 0x600 && r <= 0x605 || r == 0x6dd || r == 0x70f || r == 0x890 || r == 0x891 || r == 0x8e2
 }

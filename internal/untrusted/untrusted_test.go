@@ -42,3 +42,11 @@ func TestInvisibleTextIsStripped(t *testing.T) {
 		t.Errorf("an emoji variation selector was stripped: %q", got)
 	}
 }
+
+// The format characters that are written (an Arabic number sign, the end of ayah) are text, not hidden text.
+func TestWrittenFormatCharactersStay(t *testing.T) {
+	arabic := string([]rune{0x0600, '1', '2', '3', ' ', 0x06dd}) // an Arabic number sign and the end of ayah
+	if got := Text(arabic, 100); got != arabic {
+		t.Errorf("Text(%q) = %q", arabic, got)
+	}
+}
