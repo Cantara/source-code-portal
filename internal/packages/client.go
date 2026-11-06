@@ -22,6 +22,7 @@ const (
 	requestLimit = 30 * time.Second // one request, its body read included
 	keepMax      = 1 << 20          // bytes of an answer kept for its validators; a larger one streams and is not kept
 	cacheMax     = 32 << 20         // bytes of answers kept in all
+	hostsMax     = 256              // registry hosts remembered before the idle ones are forgotten
 	pauseBase    = time.Minute      // after a 429 or 503 without Retry-After; doubles to pauseMax
 	pauseMax     = 15 * time.Minute
 )
@@ -211,10 +212,23 @@ func (c *Client) host(name string) *host {
 	defer c.mu.Unlock()
 	h := c.hosts[name]
 	if h == nil {
+		if len(c.hosts) >= hostsMax {
+			c.forgetIdle() // the names come from repositories' build files: they must not pile up
+		}
 		h = &host{slots: make(chan struct{}, perHost), wait: pauseBase}
 		c.hosts[name] = h
 	}
 	return h
+}
+
+// forgetIdle drops the hosts with no request in flight and no pause running; the caller holds the lock.
+func (c *Client) forgetIdle() {
+	now := c.now()
+	for name, h := range c.hosts {
+		if len(h.slots) == 0 && !now.Before(h.until) {
+			delete(c.hosts, name)
+		}
+	}
 }
 
 func (c *Client) paused(h *host) time.Time {

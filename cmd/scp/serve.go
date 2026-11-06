@@ -295,14 +295,19 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		routes = append(routes, a.Routes()...)
 	}
+	// The hooks that add to a repository's summary, in the order of its fields; the pull requests' only when the feature is on.
+	repoHooks := []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo}
+	if f.Pulls {
+		repoHooks = append(repoHooks, pulls.Repo)
+	}
+	repoHooks = append(repoHooks, repoIssuesAPI, repoHealthAPI)
 	catalogAPI := catalog.API{Current: view,
 		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
-		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo, repoIssuesAPI, repoHealthAPI},
+		Repo:      repoHooks,
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
 	if f.Pulls {
 		catalogAPI.Dashboard = append(catalogAPI.Dashboard, pulls.Dashboard)
-		catalogAPI.Repo = slices.Insert(catalogAPI.Repo, 4, pulls.Repo)
 	}
 	commitsAPI := commits.API{Current: view}
 	pullsAPI, issuesAPI := pulls.API{Current: view, Off: !f.Pulls}, issues.API{Current: view, Off: !f.Issues}

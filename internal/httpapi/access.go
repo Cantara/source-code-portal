@@ -155,17 +155,17 @@ func SameOrigin(r *http.Request, publicURL string) bool {
 	if origin == "" {
 		return false
 	}
-	return strings.EqualFold(strings.TrimSuffix(origin, "/"), PortalOrigin(r, publicURL))
+	return strings.EqualFold(strings.TrimSuffix(origin, "/"), PortalOrigin(r, publicURL, false))
 }
 
-// PortalOrigin is the origin the portal answers as: the public URL's, else the request's own (https when it came in over TLS). The
-// guards that compare a browser's Origin with it share this one.
-func PortalOrigin(r *http.Request, publicURL string) string {
+// PortalOrigin is the origin the portal answers as: the public URL's, else the request's own (https when it came in over TLS, or
+// forwardedHTTPS: a trusted proxy said so). Everything that tells or compares the portal's origin shares this one.
+func PortalOrigin(r *http.Request, publicURL string, forwardedHTTPS bool) string {
 	if u, err := url.Parse(publicURL); err == nil && u.Host != "" {
 		return u.Scheme + "://" + u.Host
 	}
 	scheme := "http"
-	if r.TLS != nil {
+	if r.TLS != nil || forwardedHTTPS {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host

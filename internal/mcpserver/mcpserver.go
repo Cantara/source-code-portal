@@ -54,7 +54,7 @@ func Routes(o Options) []httpapi.Route {
 // reach the endpoint nor ride a reader's session into it.
 func guard(o Options, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if origin := r.Header.Get("Origin"); origin != "" && !strings.EqualFold(strings.TrimSuffix(origin, "/"), httpapi.PortalOrigin(r, o.PublicURL)) {
+		if origin := r.Header.Get("Origin"); origin != "" && !strings.EqualFold(strings.TrimSuffix(origin, "/"), httpapi.PortalOrigin(r, o.PublicURL, false)) {
 			httpapi.WriteProblem(w, http.StatusForbidden, "forbidden", "The MCP endpoint is not for pages of other sites.")
 			return
 		}

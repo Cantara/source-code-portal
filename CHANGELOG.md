@@ -4,6 +4,19 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## Unreleased
+
+Fixes from a review of the code; no configuration change.
+
+- The dashboard and `/present` refresh their data at most once in 15 seconds (a run of snapshots was one refresh each) and no longer
+  prefetch every repository link.
+- GitHub's conditional-request cache is keyed by credential, not by an installation's hourly token, and is bounded by bytes.
+- An instance that cannot read the cluster's state map does not take the lead.
+- Text from repositories loses every invisible format character (the tag block spells invisible text); the sitemap, `robots.txt`
+  and `opensearch.xml` are not cached by shared caches when `server.public_url` is not set; the webhook receiver reads at most four
+  bodies at once (`busy`, 503); an OIDC `email_verified` of the string `"false"` is not verified; a tool schema whose constraints
+  could not be enforced is refused.
+
 ## 2.2.4
 
 The presentation page, open pull requests and issues, announcements and commit diff stats; the dashboard's side panel in sections.

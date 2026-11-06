@@ -201,3 +201,21 @@ func TestSharedDedupe(t *testing.T) {
 		t.Errorf("sink called %d times, want 2", calls)
 	}
 }
+
+// Bodies are held whole until their signature can be checked: past a few at once a delivery is told to come back.
+func TestBusyReceiverTurnsDeliveriesAway(t *testing.T) {
+	var results []string
+	rc := New([]byte("s"), nil, func(sync.Event, string, string) {}, slog.New(slog.DiscardHandler))
+	rc.Observe(func(_, result string) { results = append(results, result) })
+	for range cap(rc.reading) {
+		rc.reading <- struct{}{}
+	}
+	req := httptest.NewRequest(http.MethodPost, Pattern[len("POST "):], strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Hub-Signature-256", "sha256="+strings.Repeat("0", 64))
+	rec := httptest.NewRecorder()
+	rc.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" || len(results) != 1 || results[0] != "busy" {
+		t.Errorf("%d, Retry-After %q, results %v", rec.Code, rec.Header().Get("Retry-After"), results)
+	}
+}

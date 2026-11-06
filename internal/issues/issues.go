@@ -22,7 +22,6 @@ const (
 	ttl       = 15 * time.Minute // webhooks notify the job; an unchanged page is a free 304
 	settle    = time.Minute      // anyone may comment on a public repository's issue: a stream of comments costs one read a minute
 	maxTitle  = 200
-	maxLabel  = 50
 	maxName   = 100
 	maxPeople = 3
 )
@@ -32,10 +31,7 @@ const (
 var Events = []sync.Event{"issues"} //nolint:gochecknoglobals // a constant list
 
 // Label is an issue's label.
-type Label struct {
-	Name  string `json:"name"`
-	Color string `json:"color,omitempty"`
-}
+type Label = untrusted.Label
 
 // Issue is an open issue as the listing gives it, cleaned.
 type Issue struct {
@@ -181,9 +177,9 @@ func build(listed []Listed, exact bool) *Set {
 	for _, l := range listed {
 		i := Issue{Number: l.Number, Title: untrusted.Text(l.Title, maxTitle), URL: l.URL, Author: untrusted.Text(l.Author, maxName),
 			Bot: l.AuthorBot || actor.Bot(l.Author), Created: l.Created.UTC(), Updated: l.Updated.UTC(), Assigned: l.Assigned,
-			Comments: l.Comments, Milestone: untrusted.Text(l.Milestone, maxName), Type: untrusted.Text(l.Type, maxLabel)}
+			Comments: l.Comments, Milestone: untrusted.Text(l.Milestone, maxName), Type: untrusted.Text(l.Type, untrusted.MaxLabel)}
 		for _, lb := range l.Labels {
-			i.Labels = append(i.Labels, Label{Name: untrusted.Text(lb.Name, maxLabel), Color: hexColor(lb.Color)})
+			i.Labels = append(i.Labels, untrusted.NewLabel(lb.Name, lb.Color))
 		}
 		for _, a := range l.Assignees[:min(len(l.Assignees), maxPeople)] {
 			i.Assignees = append(i.Assignees, untrusted.Text(a, maxName))
@@ -191,19 +187,6 @@ func build(listed []Listed, exact bool) *Set {
 		s.Issues = append(s.Issues, i)
 	}
 	return s
-}
-
-// hexColor is a label colour as six hex digits, or empty.
-func hexColor(s string) string {
-	if len(s) != 6 {
-		return ""
-	}
-	for _, c := range strings.ToLower(s) {
-		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-			return ""
-		}
-	}
-	return strings.ToLower(s)
 }
 
 func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {

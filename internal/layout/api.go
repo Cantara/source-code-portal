@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"mime"
 	"net/http"
 	"slices"
 
@@ -142,18 +141,8 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
-		httpapi.WriteProblem(w, http.StatusUnsupportedMediaType, "unsupported-media-type", "Send the layout as application/json.")
-		return
-	}
-	if !h.writable(w, r) {
-		return
-	}
 	var body saveBody
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil {
-		httpapi.WriteProblem(w, http.StatusBadRequest, "validation-failed", "The body is not a layout.")
+	if !h.writable(w, r) || !httpapi.JSONBody(w, r, &body, "the layout", "The body is not a layout.") {
 		return
 	}
 	h.finish(w, page, func() error {

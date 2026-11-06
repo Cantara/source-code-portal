@@ -25,7 +25,6 @@ const (
 	eventGap  = time.Minute      // anyone may open a pull request or review one on a public repository: one read a minute at most
 	failAgain = 10 * time.Minute // a failed GraphQL query is asked again this soon
 	maxTitle  = 200
-	maxLabel  = 50
 )
 
 // pendingSteps are the waits before a pull request whose checks run or whose mergeability GitHub is still computing is asked again:
@@ -37,10 +36,7 @@ var pendingSteps = []time.Duration{5 * time.Minute, 10 * time.Minute, 20 * time.
 var Events = []sync.Event{sync.EventPush, "pull_request", "pull_request_review"} //nolint:gochecknoglobals // a constant list
 
 // Label is a pull request's label.
-type Label struct {
-	Name  string `json:"name"`
-	Color string `json:"color,omitempty"`
-}
+type Label = untrusted.Label
 
 // Stats is what a pull request changes.
 type Stats struct {
@@ -241,7 +237,7 @@ func merge(prev *Set, listed []Listed, now time.Time) (*Set, []int) {
 			Bot: l.AuthorBot || actor.Bot(l.Author) || actor.Branch(l.Head), Draft: l.Draft, Fork: l.Fork, Created: l.Created.UTC(), Updated: l.Updated.UTC(),
 			Base: untrusted.Text(l.Base, 100), Head: untrusted.Text(l.Head, 100), HeadSHA: l.HeadSHA, Requested: l.Requested}
 		for _, lb := range l.Labels {
-			p.Labels = append(p.Labels, Label{Name: untrusted.Text(lb.Name, maxLabel), Color: hexColor(lb.Color)})
+			p.Labels = append(p.Labels, untrusted.NewLabel(lb.Name, lb.Color))
 		}
 		o := old[p.Number]
 		if o != nil {
@@ -299,19 +295,6 @@ func settle(r *Set, asked []int, now time.Time) time.Duration {
 		r.PendingAt = now
 	}
 	return max(r.PendingAt.Add(pendingSteps[r.Pending]).Sub(now), time.Minute)
-}
-
-// hexColor is a label colour as six hex digits, or empty.
-func hexColor(s string) string {
-	if len(s) != 6 {
-		return ""
-	}
-	for _, c := range strings.ToLower(s) {
-		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-			return ""
-		}
-	}
-	return strings.ToLower(s)
 }
 
 func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
