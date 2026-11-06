@@ -442,7 +442,9 @@ stands: *needs triage* (no label, milestone or issue type: nobody has looked at 
 (enhancement, feature, improvement), a question (question, support) or other. People's come before automation's (Renovate's
 dependency dashboard is automation), those needing triage first, then the longest idle; the states are filters, and the kind, the
 product, the repository, whose and the order are a form that works without JavaScript. A group's and a repository's page have a panel
-with the ones that wait longest, and the group table's issue counts link to them. The dashboard keeps its signal, the *backlog*
+with the ones that wait longest, and the group table's issue counts link to them. The dashboard's side panel has them between the
+pull requests and the latest commits, each a third of it with its own scroll; a reader folds any of the three by its title, and the
+others take the space. The dashboard keeps its signal, the *backlog*
 finding. They need the App's *Issues* read permission (section 1); without it GitHub refuses the listing and `/issues` stays empty.
 `features.issues: false` switches them off (section 1).
 

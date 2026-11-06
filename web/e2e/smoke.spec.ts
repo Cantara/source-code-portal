@@ -150,29 +150,54 @@ test("a fleet tile and a legend level name their signals at once, on hover or a 
   await expect(tip).toContainText(/^Active.*Changed in the last 30 days$/)
 })
 
-test("the latest commits sit beside the products, fold away and widen, and the page remembers both", async ({
+test("the side panel holds the pull requests, the issues and the latest commits in thirds, folds a section or itself, and the page remembers both", async ({
   page,
   isMobile,
 }) => {
   await page.goto("/")
-  const panel = page.getByRole("complementary", { name: "Latest commits" })
-  await expect(panel.getByRole("heading", { name: /^Latest commits/ })).toBeVisible()
+  const panel = page.getByRole("complementary", { name: "Side panel" })
+  const titles = ["Pull requests", "Issues", "Latest commits"]
+  for (const t of titles) await expect(panel.getByRole("heading", { name: new RegExp(`^${t}`) })).toBeVisible()
+  const cards = titles.map((t) =>
+    panel.locator("section").filter({ has: page.getByRole("heading", { name: new RegExp(`^${t}`) }) }),
+  )
+  const heights = () => Promise.all(cards.map(async (c) => Math.round((await c.boundingBox())?.height ?? 0)))
+  const near = (a: number, b: number) => Math.abs(a - b) <= 2
   if (!isMobile) {
     const products = await page.getByRole("heading", { name: "Products" }).boundingBox()
     const side = await panel.boundingBox()
     expect(side?.x ?? 0).toBeGreaterThan((products?.x ?? 0) + 200) // to the right, not below
-    const edge = page.getByRole("separator", { name: "Resize latest commits" })
+    // Viewport-high, the three open sections in thirds.
+    const window = page.viewportSize()?.height ?? 0
+    expect(near(side?.height ?? 0, window - 96)).toBe(true)
+    const [a = 0, b = 0, c = 0] = await heights()
+    expect(near(a, b) && near(b, c)).toBe(true)
+    const edge = page.getByRole("separator", { name: "Resize the side panel" })
     await edge.focus()
     await page.keyboard.press("ArrowLeft")
     await expect(edge).toHaveAttribute("aria-valuenow", "27")
   }
-  await panel.getByRole("button", { name: "Hide latest commits" }).click()
+  // A section folds to its header; the open ones share its space, and the fold is kept.
+  const issues = panel.getByRole("button", { name: "Issues", exact: true })
+  await issues.click()
+  await expect(issues).toHaveAttribute("aria-expanded", "false")
+  await expect(panel.locator("#issues-body")).toHaveCount(0)
+  if (!isMobile) {
+    const [a = 0, b = 0, c = 0] = await heights()
+    expect(near(a, c) && b < a / 3).toBe(true)
+  }
+  await page.reload()
+  await expect(issues).toHaveAttribute("aria-expanded", "false")
+  await issues.click()
+  await expect(issues).toHaveAttribute("aria-expanded", "true")
+  // The whole panel folds to its rail and comes back as it was.
+  await panel.getByRole("button", { name: "Hide the side panel" }).click()
   await expect(panel.getByRole("heading")).toHaveCount(0)
   await page.reload()
-  await panel.getByRole("button", { name: "Show latest commits" }).click()
+  await panel.getByRole("button", { name: "Show the side panel" }).click()
   await expect(panel.getByRole("heading", { name: /^Latest commits/ })).toBeVisible()
   if (!isMobile)
-    await expect(page.getByRole("separator", { name: "Resize latest commits" })).toHaveAttribute("aria-valuenow", "27")
+    await expect(page.getByRole("separator", { name: "Resize the side panel" })).toHaveAttribute("aria-valuenow", "27")
 })
 
 test("the theme menu switches light and dark, and system follows the system preference as it changes", async ({ page }) => {

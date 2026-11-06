@@ -178,16 +178,31 @@ export const columnsValue = (c: Columns) =>
     .join(",")
 
 /** Side is the dashboard's side panel of the latest commits beside the products: open or folded to a rail, and its width (rem). */
-export type Side = { open: boolean; width: number }
+/** Side is the dashboard's side panel as the reader left it: open or folded to a rail, its width, and its folded sections. */
+export type Side = { open: boolean; width: number; folded: SectionKind[] }
 
 export const sideCookie = "scp-side-commits"
+/** sectionsCookie keeps the side panel's folded sections, comma-separated ("issues,pulls"). */
+export const sectionsCookie = "scp-side-sections"
+/** sectionKinds are the elements that are sections of the side panel, in their usual order. */
+export const sectionKinds = ["pulls", "issues", "latest-commits"] as const
+export type SectionKind = (typeof sectionKinds)[number]
 export const sideWidths = { min: 18, max: 40, initial: 26 } as const
 
-/** sideOf reads the panel's cookie ("open:26", "closed:30"); anything else is open at the initial width. */
-export function sideOf(v: unknown): Side {
+/**
+ * sideOf reads the panel's cookie ("open:26", "closed:30"; anything else is open at the initial width) and its sections' (the
+ * folded kinds; unknown ones are left out).
+ */
+export function sideOf(v: unknown, sections?: unknown): Side {
   const m = typeof v === "string" ? /^(open|closed):(\d{1,2})$/.exec(v) : null
   const width = m ? Math.min(Math.max(Number(m[2]), sideWidths.min), sideWidths.max) : sideWidths.initial
-  return { open: m?.[1] !== "closed", width }
+  const named = typeof sections === "string" ? sections.split(",") : []
+  return { open: m?.[1] !== "closed", width, folded: sectionKinds.filter((k) => named.includes(k)) }
+}
+
+/** sectionsValue is the sections' cookie value. */
+export function sectionsValue(folded: SectionKind[]): string {
+  return sectionKinds.filter((k) => folded.includes(k)).join(",")
 }
 
 /** sideValue is the panel's cookie value. */

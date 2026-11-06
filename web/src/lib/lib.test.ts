@@ -7,7 +7,7 @@ import { api, ProblemError, unwrap } from "./api/client"
 import { relative } from "./format"
 import { retryDelay } from "./query"
 import { apply, isDark, stored, themeKey, useTheme } from "./theme"
-import { sideOf, sideValue } from "./preferences"
+import { sectionsValue, sideOf, sideValue } from "./preferences"
 
 describe("unwrap", () => {
   it("returns the data of a success", async () => {
@@ -144,11 +144,17 @@ describe("docs", () => {
 
 describe("side panel preference", () => {
   it("reads open or closed and a width within bounds, anything else as open at the usual width", () => {
-    expect(sideOf("closed:30")).toEqual({ open: false, width: 30 })
-    expect(sideOf("open:99")).toEqual({ open: true, width: 40 })
-    expect(sideOf("open:5")).toEqual({ open: true, width: 18 })
-    expect(sideOf("wide")).toEqual({ open: true, width: 26 })
-    expect(sideOf(undefined)).toEqual({ open: true, width: 26 })
-    expect(sideValue({ open: false, width: 22 })).toBe("closed:22")
+    expect(sideOf("closed:30")).toEqual({ open: false, width: 30, folded: [] })
+    expect(sideOf("open:99")).toEqual({ open: true, width: 40, folded: [] })
+    expect(sideOf("open:5")).toEqual({ open: true, width: 18, folded: [] })
+    expect(sideOf("wide")).toEqual({ open: true, width: 26, folded: [] })
+    expect(sideOf(undefined)).toEqual({ open: true, width: 26, folded: [] })
+    expect(sideValue({ open: false, width: 22, folded: [] })).toBe("closed:22")
+  })
+
+  it("reads the folded sections, known kinds only, in their usual order", () => {
+    expect(sideOf("open:26", "latest-commits,nope,pulls").folded).toEqual(["pulls", "latest-commits"])
+    expect(sideOf("open:26", "").folded).toEqual([])
+    expect(sectionsValue(["issues", "pulls"])).toBe("pulls,issues")
   })
 })

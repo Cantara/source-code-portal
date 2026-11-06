@@ -2,13 +2,15 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { useEffect, useRef, useState, type ReactNode } from "react"
-import { Card, CardTitle } from "@/components/ui/card"
+import { useEffect, useRef, useState } from "react"
+import { Card } from "@/components/ui/card"
+import { cn } from "@/lib/cn"
 import { api, type Commit, type Schemas } from "@/lib/api/client"
 import { CommitList } from "@/entities/commit/commit-list"
 import { sameWork, type Work } from "@/lib/preferences"
 import { moreQuery, morePages } from "./api"
 import { ShowPicker, useShow } from "./show"
+import { sectionBody, sectionCard, SectionTitle, type Section } from "./side"
 
 /** dedupe keeps each commit once, the first time it comes: new commits move older ones to later pages while the reader scrolls. */
 export function dedupe(commits: Commit[]): Commit[] {
@@ -24,7 +26,7 @@ export function dedupe(commits: Commit[]): Commit[] {
 /**
  * LatestCommits are the newest commits of the kinds the reader shows them (ShowPicker: the work that counts until they choose).
  * Scrolled to its end, the list reads the next page of the same commits and goes on, up to morePages pages; past them "All commits"
- * has the rest. As the dashboard's side panel it carries the button that folds it.
+ * has the rest. As a section of the dashboard's side panel (section) its title folds it and its list scrolls inside it.
  */
 export function LatestCommits({
   counted,
@@ -32,7 +34,7 @@ export function LatestCommits({
   show,
   activity,
   count,
-  fold,
+  section,
 }: {
   /** the newest commits of the work that counts, as the dashboard read them */
   counted: Commit[]
@@ -41,34 +43,40 @@ export function LatestCommits({
   show?: Work
   activity: Schemas["Activity"]
   count: number
-  /** The side panel's button that folds it away, at the header's end. */
-  fold?: ReactNode
+  /** its section of the dashboard's side panel, if it is one */
+  section?: Section
 }) {
   const s = useShow(show, work)
   return (
-    <Card aria-labelledby="latest" className="flex flex-col gap-3">
+    <Card aria-labelledby="latest" className={cn("flex flex-col gap-3", sectionCard(section))}>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
-          <CardTitle id="latest" className="min-w-0 flex-1">
+          <SectionTitle id="latest" section={section}>
             Latest commits
-          </CardTitle>
-          {fold}
+          </SectionTitle>
+          {section?.fold}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <ShowPicker
-            shown={s.shown}
-            follows={s.follows}
-            activity={activity}
-            onChange={s.set}
-            align="start"
-            className="-ml-1.5"
-          />
-          <Link href="/commits" className="hover:text-primary hover:underline">
-            All commits
-          </Link>
-        </div>
+        {section?.open !== false && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <ShowPicker
+              shown={s.shown}
+              follows={s.follows}
+              activity={activity}
+              onChange={s.set}
+              align="start"
+              className="-ml-1.5"
+            />
+            <Link href="/commits" className="hover:text-primary hover:underline">
+              All commits
+            </Link>
+          </div>
+        )}
       </div>
-      <Feed key={s.shown.join(",")} counted={sameWork(s.shown, work) ? counted.slice(0, count) : undefined} shown={s.shown} />
+      {section?.open !== false && (
+        <div id="latest-body" className={cn("flex flex-col gap-3", sectionBody(section))}>
+          <Feed key={s.shown.join(",")} counted={sameWork(s.shown, work) ? counted.slice(0, count) : undefined} shown={s.shown} />
+        </div>
+      )}
     </Card>
   )
 }

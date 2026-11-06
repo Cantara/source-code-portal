@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query"
 import { get, unwrap, type Api } from "@/lib/api/client"
-import { keys, type PullFilter } from "@/lib/api/queries"
+import { keys, type IssueFilter, type PullFilter } from "@/lib/api/queries"
 import { has, type Work } from "@/lib/preferences"
 import type { Element } from "./layout"
 
@@ -66,3 +66,6 @@ export const byWork = (work: Work): PullFilter["by"] => (has(work, "automation")
 
 /** pullsFilter is what the pulls element reads: the first count of the work that counts, whose turn first. */
 export const pullsFilter = (work: Work, n: number, group?: string): PullFilter => ({ group, by: byWork(work), size: n })
+
+/** issuesFilter is what the issues element reads: the first n of the work that counts, what waits first. */
+export const issuesFilter = (work: Work, n: number, group?: string): IssueFilter => ({ group, by: byWork(work), size: n })

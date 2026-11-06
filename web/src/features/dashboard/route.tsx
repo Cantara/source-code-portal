@@ -11,6 +11,7 @@ import {
   productsView,
   profileCookie,
   profileNamed,
+  sectionsCookie,
   sideCookie,
   sideOf,
   viewCookie,
@@ -19,8 +20,8 @@ import {
   workOf,
 } from "@/lib/preferences"
 import { DashboardView } from "./view"
-import { pullsQuery } from "@/lib/api/queries"
-import { pullsFilter } from "./api"
+import { issuesQuery, pullsQuery } from "@/lib/api/queries"
+import { issuesFilter, pullsFilter } from "./api"
 import { PresentView } from "./present"
 import type { Search } from "@/lib/page"
 import { ld } from "@/lib/seo"
@@ -33,6 +34,7 @@ export const dashboardRoute: Route<object> = {
       load(qc, dashboardQuery(api, work)),
       prefetch(qc, pageQuery(api)),
       prefetch(qc, pullsQuery(api, pullsFilter(work, 5))),
+      prefetch(qc, issuesQuery(api, issuesFilter(work, 5))),
     ])
   },
   metadata: () => ({ title: { absolute: "Dashboard · Source Code Portal" }, alternates: { canonical: "/" } }),
@@ -43,7 +45,7 @@ export const dashboardRoute: Route<object> = {
       <DashboardView
         work={workOf(ctx.cookies[workCookie])}
         view={view ? productsView(view, "cards") : undefined}
-        side={sideOf(ctx.cookies[sideCookie])}
+        side={sideOf(ctx.cookies[sideCookie], ctx.cookies[sectionsCookie])}
         show={commitsOf(ctx.cookies[commitsCookie])}
         dismissed={dismissedOf(ctx.cookies[dismissedCookie])}
       />

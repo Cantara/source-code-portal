@@ -54,8 +54,12 @@ func needs(f config.Features) []prereq.Need {
 
 // offElements is the layout elements of the features switched off.
 func offElements(f config.Features) []oapi.LayoutElementKind {
+	var off []oapi.LayoutElementKind
 	if !f.Pulls {
-		return []oapi.LayoutElementKind{oapi.LayoutElementKindPulls}
+		off = append(off, oapi.LayoutElementKindPulls)
 	}
-	return nil
+	if !f.Issues {
+		off = append(off, oapi.LayoutElementKindIssues)
+	}
+	return off
 }

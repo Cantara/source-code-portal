@@ -701,10 +701,11 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
             </Figure>
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
               <p>
-                The latest commits sit in a panel beside the products: fold it away with its button, or drag its edge to make it
-                wider. Scroll to its end and older commits load. Its label says what it shows, the work that counts until you
-                choose: select it for a small dialog with the three kinds as checkboxes, each with its commits in the last {days}.
-                Commits made with AI carry a mark naming the assistant.
+                Beside the products, a side panel holds the pull requests, the issues and the latest commits, a third each. Each
+                scrolls on its own; its title folds it, and the others take its space. The panel&apos;s button folds it all away,
+                and its edge drags it wider. Scroll to the end of the latest commits and older ones load. Its label says what it
+                shows, the work that counts until you choose: select it for a small dialog with the three kinds as checkboxes,
+                each with its commits in the last {days}. Commits made with AI carry a mark naming the assistant.
               </p>
               <p>
                 <strong className="text-foreground">Commits</strong> in the header holds every commit of every repository, to
@@ -834,7 +835,7 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
             items={[
               ["The work that counts", "By hand, with AI, by automation: any of them (section 6)."],
               ["Cards or a table", "The products' view, switched above them."],
-              ["The side panel", "The latest commits folded away or as wide as you dragged them."],
+              ["The side panel", "Its sections folded or open, the whole panel folded away, and as wide as you dragged it."],
               ["What the latest commits show", "Any of the three kinds, apart from the work that counts."],
               ["Page sizes", "How many commits a list shows at a time."],
               ["Theme", "System, dark or light, from the header's theme menu."],

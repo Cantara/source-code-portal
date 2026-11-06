@@ -1,5 +1,5 @@
 # Landing page and layouts
-Status: as built (L1 to L4). Binding order: ../plan.md > this note.
+Status: as built (L1 to L5). Binding order: ../plan.md > this note.
 
 ## Terms
 The words the owner's instructions and these notes use for the pages built from layouts (owner, 2026-11-06). Internal: `docs/` keeps
@@ -8,16 +8,18 @@ the readers' words. A new part of a page gets its term here first.
 | Term | What it is | In code |
 |---|---|---|
 | **Layout** | A page's ordered list of elements: the built-in one, or the one an admin stored | `/api/v1/pages/{page}`, `<layout.dir>/<page>.json` |
-| **Element** | One block of a page, of a kind: `announcements`, `telemetry`, `fleet-map`, `products`, `pulls`, `latest-commits`, `heading` | `LayoutElement`; `Elements` in `features/dashboard/elements.tsx` |
+| **Element** | One block of a page, of a kind: `announcements`, `telemetry`, `fleet-map`, `products`, `pulls`, `issues`, `latest-commits`, `heading` | `LayoutElement`; `Elements` in `features/dashboard/elements.tsx` |
 | **Design mode** | Where an admin adds, moves, changes and removes elements and saves the layout | `features/dashboard/design.tsx` |
 | **Main column** | At the left on a wide screen: the `products` element. It grows with its content; the **page scrolls** | `main` of `SidePanel` |
 | **Product card** | One product (a group) in the products' **cards** view; the other view is the **products table** | `ProductCard` in `products.tsx` |
-| **Side panel** | At the right on a wide screen: the elements right after `products` (the pull requests, the latest commits), in order | `SidePanel` in `side.tsx` |
+| **Side panel** | At the right on a wide screen: the elements right after `products` (the pull requests, the issues, the latest commits), in order, each a section | `SidePanel` in `side.tsx` |
+| **Section** | One element in the side panel: its header (title, count, its fold) stays at its top, its list has an inner scroll; the open sections share the panel's height equally (three open: thirds) | `Section` in `side.tsx` |
+| **Fold a section** | A section's title folds it to its header and opens it again; the open ones take its space. Each section's fold is kept | cookie `scp-side-sections` |
 | **Sticky** | The side panel stays in place while the page scrolls under it | `lg:sticky lg:top-20` |
-| **Viewport-high** | The side panel is never taller than the window below the header, however long the main column is | `lg:max-h-[calc(100dvh-6rem)]` |
+| **Viewport-high** | The side panel is as tall as the window below the header, however long the main column is | `lg:max-h-[calc(100dvh-6rem)]` |
 | **Inner scroll** | A part that scrolls on its own, apart from the page: the side panel when its content is taller than it | `lg:overflow-y-auto` |
 | **Loads more at the end** | A list that reads its next page when its end comes into view (the latest commits) | `latest.tsx` |
-| **Fold**, **rail** | The side panel's button folds it to a thin rail and opens it again | cookie `scp-side-commits` |
+| **Fold**, **rail** | The side panel's button folds the whole panel to a thin rail and opens it again | cookie `scp-side-commits` |
 | **Resize edge** | The side panel's left edge, dragged (or moved with the arrow keys) to set its width, 18 to 40 rem | cookie `scp-side-commits` |
 | **Stacked** | Below `lg`: no side panel, every element in one column in layout order | — |
 | **Telemetry tiles** | The fleet's numbers in a row at the top of the dashboard, each with its hint | `telemetry.tsx` |
@@ -86,7 +88,9 @@ The landing page is a list of elements, each a component of `web/src/features/da
 |---|---|---|
 | `fleet-map` | every counted repository as one tile, grouped by product, coloured by its activity level (people only); tooltips and a text summary | groups |
 | `products` | the products as cards or as a table, the reader's switch kept in the cookie `scp-view-products` (as the page size is, P-26). A card has the same five rows on every product: name and level (the score small while good, the level chip when not), people's work (30-day counts and the 12-week sparkline) against automation's, who and the last change by a person, the 3 repositories people changed last, and the 3 costliest findings with what the members share said once. The table has a row per product, sortable by any column | groups, view |
-| `latest-commits` | the newest commits of the work that counts, or of the kinds the reader shows them (its label is a button, `ShowPicker` in `show.tsx`: a dialog of the three kinds as checkboxes, each in its colour with its count in the rules' window and what it covers, one at least; kept in the cookie `scp-latest-work`, read by the server; "Same as the work that counts" forgets it; the presentation page's column has the same). Its end in view reads the next pages of the same lens (`/commits?work=&page=`, 50 each, a commit once however new ones moved the pages; at most 10 pages, then "Every commit, with filters" links `/commits`; without `IntersectionObserver` the list stays and links the same). Right after `products` it is their side panel on a wide screen: sticky at the right, folded to a rail by its button and resized by dragging its edge (or the arrow keys), both kept in the cookie `scp-side-commits` (`open:26`, 18 to 40 rem) so the server renders them; below `lg` it follows the products | count |
+| `latest-commits` | the newest commits of the work that counts, or of the kinds the reader shows them (its label is a button, `ShowPicker` in `show.tsx`: a dialog of the three kinds as checkboxes, each in its colour with its count in the rules' window and what it covers, one at least; kept in the cookie `scp-latest-work`, read by the server; "Same as the work that counts" forgets it; the presentation page's column has the same). Its end in view reads the next pages of the same lens (`/commits?work=&page=`, 50 each, a commit once however new ones moved the pages; at most 10 pages, then "Every commit, with filters" links `/commits`; without `IntersectionObserver` the list stays and links the same). Right after `products` it is a section of their side panel (below) | count |
+| `pulls` | the open pull requests whose turn it is first (`pulls.md`) | count |
+| `issues` | the open issues that wait first, of the work that counts (people's, and automation's when it counts): where each stands and its kind, a line of how many need triage and how many nobody took, "All N open" to `/issues`; nothing when the feature is off (`features.md`) | count |
 | `telemetry` | the fleet tiles (repositories, products, people this month, findings, freshness) | tiles |
 | `heading` | a plain-text heading and line of text, no HTML | text |
 | `announcements` | the announcements the page layout's answer carries for this viewer and page (`announcements.md`), dismissible on the dashboard (the cookie `scp-announcements`), with QR codes on `/present`; nothing when there are none. In the built-in layouts the first row below the top bar: first on the dashboard, after the strip on `/present` | none |
@@ -95,6 +99,18 @@ The landing page is a list of elements, each a component of `web/src/features/da
 names a repository. The default landing page is a `telemetry` row, the `fleet-map` band, `products` as cards, then `latest-commits`.
 Per-repository rows leave the landing page for the group page. The telemetry tiles (P-61, the same signals as the presentation page's strip): people (commits by hand), AI (with an AI or by an
 agent), automation (and sweeps), active repositories (and those in no group), findings (of how many products), in sync.
+
+## The side panel (L5)
+The elements right after `products` of the kinds `pulls`, `issues` and `latest-commits` are their side panel on a wide screen (the
+dashboard only; `/present` keeps its commit column and stacks `pulls` and `issues` at the left). The built-in dashboard has all three,
+in that order. The panel is sticky at the right and viewport-high (`100dvh` less the header), folded to a rail by its button (in the
+first section's header) and resized by its edge (or the arrow keys), both kept in `scp-side-commits` (`open:26`, 18 to 40 rem).
+Each element is a section: its header (the title, the count that links its page, the panel's button in the first) stays at the
+section's top, its list scrolls inside it, and the latest commits load more at the end of theirs. The open sections share the height
+equally: three open, thirds; one folded, halves. A section's title is a button (`aria-expanded`) that folds it to its header; the
+folded kinds are kept in the cookie `scp-side-sections` (`issues,pulls`), read by the server so the first paint is right. Below `lg`
+the sections follow the products at their own height, each still folding. A switched-off feature's element is not there, and the
+others share the panel.
 
 ## Layouts (L2)
 A layout is a page's elements and their options, as data; the file is the API's element list (`LayoutElement` in the contract, one

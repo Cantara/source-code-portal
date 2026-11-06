@@ -162,7 +162,7 @@ export function Designer({
   const [edited, setDraft] = useState<Element[] | null>(null)
   const [adding, setAdding] = useState<Kind>("heading")
   const features = useFeatures()
-  const offered = kinds.filter((k) => k.kind !== "pulls" || features.pulls)
+  const offered = kinds.filter((k) => (k.kind !== "pulls" || features.pulls) && (k.kind !== "issues" || features.issues))
   const [dragging, setDragging] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const addId = useId()

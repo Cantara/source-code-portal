@@ -45,6 +45,7 @@ import { defaultPresent, pick, type Element } from "./layout"
 import { TelemetryStrip } from "./telemetry"
 import { ProductTiles } from "./tiles"
 import { Pulls } from "./pulls"
+import { Issues } from "./issues"
 
 /** stale and offline are how long since the data was last known current before the page says so (design/present.md). */
 const stale = 2 * 60_000
@@ -335,6 +336,9 @@ function Screen({
         if (features.pulls) {
           left.push(<Pulls key={i} work={data.work} group={one?.id} counts={one?.pulls ?? data.pulls} n={el.count ?? 8} wall />)
         }
+        break
+      case "issues":
+        if (features.issues) left.push(<Issues key={i} work={data.work} group={one?.id} n={el.count ?? 8} wall />)
         break
       case "heading":
         left.push(
