@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strconv"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/cantara/source-code-portal/internal/untrusted"
 )
