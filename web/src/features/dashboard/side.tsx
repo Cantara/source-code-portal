@@ -2,7 +2,7 @@
 
 import { Fragment, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
 import { CardTitle } from "@/components/ui/card"
-import { ChevronDownIcon, PanelRightIcon } from "@/components/ui/icons"
+import { PanelRightIcon } from "@/components/ui/icons"
 import { cn } from "@/lib/cn"
 import {
   remember,
@@ -43,14 +43,21 @@ const widths: Record<number, string> = {
   40: "lg:w-[40rem]",
 }
 
+/** sectionLabels are the sections' names, as their buttons say them. */
+const sectionLabels: Record<SectionKind, string> = {
+  "latest-commits": "Latest commits",
+  pulls: "Pull requests",
+  issues: "Issues",
+}
+
 const clamp = (w: number) => Math.min(Math.max(Math.round(w), sideWidths.min), sideWidths.max)
 
 /** Section is what a side panel's element gets (design/layout.md, L5): open or folded, the way to fold it, and the panel's button. */
 export interface Section {
   open: boolean
   toggle: () => void
-  /** the button that folds the whole panel to a rail, in the first section's header */
-  fold?: ReactNode
+  /** the section's name, as its button says it ("Hide issues") */
+  label: string
 }
 
 /** sectionCard is a section's card: open, its share of the panel's height on a wide screen; folded, its header alone. */
@@ -61,37 +68,44 @@ export const sectionCard = (s: Section | undefined) =>
 export const sectionBody = (s: Section | undefined) =>
   s ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:-mr-2 lg:pr-2" : undefined
 
-/** SectionTitle is an element's title: in the side panel a button that folds its section and opens it again. */
-export function SectionTitle({ id, section, children }: { id: string; section?: Section; children: ReactNode }) {
-  if (!section) {
-    return (
-      <CardTitle id={id} className="min-w-0 flex-1">
-        {children}
-      </CardTitle>
-    )
-  }
+/** SectionTitle is an element's title. */
+export function SectionTitle({ id, children }: { id: string; children: ReactNode }) {
   return (
     <CardTitle id={id} className="min-w-0 flex-1">
-      <button
-        type="button"
-        aria-expanded={section.open}
-        aria-controls={`${id}-body`}
-        onClick={section.toggle}
-        className="-ml-1 flex items-center gap-1.5 rounded-md px-1 text-left transition-colors hover:text-primary"
-      >
-        <ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", !section.open && "-rotate-90")} />
-        {children}
-      </button>
+      {children}
     </CardTitle>
   )
 }
 
 /**
- * SidePanel puts the sections (the pull requests, the issues, the latest commits) at the right of main (the products) on a wide
+ * SectionFold is a section's button at its header's end: it hides the section (folds it to its header, the open ones take its
+ * space) and shows it again. Hiding the last open one folds the whole panel to its rail.
+ */
+export function SectionFold({ id, section }: { id: string; section?: Section }) {
+  if (!section) return null
+  const say = `${section.open ? "Hide" : "Show"} ${section.label.toLowerCase()}`
+  return (
+    <button
+      type="button"
+      onClick={section.toggle}
+      aria-expanded={section.open}
+      aria-controls={section.open ? `${id}-body` : undefined}
+      aria-label={say}
+      title={say}
+      className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      <PanelRightIcon open={section.open} className="size-4" />
+    </button>
+  )
+}
+
+/**
+ * SidePanel puts the sections (the latest commits, the pull requests, the issues) at the right of main (the products) on a wide
  * screen: sticky while the products scroll and as tall as the window below the header, the open sections sharing its height
- * equally, each with its inner scroll. A section's title folds it (kept in `scp-side-sections`); the panel's button folds the whole
- * panel to a rail, and its edge is dragged (or moved with the arrow keys) to its width, both kept in `scp-side-commits`. On a narrow
- * screen the sections follow main at their own height and still fold.
+ * equally, each with its inner scroll. Each section's button hides it and shows it again (kept in `scp-side-sections`); hiding the
+ * last open one folds the panel to a rail, whose button shows them all again. Its edge is dragged (or moved with the arrow keys) to
+ * its width; the rail and the width are kept in `scp-side-commits`. On a narrow screen the sections follow main at their own height
+ * and still hide.
  */
 export function SidePanel({
   main,
@@ -109,12 +123,14 @@ export function SidePanel({
     setSide(s)
     remember(sideCookie, sideValue(s))
   }
-  const toggle = (kind: SectionKind) =>
-    setSide((s) => {
-      const folded = s.folded.includes(kind) ? s.folded.filter((k) => k !== kind) : [...s.folded, kind]
-      remember(sectionsCookie, sectionsValue(folded))
-      return { ...s, folded }
-    })
+  const toggle = (kind: SectionKind) => {
+    const folded = side.folded.includes(kind) ? side.folded.filter((k) => k !== kind) : [...side.folded, kind]
+    // The last open one hidden: the whole panel folds to its rail, and comes back with every section open.
+    const all = sections.every((x) => folded.includes(x.kind))
+    const next = all ? { ...side, open: false, folded: [] } : { ...side, folded }
+    remember(sectionsCookie, sectionsValue(next.folded))
+    save(next)
+  }
   const resizeTo = (width: number) => setSide((s) => ({ ...s, width: clamp(width) }))
 
   const drag = (e: PointerEvent<HTMLDivElement>) => {
@@ -130,18 +146,6 @@ export function SidePanel({
     save({ ...side, width: clamp(to) })
   }
 
-  const fold = (
-    <button
-      type="button"
-      onClick={() => save({ ...side, open: false })}
-      aria-expanded={true}
-      aria-label="Hide the side panel"
-      title="Hide the side panel"
-      className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-    >
-      <PanelRightIcon open className="size-4" />
-    </button>
-  )
   const anyOpen = sections.some((x) => !side.folded.includes(x.kind))
 
   return (
@@ -178,13 +182,9 @@ export function SidePanel({
               widths[side.width],
             )}
           >
-            {sections.map((x, j) => (
+            {sections.map((x) => (
               <Fragment key={x.kind}>
-                {x.render({
-                  open: !side.folded.includes(x.kind),
-                  toggle: () => toggle(x.kind),
-                  fold: j === 0 ? fold : undefined,
-                })}
+                {x.render({ open: !side.folded.includes(x.kind), toggle: () => toggle(x.kind), label: sectionLabels[x.kind] })}
               </Fragment>
             ))}
           </aside>

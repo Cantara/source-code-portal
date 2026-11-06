@@ -10,7 +10,7 @@ import { count } from "@/lib/format"
 import type { Work } from "@/lib/preferences"
 import { byWork, pullsFilter } from "./api"
 import { PullList } from "@/entities/pull/pull"
-import { sectionBody, sectionCard, SectionTitle, type Section } from "./side"
+import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
 /**
  * Pulls is the pulls element (design/pulls.md): the open pull requests of the work that counts whose turn it is first, the ones
@@ -45,13 +45,11 @@ export function Pulls({
   return (
     <Card aria-labelledby="pulls" className={cn("flex flex-col gap-2", wall && "min-h-0 overflow-hidden", sectionCard(section))}>
       <div className="flex items-center gap-2">
-        <SectionTitle id="pulls" section={section}>
-          Pull requests
-        </SectionTitle>
+        <SectionTitle id="pulls">Pull requests</SectionTitle>
         <Link href={all} className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline">
           All {count(counts.open)} open
         </Link>
-        {section?.fold}
+        <SectionFold id="pulls" section={section} />
       </div>
       {section?.open !== false && (
         <p className="text-sm text-muted-foreground">

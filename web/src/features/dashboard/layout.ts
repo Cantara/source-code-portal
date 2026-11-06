@@ -70,9 +70,9 @@ export const defaultLayout: Element[] = [
   { kind: "telemetry" },
   { kind: "fleet-map" },
   { kind: "products", view: "cards" },
+  { kind: "latest-commits", count: 10 },
   { kind: "pulls", count: 5 },
   { kind: "issues", count: 5 },
-  { kind: "latest-commits", count: 10 },
 ]
 
 /** defaultPresent is the presentation page before its layout is read (design/present.md): the API's built-in one. */

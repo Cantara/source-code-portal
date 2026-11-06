@@ -153,7 +153,7 @@ describe("side panel preference", () => {
   })
 
   it("reads the folded sections, known kinds only, in their usual order", () => {
-    expect(sideOf("open:26", "latest-commits,nope,pulls").folded).toEqual(["pulls", "latest-commits"])
+    expect(sideOf("open:26", "issues,nope,latest-commits").folded).toEqual(["latest-commits", "issues"])
     expect(sideOf("open:26", "").folded).toEqual([])
     expect(sectionsValue(["issues", "pulls"])).toBe("pulls,issues")
   })

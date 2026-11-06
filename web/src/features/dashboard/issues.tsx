@@ -10,7 +10,7 @@ import { count } from "@/lib/format"
 import type { Work } from "@/lib/preferences"
 import { IssueList } from "@/entities/issue/issue"
 import { byWork, issuesFilter } from "./api"
-import { sectionBody, sectionCard, SectionTitle, type Section } from "./side"
+import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
 /**
  * Issues is the issues element (design/layout.md): the open issues of the work that counts that wait first, each where it stands
@@ -42,13 +42,11 @@ export function Issues({
   return (
     <Card aria-labelledby="issues" className={cn("flex flex-col gap-2", wall && "min-h-0 overflow-hidden", sectionCard(section))}>
       <div className="flex items-center gap-2">
-        <SectionTitle id="issues" section={section}>
-          Issues
-        </SectionTitle>
+        <SectionTitle id="issues">Issues</SectionTitle>
         <Link href={all} className="text-sm whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline">
           {counts ? `All ${count(counts.open)} open` : "All open"}
         </Link>
-        {section?.fold}
+        <SectionFold id="issues" section={section} />
       </div>
       {section?.open !== false && (
         <p className="text-sm text-muted-foreground">

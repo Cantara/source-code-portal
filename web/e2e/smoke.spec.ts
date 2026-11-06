@@ -150,14 +150,16 @@ test("a fleet tile and a legend level name their signals at once, on hover or a 
   await expect(tip).toContainText(/^Active.*Changed in the last 30 days$/)
 })
 
-test("the side panel holds the pull requests, the issues and the latest commits in thirds, folds a section or itself, and the page remembers both", async ({
+test("the side panel holds the latest commits, the pull requests and the issues in thirds, hides each by its button, folds when all are hidden, and the page remembers it", async ({
   page,
   isMobile,
 }) => {
   await page.goto("/")
   const panel = page.getByRole("complementary", { name: "Side panel" })
-  const titles = ["Pull requests", "Issues", "Latest commits"]
-  for (const t of titles) await expect(panel.getByRole("heading", { name: new RegExp(`^${t}`) })).toBeVisible()
+  const titles = ["Latest commits", "Pull requests", "Issues"]
+  // In this order, each with its hide button.
+  await expect(panel.getByRole("heading", { level: 2 })).toHaveText(titles.map((t) => new RegExp(`^${t}`)))
+  for (const t of titles) await expect(panel.getByRole("button", { name: `Hide ${t.toLowerCase()}` })).toBeVisible()
   const cards = titles.map((t) =>
     panel.locator("section").filter({ has: page.getByRole("heading", { name: new RegExp(`^${t}`) }) }),
   )
@@ -177,25 +179,24 @@ test("the side panel holds the pull requests, the issues and the latest commits 
     await page.keyboard.press("ArrowLeft")
     await expect(edge).toHaveAttribute("aria-valuenow", "27")
   }
-  // A section folds to its header; the open ones share its space, and the fold is kept.
-  const issues = panel.getByRole("button", { name: "Issues", exact: true })
-  await issues.click()
-  await expect(issues).toHaveAttribute("aria-expanded", "false")
-  await expect(panel.locator("#issues-body")).toHaveCount(0)
+  // A section hides to its header; the open ones share its space, and it is kept.
+  await panel.getByRole("button", { name: "Hide pull requests" }).click()
+  const show = panel.getByRole("button", { name: "Show pull requests" })
+  await expect(show).toHaveAttribute("aria-expanded", "false")
+  await expect(panel.locator("#pulls-body")).toHaveCount(0)
   if (!isMobile) {
     const [a = 0, b = 0, c = 0] = await heights()
     expect(near(a, c) && b < a / 3).toBe(true)
   }
   await page.reload()
-  await expect(issues).toHaveAttribute("aria-expanded", "false")
-  await issues.click()
-  await expect(issues).toHaveAttribute("aria-expanded", "true")
-  // The whole panel folds to its rail and comes back as it was.
-  await panel.getByRole("button", { name: "Hide the side panel" }).click()
+  await expect(show).toHaveAttribute("aria-expanded", "false")
+  // Hiding the other two folds the whole panel to its rail, which brings every section back.
+  await panel.getByRole("button", { name: "Hide latest commits" }).click()
+  await panel.getByRole("button", { name: "Hide issues" }).click()
   await expect(panel.getByRole("heading")).toHaveCount(0)
   await page.reload()
   await panel.getByRole("button", { name: "Show the side panel" }).click()
-  await expect(panel.getByRole("heading", { name: /^Latest commits/ })).toBeVisible()
+  for (const t of titles) await expect(panel.getByRole("button", { name: `Hide ${t.toLowerCase()}` })).toBeVisible()
   if (!isMobile)
     await expect(page.getByRole("separator", { name: "Resize the side panel" })).toHaveAttribute("aria-valuenow", "27")
 })

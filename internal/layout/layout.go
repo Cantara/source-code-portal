@@ -39,7 +39,7 @@ type Layout struct {
 	Elements []oapi.LayoutElement `json:"elements"`
 }
 
-// Default is the built-in layout of page: the announcements first, below the header, then the fleet's numbers and map, then the products with their side panel: the pull requests whose turn it is, the issues that wait and people's commits. The presentation page
+// Default is the built-in layout of page: the announcements first, below the header, then the fleet's numbers and map, then the products with their side panel: people's commits, the pull requests whose turn it is and the issues that wait. The presentation page
 // (design/present.md) shows the same compact: the fleet by health and the products as tiles.
 func Default(page string) Layout {
 	switch page {
@@ -61,9 +61,9 @@ func Default(page string) Layout {
 		{Kind: oapi.LayoutElementKindTelemetry},
 		{Kind: oapi.LayoutElementKindFleetMap},
 		{Kind: oapi.LayoutElementKindProducts, View: new(oapi.Cards)},
+		{Kind: oapi.LayoutElementKindLatestCommits, Count: new(10)},
 		{Kind: oapi.LayoutElementKindPulls, Count: new(5)},
 		{Kind: oapi.LayoutElementKindIssues, Count: new(5)},
-		{Kind: oapi.LayoutElementKindLatestCommits, Count: new(10)},
 	}}
 }
 

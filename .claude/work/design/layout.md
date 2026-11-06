@@ -12,14 +12,14 @@ the readers' words. A new part of a page gets its term here first.
 | **Design mode** | Where an admin adds, moves, changes and removes elements and saves the layout | `features/dashboard/design.tsx` |
 | **Main column** | At the left on a wide screen: the `products` element. It grows with its content; the **page scrolls** | `main` of `SidePanel` |
 | **Product card** | One product (a group) in the products' **cards** view; the other view is the **products table** | `ProductCard` in `products.tsx` |
-| **Side panel** | At the right on a wide screen: the elements right after `products` (the pull requests, the issues, the latest commits), in order, each a section | `SidePanel` in `side.tsx` |
-| **Section** | One element in the side panel: its header (title, count, its fold) stays at its top, its list has an inner scroll; the open sections share the panel's height equally (three open: thirds) | `Section` in `side.tsx` |
-| **Fold a section** | A section's title folds it to its header and opens it again; the open ones take its space. Each section's fold is kept | cookie `scp-side-sections` |
+| **Side panel** | At the right on a wide screen: the elements right after `products` (the latest commits, the pull requests, the issues), in order, each a section | `SidePanel` in `side.tsx` |
+| **Section** | One element in the side panel: its header (title, count, its hide button) stays at its top, its list has an inner scroll; the open sections share the panel's height equally (three open: thirds) | `Section` in `side.tsx` |
+| **Hide a section** | A section's button (the panel icon at its header's end) folds it to its header and shows it again; the open ones take its space. Each section's state is kept | cookie `scp-side-sections` |
 | **Sticky** | The side panel stays in place while the page scrolls under it | `lg:sticky lg:top-20` |
 | **Viewport-high** | The side panel is as tall as the window below the header, however long the main column is | `lg:max-h-[calc(100dvh-6rem)]` |
 | **Inner scroll** | A part that scrolls on its own, apart from the page: the side panel when its content is taller than it | `lg:overflow-y-auto` |
 | **Loads more at the end** | A list that reads its next page when its end comes into view (the latest commits) | `latest.tsx` |
-| **Fold**, **rail** | The side panel's button folds the whole panel to a thin rail and opens it again | cookie `scp-side-commits` |
+| **Fold**, **rail** | With every section hidden the side panel folds to a thin rail, whose button shows them all again | cookie `scp-side-commits` |
 | **Resize edge** | The side panel's left edge, dragged (or moved with the arrow keys) to set its width, 18 to 40 rem | cookie `scp-side-commits` |
 | **Stacked** | Below `lg`: no side panel, every element in one column in layout order | — |
 | **Telemetry tiles** | The fleet's numbers in a row at the top of the dashboard, each with its hint | `telemetry.tsx` |
@@ -101,16 +101,17 @@ Per-repository rows leave the landing page for the group page. The telemetry til
 agent), automation (and sweeps), active repositories (and those in no group), findings (of how many products), in sync.
 
 ## The side panel (L5)
-The elements right after `products` of the kinds `pulls`, `issues` and `latest-commits` are their side panel on a wide screen (the
+The elements right after `products` of the kinds `latest-commits`, `pulls` and `issues` are their side panel on a wide screen (the
 dashboard only; `/present` keeps its commit column and stacks `pulls` and `issues` at the left). The built-in dashboard has all three,
-in that order. The panel is sticky at the right and viewport-high (`100dvh` less the header), folded to a rail by its button (in the
-first section's header) and resized by its edge (or the arrow keys), both kept in `scp-side-commits` (`open:26`, 18 to 40 rem).
-Each element is a section: its header (the title, the count that links its page, the panel's button in the first) stays at the
-section's top, its list scrolls inside it, and the latest commits load more at the end of theirs. The open sections share the height
-equally: three open, thirds; one folded, halves. A section's title is a button (`aria-expanded`) that folds it to its header; the
-folded kinds are kept in the cookie `scp-side-sections` (`issues,pulls`), read by the server so the first paint is right. Below `lg`
-the sections follow the products at their own height, each still folding. A switched-off feature's element is not there, and the
-others share the panel.
+the latest commits first, then the pull requests, then the issues (owner, 2026-11-06). The panel is sticky at the right and
+viewport-high (`100dvh` less the header) and resized by its edge (or the arrow keys). Each element is a section: its header (the
+title, the count that links its page, its hide button) stays at the section's top, its list scrolls inside it, and the latest
+commits load more at the end of theirs. The open sections share the height equally: three open, thirds; one hidden, halves. Every
+section's header ends with the same button, the panel icon (`aria-expanded`), that hides the section to its header and shows it
+again; the hidden kinds are kept in the cookie `scp-side-sections` (`pulls,issues`), read by the server so the first paint is right.
+Hiding the last open one folds the whole panel to its rail, whose button shows every section again; the rail and the width are kept
+in `scp-side-commits` (`open:26`, 18 to 40 rem). Below `lg` the sections follow the products at their own height, each still hiding.
+A switched-off feature's element is not there, and the others share the panel.
 
 ## Layouts (L2)
 A layout is a page's elements and their options, as data; the file is the API's element list (`LayoutElement` in the contract, one

@@ -10,7 +10,7 @@ import { CommitList } from "@/entities/commit/commit-list"
 import { sameWork, type Work } from "@/lib/preferences"
 import { moreQuery, morePages } from "./api"
 import { ShowPicker, useShow } from "./show"
-import { sectionBody, sectionCard, SectionTitle, type Section } from "./side"
+import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
 /** dedupe keeps each commit once, the first time it comes: new commits move older ones to later pages while the reader scrolls. */
 export function dedupe(commits: Commit[]): Commit[] {
@@ -51,10 +51,8 @@ export function LatestCommits({
     <Card aria-labelledby="latest" className={cn("flex flex-col gap-3", sectionCard(section))}>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
-          <SectionTitle id="latest" section={section}>
-            Latest commits
-          </SectionTitle>
-          {section?.fold}
+          <SectionTitle id="latest">Latest commits</SectionTitle>
+          <SectionFold id="latest" section={section} />
         </div>
         {section?.open !== false && (
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground">

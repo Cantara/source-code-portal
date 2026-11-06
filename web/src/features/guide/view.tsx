@@ -701,11 +701,11 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
             </Figure>
             <div className="flex max-w-prose flex-col gap-3 text-sm text-muted-foreground">
               <p>
-                Beside the products, a side panel holds the pull requests, the issues and the latest commits, a third each. Each
-                scrolls on its own; its title folds it, and the others take its space. The panel&apos;s button folds it all away,
-                and its edge drags it wider. Scroll to the end of the latest commits and older ones load. Its label says what it
-                shows, the work that counts until you choose: select it for a small dialog with the three kinds as checkboxes,
-                each with its commits in the last {days}. Commits made with AI carry a mark naming the assistant.
+                Beside the products, a side panel holds the latest commits, the pull requests and the issues, a third each. Each
+                scrolls on its own; its button hides it, and the others take its space. With all three hidden the panel folds to a
+                thin rail, and its edge drags it wider. Scroll to the end of the latest commits and older ones load. Its label
+                says what it shows, the work that counts until you choose: select it for a small dialog with the three kinds as
+                checkboxes, each with its commits in the last {days}. Commits made with AI carry a mark naming the assistant.
               </p>
               <p>
                 <strong className="text-foreground">Commits</strong> in the header holds every commit of every repository, to

@@ -182,10 +182,10 @@ export const columnsValue = (c: Columns) =>
 export type Side = { open: boolean; width: number; folded: SectionKind[] }
 
 export const sideCookie = "scp-side-commits"
-/** sectionsCookie keeps the side panel's folded sections, comma-separated ("issues,pulls"). */
+/** sectionsCookie keeps the side panel's folded sections, comma-separated ("pulls,issues"). */
 export const sectionsCookie = "scp-side-sections"
 /** sectionKinds are the elements that are sections of the side panel, in their usual order. */
-export const sectionKinds = ["pulls", "issues", "latest-commits"] as const
+export const sectionKinds = ["latest-commits", "pulls", "issues"] as const
 export type SectionKind = (typeof sectionKinds)[number]
 export const sideWidths = { min: 18, max: 40, initial: 26 } as const
 
