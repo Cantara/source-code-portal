@@ -17,6 +17,9 @@ import (
 )
 
 // stream reads server-sent events.
+// pingBlock is the heartbeat: an event, not a comment, so the page can tell a silent stream from a quiet one.
+const pingBlock = "event: ping|data: {}"
+
 type stream struct {
 	resp *http.Response
 	r    *bufio.Reader
@@ -97,7 +100,7 @@ func TestEvents(t *testing.T) {
 	pub.Update(func(b *snapshot.Builder) { b.Mark("a", "", 42, 42) })
 	pub.Flush()
 	got := s.next(t)
-	for got == ": ping" {
+	for got == pingBlock {
 		got = s.next(t)
 	}
 	if v := version(t, got); v != 42 {
@@ -105,7 +108,7 @@ func TestEvents(t *testing.T) {
 	}
 	pub.Update(func(*snapshot.Builder) {}) // the same version: no event
 	pub.Flush()
-	if got := s.next(t); got != ": ping" {
+	if got := s.next(t); got != pingBlock {
 		t.Errorf("after a publish with the same version: %q, want the heartbeat", got)
 	}
 

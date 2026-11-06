@@ -23,8 +23,10 @@ const (
 	ttl       = 15 * time.Minute // webhooks notify the job; the listing is a free 304 when nothing changed
 	fullEvery = time.Hour        // checks change without touching the listing: every pull request is asked again this often
 	eventGap  = time.Minute      // anyone may open a pull request or review one on a public repository: one read a minute at most
-	failAgain = 10 * time.Minute // a failed GraphQL query is asked again this soon
-	maxTitle  = 200
+	// ConfirmAfter is when a run caused by an event reads again: GitHub's listing can be a few seconds behind the event.
+	ConfirmAfter = 30 * time.Second
+	failAgain    = 10 * time.Minute // a failed GraphQL query is asked again this soon
+	maxTitle     = 200
 )
 
 // pendingSteps are the waits before a pull request whose checks run or whose mergeability GitHub is still computing is asked again:
@@ -33,7 +35,7 @@ var pendingSteps = []time.Duration{5 * time.Minute, 10 * time.Minute, 20 * time.
 
 // Events are the webhook deliveries that re-read a repository's pull requests (webhook.Normalise passes them by their names).
 // Not check_suite or status: they fire on every CI update of every commit; running checks are asked again on their own steps.
-var Events = []sync.Event{sync.EventPush, "pull_request", "pull_request_review"} //nolint:gochecknoglobals // a constant list
+var Events = []sync.Event{sync.EventPush, sync.EventOpen, "pull_request", "pull_request_review"} //nolint:gochecknoglobals // a constant list
 
 // Label is a pull request's label.
 type Label = untrusted.Label
@@ -205,6 +207,9 @@ func (p *Pulls) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	}
 	if d := settle(next, ask, now); d > 0 && (again == 0 || d < again) {
 		again = d
+	}
+	if j.Event && (again == 0 || ConfirmAfter < again) {
+		again = ConfirmAfter // GitHub's listing can lag the event that caused this run
 	}
 	payload, err := json.Marshal(next)
 	if err != nil {

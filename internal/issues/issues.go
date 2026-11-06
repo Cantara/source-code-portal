@@ -28,7 +28,10 @@ const (
 
 // Events are the webhook deliveries that re-read a repository's issues (webhook.Normalise passes them by their names).
 // Not issue_comment: anyone may comment, and a comment changes an issue's idle time and count, not where it stands.
-var Events = []sync.Event{"issues"} //nolint:gochecknoglobals // a constant list
+// ConfirmAfter is when a run caused by an event reads again: GitHub's listing can be a few seconds behind the event.
+const ConfirmAfter = 30 * time.Second
+
+var Events = []sync.Event{"issues", sync.EventOpen} //nolint:gochecknoglobals // a constant list
 
 // Label is an issue's label.
 type Label = untrusted.Label
@@ -168,7 +171,11 @@ func (f *Issues) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if err != nil {
 		return sync.Result{}, err
 	}
-	return sync.Result{Payload: payload, Unchanged: j.Prev.State == snapshot.StateOK && string(j.Prev.Payload) == string(payload)}, nil
+	res := sync.Result{Payload: payload, Unchanged: j.Prev.State == snapshot.StateOK && string(j.Prev.Payload) == string(payload)}
+	if j.Event {
+		res.Again = ConfirmAfter // GitHub's listing can lag the event that caused this run
+	}
+	return res, nil
 }
 
 // build cleans the listing into a repository's issues.

@@ -64,6 +64,7 @@ type Event string
 const (
 	EventPush          Event = "push"   // new commits on a repository's default branch, or a changed pushed_at
 	EventSourceChanged Event = "source" // repositories were added, removed or renamed in a source
+	EventOpen          Event = "open"   // the count of open issues and pull requests in a listing changed (the safety net when no webhook came)
 	EventTag           Event = "tag"    // a tag was pushed or a release published
 )
 
@@ -73,6 +74,9 @@ type Job struct {
 	Source string           // configured source id
 	Repo   snapshot.RepoKey // empty for per-source jobs
 	Prev   store.Item       // the last stored outcome; State never when there is none
+	// Event: the run was asked for by an event (a webhook), not by its time. What GitHub lists a few seconds after an event may not
+	// show it yet: such a job asks to run again soon (Result.Again) to confirm.
+	Event bool
 }
 
 // Result is a successful run.
@@ -408,7 +412,7 @@ func (e *Engine) next(now time.Time) (*entry, time.Time) {
 }
 
 func (e *Engine) start(ctx context.Context, en *entry) {
-	j := Job{Key: en.key, Source: en.source, Repo: en.repo, Prev: en.item}
+	j := Job{Key: en.key, Source: en.source, Repo: en.repo, Prev: en.item, Event: en.prio == PrioEvent}
 	go func() {
 		started := time.Now()
 		jctx, cancel := context.WithTimeout(ctx, en.spec.Timeout)

@@ -129,13 +129,21 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		listed[i].ID.Source = j.Source
 	}
 	next := state{Schema: schema, Repos: Plan(listed, prev.Repos, src.filter)}
-	pushed := map[int64]time.Time{}
+	before := map[int64]snapshot.Repo{}
 	for _, t := range prev.Repos {
-		pushed[t.Repo.ID.GitHubID] = t.Repo.PushedAt
+		before[t.Repo.ID.GitHubID] = t.Repo
 	}
 	for _, t := range next.Repos {
-		if at, was := pushed[t.Repo.ID.GitHubID]; was && !at.Equal(t.Repo.PushedAt) {
+		was, known := before[t.Repo.ID.GitHubID]
+		if !known {
+			continue
+		}
+		if !was.PushedAt.Equal(t.Repo.PushedAt) {
 			c.notify(sync.EventPush, t.Repo.Key())
+		}
+		// The count of open issues and pull requests moved: whatever missed its webhook is read within the listing's interval.
+		if was.OpenIssues != t.Repo.OpenIssues {
+			c.notify(sync.EventOpen, t.Repo.Key())
 		}
 	}
 	payload, err := json.Marshal(next)

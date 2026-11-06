@@ -171,6 +171,36 @@ func TestPushedAtNotifies(t *testing.T) {
 	}
 }
 
+// TestOpenCountNotifies: a changed count of open issues and pull requests in the listing asks the jobs that read them to run, the
+// safety net for a webhook that never came.
+func TestOpenCountNotifies(t *testing.T) {
+	l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a"), pub(2, "b")}}}
+	var opened []snapshot.RepoKey
+	c, err := New(config.Catalog{ReconcileInterval: 5 * time.Minute, Groups: []config.Group{
+		{ID: "all", Name: "All", DefaultRepo: "a", Match: []config.Match{{CatchAll: true}}},
+	}}, []config.Source{{ID: "gh", Orgs: []string{"acme"}}}, map[string]GitHub{"gh": l},
+		func(ev sync.Event, k snapshot.RepoKey) {
+			if ev == sync.EventOpen {
+				opened = append(opened, k)
+			}
+		}, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	it, _, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+	if err != nil || len(opened) != 0 {
+		t.Fatalf("first listing: %v, err %v", opened, err)
+	}
+	if it, _, err = runAndPublish(t, c, p, it); err != nil || len(opened) != 0 {
+		t.Fatalf("unchanged sweep notified %v, err %v", opened, err)
+	}
+	l.repos["acme"][1].OpenIssues++
+	if _, _, err := runAndPublish(t, c, p, it); err != nil || len(opened) != 1 || opened[0] != "acme/b" {
+		t.Errorf("after an issue opened in b: notified %v, err %v", opened, err)
+	}
+}
+
 // TestMissConfirmedSoon: a listing that misses a tracked repository (deleted, transferred) asks to run again within confirmAfter,
 // and that listing removes it; a listing with no miss keeps the interval.
 func TestMissConfirmedSoon(t *testing.T) {
