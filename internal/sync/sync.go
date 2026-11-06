@@ -324,6 +324,38 @@ func (e *Engine) NotifySource(ev Event, source string) {
 	e.poke()
 }
 
+// Handled reports whether the event ev about repo (or, when repo is empty, about source) has been acted on: every job that listens for it
+// has finished a run since at, none is running or waiting to run again for it, and none is failing. A job that does not exist (the
+// repository was removed, the feature is off) has nothing to do. Whoever parked the event may then forget it.
+func (e *Engine) Handled(ev Event, repo snapshot.RepoKey, source string, at time.Time) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, s := range e.specs {
+		if !slices.Contains(s.On, ev) {
+			continue
+		}
+		var key string
+		switch {
+		case repo == "" && s.PerSource:
+			key = s.Kind + "/" + source
+		case repo != "" && s.PerSource:
+			r, known := e.repos[repo]
+			if !known {
+				continue
+			}
+			key = s.Kind + "/" + r.ID.Source
+		case repo != "":
+			key = s.Kind + "/" + string(repo)
+		default:
+			continue
+		}
+		if en := e.entries[key]; en != nil && (en.running || en.dirty || en.item.Attempts > 0 || !en.item.CheckedAt.After(at)) {
+			return false
+		}
+	}
+	return true
+}
+
 func (e *Engine) poke() {
 	select {
 	case e.wake <- struct{}{}:

@@ -22,8 +22,8 @@ first, with the exact total when every page was read.**
   bodies and no comments' text.
 - **Triggers.** The webhook event `issues` (passed through by `webhook.Normalise` under its name; not `issue_comment`, P-73) and the
   TTL: 15 minutes, and `EventOpen`: the catalogue's listing (every 5 minutes) notices that a repository's count of open issues and
-  pull requests moved, the safety net when no webhook came. A run an event caused (`Job.Event`) asks to run again in 30 seconds
-  (`ConfirmAfter`): GitHub's listing can be seconds behind the webhook that announced the issue. An archived repository is read once.
+  pull requests moved, the safety net when no webhook came. A run an event caused (`Job.Event`) that found nothing new asks to run again in 30 seconds
+  (`ConfirmAfter`; one that found a change needs no second read): GitHub's listing can be seconds behind the webhook that announced the issue. An archived repository is read once.
 - **Measured on Cantara (2026-11-05)**: 351 open issues in 136 repositories, at most 17 in one; 128 are Renovate's dependency
   dashboards. One page per repository, nearly always 304: at most 4 free requests per repository an hour.
 - **Cost at 1,000 repositories.** 4,000 conditional requests an hour, nearly all 304; the first read 1,000 requests and a few more

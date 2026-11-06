@@ -208,15 +208,16 @@ func (p *Pulls) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if d := settle(next, ask, now); d > 0 && (again == 0 || d < again) {
 		again = d
 	}
-	if j.Event && (again == 0 || ConfirmAfter < again) {
-		again = ConfirmAfter // GitHub's listing can lag the event that caused this run
-	}
 	payload, err := json.Marshal(next)
 	if err != nil {
 		return sync.Result{}, err
 	}
+	unchanged := j.Prev.State == snapshot.StateOK && string(j.Prev.Payload) == string(payload)
+	if j.Event && unchanged && (again == 0 || ConfirmAfter < again) {
+		again = ConfirmAfter // the event found nothing new: GitHub's listing may be seconds behind it. One that found a change needs no second read
+	}
 	return sync.Result{Payload: payload, Again: again,
-		Unchanged: j.Prev.State == snapshot.StateOK && string(j.Prev.Payload) == string(payload)}, nil
+		Unchanged: unchanged}, nil
 }
 
 // merge builds the repository's pull requests from the listing, carrying GraphQL's fields over from prev, and returns the numbers

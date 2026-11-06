@@ -49,7 +49,10 @@ const pushMain = `{"ref":"refs/heads/main","repository":{"name":"core","default_
 
 func TestReceiver(t *testing.T) {
 	var calls []call
-	rc := New([]byte("new"), []byte("old"), func(ev sync.Event, owner, name string) { calls = append(calls, call{ev, owner, name}) },
+	rc := New([]byte("new"), []byte("old"), func(ev sync.Event, owner, name string) error {
+		calls = append(calls, call{ev, owner, name})
+		return nil
+	},
 		slog.New(slog.DiscardHandler))
 	n := 0
 	id := func() string { n++; return "d-" + strings.Repeat("x", n%3) + string(rune('a'+n)) }
@@ -84,7 +87,7 @@ func TestReceiver(t *testing.T) {
 
 func TestDuplicateAndOversize(t *testing.T) {
 	calls := 0
-	rc := New([]byte("s"), nil, func(sync.Event, string, string) { calls++ }, slog.New(slog.DiscardHandler))
+	rc := New([]byte("s"), nil, func(sync.Event, string, string) error { calls++; return nil }, slog.New(slog.DiscardHandler))
 	var observed []string
 	rc.Observe(func(event, result string) { observed = append(observed, event+":"+result) })
 	defer func() {
@@ -176,7 +179,7 @@ func FuzzNormalise(f *testing.F) {
 
 func TestSharedDedupe(t *testing.T) {
 	calls := 0
-	rc := New([]byte("s"), nil, func(sync.Event, string, string) { calls++ }, slog.New(slog.DiscardHandler))
+	rc := New([]byte("s"), nil, func(sync.Event, string, string) error { calls++; return nil }, slog.New(slog.DiscardHandler))
 	shared := map[string]bool{"elsewhere": true}
 	down := false
 	rc.Dedupe(func(_ context.Context, id string) (bool, error) {
@@ -206,7 +209,7 @@ func TestSharedDedupe(t *testing.T) {
 // one is not held up by them.
 func TestBusyReceiverTurnsDeliveriesAway(t *testing.T) {
 	var results []string
-	rc := New([]byte("s"), nil, func(sync.Event, string, string) {}, slog.New(slog.DiscardHandler))
+	rc := New([]byte("s"), nil, func(sync.Event, string, string) error { return nil }, slog.New(slog.DiscardHandler))
 	rc.Observe(func(_, result string) { results = append(results, result) })
 	for range cap(rc.reading) {
 		rc.reading <- struct{}{}
@@ -227,5 +230,31 @@ func TestBusyReceiverTurnsDeliveriesAway(t *testing.T) {
 	rc.ServeHTTP(rec, small)
 	if rec.Code == http.StatusServiceUnavailable {
 		t.Errorf("a small delivery was turned away while large ones were being read")
+	}
+}
+
+// An event the sink could not keep is not acknowledged: 503, so GitHub's delivery log shows it failed, and the same delivery sent again
+// is acted on, not dropped as a duplicate.
+func TestUnkeptEventIsNotAcknowledged(t *testing.T) {
+	fail := true
+	var kept []sync.Event
+	rc := New([]byte("s"), nil, func(ev sync.Event, _, _ string) error {
+		if fail {
+			return errors.New("disk full")
+		}
+		kept = append(kept, ev)
+		return nil
+	}, slog.New(slog.DiscardHandler))
+	var observed []string
+	rc.Observe(func(event, result string) { observed = append(observed, event+":"+result) })
+	if code, _ := deliver(t, rc, "push", "d-1", sign("s", pushMain), pushMain, nil); code != http.StatusServiceUnavailable {
+		t.Fatalf("an event that could not be kept: %d, want 503", code)
+	}
+	fail = false
+	if code, status := deliver(t, rc, "push", "d-1", sign("s", pushMain), pushMain, nil); code != http.StatusAccepted || status != "accepted" {
+		t.Errorf("the delivery sent again: %d %q, want accepted", code, status)
+	}
+	if len(kept) != 1 || strings.Join(observed, ",") != "push:unavailable,push:accepted" {
+		t.Errorf("kept %v, observed %v", kept, observed)
 	}
 }

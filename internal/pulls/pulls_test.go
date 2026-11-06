@@ -86,25 +86,29 @@ func diff(a, b map[string]int) map[string]int {
 	return out
 }
 
-// TestEventRunConfirms: a run an event asked for reads again within ConfirmAfter, because GitHub's listing can lag the webhook that
-// announced the pull request; a scheduled run keeps its own interval.
+// TestEventRunConfirms: a run an event asked for that found nothing new reads again within ConfirmAfter, because GitHub's listing can lag
+// the webhook that announced the pull request; one that found a change keeps its own interval.
 func TestEventRunConfirms(t *testing.T) {
 	r := newRig(t)
 	at := r.now.Add(-time.Hour)
 	r.srv.SetPulls(r.id, githubtest.Pull{Number: 7, Title: "One", Author: "ann", Created: at, Updated: at, Base: "main", Head: "x",
 		HeadSHA: strings.Repeat("a", 40), Checks: "SUCCESS"})
-	run := func(event bool) sync.Result {
-		res, err := r.spec.Run(t.Context(), sync.Job{Key: Kind + "/acme/one", Source: "gh", Repo: "acme/one", Event: event})
+	run := func(prev store.Item, event bool) (sync.Result, store.Item) {
+		res, err := r.spec.Run(t.Context(), sync.Job{Key: Kind + "/acme/one", Source: "gh", Repo: "acme/one", Event: event, Prev: prev})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return res
+		return res, store.Item{State: snapshot.StateOK, Payload: res.Payload}
 	}
-	if res := run(false); res.Again == ConfirmAfter {
+	res, prev := run(store.Item{}, true)
+	if res.Again == ConfirmAfter {
+		t.Errorf("an event's run that found a change asked again in %v", res.Again)
+	}
+	if res, _ = run(prev, false); res.Again == ConfirmAfter {
 		t.Errorf("a scheduled run asked again in %v", res.Again)
 	}
-	if res := run(true); res.Again != ConfirmAfter {
-		t.Errorf("an event's run asked again in %v, want %v", res.Again, ConfirmAfter)
+	if res, _ = run(prev, true); !res.Unchanged || res.Again != ConfirmAfter {
+		t.Errorf("an event's run that found nothing new: unchanged %v, again %v, want %v", res.Unchanged, res.Again, ConfirmAfter)
 	}
 }
 
