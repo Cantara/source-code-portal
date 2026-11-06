@@ -239,20 +239,40 @@ func (d *Reader) escape() (rune, error) {
 	if err != nil || !utf16.IsSurrogate(r) {
 		return r, err
 	}
-	// A high surrogate wants its low one as the next escape; a lone one is the replacement character, as encoding/json reads it.
-	if next, err := d.r.Peek(2); err != nil || next[0] != '\\' || next[1] != 'u' {
-		return utf8.RuneError, nil //nolint:nilerr // a lone surrogate is not an error of the document
+	// A high surrogate wants its low one as the next escape; a lone one is the replacement character, and what follows it is read as
+	// it is, as encoding/json does.
+	if r >= 0xdc00 { // a low surrogate with no high one before it
+		return utf8.RuneError, nil
 	}
-	_, _ = d.byte()
-	_, _ = d.byte()
-	low, err := d.hex4()
-	if err != nil {
-		return 0, err
+	next, _ := d.r.Peek(6)
+	if len(next) < 6 || next[0] != '\\' || next[1] != 'u' {
+		return utf8.RuneError, nil
 	}
-	if pair := utf16.DecodeRune(r, low); pair != utf8.RuneError {
-		return pair, nil
+	low, ok := hexRune(next[2:6])
+	if !ok || low < 0xdc00 || low > 0xdfff {
+		return utf8.RuneError, nil
 	}
-	return utf8.RuneError, nil
+	_, _ = d.r.Discard(6)
+	d.off += 6
+	return utf16.DecodeRune(r, low), nil
+}
+
+// hexRune is four hexadecimal digits as a rune.
+func hexRune(b []byte) (rune, bool) {
+	var r rune
+	for _, c := range b {
+		switch {
+		case c >= '0' && c <= '9':
+			r = r<<4 | rune(c-'0')
+		case c >= 'a' && c <= 'f':
+			r = r<<4 | rune(c-'a'+10)
+		case c >= 'A' && c <= 'F':
+			r = r<<4 | rune(c-'A'+10)
+		default:
+			return 0, false
+		}
+	}
+	return r, true
 }
 
 func (d *Reader) hex4() (rune, error) {

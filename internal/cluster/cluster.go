@@ -135,7 +135,7 @@ func (m *Member) session(ctx context.Context, b Backend, e Engine) error {
 	}
 	m.backend.Store(&backendRef{b})
 	m.connected.Store(true)
-	m.resync(ctx, b, e)
+	synced := m.resync(ctx, b, e)
 
 	tick := time.NewTicker(leadInterval)
 	defer tick.Stop()
@@ -147,16 +147,23 @@ func (m *Member) session(ctx context.Context, b Backend, e Engine) error {
 			switch {
 			case !up && m.connected.Load():
 				m.connected.Store(false)
+				synced = false
 				m.stepDown(e)
 				m.log.Warn("cluster connection lost")
 			case up && !m.connected.Load():
 				m.connected.Store(true)
 				m.log.Info("cluster connection back")
-				m.resync(ctx, b, e)
+				synced = m.resync(ctx, b, e)
 			}
 		case <-tick.C:
 			if !m.connected.Load() || m.leader.Load() {
 				continue
+			}
+			// Never lead on a state that was not loaded: seeding would delete what the last leader recorded.
+			if !synced {
+				if synced = m.resync(ctx, b, e); !synced {
+					continue
+				}
 			}
 			ok, err := b.TryLead(ctx)
 			if err != nil {
@@ -202,11 +209,12 @@ func (m *Member) stepDown(e Engine) {
 }
 
 // resync applies the whole state map, listings first, so an instance that joins or reconnects has everything the leader recorded.
-func (m *Member) resync(ctx context.Context, b Backend, e Engine) {
+// It reports whether the map was read: an instance that could not does not take the lead (seed would delete the map's entries).
+func (m *Member) resync(ctx context.Context, b Backend, e Engine) bool {
 	entries, err := b.Entries(ctx)
 	if err != nil {
 		m.log.Warn("cluster state not loaded", "err", err)
-		return
+		return false
 	}
 	recs := make([]sync.Shared, 0, len(entries))
 	for k, v := range entries {
@@ -230,6 +238,7 @@ func (m *Member) resync(ctx context.Context, b Backend, e Engine) {
 		e.Receive(ctx, r)
 	}
 	m.log.Info("cluster state loaded", "items", len(recs))
+	return true
 }
 
 // seed makes the state map mirror the engine when this instance takes the lead: what the map lacks is written, what the engine has
