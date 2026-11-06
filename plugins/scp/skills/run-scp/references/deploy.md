@@ -142,6 +142,10 @@ claude mcp add --transport http scp https://portal.example.org/mcp --header "Aut
 
 `/mcp` refuses an `Origin` other than `server.public_url`'s: set the public URL when the proxy serves another host name.
 
+To show WebMCP in a browser, walk the operator through the operator guide's *Testing WebMCP in Chrome* (section 2.6): Chrome's flag
+`chrome://flags/#enable-webmcp-testing`, the *Model Context Tool Inspector* extension, and a Gemini API key from Google AI Studio,
+which stays in the extension. A badge of 0 means the flag is off or Chrome was not relaunched.
+
 ## A screen on a wall
 
 `/present` is the presentation page for a tablet or a TV: one screen, no scrolling, live, nothing to configure. Bookmark one per team

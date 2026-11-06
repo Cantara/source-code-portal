@@ -528,6 +528,27 @@ model is involved on the portal's side: the agent brings its own.
   `Origin` is not `server.public_url`'s, so set the public URL when the portal is reached under another name than its own host.
 - **Limits.** A call reads the snapshot in memory; the 30-second request deadline and your proxy's rate limits apply.
 
+**Testing WebMCP in Chrome.** Chrome offers WebMCP behind a flag for testing. The extension *Model Context Tool Inspector* shows a
+page's tools and lets a Gemini model call them:
+
+1. Use Chrome 146 or newer (Beta, Dev or Canary when the stable one is older). Open `chrome://flags/#enable-webmcp-testing`, set
+   *WebMCP for testing* to *Enabled* and press *Relaunch*.
+2. Install [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)
+   from the Chrome Web Store.
+3. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/api-keys) (*Create API key*; the free tier is enough).
+   The key stays in the extension and goes to Google only, never to the portal.
+4. Open a page of the portal (a repository's page is a good start), sign in for the private view, and click the extension's icon. Its
+   side panel lists the page's tools under *WebMCP Tools*, and its badge shows how many there are. Then press *Set Gemini API key* and
+   paste the key.
+5. Under *Interact with the Page*, choose a *Tool* (`current_page` first), adjust its *Input Arguments* and press *Execute Tool*. The
+   answer in *Tool Results* is what an agent gets.
+6. Write a *User Prompt* ("what repository am I looking at, its open bugs waiting for triage, and its health score?") and press
+   *Send*: Gemini picks the tools and fills in their arguments. *Copy trace* copies every call and answer as JSON, for a bug report.
+
+The page adds three tools of its own to the catalogue's: `current_page` (what the reader looks at), `open_page` (go to a page of the
+portal) and `set_preferences` (the reader's Settings). None reaches an administrator's actions. When the badge shows 0, the flag is off
+or Chrome was not relaunched. The Guide (`/guide#webmcp`) shows the same steps with a picture of the inspector.
+
 ## 3. Run
 
 **Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.0.0.tar.gz`, the same for every platform) from
