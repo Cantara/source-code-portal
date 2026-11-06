@@ -546,3 +546,20 @@ func statsOf(s *Stats) *oapi.CommitStats {
 	}
 	return out
 }
+
+// Authorship is how the people's recent work on a repository is shared (design/insights.md): how many of its newest default-branch
+// commits are people's (automation and sweeps left out) and how many the busiest author wrote. Authors are counted, never returned.
+func Authorship(s *snapshot.Snapshot, e *snapshot.RepoEntry) (people, top int) {
+	cs, _ := Of(e)
+	by := map[string]int{}
+	for i := range cs[:min(len(cs), alumniAuthors)] {
+		if k, _ := Classify(&cs[i]); k == OriginAutomation || Sweep(s, &cs[i]) {
+			continue
+		}
+		people++
+		who := strings.ToLower(cmp.Or(cs[i].AuthorLogin, cs[i].AuthorName))
+		by[who]++
+		top = max(top, by[who])
+	}
+	return people, top
+}

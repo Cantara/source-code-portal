@@ -252,6 +252,13 @@ func TestSweepsAndActivity(t *testing.T) {
 	if at, before := LastAuthored(s, "acme/r0", WorkTeam); !at.Equal(ago(3)) || before {
 		t.Errorf("last authored = %v %v, want the person's commit 3 days ago", at, before)
 	}
+	// Authorship counts people's commits only, without the bot's update and the sweep: Ada twice (one with an AI) and Bo once.
+	if people, top := Authorship(s, s.Repos["acme/r0"]); people != 3 || top != 2 {
+		t.Errorf("authorship = %d people's commits, %d by the busiest; want 3 and 2", people, top)
+	}
+	if people, top := Authorship(s, s.Repos["acme/r5"]); people != 0 || top != 0 {
+		t.Errorf("a repository holding only the sweep: %d, %d", people, top)
+	}
 	if at, _ := LastAuthored(s, "acme/r5", WorkTeam); !at.Equal(ago(2)) {
 		t.Errorf("a repository holding only the sweep: %v, want the oldest read commit", at)
 	}
