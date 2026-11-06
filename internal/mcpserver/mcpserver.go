@@ -9,7 +9,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -55,7 +54,7 @@ func Routes(o Options) []httpapi.Route {
 // reach the endpoint nor ride a reader's session into it.
 func guard(o Options, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if origin := r.Header.Get("Origin"); origin != "" && !sameOrigin(origin, o.PublicURL, r) {
+		if origin := r.Header.Get("Origin"); origin != "" && !strings.EqualFold(strings.TrimSuffix(origin, "/"), httpapi.PortalOrigin(r, o.PublicURL)) {
 			httpapi.WriteProblem(w, http.StatusForbidden, "forbidden", "The MCP endpoint is not for pages of other sites.")
 			return
 		}
@@ -72,20 +71,6 @@ func guard(o Options, next http.Handler) http.Handler {
 }
 
 // sameOrigin reports whether origin is the portal's: its public URL's, else the request's own host.
-func sameOrigin(origin, publicURL string, r *http.Request) bool {
-	want := ""
-	if u, err := url.Parse(publicURL); err == nil && u.Host != "" {
-		want = u.Scheme + "://" + u.Host
-	} else {
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		want = scheme + "://" + r.Host
-	}
-	return strings.EqualFold(strings.TrimSuffix(origin, "/"), want)
-}
-
 func handler(c *tools.Catalogue, name string) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		input := map[string]any{}

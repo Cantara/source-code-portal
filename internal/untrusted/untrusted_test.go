@@ -28,3 +28,17 @@ func TestFirstLine(t *testing.T) {
 		t.Errorf("FirstLine = %q", got)
 	}
 }
+
+// Tag characters spell ASCII a reader cannot see: ASCII smuggling.
+func TestInvisibleTextIsStripped(t *testing.T) {
+	smuggled := "ok" + string([]rune{0xe0049, 0xe0067, 0xe006e}) + "­" + string(rune(0xe0100)) + "⁡!"
+	if got := Text(smuggled, 100); got != "ok!" {
+		t.Errorf("Text = %q, want ok!", got)
+	}
+	if got := Strip("a\nb\t" + string(rune(0xe0041))); got != "a\nb\t" {
+		t.Errorf("Strip = %q", got)
+	}
+	if got := Text("❤️", 100); got != "❤️" {
+		t.Errorf("an emoji variation selector was stripped: %q", got)
+	}
+}

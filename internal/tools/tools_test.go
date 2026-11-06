@@ -83,3 +83,17 @@ func TestCatalogue(t *testing.T) {
 		t.Error("a name twice passed")
 	}
 }
+
+// A constraint Check cannot read is refused when the catalogue is built, not skipped when a call is made.
+func TestNewRefusesSchemasCheckWouldSkip(t *testing.T) {
+	run := func(context.Context, map[string]any) (Result, error) { return Result{}, nil }
+	for name, schema := range map[string]map[string]any{
+		"required as []any": {"type": "object", "properties": map[string]any{}, "required": []any{"q"}},
+		"minimum as float":  {"type": "object", "properties": map[string]any{"n": map[string]any{"type": "integer", "minimum": 1.0}}},
+		"enum as []any":     {"type": "object", "properties": map[string]any{"s": map[string]any{"type": "string", "enum": []any{"a"}}}},
+	} {
+		if _, err := New(Tool{Name: "x", Description: "d", Schema: schema, Run: run}); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
