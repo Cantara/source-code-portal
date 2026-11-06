@@ -4,10 +4,17 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
-## Unreleased
+## 2.2.5
 
-Fixes from a review of the code; no configuration change.
+Fixes from a review of the code, webhooks that are not lost, and every dependency brought up to date. No configuration change is needed
+to upgrade. The web UI is now built and run on Node.js 26 (the LTS) in the images and in CI; a host that runs the release bundle can keep
+Node.js 24 (the bundle starts and serves under it) but the documentation names 26.
 
+- Every dependency is current: go-github v93, go.yaml.in/yaml v4, oapi-codegen 2.8.1, Next.js 16.4.3, Vitest 5.1, Playwright 1.65,
+  jsdom 31, Tailwind 4.3.5, ESLint 10.14, pnpm 12.17, GoReleaser 2.19 and the rest of the Dependency Dashboard; Node.js 24.22.1 and later
+  carry security fixes (HTTP agent, TLS IP checks, permission model, brotli, OpenSSL 3.5.9, undici). TypeScript stays on 6 for the tooling
+  API and on 7.0 for `tsc`; Renovate holds 7.1.
+- The Guide's pictures show the default work that counts (every kind, automation included), the pull requests tile and the side panel.
 - New issues and pull requests show without waiting for the next poll: a run a webhook caused that found nothing new reads again after 30 seconds (GitHub's
   listing can lag the event), and the catalogue's listing every 5 minutes asks for a read when a repository's count of open issues and
   pull requests moved, so a missed webhook costs minutes, not the 15-minute TTL. The event stream sends a `ping` event every 25 seconds;
