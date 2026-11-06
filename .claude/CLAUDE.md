@@ -33,7 +33,7 @@ never modify it, push to it or open issues or pull requests on it.
   Commit to `main` locally only (Conventional Commits, a few per feature, not one per step) and never push `main`. When a feature is
   complete, open one PR for it (its commits pushed to a branch); CI runs once, on the PR. When the owner explicitly asks to commit and push
   directly, push `main` itself (no branch, no PR): his instruction wins, for that request. Between changes run only the tests of what
-  changed; the full `make check` once, before the PR. Never rerun a flaky job: fix the test.
+  changed; the full `make check` once, before the PR. Never rerun a flaky job: fix the test. CI runs quick checks only; the browser tests and the load and size checks run locally in `make check` (P-85).
 - **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
   for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
   `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
