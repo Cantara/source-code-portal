@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	gogh "github.com/google/go-github/v92/github"
+	gogh "github.com/google/go-github/v93/github"
 	"go.uber.org/goleak"
 
 	"github.com/cantara/source-code-portal/internal/config"

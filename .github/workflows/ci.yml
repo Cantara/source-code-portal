@@ -54,7 +54,7 @@ concurrency:
 env:
   GOFLAGS: -mod=readonly
   GOTOOLCHAIN: local
-  PNPM_VERSION: 12.11.2
+  PNPM_VERSION: 12.17.0
 
 jobs:
   go:

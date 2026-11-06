@@ -64,7 +64,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | CLI and config | `spf13/cobra`, `spf13/viper` (one instance per run, unknown keys rejected) |
 | HTTP | stdlib `net/http`, `log/slog` |
 | API | OpenAPI 3.1, `oapi-codegen` v2 (strict server), `openapi-typescript` and `openapi-fetch` for the web |
-| GitHub | `google/go-github` v92, `bradleyfalzon/ghinstallation` v2, an own ETag and rate transport |
+| GitHub | `google/go-github` v93, `bradleyfalzon/ghinstallation` v2, an own ETag and rate transport |
 | Storage | `modernc.org/sqlite` |
 | Markdown | `yuin/goldmark` v2, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` |
 | Metrics | `prometheus/client_golang` |
@@ -72,7 +72,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | Sign-in | `coreos/go-oidc` v3, `golang.org/x/oauth2` |
 | Language models | own `net/http` adapters for the Anthropic Messages and OpenAI Chat Completions wire formats (P-28) |
 | Tests | `testing`, `testing/synctest`, `go-cmp`, `goleak` |
-| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, react-markdown with remark-gfm (the assistant's answers), Vitest, MSW, Playwright with axe; pnpm 12, Node.js 24 |
+| Web | Next.js 16 (App Router, standalone), React 19, TypeScript 7 (`tsc`), Tailwind 4, TanStack Query 5, react-markdown with remark-gfm (the assistant's answers), Vitest, MSW, Playwright with axe; pnpm 12, Node.js 26 |
 | Build | Makefile, golangci-lint, GitHub Actions, GoReleaser, cosign, Renovate |
 
 ## 4. Work

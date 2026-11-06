@@ -3,13 +3,13 @@ Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
 `internal/github` reads repositories of one or more GitHub organisations for the sync jobs: App auth or a token, REST reads through
-`google/go-github` v92, a small conditional-request and rate-observer transport, error classes, and the fake server
+`google/go-github` v93, a small conditional-request and rate-observer transport, error classes, and the fake server
 `internal/github/githubtest`. It returns `internal/snapshot` value types. Admission and the removal rule are in `catalog.md`; the rate
 budget, retries and pauses in `sync-snapshot-store.md`; webhook verification and dedupe in `http-api.md` behaviour 4. This note lists the
 webhook events the portal reacts to and the `sync` event each becomes.
 
 ## Decisions (bullets, each with a one-line reason)
-- go-github v92 for REST, ghinstallation v2 for App auth (plan.md 4): mature, widely used libraries keep the client small.
+- go-github v93 for REST, ghinstallation v2 for App auth (plan.md 4): mature, widely used libraries keep the client small.
 - REST covers every read: listings, commits, trees and blobs; the README and documents are read as blobs found in the tree.
 - Commit freshness: webhooks, plus the org listing every `catalog.reconcile_interval` (default 5 m) sorted by `pushed_at`; a repository
   whose `pushed_at` changed gets `sync.EventPush`; the 2 h commits TTL is the safety net.
@@ -59,7 +59,7 @@ Consumers declare their own narrow interfaces over these methods. The calls shar
 methods here; a call only one feature makes lives in that feature over `REST` and `Classify`: the commits listing in `commits`
 (`FromGitHub`), the latest release in `badges` (`FromGitHub`).
 
-| Need | go-github v92 call | Auth | Endpoint |
+| Need | go-github v93 call | Auth | Endpoint |
 |---|---|---|---|
 | installations | `Apps.ListInstallations` | App JWT | `GET /app/installations` |
 | repos of an organisation | `Repositories.ListByOrg` (`type=all`, `sort=pushed`, `direction=desc`, `per_page=100`) | either | `GET /orgs/{org}/repos` |

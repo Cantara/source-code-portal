@@ -89,7 +89,7 @@ docker run --rm -p 9090:9090 -p 9091:9091 -v scp-data:/data \
 Open http://localhost:9090. The first sync of a large organisation takes a few minutes; the pages show what is loaded so far.
 
 Without containers, take the binary for Linux (amd64, arm64) or macOS (arm64) and the web UI bundle `scp-web_<version>.tar.gz` from the
-[releases page](https://github.com/Cantara/source-code-portal/releases), unpack the bundle and run it with Node.js 24:
+[releases page](https://github.com/Cantara/source-code-portal/releases), unpack the bundle and run it with Node.js 26:
 
 ```sh
 SCP_WEB_DIR=./scp-web scp serve --config scp.yaml
@@ -158,7 +158,7 @@ TypeScript 7, Tailwind CSS 4, TanStack Query and openapi-fetch typed from the co
 
 ## Develop
 
-Requirements: Go 1.27, Node.js 24, pnpm 12 and golangci-lint 2.14.
+Requirements: Go 1.27, Node.js 26, pnpm 12 and golangci-lint 2.15.
 
 ```sh
 make check        # the gate: generated code, tidy modules, lint, Go and web tests, Playwright

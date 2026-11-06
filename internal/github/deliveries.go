@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	gh "github.com/google/go-github/v92/github"
+	gh "github.com/google/go-github/v93/github"
 )
 
 // Delivery is one line of the App's webhook delivery log: what GitHub sent, and what the portal answered.
