@@ -18,7 +18,7 @@ the readers' words. A new part of a page gets its term here first.
 | **Sticky** | The side panel stays in place while the page scrolls under it | `lg:sticky lg:top-20` |
 | **Viewport-high** | The side panel is as tall as the window below the header, however long the main column is | `lg:max-h-[calc(100dvh-6rem)]` |
 | **Inner scroll** | A part that scrolls on its own, apart from the page: the side panel when its content is taller than it | `lg:overflow-y-auto` |
-| **Loads more at the end** | A list that reads its next page when its end comes into view (the latest commits) | `latest.tsx` |
+| **Loads more at the end** | A list that reads its next page as its end nears the view of its scroll, 300 px before it (the latest commits, the pull requests, the issues; up to 10 pages, then the link to their page) | `latest.tsx`, `more.tsx` |
 | **Fold**, **rail** | With every section hidden the side panel folds to a thin rail, whose button shows them all again | cookie `scp-side-commits` |
 | **Resize edge** | The side panel's left edge, dragged (or moved with the arrow keys) to set its width, 18 to 40 rem | cookie `scp-side-commits` |
 | **Stacked** | Below `lg`: no side panel, every element in one column in layout order | — |
@@ -29,9 +29,9 @@ The presentation page (`present.md`) is one screen that never scrolls, with word
 
 | Term | What it is |
 |---|---|
-| **Status strip** | The telemetry as one line across the top, the brand at its start and the freshness at its end |
+| **Status strip** | The telemetry as one compact line across the top, the brand at its start and the freshness at its end; every signal fits a tablet on its side |
 | **Product tiles** | The products as tiles that fold the good ones when they do not fit |
-| **Commit column** | The latest commits at the right at full height (below the rest in portrait), with its inner scroll and its resize edge |
+| **Side column** | The present side panel: the latest commits, the pull requests and the issues as sections at the right at full height (below the rest in portrait), each hidden by its button and scrolling inside, equal shares, a rail when all are hidden, its resize edge |
 | **Tap bar** | The controls a tap or a key shows for a few seconds: the profile and the window's size, back to the dashboard, the theme, *On a wall*, full screen, the design mode (admins) |
 | **Profile** | How the page is set for a screen: Handheld portrait, Handheld landscape, Desk, Wall |
 
@@ -102,11 +102,12 @@ agent), automation (and sweeps), active repositories (and those in no group), fi
 
 ## The side panel (L5)
 The elements right after `products` of the kinds `latest-commits`, `pulls` and `issues` are their side panel on a wide screen (the
-dashboard only; `/present` keeps its commit column and stacks `pulls` and `issues` at the left). The built-in dashboard has all three,
+dashboard; `/present` has the same sections in its side column, `present.md`). The built-in dashboard has all three,
 the latest commits first, then the pull requests, then the issues (owner, 2026-11-06). The panel is sticky at the right and
 viewport-high (`100dvh` less the header) and resized by its edge (or the arrow keys). Each element is a section: its header (the
 title, the count that links its page, its hide button) stays at the section's top, its list scrolls inside it, and the latest
-commits load more at the end of theirs. The open sections share the height equally: three open, thirds; one hidden, halves. Every
+commits, the pull requests and the issues each load more at the end of theirs (`more.tsx`: the next pages of 25 read 300 px
+before the end of the section's scroll, each item once, up to 10 pages, then the link to their page). The open sections share the height equally: three open, thirds; one hidden, halves. Every
 section's header ends with the same button, the panel icon (`aria-expanded`), that hides the section to its header and shows it
 again; the hidden kinds are kept in the cookie `scp-side-sections` (`pulls,issues`), read by the server so the first paint is right.
 Hiding the last open one folds the whole panel to its rail, whose button shows every section again; the rail and the width are kept

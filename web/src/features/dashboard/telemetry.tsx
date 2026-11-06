@@ -264,9 +264,9 @@ export function TelemetryStrip({ data, start, end }: { data: Schemas["Dashboard"
   const rules = useRules()
   const now = useNow()
   return (
-    <section aria-label="Telemetry" className="panel flex items-center gap-x-6 px-4 py-2">
+    <section aria-label="Telemetry" className="panel flex items-center gap-x-4 px-3 py-1.5">
       {start}
-      <dl className="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-1">
+      <dl className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3.5 gap-y-1">
         {signals(data, rules, now).map((s) => (
           <SignalHint
             key={s.key}
@@ -276,15 +276,15 @@ export function TelemetryStrip({ data, start, end }: { data: Schemas["Dashboard"
                 {...t}
                 tabIndex={0}
                 className={cn(
-                  "flex cursor-help items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "flex cursor-help items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   s.level,
                   s.drop,
                 )}
               >
                 <dt className="sr-only">{s.label}</dt>
-                <dd className="flex items-center gap-1.5">
-                  <span className={cn("[&_svg]:size-5", iconClass(s))}>{s.icon}</span>
-                  <span className="font-mono text-xl font-semibold tabular-nums">{s.value}</span>
+                <dd className="flex items-center gap-1">
+                  <span className={cn("[&_svg]:size-4", iconClass(s))}>{s.icon}</span>
+                  <span className="font-mono text-lg font-semibold tabular-nums">{s.value}</span>
                 </dd>
               </div>
             )}

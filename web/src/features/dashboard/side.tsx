@@ -44,7 +44,7 @@ const widths: Record<number, string> = {
 }
 
 /** sectionLabels are the sections' names, as their buttons say them. */
-const sectionLabels: Record<SectionKind, string> = {
+export const sectionLabels: Record<SectionKind, string> = {
   "latest-commits": "Latest commits",
   pulls: "Pull requests",
   issues: "Issues",
@@ -58,15 +58,23 @@ export interface Section {
   toggle: () => void
   /** the section's name, as its button says it ("Hide issues") */
   label: string
+  /** always in a column of fixed height (the presentation page), not only on a wide screen */
+  fixed?: boolean
 }
 
 /** sectionCard is a section's card: open, its share of the panel's height on a wide screen; folded, its header alone. */
 export const sectionCard = (s: Section | undefined) =>
-  s ? cn("flex flex-col", s.open ? "lg:min-h-0 lg:flex-1 lg:basis-0" : "flex-none") : undefined
+  s
+    ? cn("flex flex-col", !s.open ? "flex-none" : s.fixed ? "min-h-0 flex-1 basis-0" : "lg:min-h-0 lg:flex-1 lg:basis-0")
+    : undefined
 
 /** sectionBody is a section's list: on a wide screen it scrolls inside the section, below the header that stays. */
 export const sectionBody = (s: Section | undefined) =>
-  s ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:-mr-2 lg:pr-2" : undefined
+  s
+    ? s.fixed
+      ? "min-h-0 flex-1 overflow-y-auto -mr-2 pr-2"
+      : "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:-mr-2 lg:pr-2"
+    : undefined
 
 /** SectionTitle is an element's title. */
 export function SectionTitle({ id, children }: { id: string; children: ReactNode }) {

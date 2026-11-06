@@ -11,7 +11,9 @@ import {
   productsView,
   profileCookie,
   profileNamed,
+  presentSectionsCookie,
   sectionsCookie,
+  sectionsOf,
   sideCookie,
   sideOf,
   viewCookie,
@@ -73,6 +75,7 @@ export const presentRoute: Route<object> = {
       load(qc, dashboardQuery(api, lens(search, cookies))),
       prefetch(qc, pageQuery(api, "present")),
       prefetch(qc, pullsQuery(api, pullsFilter(lens(search, cookies), 8))),
+      prefetch(qc, issuesQuery(api, issuesFilter(lens(search, cookies), 8))),
     ]),
   metadata: () => ({
     title: "Presentation",
@@ -90,6 +93,7 @@ export const presentRoute: Route<object> = {
       wall={cookies[wallCookie] === "1"}
       ask={typeof search.profile === "string" ? search.profile : undefined}
       show={commitsOf(cookies[commitsCookie])}
+      hidden={sectionsOf(cookies[presentSectionsCookie])}
     />
   ),
 }

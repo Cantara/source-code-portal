@@ -40,7 +40,7 @@ type Layout struct {
 }
 
 // Default is the built-in layout of page: the announcements first, below the header, then the fleet's numbers and map, then the products with their side panel: people's commits, the pull requests whose turn it is and the issues that wait. The presentation page
-// (design/present.md) shows the same compact: the fleet by health and the products as tiles.
+// (design/present.md) shows the same compact: the fleet by health, the products as tiles and the same three sections in its side column.
 func Default(page string) Layout {
 	switch page {
 	case "dashboard":
@@ -50,8 +50,9 @@ func Default(page string) Layout {
 			{Kind: oapi.LayoutElementKindAnnouncements},
 			{Kind: oapi.LayoutElementKindFleetMap, Color: new(oapi.LayoutElementColorHealth)},
 			{Kind: oapi.LayoutElementKindProducts, View: new(oapi.Tiles)},
-			{Kind: oapi.LayoutElementKindPulls, Count: new(8)},
 			{Kind: oapi.LayoutElementKindLatestCommits, Count: new(30)},
+			{Kind: oapi.LayoutElementKindPulls, Count: new(8)},
+			{Kind: oapi.LayoutElementKindIssues, Count: new(8)},
 		}}
 	default:
 		return Layout{Elements: []oapi.LayoutElement{}}

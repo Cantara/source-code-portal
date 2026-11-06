@@ -20,10 +20,15 @@ import {
   profiles,
   remember,
   sameWork,
+  presentSectionsCookie,
+  sectionKinds,
+  sectionsValue,
   type Columns,
   type Profile,
+  type SectionKind,
   type Work,
 } from "@/lib/preferences"
+import { PanelRightIcon } from "@/components/ui/icons"
 import { Mark } from "@/components/ui/mark"
 import { AiMark } from "@/entities/commit/ai-mark"
 import { InitialsAvatar } from "@/shared/initials-avatar"
@@ -46,6 +51,7 @@ import { TelemetryStrip } from "./telemetry"
 import { ProductTiles } from "./tiles"
 import { Pulls } from "./pulls"
 import { Issues } from "./issues"
+import { sectionLabels, SectionFold, type Section } from "./side"
 
 /** stale and offline are how long since the data was last known current before the page says so (design/present.md). */
 const stale = 2 * 60_000
@@ -108,10 +114,10 @@ function Freshness() {
     <p role="status" className={cn(s.level, "flex shrink-0 flex-col items-end leading-tight")} title={s.about}>
       <span className="flex items-center gap-2">
         <span aria-hidden="true" className="led led-live" />
-        <span className="font-mono font-semibold tracking-widest text-(--lvl-fg) uppercase">{s.word}</span>
+        <span className="font-mono text-sm font-semibold tracking-widest text-(--lvl-fg) uppercase">{s.word}</span>
       </span>
       {data?.builtAt && (
-        <span className="text-sm text-muted-foreground" suppressHydrationWarning>
+        <span className="text-xs text-muted-foreground" suppressHydrationWarning>
           <span className="sr-only">data from </span>
           {ago(data.builtAt, now) === "now" ? "now" : `${ago(data.builtAt, now)} ago`}
         </span>
@@ -135,6 +141,7 @@ function Stream({
   work,
   keep,
   picker,
+  section,
 }: {
   commits: Commit[]
   /** the kinds the column shows */
@@ -142,6 +149,8 @@ function Stream({
   keep: (c: Commit) => boolean
   /** the label that chooses the kinds (ShowPicker) */
   picker?: ReactNode
+  /** its section of the side column */
+  section?: Section
 }) {
   const now = useNow()
   // The commits of the first render; a row's animation runs once, when it mounts, and only for one that arrived at the top.
@@ -194,69 +203,80 @@ function Stream({
   }
   useEffect(() => () => window.clearTimeout(idle.current), [])
   return (
-    <section aria-labelledby="stream" className="panel flex min-h-0 flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+    <section
+      aria-labelledby="stream"
+      className={cn("panel flex min-h-0 flex-col overflow-hidden", section && (section.open ? "flex-1 basis-0" : "flex-none"))}
+    >
+      <div
+        className={cn("flex items-center justify-between gap-2 px-3 py-2", section?.open !== false && "border-b border-border")}
+      >
         <h2
           id="stream"
           className="shrink-0 text-xs font-medium tracking-widest whitespace-nowrap text-muted-foreground uppercase"
         >
           Latest commits
         </h2>
-        {picker ?? <span className="text-xs text-muted-foreground">{by(work)}</span>}
+        <span className="flex min-w-0 items-center gap-1">
+          {section?.open !== false && (picker ?? <span className="text-xs text-muted-foreground">{by(work)}</span>)}
+          <SectionFold id="stream" section={section} />
+        </span>
       </div>
       {/* A container: the avatars show while the column is wide enough for them. */}
-      <ol
-        ref={list}
-        onScroll={scrolled}
-        tabIndex={0}
-        aria-label="Latest commits, newest first"
-        className="@container min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring [scrollbar-width:thin]"
-      >
-        {rows.map(({ c, id, fresh }) => {
-          const who = c.authorLogin || c.authorName
-          return (
-            <li key={id} className={cn("flex items-center gap-2.5 px-3 py-2", fresh && "arrive")}>
-              <span className="@max-[17rem]:hidden">
-                <InitialsAvatar name={c.authorName || c.authorLogin} />
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <p className="flex items-baseline gap-2 text-[0.9375rem]">
-                  <Link href={addressPath(c.repo)} className="min-w-0 truncate font-semibold hover:underline">
-                    {c.repo.split("/")[1]}
-                  </Link>
-                  <span className="ml-auto flex max-w-[55%] shrink-0 items-baseline gap-1.5 text-sm text-muted-foreground">
-                    <span className="truncate">{who}</span>
-                    <span aria-hidden="true">·</span>
-                    <time dateTime={c.committedAt} className="shrink-0 font-mono" suppressHydrationWarning>
-                      {ago(c.committedAt, now)}
-                    </time>
-                  </span>
-                </p>
-                <p className="flex min-w-0 items-center gap-1.5 text-[0.9375rem]">
-                  <AiMark commit={c} />
-                  {c.url ? (
-                    <a href={c.url} className="truncate hover:underline" rel="noreferrer" title={c.subject}>
-                      {c.subject}
-                    </a>
-                  ) : (
-                    <span className="truncate" title={c.subject}>
-                      {c.subject}
+      {section?.open !== false && (
+        <ol
+          ref={list}
+          onScroll={scrolled}
+          tabIndex={0}
+          id="stream-body"
+          aria-label="Latest commits, newest first"
+          className="@container min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring [scrollbar-width:thin]"
+        >
+          {rows.map(({ c, id, fresh }) => {
+            const who = c.authorLogin || c.authorName
+            return (
+              <li key={id} className={cn("flex items-center gap-2.5 px-3 py-2", fresh && "arrive")}>
+                <span className="@max-[17rem]:hidden">
+                  <InitialsAvatar name={c.authorName || c.authorLogin} />
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <p className="flex items-baseline gap-2 text-[0.9375rem]">
+                    <Link href={addressPath(c.repo)} className="min-w-0 truncate font-semibold hover:underline">
+                      {c.repo.split("/")[1]}
+                    </Link>
+                    <span className="ml-auto flex max-w-[55%] shrink-0 items-baseline gap-1.5 text-sm text-muted-foreground">
+                      <span className="truncate">{who}</span>
+                      <span aria-hidden="true">·</span>
+                      <time dateTime={c.committedAt} className="shrink-0 font-mono" suppressHydrationWarning>
+                        {ago(c.committedAt, now)}
+                      </time>
                     </span>
-                  )}
-                  <DiffStat stats={c.stats} className="ml-auto pl-2 @max-[22rem]:hidden" />
-                </p>
-              </div>
-            </li>
-          )
-        })}
-        <li ref={end} aria-hidden="true" className="px-3 py-2 text-center text-xs text-muted-foreground">
-          {more && q.isFetching
-            ? "Loading more…"
-            : more && (pages >= morePages || (q.isSuccess && !q.hasNextPage))
-              ? "The rest is under All commits"
-              : ""}
-        </li>
-      </ol>
+                  </p>
+                  <p className="flex min-w-0 items-center gap-1.5 text-[0.9375rem]">
+                    <AiMark commit={c} />
+                    {c.url ? (
+                      <a href={c.url} className="truncate hover:underline" rel="noreferrer" title={c.subject}>
+                        {c.subject}
+                      </a>
+                    ) : (
+                      <span className="truncate" title={c.subject}>
+                        {c.subject}
+                      </span>
+                    )}
+                    <DiffStat stats={c.stats} className="ml-auto pl-2 @max-[22rem]:hidden" />
+                  </p>
+                </div>
+              </li>
+            )
+          })}
+          <li ref={end} aria-hidden="true" className="px-3 py-2 text-center text-xs text-muted-foreground">
+            {more && q.isFetching
+              ? "Loading more…"
+              : more && (pages >= morePages || (q.isSuccess && !q.hasNextPage))
+                ? "The rest is under All commits"
+                : ""}
+          </li>
+        </ol>
+      )}
     </section>
   )
 }
@@ -285,24 +305,31 @@ function Screen({
   shown = data.work,
   picker,
   notices = [],
+  hidden = [],
+  onHide,
+  onShowAll,
 }: {
   layout: Element[]
   data: Schemas["Dashboard"]
   commits: Commit[]
   only?: string[]
   frame: string
-  /** the commit column's width in percent of the screen, in landscape */
+  /** the side column's width in percent of the screen, in landscape */
   column?: number
   /** resizes the column as its edge is dragged; kept when the drag ends (keep) */
   onColumn?: (width: number, keep: boolean) => void
-  /** the profile's usual width of the commit column, and the profile (data-profile on the frame) */
+  /** the profile's usual width of the side column, and the profile (data-profile on the frame) */
   usual?: number
   profile?: Profile
-  /** the kinds the commit column shows, and the label that chooses them */
+  /** the kinds the side column shows, and the label that chooses them */
   shown?: Work
   picker?: ReactNode
   /** the announcements the server gave this page */
   notices?: Notice[]
+  /** the side column's hidden sections, and the ways to hide one and to show them all */
+  hidden?: SectionKind[]
+  onHide?: (kind: SectionKind) => void
+  onShowAll?: () => void
 }) {
   const now = useNow()
   const features = useFeatures()
@@ -332,14 +359,6 @@ function Screen({
       case "announcements":
         left.push(<Announcements key={i} list={notices} wall />)
         break
-      case "pulls":
-        if (features.pulls) {
-          left.push(<Pulls key={i} work={data.work} group={one?.id} counts={one?.pulls ?? data.pulls} n={el.count ?? 8} wall />)
-        }
-        break
-      case "issues":
-        if (features.issues) left.push(<Issues key={i} work={data.work} group={one?.id} n={el.count ?? 8} wall />)
-        break
       case "heading":
         left.push(
           <div key={i}>
@@ -349,21 +368,65 @@ function Screen({
         )
         break
       case "latest-commits":
+      case "pulls":
+      case "issues":
         break
     }
   })
-  const stream = layout.find((e) => e.kind === "latest-commits")
+  // The latest commits, the pull requests and the issues are the side column's sections, in the layout's order (design/present.md).
+  const on = (e: Element) => (e.kind !== "pulls" || features.pulls) && (e.kind !== "issues" || features.issues)
+  const kinds = layout.filter((e) => (sectionKinds as readonly string[]).includes(e.kind) && on(e))
+  const allHidden = kinds.length > 0 && kinds.every((e) => hidden.includes(e.kind as SectionKind))
+  const section = (e: Element): Section => {
+    const kind = e.kind as SectionKind
+    return { open: !hidden.includes(kind), toggle: () => onHide?.(kind), label: sectionLabels[kind], fixed: true }
+  }
+  const draw = (e: Element) => {
+    const sec = section(e)
+    switch (e.kind) {
+      case "latest-commits":
+        return (
+          <Stream
+            key={`stream-${shown.join(",")}-${sec.open}`}
+            commits={commits.slice(0, e.count ?? 30)}
+            work={shown}
+            keep={keep}
+            picker={picker}
+            section={sec}
+          />
+        )
+      case "pulls":
+        return (
+          <Pulls
+            key="pulls"
+            work={data.work}
+            group={one?.id}
+            counts={one?.pulls ?? data.pulls}
+            n={e.count ?? 8}
+            section={sec}
+            wall
+          />
+        )
+      case "issues":
+        return <Issues key="issues" work={data.work} group={one?.id} n={e.count ?? 8} section={sec} wall />
+    }
+    return null
+  }
   return (
     <div
       data-profile={profile}
       data-split={profile !== "handheld-portrait" || undefined}
       className={cn(
-        "grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,38%)] gap-3 overflow-hidden p-3 text-[0.9375rem] split:grid-rows-1 split:gap-x-0",
-        stream ? columns[column] : "split:grid-cols-1",
+        "grid grid-cols-1 gap-3 overflow-hidden p-3 text-[0.9375rem] split:grid-rows-1 split:gap-x-0",
+        kinds.length === 0
+          ? "split:grid-cols-1"
+          : allHidden
+            ? "grid-rows-[minmax(0,1fr)_auto] split:grid-cols-[minmax(0,1fr)_auto] split:gap-x-3"
+            : cn("grid-rows-[minmax(0,1fr)_minmax(0,38%)]", columns[column]),
         frame,
       )}
     >
-      {/* A container: as the commit column widens, the elements keep the signals that matter most (container queries). */}
+      {/* A container: as the side column widens, the elements keep the signals that matter most (container queries). */}
       <div className="@container flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
         {!strip && (
           <div className="flex items-center justify-between gap-4">
@@ -373,15 +436,42 @@ function Screen({
         )}
         {left}
       </div>
-      {stream && <Resizer width={column} usual={usual} onChange={onColumn} />}
-      {stream && (
-        <Stream key={shown.join(",")} commits={commits.slice(0, stream.count ?? 30)} work={shown} keep={keep} picker={picker} />
+      {kinds.length > 0 && !allHidden && <Resizer width={column} usual={usual} onChange={onColumn} />}
+      {kinds.length > 0 && !allHidden && (
+        <aside aria-label="Side column" className="@container flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
+          {kinds.map((e) => (
+            // Each section's share is its wrapper's, padding apart, so the open ones are equal (design/present.md).
+            <div
+              key={e.kind}
+              className={
+                hidden.includes(e.kind as SectionKind) ? "flex flex-none flex-col" : "flex min-h-0 flex-1 basis-0 flex-col"
+              }
+            >
+              {draw(e)}
+            </div>
+          ))}
+        </aside>
+      )}
+      {allHidden && (
+        <aside aria-label="Side column">
+          <button
+            type="button"
+            onClick={onShowAll}
+            aria-expanded={false}
+            aria-label="Show the side column"
+            title="Show the side column"
+            className="panel flex h-full w-full items-center gap-2 px-3 py-2 text-xs font-medium tracking-widest text-muted-foreground uppercase transition-colors hover:text-foreground split:w-10 split:flex-col split:px-0 split:py-3"
+          >
+            <PanelRightIcon open={false} className="size-4 shrink-0" />
+            <span className="split:[writing-mode:vertical-rl]">Side column</span>
+          </button>
+        </aside>
       )}
     </div>
   )
 }
 
-/** columns are the landscape grid at each width of the commit column, as written classes (the CSP allows no style attribute). */
+/** columns are the landscape grid at each width of the side column, as written classes (the CSP allows no style attribute). */
 const columns: Record<number, string> = {
   20: "split:grid-cols-[minmax(0,1fr)_0.75rem_20%]",
   25: "split:grid-cols-[minmax(0,1fr)_0.75rem_25%]",
@@ -402,7 +492,7 @@ const slop = 4
 const doubleTap = 400
 
 /**
- * Resizer is the commit column's edge in split: dragged (a finger or a pointer) or moved with the arrow keys, in steps of 5% of
+ * Resizer is the side column's edge in split: dragged (a finger or a pointer) or moved with the arrow keys, in steps of 5% of
  * the screen from 20% to 60%; a double tap or click brings back the profile's usual width. Taps are told apart here, as a touch on a handle
  * that takes the whole gesture (touch-action none) sends no dblclick in every browser, and a tap never moves the column.
  */
@@ -437,7 +527,7 @@ function Resizer({
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize latest commits"
+      aria-label="Resize the side column"
       aria-valuemin={columnWidths.min}
       aria-valuemax={columnWidths.max}
       aria-valuenow={width}
@@ -584,20 +674,32 @@ export function PresentView({
   wall: told = false,
   ask,
   show,
+  hidden: hiddenAtFirst = [],
 }: {
   work: Work
   only?: string[]
-  /** the commit column's width per profile (the cookie `scp-present-column`) */
+  /** the side column's width per profile (the cookie `scp-present-column`) */
   columns?: Columns
   /** the profile the page last found on this screen (the cookie `scp-present-profile`), for the first paint */
   profile?: Profile
   /** whether this screen was told it is on a wall (the cookie `scp-present-wall`), and the address's `?profile=` */
   wall?: boolean
   ask?: string
-  /** the kinds the reader shows in the commit column (the cookie `scp-latest-work`), if any */
+  /** the kinds the reader shows in the side column (the cookie `scp-latest-work`), if any */
   show?: Work
+  /** the side column's hidden sections (the cookie `scp-present-sections`) */
+  hidden?: SectionKind[]
 }) {
   const s = useShow(show, work)
+  const [hidden, setHidden] = useState(hiddenAtFirst)
+  const keepHidden = (next: SectionKind[]) => {
+    setHidden(next)
+    const v = sectionsValue(next)
+    if (v) remember(presentSectionsCookie, v)
+    else forget(presentSectionsCookie)
+  }
+  // Hiding the last open section folds the column to its rail; showing it brings every section back (design/present.md).
+  const hide = (kind: SectionKind) => keepHidden(hidden.includes(kind) ? hidden.filter((k) => k !== kind) : [...hidden, kind])
   const p = useProfile(guess, told, ask)
   const [columns, setColumns] = useState(initial)
   const column = columns[p.profile]
@@ -661,6 +763,9 @@ export function PresentView({
             shown={s.shown}
             picker={picker}
             notices={page?.announcements}
+            hidden={hidden}
+            onHide={hide}
+            onShowAll={() => keepHidden([])}
           />
           <Bar
             profile={p.profile}

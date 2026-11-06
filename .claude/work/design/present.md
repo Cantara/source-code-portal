@@ -55,6 +55,8 @@ fits from 1024 to 1920 pixels wide.
   with a check, crossed out in red while updates fail); the name, what it counts and its parts (the people, the assistants, the bots
   and sweeps, the activities, the costliest findings, the products by level, the repositories by freshness) in its hint. As the
   column narrows the active repositories go first, then the products, then the three kinds of commits together. The freshness indicator closes it.
+  Compact (icons 16 px, values 18 px, the freshness word 14 px), so every signal fits a tablet on its side (Handheld landscape at
+  1180×820 with the side column at its usual 30%; owner, 2026-11-06).
 - **Fleet health**: the `fleet-map` coloured by health level instead of activity (one square per repository, the level's colour and
   a shape, attention outlined and watch round, so colour is never alone), drawn dense: one strip of clusters, each product's squares in
   a hairline outline without a name (a tap on a square names its repository and its product; a screen reader hears each product's
@@ -68,11 +70,18 @@ fits from 1024 to 1920 pixels wide.
   browser will (`fits`: the dense grid's placement, each tile at the first free place from the top left, a wide tile two columns and
   two rows), takes the fewest steps that let the products needing a look fit, then shows as many good ones as fit beside them (so a
   column a wide tile cannot use is filled), and checks what it drew, folding one more while anything is cut off.
-- **Latest commits**, the right column at full height: the author's avatar (initials) at the left while the column is at least
+- **The side column** (owner, 2026-11-06): the elements `latest-commits`, `pulls` and `issues` are the sections of the right column
+  at full height (below the rest in portrait), in the layout's order, the built-in one the latest commits, then the pull requests,
+  then the issues, as the dashboard's side panel (`layout.md`, L5). Each section's header ends with the panel icon that hides it to
+  its header and shows it again; the open ones share the column equally, each scrolling inside, and the pull requests and the issues
+  load more at their end as the commits do. The hidden kinds are kept in the cookie `scp-present-sections`, apart from the
+  dashboard's (another screen), read by the server; hiding the last open one folds the column to a rail ("Show the side column")
+  that brings every section back. A switched-off feature's section is not there.
+- **Latest commits**, a section of the side column: the author's avatar (initials) at the left while the column is at least
   17 rem wide, then the repository with the committer's alias and the time on the first line and the subject alone on the second,
   with the AI and automation marks of the commit lists. Its label (by the team, with AI, ...) is the button that chooses the kinds it shows, as on the dashboard (P-63). The column scrolls on its own (the page never does): at its end it reads the next pages of the same commits (`/commits?work=&page=`, 50 each, each commit once, the products `?groups=` names kept, at most 10 pages), and a minute untouched it goes back to the top and lets the older ones go, so a wall shows the newest again. A new commit slides in at the top (no motion with
   `prefers-reduced-motion`). It follows the work that counts.
-- **The commit column's width**: in landscape its left edge is a handle (`role=separator`), as wide as the gap it replaces and a hairline to see, its hit area reaching past it for a finger: dragged by a finger or a pointer, or
+- **The side column's width**: in landscape its left edge is a handle (`role=separator`), as wide as the gap it replaces and a hairline to see, its hit area reaching past it for a finger: dragged by a finger or a pointer, or
   moved with the arrow keys, from 20% to 60% of the screen in steps of 5% (written grid classes: the CSP allows no style), a double
   tap back to 30%. The width is the reader's, in the cookie `scp-present-column`, so the server draws it. The left column is a
   container, and as it narrows its elements keep what matters most (container queries): the strip drops the people and the share
@@ -104,14 +113,14 @@ fits from 1024 to 1920 pixels wide.
 ## Profiles
 
 A screen is one of four profiles, named for where it sits (P-64): **Handheld portrait** (a tablet upright, narrower than 1100 CSS
-px: the commit column below the rest; an iPad Pro 13" upright is 1032), **Handheld landscape** (a tablet on its side, narrower than
+px: the side column below the rest; an iPad Pro 13" upright is 1032), **Handheld landscape** (a tablet on its side, narrower than
 1600; the iPad is 1376), **Desk** (a monitor at arm's length: 1600 px and wider on its side, or an upright window wider than a tablet,
 such as half a 27" display at 1280×1328; the commit log is the point, 60% of the screen) and **Wall** (a screen read from across a
-room). Every profile but Handheld portrait is split, the commit column beside the rest, whichever way the window stands: the
+room). Every profile but Handheld portrait is split, the side column beside the rest, whichever way the window stands: the
 frame's `data-split` and the `split:` variant, not the screen's orientation. The page finds the first three from the window as it is and as it changes (`profileOf`,
 `useProfile` in `profile.ts`); a wall has a desk's pixels and no browser knows the viewer's distance, so a screen is told once
 (`?profile=wall` or *On a wall* in the tap bar, the cookie `scp-present-wall`; `?profile=auto` forgets it). Each profile keeps its own
-commit column (the cookie `scp-present-column`, `handheld-landscape:30,desk:55`, only the widths that differ from their defaults: 60%
+side column (the cookie `scp-present-column`, `handheld-landscape:30,desk:55`, only the widths that differ from their defaults: 60%
 for a desk, 30% for the rest), and a double tap brings back the profile's own. The server cannot see the window, so the page
 remembers the profile it last found (`scp-present-profile`) and the server renders that profile's column at once; a screen whose
 profile changed corrects it on its first paint. The tap bar names the profile and the window's size in CSS pixels, so two people can tell they look at the same screen.
@@ -152,7 +161,7 @@ profile's own layout or type size would go.
 |---|---|
 | K1 | `/present` from the layout page `present`: the grid, the status strip, `fleet-map.color: health`, `products.view: tiles` with the fold, latest commits at full height, the live data and the freshness indicator, `?groups=` and `?work=` |
 | K2 | The wall: no chrome with the tap bar, wake lock, the manifest, reload on a new build and hourly, burn-in shift; design mode on `/present`; docs, the Guide (a section with a picture), the plugin |
-| K3 | Profiles: Handheld portrait, Handheld landscape, Desk and Wall, found from the window (a wall told), each with its own commit column, Desk at 60%; the tap bar names the profile; docs and the plugin |
+| K3 | Profiles: Handheld portrait, Handheld landscape, Desk and Wall, found from the window (a wall told), each with its own side column, Desk at 60%; the tap bar names the profile; docs and the plugin |
 
 ## Not now
 

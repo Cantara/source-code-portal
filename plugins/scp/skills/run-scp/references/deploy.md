@@ -150,7 +150,8 @@ which stays in the extension. A badge of 0 means the flag is off or Chrome was n
 
 `/present` is the presentation page for a tablet or a TV: one screen, no scrolling, live, nothing to configure. Bookmark one per team
 (`/present?groups=payments,identity`, `?work=hand,ai`); on an iPad add it to the home screen. The page picks its profile from the screen (*Handheld portrait*, *Handheld
-landscape* up to 1600 px, *Desk* beyond, the commit log at 60%), each with its own commit column; a TV is told it is on a wall once
+landscape* up to 1600 px, *Desk* beyond, the commit log at 60%), each with its own width of the side column (the latest commits,
+the pull requests and the issues, each hidden by its button, as on the dashboard); a TV is told it is on a wall once
 with `/present?profile=wall`. Behind `access.require_auth` sign in
 once on the device, with single sign-on or a token of its own from `auth.tokens` (only the groups it shows): the page's hourly reload
 renews the session. An administrator arranges it like the dashboard; with `layout.dir`

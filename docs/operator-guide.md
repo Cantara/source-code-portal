@@ -373,7 +373,10 @@ against burn-in. A tap shows its controls; an administrator designs it as the da
   tablet on its side, up to 1600 pixels wide), *Desk* (a wider monitor, or a window on half of one: the commit log takes 60% of it) and *Wall* (a screen read
   from across a room). A wall has a desk's pixels, so tell the screen once: `/present?profile=wall`, or *On a wall* in its controls;
   `?profile=auto` forgets it. The controls show the profile.
-- Drag the commit column's edge (or use the arrow keys on it) to make it wider, up to 60% of the screen; the device remembers it for
+- The right side column holds the latest commits, the pull requests and the issues, each with its own scroll and a button that
+  hides it; the others take its space, and with all three hidden the column folds to a thin rail that brings them back. Each screen
+  remembers its own choice.
+- Drag the side column's edge (or use the arrow keys on it) to make it wider, up to 60% of the screen; the device remembers it for
   each profile, so a width dragged on the desk leaves the tablet's alone, and a double tap brings back the profile's own. The
   left side then keeps what matters most: the products that need a look and how current the page is stay, the people, the counts and
   the counts give way first; the products then fold the good ones, then shrink and fold the mildest to watch.
@@ -443,8 +446,8 @@ stands: *needs triage* (no label, milestone or issue type: nobody has looked at 
 dependency dashboard is automation), those needing triage first, then the longest idle; the states are filters, and the kind, the
 product, the repository, whose and the order are a form that works without JavaScript. A group's and a repository's page have a panel
 with the ones that wait longest, and the group table's issue counts link to them. The dashboard's side panel has them after the
-latest commits and the pull requests, each a third of it with its own scroll; a reader hides any of the three by its button, and the
-others take the space. The dashboard keeps its signal, the *backlog*
+latest commits and the pull requests, each a third of it with its own scroll that reads more as it nears its end; a reader hides
+any of the three by its button, and the others take the space. `/present` has the same three in its side column. The dashboard keeps its signal, the *backlog*
 finding. They need the App's *Issues* read permission (section 1); without it GitHub refuses the listing and `/issues` stays empty.
 `features.issues: false` switches them off (section 1).
 

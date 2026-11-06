@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
-/* The presentation page split in two, the commit column beside the rest: set by its profile, not the screen's orientation (P-64). */
+/* The presentation page split in two, the side column beside the rest: set by its profile, not the screen's orientation (P-64). */
 @custom-variant split (&:is([data-split], [data-split] *));
 
 @theme inline {

@@ -139,13 +139,13 @@ export function profileNamed(v: unknown): Profile | undefined {
 export const wallCookie = "scp-present-wall"
 
 /**
- * columnCookie remembers the presentation page's commit column per profile, its width in percent of the screen
+ * columnCookie remembers the presentation page's side column per profile, its width in percent of the screen
  * ("handheld-landscape:30,desk:60"): a width dragged on the desk's monitor leaves the tablet's alone.
  */
 export const columnCookie = "scp-present-column"
 export const columnWidths = { min: 20, max: 60, step: 5 } as const
 
-/** Columns are the commit column's width per profile. */
+/** Columns are the side column's width per profile. */
 export type Columns = Record<Profile, number>
 
 /** columnDefaults are each profile's width until it is dragged: the commit log takes most of a desk, a third elsewhere. */
@@ -184,6 +184,8 @@ export type Side = { open: boolean; width: number; folded: SectionKind[] }
 export const sideCookie = "scp-side-commits"
 /** sectionsCookie keeps the side panel's folded sections, comma-separated ("pulls,issues"). */
 export const sectionsCookie = "scp-side-sections"
+/** presentSectionsCookie keeps the presentation page's hidden sections, apart from the dashboard's (another screen). */
+export const presentSectionsCookie = "scp-present-sections"
 /** sectionKinds are the elements that are sections of the side panel, in their usual order. */
 export const sectionKinds = ["latest-commits", "pulls", "issues"] as const
 export type SectionKind = (typeof sectionKinds)[number]
@@ -196,8 +198,13 @@ export const sideWidths = { min: 18, max: 40, initial: 26 } as const
 export function sideOf(v: unknown, sections?: unknown): Side {
   const m = typeof v === "string" ? /^(open|closed):(\d{1,2})$/.exec(v) : null
   const width = m ? Math.min(Math.max(Number(m[2]), sideWidths.min), sideWidths.max) : sideWidths.initial
-  const named = typeof sections === "string" ? sections.split(",") : []
-  return { open: m?.[1] !== "closed", width, folded: sectionKinds.filter((k) => named.includes(k)) }
+  return { open: m?.[1] !== "closed", width, folded: sectionsOf(sections) }
+}
+
+/** sectionsOf reads a sections cookie: the hidden kinds, known ones only, in their usual order. */
+export function sectionsOf(v: unknown): SectionKind[] {
+  const named = typeof v === "string" ? v.split(",") : []
+  return sectionKinds.filter((k) => named.includes(k))
 }
 
 /** sectionsValue is the sections' cookie value. */

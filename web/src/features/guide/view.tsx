@@ -703,9 +703,9 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
               <p>
                 Beside the products, a side panel holds the latest commits, the pull requests and the issues, a third each. Each
                 scrolls on its own; its button hides it, and the others take its space. With all three hidden the panel folds to a
-                thin rail, and its edge drags it wider. Scroll to the end of the latest commits and older ones load. Its label
-                says what it shows, the work that counts until you choose: select it for a small dialog with the three kinds as
-                checkboxes, each with its commits in the last {days}. Commits made with AI carry a mark naming the assistant.
+                thin rail, and its edge drags it wider. Scroll to the end of any of them and more load. Its label says what it
+                shows, the work that counts until you choose: select it for a small dialog with the three kinds as checkboxes,
+                each with its commits in the last {days}. Commits made with AI carry a mark naming the assistant.
               </p>
               <p>
                 <strong className="text-foreground">Commits</strong> in the header holds every commit of every repository, to
@@ -795,9 +795,10 @@ export function GuideView({ version, rules = none }: { version: string; rules?: 
                 </p>
                 <p>
                   It knows the screen it is on: a tablet held upright or on its side, a monitor at a desk, where the commits take
-                  most of the width, or a screen on a wall. Each keeps its own width of the commits, which scroll on their own and
-                  go back to the newest after a minute untouched. A finding on a tile opens its repository, where its next step
-                  is.
+                  most of the width, or a screen on a wall. At the right, the latest commits, the pull requests and the issues
+                  share a column, each scrolling on its own and hidden by its button, as on the dashboard; each screen keeps its
+                  own width of it, and the commits go back to the newest after a minute untouched. A finding on a tile opens its
+                  repository, where its next step is.
                 </p>
                 <p>
                   It keeps the screen awake, is dark on a wall unless you chose otherwise, reloads itself for a new release and

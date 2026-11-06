@@ -81,8 +81,9 @@ export const defaultPresent: Element[] = [
   { kind: "announcements" },
   { kind: "fleet-map", color: "health" },
   { kind: "products", view: "tiles" },
-  { kind: "pulls", count: 8 },
   { kind: "latest-commits", count: 30 },
+  { kind: "pulls", count: 8 },
+  { kind: "issues", count: 8 },
 ]
 
 /** pick is the groups an element selects (none: every group), in its order; ids no group has are left out. */

@@ -191,7 +191,7 @@ export function FleetMap({
 /**
  * HealthMap is the fleet map coloured by health: every repository one tile by product, attention outlined and watch round besides
  * their colours, so the fleet's health reads at a glance and from across a room. The legend counts each level, once per repository;
- * in a narrow container (the presentation page with a wide commit column) only the legend stays, the tiles' room going to the products.
+ * in a narrow container (the presentation page with a wide side column) only the legend stays, the tiles' room going to the products.
  */
 function HealthMap({
   groups,

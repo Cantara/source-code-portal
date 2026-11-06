@@ -79,11 +79,55 @@ test("/present passes axe in both themes, the reader's choice", async ({ page })
   await page.evaluate(() => localStorage.removeItem("scp-theme"))
 })
 
-test("the commit column widens by its edge, is remembered, and the left keeps what matters most", async ({ page }, info) => {
+test("the side column holds the latest commits, the pull requests and the issues, each hidden by its button, all hidden a rail", async ({
+  page,
+}, info) => {
   test.skip(info.project.name !== "desktop", "a landscape screen")
   await page.setViewportSize({ width: 1180, height: 820 })
   await page.goto("/present")
-  const edge = page.getByRole("separator", { name: "Resize latest commits" })
+  const column = page.getByRole("complementary", { name: "Side column" })
+  const shares = () => column.evaluate((c) => [...c.children].map((e) => Math.round(e.getBoundingClientRect().height)))
+  for (const name of ["latest commits", "pull requests", "issues"]) {
+    await expect(column.getByRole("button", { name: `Hide ${name}` })).toHaveAttribute("aria-expanded", "true")
+  }
+  // The open sections share the column equally, each scrolling inside its own.
+  const three = await shares()
+  expect(three).toHaveLength(3)
+  expect(Math.max(...three) - Math.min(...three)).toBeLessThanOrEqual(1)
+  await column.getByRole("button", { name: "Hide pull requests" }).click()
+  await page.reload()
+  await expect(column.getByRole("button", { name: "Show pull requests" })).toHaveAttribute("aria-expanded", "false")
+  const [commits = 0, pulls = 0, issues = 0] = await shares()
+  expect(Math.abs(commits - issues)).toBeLessThanOrEqual(1)
+  expect(pulls).toBeLessThan(commits / 2)
+  // Hiding the last two folds the column to a rail; it brings every section back.
+  await column.getByRole("button", { name: "Hide latest commits" }).click()
+  await column.getByRole("button", { name: "Hide issues" }).click()
+  await expect(page.getByRole("separator", { name: "Resize the side column" })).toHaveCount(0)
+  const rail = page.getByRole("button", { name: "Show the side column" })
+  await rail.click()
+  for (const name of ["latest commits", "pull requests", "issues"]) {
+    await expect(column.getByRole("button", { name: `Hide ${name}` })).toBeVisible()
+  }
+  const size = await page.evaluate(() => [document.documentElement.scrollHeight, document.documentElement.clientHeight])
+  expect(size[0]).toBe(size[1])
+})
+
+test("the status strip shows every signal on a tablet on its side", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "a landscape screen")
+  await page.setViewportSize({ width: 1180, height: 820 })
+  await page.goto("/present")
+  const signals = page.getByRole("region", { name: "Telemetry" }).locator("dl > div")
+  await expect(signals.first()).toBeVisible()
+  const hidden = await signals.evaluateAll((all) => all.filter((e) => getComputedStyle(e).display === "none").length)
+  expect(hidden).toBe(0)
+})
+
+test("the side column widens by its edge, is remembered, and the left keeps what matters most", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "a landscape screen")
+  await page.setViewportSize({ width: 1180, height: 820 })
+  await page.goto("/present")
+  const edge = page.getByRole("separator", { name: "Resize the side column" })
   await expect(edge).toHaveAttribute("aria-valuenow", "30")
   const strip = page.getByRole("region", { name: "Telemetry" })
   await expect(strip.getByText("Commits by hand", { exact: true })).toBeVisible()
@@ -108,7 +152,7 @@ test("the commit column widens by its edge, is remembered, and the left keeps wh
   await expect(edge).toHaveAttribute("aria-valuenow", "30")
 })
 
-test("a double tap on the commit column's edge brings back its usual width", async ({ browser }) => {
+test("a double tap on the side column's edge brings back its usual width", async ({ browser }) => {
   const baseURL = test.info().project.use.baseURL ?? ""
   const ctx = await browser.newContext({
     baseURL,
@@ -120,7 +164,7 @@ test("a double tap on the commit column's edge brings back its usual width", asy
   await ctx.addCookies([{ name: "scp-present-column", value: "handheld-landscape:50", url: baseURL }])
   const page = settled(await ctx.newPage())
   await page.goto("/present")
-  const edge = page.getByRole("separator", { name: "Resize latest commits" })
+  const edge = page.getByRole("separator", { name: "Resize the side column" })
   await expect(edge).toHaveAttribute("aria-valuenow", "50")
   const box = await edge.boundingBox()
   if (!box) throw new Error("no edge")
@@ -130,12 +174,12 @@ test("a double tap on the commit column's edge brings back its usual width", asy
   await ctx.close()
 })
 
-test("each profile keeps its own commit column: a desk's monitor starts at 60%, a tablet at 30%, a wall is told", async ({
+test("each profile keeps its own side column: a desk's monitor starts at 60%, a tablet at 30%, a wall is told", async ({
   page,
 }, info) => {
   test.skip(info.project.name !== "desktop", "a landscape screen")
   const frame = page.locator("[data-profile]")
-  const edge = page.getByRole("separator", { name: "Resize latest commits" })
+  const edge = page.getByRole("separator", { name: "Resize the side column" })
   // A 27-inch monitor at its usual resolution is a desk: the commit log takes most of it.
   await page.setViewportSize({ width: 2560, height: 1440 })
   await page.goto("/present")

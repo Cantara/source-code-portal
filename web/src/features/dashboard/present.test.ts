@@ -55,7 +55,7 @@ describe("profiles", () => {
     expect(profileNamed("tv")).toBeUndefined()
   })
 
-  it("keep a commit column of their own, on the 5% grid within 20% to 60%, the desk's 60% until dragged", () => {
+  it("keep a side column of their own, on the 5% grid within 20% to 60%, the desk's 60% until dragged", () => {
     expect(columnsOf(undefined)).toEqual(columnDefaults)
     expect(columnsOf(undefined).desk).toBe(60)
     const c = columnsOf("handheld-landscape:43,desk:90,tv:20,wall:wide")
