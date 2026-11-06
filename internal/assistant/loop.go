@@ -73,8 +73,13 @@ func (a *Assistant) answer(w http.ResponseWriter, r *http.Request, history []llm
 	s := &stream{w: w, rc: rc}
 
 	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-	go func() {
+	// The ping writes to the response: it ends, and is waited for, before the handler returns the writer to the server.
+	var pings sync.WaitGroup
+	defer func() {
+		cancel()
+		pings.Wait()
+	}()
+	pings.Go(func() {
 		t := time.NewTicker(a.ping)
 		defer t.Stop()
 		for {
@@ -88,7 +93,7 @@ func (a *Assistant) answer(w http.ResponseWriter, r *http.Request, history []llm
 				}
 			}
 		}
-	}()
+	})
 
 	u, code, err := a.run(ctx, s, history)
 	if code == "" {

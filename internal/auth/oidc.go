@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -176,7 +177,7 @@ func (a *Auth) exchange(ctx context.Context, code string, f flow) (session, erro
 			}
 		}
 	}
-	s := session{Issuer: idt.Issuer, Subject: idt.Subject, Email: str(claims["email"]), Verified: claims["email_verified"] != false,
+	s := session{Issuer: idt.Issuer, Subject: idt.Subject, Email: str(claims["email"]), Verified: emailVerified(claims["email_verified"]),
 		Groups: a.o.Keep(stringList(claims[p.o.GroupsClaim]))}
 	for _, k := range []string{"name", "preferred_username", "email"} {
 		if s.Name = str(claims[k]); s.Name != "" {
@@ -187,6 +188,18 @@ func (a *Auth) exchange(ctx context.Context, code string, f flow) (session, erro
 		s.Name = idt.Subject
 	}
 	return s, nil
+}
+
+// emailVerified is the email_verified claim: false for a boolean false or the string "false" (providers that answer it from userinfo
+// as a string); a provider that does not say is taken as it is.
+func emailVerified(v any) bool {
+	switch v := v.(type) {
+	case bool:
+		return v
+	case string:
+		return !strings.EqualFold(v, "false")
+	}
+	return true
 }
 
 func str(v any) string {
