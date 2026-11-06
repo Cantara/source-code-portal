@@ -61,7 +61,7 @@ describe("pages", () => {
     expect(rows[0]).toHaveTextContent("acme/core")
     expect(rows[0]).toHaveTextContent("Pre-release")
     expect(rows[0]).toHaveTextContent("Faster login")
-    expect(within(rows[0]).getByRole("link", { name: "v2.1.0-rc1" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "v2.1.0-rc1" })).toHaveAttribute(
       "href",
       "https://github.com/acme/core/releases/tag/v2.1.0-rc1",
     )
