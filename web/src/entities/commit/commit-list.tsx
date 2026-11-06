@@ -59,6 +59,7 @@ export function CommitList({
                 {showRepo && (
                   <>
                     <Link
+                      prefetch={false}
                       href={repoHref(c.repo)}
                       className="rounded border border-border px-1.5 py-px text-xs font-medium text-foreground hover:bg-accent"
                     >

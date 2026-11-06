@@ -1,13 +1,11 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useState, type FormEvent, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { api } from "@/lib/api/client"
-import { groupsQuery } from "@/lib/api/queries"
 import { cn } from "@/lib/cn"
 import { count } from "@/lib/format"
+import { filterField, ProductField, RepoField } from "@/shared/filter-fields"
 import { PageSizeField } from "@/shared/pager"
 
 /** QueueStatus is one state of a list of open work (pull requests, issues): its words, what it waits for and its dot. */
@@ -68,9 +66,6 @@ export function QueueChips<S extends string>({
   )
 }
 
-/** queueField is the look of a filter form's select or input. */
-export const queueField = "mt-1 min-h-9 rounded-md border border-input bg-background px-2"
-
 /**
  * QueueForm is a list's filters as a GET form that works without JavaScript: the fields of its own first (before), the product, the
  * repository, who opened it and the order (waiting names the default order), those after it, the page size and Apply. With
@@ -97,7 +92,6 @@ export function QueueForm({
   onSize: (n: number) => void
   onApply: (fields: Record<string, string>) => void
 }) {
-  const groups = useQuery(groupsQuery(api))
   const [repoText, setRepoText] = useState(filter.repo ?? "")
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -109,24 +103,11 @@ export function QueueForm({
     <form onSubmit={submit} action={action} className="flex flex-wrap items-end gap-3 text-sm" aria-label={label}>
       {filter.state && <input type="hidden" name="state" value={filter.state} />}
       {before}
-      <label className="flex flex-col">
-        Product
-        <select name="group" defaultValue={filter.group ?? ""} className={queueField}>
-          <option value="">All products</option>
-          {groups.data?.groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col">
-        Repository (owner/name)
-        <input name="repo" value={repoText} onChange={(e) => setRepoText(e.target.value)} className={queueField} />
-      </label>
+      <ProductField value={filter.group} />
+      <RepoField value={repoText} onChange={setRepoText} />
       <label className="flex flex-col">
         Opened by
-        <select name="by" defaultValue={filter.by ?? ""} className={queueField}>
+        <select name="by" defaultValue={filter.by ?? ""} className={filterField}>
           <option value="">People and automation</option>
           <option value="people">People</option>
           <option value="automation">Automation</option>
@@ -134,7 +115,7 @@ export function QueueForm({
       </label>
       <label className="flex flex-col">
         Order
-        <select name="sort" defaultValue={filter.sort ?? "waiting"} className={queueField}>
+        <select name="sort" defaultValue={filter.sort ?? "waiting"} className={filterField}>
           <option value="waiting">{waiting}</option>
           <option value="newest">Newest first</option>
           <option value="updated">Updated last first</option>

@@ -15,7 +15,10 @@ class InView {
   disconnect() {}
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 const section: Section = { open: true, toggle: () => {}, label: "Section", fixed: true }
 const client = () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -78,5 +81,30 @@ describe("the side sections list the newest first and read more at their end", (
     )
     expect(await screen.findByText("Problem 2")).toBeInTheDocument()
     expect(asked).toEqual(["newest:5:"])
+  })
+
+  it("reads the next page only while the list's end is near, not on what the observer once said", async () => {
+    vi.stubGlobal("IntersectionObserver", InView)
+    // The first page made the list long: the end is far below the section's bottom.
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const top = this.getAttribute("aria-live") ? 5000 : 0
+      return { top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON: () => ({}) }
+    })
+    const asked: string[] = []
+    server.use(
+      http.get("/pulls", ({ query, response }) => {
+        asked.push(query.get("page") ?? "")
+        const n = Number(query.get("page") ?? 0)
+        const pulls = n === 0 ? [pull(1), pull(2)] : [pull(1), pull(2), pull(3)]
+        return response(200).json({ pulls, counts: pullCounts({ review: 4 }), page: page(Math.max(n, 1)), freshness: fresh })
+      }),
+    )
+    render(
+      <QueryClientProvider client={client()}>
+        <Pulls work={["hand", "ai"]} counts={pullCounts({ review: 4 })} n={2} section={section} />
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText("Change 3")).toBeInTheDocument()
+    expect(asked).toEqual(["", "1"])
   })
 })

@@ -149,8 +149,8 @@ func TestCacheBound(t *testing.T) {
 		t.Error("a recently used entry was evicted")
 	}
 	c.put("big", item{body: make([]byte, 11)}, 0, now)
-	if _, ok := c.get("big", now); ok || c.size > c.max {
-		t.Errorf("an entry above the bound was kept, size %d", c.size)
+	if _, ok := c.get("big", now); ok || c.entries.Size() > 10 {
+		t.Errorf("an entry above the bound was kept, size %d", c.entries.Size())
 	}
 	c.put("t", item{body: []byte("t")}, time.Minute, now)
 	if _, ok := c.get("t", now.Add(2*time.Minute)); ok {

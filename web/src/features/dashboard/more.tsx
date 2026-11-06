@@ -28,7 +28,6 @@ export function useMore<T, P extends { page: { number: number; pages: number } }
     seen.add(k)
     return true
   })
-  const visible = useRef(false)
   const next = useRef(() => {})
   useEffect(() => {
     next.current = () => {
@@ -42,8 +41,7 @@ export function useMore<T, P extends { page: { number: number; pages: number } }
     if (!watch || !el || typeof IntersectionObserver === "undefined") return // without it the list stays, the link has the rest
     const o = new IntersectionObserver(
       (es) => {
-        visible.current = es.some((e) => e.isIntersecting)
-        if (visible.current) next.current()
+        if (es.some((e) => e.isIntersecting)) next.current()
       },
       // The margin is the scroll's that holds the list, so the next page is read before its end is reached.
       { root: scroller(el), rootMargin: "0px 0px 300px 0px" },
@@ -51,12 +49,21 @@ export function useMore<T, P extends { page: { number: number; pages: number } }
     o.observe(el)
     return () => o.disconnect()
   }, [end, watch])
-  // A page that left the end in view (a tall section) reads the next at once.
+  // A page that left the end in view (a tall section) reads the next at once. The end's place is measured now: the observer only
+  // reports a change, so what it last said is stale once the page has made the list longer.
   useEffect(() => {
-    if (!q.isFetching && visible.current) next.current()
-  }, [q.isFetching, pages])
+    const el = end.current
+    if (more && watch && !q.isFetching && el && near(el)) next.current()
+  }, [end, more, watch, q.isFetching, pages])
   const done = (more && q.isSuccess && !q.hasNextPage) || pages >= morePages
   return { items, loading: more && q.isFetching && q.data !== undefined, done }
+}
+
+/** near says whether el is within 300 px below the bottom of the area that scrolls it (the page, else), as the observer's margin. */
+function near(el: Element): boolean {
+  const root = scroller(el)
+  const bottom = root ? root.getBoundingClientRect().bottom : window.innerHeight
+  return el.getBoundingClientRect().top <= bottom + 300
 }
 
 /** scroller is the nearest element that scrolls el, else none: the page. */

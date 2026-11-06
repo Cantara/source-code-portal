@@ -111,7 +111,7 @@ function ColumnRow({ r }: { r: Row }) {
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <p className="flex items-baseline gap-2 text-[0.9375rem]">
-          <Link href={addressPath(r.repo)} className="min-w-0 truncate font-semibold hover:underline">
+          <Link prefetch={false} href={addressPath(r.repo)} className="min-w-0 truncate font-semibold hover:underline">
             {r.repo.split("/")[1]}
             <span className="font-normal text-muted-foreground">#{r.number}</span>
           </Link>

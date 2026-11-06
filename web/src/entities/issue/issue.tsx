@@ -102,6 +102,7 @@ export function IssueList({
               )}
               {showRepo ? (
                 <Link
+                  prefetch={false}
                   href={addressPath(i.repo)}
                   className="inline-flex min-h-6 items-center rounded border border-border px-1.5 text-xs font-medium text-foreground hover:bg-accent"
                 >
