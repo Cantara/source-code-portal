@@ -460,6 +460,16 @@ any of the three by its button, and the others take the space. `/present` has th
 finding. They need the App's *Issues* read permission (section 1); without it GitHub refuses the listing and `/issues` stays empty.
 `features.issues: false` switches them off (section 1).
 
+### 2.4.4 Alumni
+
+**Alumni** in the header (`/alumni`) lists the retired repositories a reader may see: those GitHub archived and those whose
+`scp.yaml` says `lifecycle: deprecated` (archived wins). A quiet repository is not retired, only dormant. Each row says why, when the
+repository was last active (its newest commit; GitHub dates no archive, so the portal does not invent a date of retirement), its
+latest release, how many other repositories still depend on it (archived ones are not counted), and how many people wrote its
+recent commits, counted and never named. The reasons are filters; the product, a name, *still depended on* and the order are a form
+that works without JavaScript. The page needs no setting and nothing from GitHub that the portal does not already read, and a
+private alumnus is shown only to those who may see the repository.
+
 ### 2.5 Published packages
 
 A repository's release is often a package, not a GitHub release: a Java library published to a Maven repository by a CI server, a

@@ -46,6 +46,8 @@ func TestServeForPlaywright(t *testing.T) {
 	sso := gh.AddRepo("acme", gogh.Repository{Name: new("whydah-sso"), Description: new("Single sign-on"), Visibility: new("public")})
 	tool := gh.AddRepo("acme", gogh.Repository{Name: new("tool"), Description: new("A tool"), Visibility: new("public")})
 	gh.AddRepo("acme", gogh.Repository{Name: new("vault"), Description: new("Secrets of the staff"), Visibility: new("private")})
+	legacy := gh.AddRepo("acme", gogh.Repository{Name: new("legacy-sso"), Description: new("Retired single sign-on"), Visibility: new("public"),
+		Archived: new(true)})
 	idp := oidctest.New("scp-e2e")
 	defer idp.Close()
 	idp.SetUser(oidctest.User{Subject: "u-1", Email: "ada@example.org", Name: "Ada Lovelace", Groups: []string{"staff"}})
@@ -75,6 +77,8 @@ func TestServeForPlaywright(t *testing.T) {
 		gh.SetCommits(id, cs...)
 		history[id] = cs
 	}
+	gh.SetCommits(legacy, githubtest.Commit{SHA: fmt.Sprintf("%040x", 0xd1), Message: "Archive the repository", AuthorName: "Ann Example",
+		AuthorLogin: "ann", Date: start.Add(-400 * 24 * time.Hour)}) // the alumnus, last active long ago
 	// A branch off the main line at 3, a renovate branch the portal leaves out, and tags: four at the head, one further down.
 	core0 := history[core]
 	gh.SetBranch(core, "feature/sso", githubtest.Commit{SHA: fmt.Sprintf("%040x", 0xb2), Message: "Bridge the SSO session",

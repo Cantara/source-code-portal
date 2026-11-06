@@ -160,14 +160,15 @@ export function PortalNav() {
 }
 
 const nav =
-  "rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+  "shrink-0 rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-foreground"
 
 /** MainNav is the header navigation, with Ask when the viewer may use the assistant; the current section is marked. */
 export function MainNav({ ask = false }: { ask?: boolean }) {
   const path = usePathname()
   const features = useFeatures()
+  // One line whatever the width: on a phone the links scroll sideways, as more pages join them, not wrap into a taller sticky header.
   return (
-    <nav aria-label="Main" className="flex gap-1 text-sm">
+    <nav aria-label="Main" className="flex w-full gap-1 overflow-x-auto text-sm sm:w-auto">
       <Link href="/" className={nav} aria-current={path === "/" ? "page" : undefined}>
         Dashboard
       </Link>
@@ -184,6 +185,9 @@ export function MainNav({ ask = false }: { ask?: boolean }) {
           Issues
         </Link>
       )}
+      <Link href="/alumni" className={nav} aria-current={path === "/alumni" ? "page" : undefined}>
+        Alumni
+      </Link>
       {ask && (
         <Link href="/ask" className={nav} aria-current={path === "/ask" ? "page" : undefined}>
           Ask

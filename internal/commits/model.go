@@ -492,6 +492,27 @@ func Repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	}
 }
 
+// alumniAuthors is how many of the newest default-branch commits an alumnus's authors are counted over.
+const alumniAuthors = 100
+
+// Alumnus completes a retired repository's row: when it was last active (its newest commit, when one is held) and how many authors
+// its newest commits have, people's work only, counted and never named (design/alumni.md).
+func Alumnus(_ *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.Alumnus) {
+	cs, _ := Of(e)
+	if len(cs) == 0 {
+		return
+	}
+	a.LastActive = cs[0].CommittedAt.UTC()
+	authors := map[string]struct{}{}
+	for i := range cs[:min(len(cs), alumniAuthors)] {
+		if k, _ := Classify(&cs[i]); k == OriginAutomation {
+			continue
+		}
+		authors[strings.ToLower(cmp.Or(cs[i].AuthorLogin, cs[i].AuthorName))] = struct{}{}
+	}
+	a.Authors = len(authors)
+}
+
 // detailCommits is how many of the newest default-branch commits a repository's detail carries.
 const detailCommits = 30
 

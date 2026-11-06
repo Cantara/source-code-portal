@@ -280,6 +280,23 @@ export const defaults = [
       freshness: fresh,
     }),
   ),
+  http.get("/alumni", ({ response }) =>
+    response(200).json({
+      alumni: [
+        {
+          repo: repo("old-lib", { archived: true, description: "Retired in 2025" }),
+          reason: "archived",
+          lastActive: "2025-01-10T00:00:00Z",
+          usedBy: 2,
+          authors: 3,
+        },
+        { repo: repo("legacy-app"), reason: "deprecated", lastActive: "2026-03-01T00:00:00Z", usedBy: 0, authors: 1 },
+      ],
+      counts: { total: 2, archived: 1, deprecated: 1, used: 1 },
+      page: { number: 1, size: 50, total: 2, pages: 1 },
+      freshness: fresh,
+    }),
+  ),
   http.get("/groups", ({ response }) =>
     response(200).json({
       groups: [{ id: "iam", name: "IAM", description: "", defaultRepo: null, defaultRepoState: "missing", repoCount: 2 }],

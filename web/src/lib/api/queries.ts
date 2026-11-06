@@ -34,6 +34,8 @@ export const keys = {
       f.size ?? 50,
       f.page ?? 1,
     ] as const,
+  alumni: (f: AlumniFilter) =>
+    ["alumni", f.group ?? "", f.q ?? "", f.reason ?? "", f.used ?? false, f.sort ?? "active", f.size ?? 50, f.page ?? 1] as const,
   issues: (f: IssueFilter) =>
     [
       "issues",
@@ -109,6 +111,33 @@ export interface PullFilter {
   page?: number
   size?: number
 }
+
+/** AlumniFilter is a list of retired repositories (GET /alumni): its group, name text, reason, whether still used, the order and the page. */
+export interface AlumniFilter {
+  group?: string
+  q?: string
+  reason?: Schemas["AlumniReason"]
+  used?: boolean
+  sort?: Schemas["AlumniSort"]
+  page?: number
+  size?: number
+}
+
+/** alumniQuery is one page of the retired repositories, last active first; /alumni reads it. */
+export const alumniQuery = (api: Api, f: AlumniFilter) =>
+  queryOptions({
+    queryKey: keys.alumni(f),
+    queryFn: ({ signal }) =>
+      unwrap(
+        api.GET("/alumni", {
+          params: {
+            query: { group: f.group, q: f.q, reason: f.reason, used: f.used, sort: f.sort, page: f.page, limit: f.size },
+          },
+          signal,
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  })
 
 /** IssueFilter is a list of open issues (GET /issues): its scope, state, kind, whose and order, and the page. */
 export interface IssueFilter {

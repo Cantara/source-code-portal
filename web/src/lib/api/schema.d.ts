@@ -91,6 +91,30 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/alumni": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The retired repositories, newest activity first, one page at a time
+     * @description The alumni of the viewer's view (design/alumni.md): repositories GitHub archived or whose `scp.yaml` says `lifecycle: deprecated`
+     *     (archived wins). Each row says why, when it was last active (the newest default-branch commit, else the last push; no date of
+     *     retirement is invented), how many other repositories still depend on it and how many authors its recent commits have (counted,
+     *     never named). `group` narrows to a group's members, `q` to names containing the text, `reason` to one reason, `used` to those
+     *     something still depends on. `counts` cover the group and `q` whatever the other filters, so they can be offered as filters.
+     */
+    get: operations["listAlumni"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/prerequisites": {
     parameters: {
       query?: never
@@ -1052,6 +1076,42 @@ export interface components {
       page: components["schemas"]["Page"]
       freshness: components["schemas"]["Freshness"]
     }
+    /**
+     * @description Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
+     * @enum {string}
+     */
+    AlumniReason: "archived" | "deprecated"
+    /**
+     * @description active: last active first (default); name; group; used: most dependants first
+     * @enum {string}
+     */
+    AlumniSort: "active" | "name" | "group" | "used"
+    Alumnus: {
+      repo: components["schemas"]["Repo"]
+      reason: components["schemas"]["AlumniReason"]
+      /**
+       * Format: date-time
+       * @description The newest default-branch commit the portal holds, else the last push
+       */
+      lastActive: string
+      /** @description Other repositories whose manifests still depend on a package it provides; archived ones are not counted */
+      usedBy: number
+      /** @description Authors of its newest default-branch commits, people's work only; counted, never named */
+      authors: number
+    }
+    AlumniCounts: {
+      total: number
+      archived: number
+      deprecated: number
+      /** @description Those another repository still depends on */
+      used: number
+    }
+    AlumniPage: {
+      alumni: components["schemas"]["Alumnus"][]
+      counts: components["schemas"]["AlumniCounts"]
+      page: components["schemas"]["Page"]
+      freshness: components["schemas"]["Freshness"]
+    }
     CommitPage: {
       commits: components["schemas"]["Commit"][]
       page: components["schemas"]["Page"]
@@ -1625,6 +1685,41 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["IssuePage"]
+        }
+      }
+      304: components["responses"]["NotModified"]
+      400: components["responses"]["BadRequest"]
+      404: components["responses"]["NotFound"]
+    }
+  }
+  listAlumni: {
+    parameters: {
+      query?: {
+        group?: string
+        /** @description Part of the repository's name */
+        q?: string
+        reason?: components["schemas"]["AlumniReason"]
+        /** @description Only those another repository still depends on */
+        used?: boolean
+        sort?: components["schemas"]["AlumniSort"]
+        /** @description The page, from 1 */
+        page?: components["parameters"]["PageNumber"]
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description One page of alumni */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"]
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["AlumniPage"]
         }
       }
       304: components["responses"]["NotModified"]
