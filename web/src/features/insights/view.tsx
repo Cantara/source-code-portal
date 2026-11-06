@@ -92,7 +92,7 @@ function Table({
   children: ReactNode
 }) {
   return (
-    <div className={plain ? undefined : "mt-3 overflow-x-auto"}>
+    <div className={plain ? undefined : "mt-3 max-w-3xl overflow-x-auto"}>
       <table className="w-full text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -110,30 +110,41 @@ function Table({
   )
 }
 
-/** Bars is the stable releases per month as an SVG chart; the table below it holds the same numbers. */
+/** monthName is "Nov" for "2026-11" (UTC, English, as the page's other words). */
+const monthName = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleString("en", { month: "short", timeZone: "UTC" })
+
+/** Bars is the stable releases per month as an SVG chart with each month named and each count written over its bar; the hidden table below holds the same numbers. */
 function Bars({ months }: { months: Schemas["InsightMonth"][] }) {
   const top = Math.max(1, ...months.map((m) => m.releases))
-  const w = 24
+  const w = 30
   return (
     <svg
       role="img"
       aria-label={`Stable releases per month, the last ${months.length} months: ${months.map((m) => `${m.month} ${m.releases}`).join(", ")}`}
-      viewBox={`0 0 ${months.length * w} 64`}
-      className="mt-3 h-24 w-full max-w-xl text-primary"
-      preserveAspectRatio="none"
+      viewBox={`0 0 ${months.length * w} 84`}
+      className="mt-3 h-auto w-full max-w-xl"
     >
       {months.map((m, i) => {
-        const h = (m.releases / top) * 56
+        const h = (m.releases / top) * 52
         return (
-          <rect
-            key={m.month}
-            x={i * w + 3}
-            y={60 - h}
-            width={w - 6}
-            height={Math.max(h, m.releases > 0 ? 2 : 0.5)}
-            fill="currentColor"
-            opacity={m.releases > 0 ? 1 : 0.25}
-          />
+          <g key={m.month}>
+            <rect
+              x={i * w + 5}
+              y={64 - h}
+              width={w - 10}
+              height={Math.max(h, m.releases > 0 ? 2 : 0.75)}
+              className="fill-primary"
+              opacity={m.releases > 0 ? 1 : 0.25}
+            />
+            {m.releases > 0 && (
+              <text x={i * w + w / 2} y={60 - h} textAnchor="middle" className="fill-foreground text-[9px]">
+                {m.releases}
+              </text>
+            )}
+            <text x={i * w + w / 2} y={78} textAnchor="middle" className="fill-muted-foreground text-[8px]">
+              {monthName(m.month)}
+            </text>
+          </g>
         )
       })}
     </svg>
