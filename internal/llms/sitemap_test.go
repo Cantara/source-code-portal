@@ -3,6 +3,7 @@ package llms
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -76,6 +77,17 @@ func TestSitemap(t *testing.T) {
 	local := New(func(context.Context) *snapshot.Snapshot { return s }, "", o).Sitemap()
 	if body := get(local, "/sitemap.xml").Body.String(); !strings.Contains(body, "<loc>http://example.com/repos/acme/core</loc>") {
 		t.Errorf("origin from the request:\n%s", body)
+	}
+	// Each request names its own host, and the sitemap is built once for them all (a Host header is no reason to build it again).
+	for _, host := range []string{"a.example", "b.example", "a.example"} {
+		r := httptest.NewRequest(http.MethodGet, "/sitemap.xml", nil)
+		r.Host = host
+		w := httptest.NewRecorder()
+		local.ServeHTTP(w, r)
+		if body := w.Body.String(); !strings.Contains(body, "<loc>http://"+host+"/repos/acme/core</loc>") || strings.Contains(body, "origin.scp.invalid") ||
+			w.Header().Get("Cache-Control") != "no-store" {
+			t.Errorf("%s: %v\n%s", host, w.Header(), body)
+		}
 	}
 }
 
