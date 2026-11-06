@@ -1,6 +1,7 @@
 package badges
 
 import (
+	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func TestFromGitHub(t *testing.T) {
 	if r, err := src.LatestRelease(t.Context(), "acme", "one"); err != nil || r == nil || r.Tag != "v1.2.0" || !r.Published.Equal(at) {
 		t.Errorf("release = %+v, %v", r, err)
 	}
-	if r, err := src.LatestRelease(t.Context(), "acme", "none"); err != nil || r != nil {
+	if r, err := src.LatestRelease(t.Context(), "acme", "none"); !errors.Is(err, ErrNoRelease) || r != nil {
 		t.Errorf("no release = %+v, %v", r, err)
 	}
 }

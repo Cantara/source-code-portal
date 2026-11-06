@@ -115,7 +115,10 @@ func (m Maven) inherited(ctx context.Context, l *Lookup, c Coordinate) ([]string
 			return nil, nil
 		}
 		p, err := m.parent(ctx, l, gav, resolve)
-		if err != nil || p == nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, nil
+		}
+		if err != nil {
 			return nil, err
 		}
 		if p.distribution != "" {
@@ -133,7 +136,8 @@ type keptPOM struct {
 	Parent       string   `json:"parent,omitempty"`
 }
 
-// parent reads the POM group:artifact:version from the first repository that holds it; nil when none does.
+// parent reads the POM group:artifact:version from the first repository that holds it; ErrNotFound when none does or the parent is a
+// snapshot (it changes: it is not followed).
 func (m Maven) parent(ctx context.Context, l *Lookup, gav string, resolve []string) (*pom, error) {
 	key := "maven:pom:" + gav
 	if v, ok := l.Kept(key); ok {
@@ -144,7 +148,7 @@ func (m Maven) parent(ctx context.Context, l *Lookup, gav string, resolve []stri
 	}
 	parts := strings.Split(gav, ":")
 	if len(parts) != 3 || strings.HasSuffix(parts[2], "-SNAPSHOT") {
-		return nil, nil //nolint:nilnil // a snapshot parent changes: it is not followed
+		return nil, ErrNotFound
 	}
 	g, a, v := parts[0], parts[1], parts[2]
 	var configured []string
@@ -171,7 +175,7 @@ func (m Maven) parent(ctx context.Context, l *Lookup, gav string, resolve []stri
 		l.Keep(key, string(b))
 		return keptToPOM(k), nil
 	}
-	return nil, failed
+	return nil, cmp.Or(failed, ErrNotFound)
 }
 
 func keptToPOM(k keptPOM) *pom {

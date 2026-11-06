@@ -2,13 +2,17 @@ package badges
 
 import (
 	"context"
+	"errors"
 
 	gh "github.com/google/go-github/v92/github"
 
 	"github.com/cantara/source-code-portal/internal/github"
 )
 
-// Releases reads the latest release. nil, nil is no release.
+// ErrNoRelease is a repository that has no published release: not a failure.
+var ErrNoRelease = errors.New("badges: no release")
+
+// Releases reads the latest release; ErrNoRelease when there is none.
 type Releases interface {
 	LatestRelease(ctx context.Context, owner, name string) (*Release, error)
 }
@@ -23,7 +27,7 @@ func FromGitHub(src REST) Releases { return rest{src} }
 
 type rest struct{ src REST }
 
-// LatestRelease returns the latest published, non-prerelease release; nil when the repository has none.
+// LatestRelease returns the latest published, non-prerelease release; ErrNoRelease when the repository has none.
 func (r rest) LatestRelease(ctx context.Context, owner, name string) (*Release, error) {
 	c, err := r.src.REST(ctx, owner)
 	if err != nil {
@@ -34,7 +38,7 @@ func (r rest) LatestRelease(ctx context.Context, owner, name string) (*Release, 
 		if err := github.Classify(resp, err); !github.IsNotFound(err) {
 			return nil, err
 		}
-		return nil, nil //nolint:nilnil // no release is not an error
+		return nil, ErrNoRelease
 	}
 	return &Release{Tag: rel.GetTagName(), Name: rel.GetName(), URL: rel.GetHTMLURL(), Published: rel.GetPublishedAt().UTC()}, nil
 }
