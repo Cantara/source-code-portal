@@ -95,7 +95,7 @@ func TestSitemapIndex(t *testing.T) {
 	s := sitemapFixture()
 	l := New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example", sitemapOptions())
 	files := l.buildSitemap(s, "https://scp.example", 3)
-	if len(files) != 4 { // 7 pages: the index and three parts
+	if len(files) != 5 { // 10 pages: the index and four parts
 		t.Fatalf("%d files", len(files))
 	}
 	for _, want := range []string{"<sitemapindex", "<loc>https://scp.example/sitemaps/1.xml</loc>", "<loc>https://scp.example/sitemaps/3.xml</loc>",

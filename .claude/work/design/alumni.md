@@ -1,6 +1,6 @@
 # Alumni: the retired repositories (AL1, AL2)
 
-Status: in progress (plan.md section 4, P-81). Binding order: ../plan.md > this note > `catalog.md`, `health.md`, `layout.md`.
+Status: AL1 built, AL2 in progress (plan.md section 4, P-81). Binding order: ../plan.md > this note > `catalog.md`, `health.md`, `layout.md`.
 
 A catalogue only grows. A repository that was archived, or that its owners marked deprecated, is no longer work in progress, but it
 is still a record: what it was, who built it, when it last moved, what it last released, and what still depends on it. The portal
@@ -24,6 +24,15 @@ no job, no GitHub call and no permission.
 - **Out of the live views.** Alumni stay out of the dashboard's product cards and health as today; the fleet map keeps showing them
   as `archived`. The group page and the repositories list keep their rows with the *Archived* badge; a group says `N retired` with a
   link to `/alumni?group=`.
+
+## As built
+
+The selection and the API live in `internal/catalog/alumni.go` (`Retired`, `API.ListAlumni`): the catalogue already owns `archived`,
+the descriptor's `lifecycle` and the repository summary, so Alumni is a view of it, not a package. What the other features know is
+added by hooks on `catalog.API.Alumnus`, wired in `cmd/scp` as the repository hooks are: `manifests.Alumnus` (`usedBy`, archived
+dependants not counted) and `commits.Alumnus` (`lastActive` from the newest commit; `authors`, the distinct people among the newest
+100 default-branch commits, automation left out). The page is `web/src/features/alumni`, the header's *Alumni* link is always shown,
+and the reader's page size has its row in Settings.
 
 ## API
 

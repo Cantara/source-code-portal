@@ -15,7 +15,9 @@ describe("settings", () => {
 
   it("keeps each preference in its cookie at once, and Default forgets a page size", async () => {
     const user = userEvent.setup()
-    render(<SettingsView initial={{ work: ["hand", "ai"], view: "cards", commits: 0, history: 0, pulls: 0, issues: 0 }} />)
+    render(
+      <SettingsView initial={{ work: ["hand", "ai"], view: "cards", commits: 0, history: 0, pulls: 0, issues: 0, alumni: 0 }} />,
+    )
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument()
     const work = screen.getByRole("group", { name: "Count, at least one" })
     expect(work).toHaveTextContent("lower bound")

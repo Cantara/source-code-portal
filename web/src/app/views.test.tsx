@@ -8,6 +8,7 @@ import { DashboardView } from "@/features/dashboard/view"
 import { DocView } from "@/features/docs/view"
 import { GroupView } from "@/features/groups/view"
 import { IssuesView } from "@/features/issues/view"
+import { AlumniView } from "@/features/alumni/view"
 import { PullsView } from "@/features/pulls/view"
 import { repoRoute } from "@/features/repos/route"
 import { RepoView } from "@/features/repos/view"
@@ -45,6 +46,23 @@ describe("pages", () => {
     expect(chips.queryByRole("link", { name: /Failing checks/ })).toBeNull()
     expect(screen.getByRole("link", { name: "Change 1" })).toHaveAttribute("href", "https://github.com/acme/core/pull/1")
     expect(screen.getByRole("form", { name: "Filter pull requests" })).toHaveAttribute("action", "/pulls")
+  })
+
+  it("lists the retired repositories with why, when they were last active and what still depends on them", async () => {
+    show(<AlumniView defaultSize={50} />, "/alumni")
+    expect(await screen.findByRole("heading", { level: 1, name: "Alumni" })).toBeInTheDocument()
+    const chips = within(await screen.findByRole("navigation", { name: "By reason" }))
+    expect(chips.getByRole("link", { name: /All 2/ })).toHaveAttribute("aria-current", "true")
+    expect(chips.getByRole("link", { name: /Archived 1/ })).toHaveAttribute("href", "/alumni?reason=archived")
+    expect(chips.getByRole("link", { name: /Deprecated 1/ })).toHaveAttribute("href", "/alumni?reason=deprecated")
+    const rows = within(screen.getByRole("list", { name: "Alumni" })).getAllByRole("listitem")
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent("Archived")
+    expect(rows[0]).toHaveTextContent("used by 2")
+    expect(rows[0]).toHaveTextContent("3 authors")
+    expect(rows[1]).toHaveTextContent("Deprecated")
+    expect(rows[1]).not.toHaveTextContent("used by")
+    expect(screen.getByRole("form", { name: "Filter the alumni" })).toHaveAttribute("action", "/alumni")
   })
 
   it("lists the open issues what waits first, the states as filters", async () => {

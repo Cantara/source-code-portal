@@ -1,0 +1,42 @@
+import AxeBuilder from "@axe-core/playwright"
+import { expect, test } from "./fixtures"
+
+// cmd/scp/e2e_test.go: acme/legacy-sso is archived on GitHub, so it is the portal's one alumnus; everything else is live.
+
+test("/alumni lists the retired repositories with why, and passes axe in both themes", async ({ page }) => {
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await page.goto("/alumni")
+    await expect(page.getByRole("heading", { level: 1, name: "Alumni", exact: true })).toBeVisible()
+    const rows = page.getByRole("list", { name: "Alumni" }).getByRole("listitem")
+    await expect(rows).toHaveCount(1)
+    await expect(rows.first()).toContainText("acme/legacy-sso")
+    await expect(rows.first()).toContainText("Archived")
+    await expect(rows.first()).toContainText("Retired single sign-on")
+    const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()
+    expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
+  }
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Alumni" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  )
+  await page
+    .getByRole("navigation", { name: "By reason" })
+    .getByRole("link", { name: /Deprecated 0/ })
+    .click()
+  await expect(page).toHaveURL(/\/alumni\?reason=deprecated$/)
+  await expect(page.getByText("No retired repository matches.")).toBeVisible()
+})
+
+test.describe("without JavaScript", () => {
+  test.use({ javaScriptEnabled: false })
+
+  test("/alumni filters by the form", async ({ page }) => {
+    await page.goto("/alumni")
+    await expect(page.getByRole("list", { name: "Alumni" }).getByRole("listitem")).toHaveCount(1)
+    await page.getByLabel("Name contains").fill("nothing-like-this")
+    await page.getByRole("button", { name: "Apply" }).click()
+    await expect(page).toHaveURL(/q=nothing-like-this/)
+    await expect(page.getByText("No retired repository matches.")).toBeVisible()
+  })
+})

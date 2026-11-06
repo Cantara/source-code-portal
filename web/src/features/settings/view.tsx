@@ -9,7 +9,15 @@ import { apply, useTheme, type Choice } from "@/lib/theme"
 import { PageHeader } from "@/shared/page-header"
 import { useFeatures } from "@/lib/rules-context"
 
-type Settings = { work: Work; view: ProductsView; commits: number; history: number; pulls: number; issues: number }
+type Settings = {
+  work: Work
+  view: ProductsView
+  commits: number
+  history: number
+  pulls: number
+  issues: number
+  alumni: number
+}
 
 /** Choices is one setting as a group of radio buttons, each with what it means. */
 function Choices<T extends string>({
@@ -166,6 +174,7 @@ export function SettingsView({ initial }: { initial: Settings }) {
           {size("history", "Repository histories")}
           {features.pulls && size("pulls", "Pull requests")}
           {features.issues && size("issues", "Issues")}
+          {size("alumni", "Alumni")}
         </Section>
         <Section title="Theme" about="As the system is set, dark or light.">
           <Choices
