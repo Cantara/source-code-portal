@@ -130,7 +130,7 @@ CREATE TABLE item (key TEXT PRIMARY KEY, kind TEXT NOT NULL,
    after the last update or 1 s after the first pending one, one build at a time; it derives the group memberships per repository,
    runs the features' indexers (the commit feeds, the dependency graph) and builds the public view (access.md) with its own indexes,
    sets `Version` from the item digests (images-events.md) and stores the atomic pointer. A mutation that panics is dropped alone and
-   logged; a panic while indexing keeps the old snapshot.
+   logged; an index whose builder panics keeps its value from the old snapshot (logged at every publish), the rest of the batch is published.
 8. **Store open**: pragmas `journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`, `foreign_keys=1`, `temp_store=MEMORY`, one
    connection, `quick_check`, migrate. Failed check, failed migration or `user_version` newer than the binary -> rename the file and its
    `-wal`/`-shm` to `<path>.quarantine-<UTC>` (keep 2) and start empty. Close runs `PRAGMA optimize` and `wal_checkpoint(TRUNCATE)`.

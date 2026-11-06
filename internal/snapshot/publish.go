@@ -13,11 +13,13 @@ import (
 
 // Builder is a private, mutable copy of the current snapshot. Maps are copied; entries are shared and replaced, never mutated.
 type Builder struct {
-	s *Snapshot
+	s    *Snapshot
+	prev *Snapshot // the snapshot it was copied from: an index that cannot be built is kept as it was there
+	log  *slog.Logger
 }
 
-func newBuilder(cur *Snapshot) *Builder {
-	return &Builder{s: &Snapshot{
+func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
+	return &Builder{prev: cur, log: log, s: &Snapshot{
 		Catalogued: cur.Catalogued,
 		marks:      maps.Clone(cur.marks),
 		sum:        cur.sum,
@@ -116,13 +118,15 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 			s.digests[m.repo] += m.content
 		}
 	}
-	s.index()
-	s.public = s.publicView()
+	s.index(b.prev.indexes, b.log)
+	s.public = s.publicView(b.prev, b.log)
 	return s
 }
 
-// index builds the derived lookups: group membership, then every feature's index.
-func (s *Snapshot) index() {
+// index builds the derived lookups: group membership, then every feature's index. An index whose builder panics keeps what the
+// snapshot before had (before): that feature shows its last good state while the rest of the batch is published, and the panic is
+// logged on every publish until it is fixed.
+func (s *Snapshot) index(before map[string]any, log *slog.Logger) {
 	s.groupsOf = map[RepoKey][]string{}
 	for _, g := range s.Groups {
 		for _, m := range g.Members {
@@ -131,12 +135,27 @@ func (s *Snapshot) index() {
 	}
 	s.indexes = make(map[string]any, len(s.indexers))
 	for _, ix := range s.indexers {
-		s.indexes[ix.name] = ix.build(s)
+		v, err := buildIndex(ix, s)
+		if err != nil {
+			log.Error("index not built; the last good one is kept", "index", ix.name, "err", err)
+			v = before[ix.name]
+		}
+		s.indexes[ix.name] = v
 	}
 }
 
+// buildIndex runs one indexer, a panic of it as an error.
+func buildIndex(ix Indexer, s *Snapshot) (v any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+	return ix.build(s), nil
+}
+
 // publicView is s without its private and internal repositories, or s itself when it has none.
-func (s *Snapshot) publicView() *Snapshot {
+func (s *Snapshot) publicView(prev *Snapshot, log *slog.Logger) *Snapshot {
 	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !e.Repo.Public() }) {
 		return s
 	}
@@ -175,7 +194,11 @@ func (s *Snapshot) publicView() *Snapshot {
 	}
 	p.Version = sum & (1<<53 - 1)
 	p.digests = s.digests
-	p.index()
+	var before map[string]any
+	if prev.public != nil {
+		before = prev.public.indexes
+	}
+	p.index(before, log)
 	p.public = p
 	return p
 }
@@ -271,15 +294,15 @@ func (p *Publisher) publish() {
 	p.mu.Unlock()
 }
 
-// build applies the batch to a copy of cur. An update that panics is dropped alone (what it changed before the panic stays); a
-// panic while indexing fails the build.
+// build applies the batch to a copy of cur. An update that panics is dropped alone (what it changed before the panic stays), an
+// index that panics keeps its last good value; a panic elsewhere while finishing fails the build.
 func build(cur *Snapshot, batch []func(*Builder), log *slog.Logger) (s *Snapshot, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic while indexing the snapshot: %v", r)
 		}
 	}()
-	b := newBuilder(cur)
+	b := newBuilder(cur, log)
 	for _, fn := range batch {
 		apply(b, fn, log)
 	}
