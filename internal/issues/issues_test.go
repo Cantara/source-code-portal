@@ -123,24 +123,28 @@ func TestJob(t *testing.T) {
 	}
 }
 
-// TestEventRunConfirms: a run an event asked for reads again in ConfirmAfter, because GitHub's listing can lag the webhook that
-// announced the issue; a scheduled run does not.
+// TestEventRunConfirms: a run an event asked for that found nothing new reads again in ConfirmAfter, because GitHub's listing can lag the
+// webhook that announced the issue; one that found a change, or a scheduled run, does not.
 func TestEventRunConfirms(t *testing.T) {
 	r := newRig(t)
 	at := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	r.srv.SetIssues(r.id, githubtest.Issue{Number: 4, Title: "One", Author: "ann", Created: at, Updated: at})
-	run := func(event bool) sync.Result {
-		res, err := r.spec.Run(t.Context(), sync.Job{Key: Kind + "/acme/one", Source: "gh", Repo: "acme/one", Event: event})
+	run := func(prev store.Item, event bool) (sync.Result, store.Item) {
+		res, err := r.spec.Run(t.Context(), sync.Job{Key: Kind + "/acme/one", Source: "gh", Repo: "acme/one", Event: event, Prev: prev})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return res
+		return res, store.Item{State: snapshot.StateOK, Payload: res.Payload}
 	}
-	if res := run(false); res.Again != 0 {
+	res, prev := run(store.Item{}, true)
+	if res.Again != 0 {
+		t.Errorf("an event's run that found a change asked again in %v", res.Again)
+	}
+	if res, _ = run(prev, false); res.Again != 0 {
 		t.Errorf("a scheduled run asked again in %v", res.Again)
 	}
-	if res := run(true); res.Again != ConfirmAfter {
-		t.Errorf("an event's run asked again in %v, want %v", res.Again, ConfirmAfter)
+	if res, _ = run(prev, true); !res.Unchanged || res.Again != ConfirmAfter {
+		t.Errorf("an event's run that found nothing new: unchanged %v, again %v, want %v", res.Unchanged, res.Again, ConfirmAfter)
 	}
 }
 

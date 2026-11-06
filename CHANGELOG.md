@@ -8,12 +8,12 @@ subjects.
 
 Fixes from a review of the code; no configuration change.
 
-- New issues and pull requests show without waiting for the next poll: a run a webhook caused reads again after 30 seconds (GitHub's
+- New issues and pull requests show without waiting for the next poll: a run a webhook caused that found nothing new reads again after 30 seconds (GitHub's
   listing can lag the event), and the catalogue's listing every 5 minutes asks for a read when a repository's count of open issues and
   pull requests moved, so a missed webhook costs minutes, not the 15-minute TTL. The event stream sends a `ping` event every 25 seconds;
   the page opens a silent or closed stream again and when the tab or the network comes back.
 - A webhook is not lost: every event is parked in the store before GitHub is answered (503 when it cannot be kept) and passed on again
-  after a restart; with an App, the App's webhook delivery log is read every two minutes and every delivery the portal did not answer
+  after a restart until the jobs it asked for have run; with an App, the App's webhook delivery log is read every two minutes and every delivery the portal did not answer
   with a success (it was down, restarting or full) is acted on. With every source an App and webhooks on, issues and pull requests are
   read again after an hour without an event, not 15 minutes. New result labels `unavailable` and `caught_up` on
   `scp_webhook_deliveries_total`.

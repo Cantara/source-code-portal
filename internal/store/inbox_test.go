@@ -42,3 +42,23 @@ func TestParkedSurvivesReopenUntilUnparked(t *testing.T) {
 		t.Errorf("unparking touched another meta row: %q", v)
 	}
 }
+
+// Parking syncs its own write and leaves the connection as the store sets it up.
+func TestParkRestoresSynchronous(t *testing.T) {
+	db, _ := openTemp(t)
+	ctx := t.Context()
+	for range 5 {
+		if err := db.Park(ctx, "a", "x"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	conn, err := db.db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	var mode int
+	if err := conn.QueryRowContext(ctx, "PRAGMA synchronous").Scan(&mode); err != nil || mode != 1 { // 1: NORMAL
+		t.Errorf("synchronous after parking: %d (%v), want 1 (NORMAL)", mode, err)
+	}
+}

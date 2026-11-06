@@ -179,8 +179,8 @@ func (f *Issues) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		return sync.Result{}, err
 	}
 	res := sync.Result{Payload: payload, Unchanged: j.Prev.State == snapshot.StateOK && string(j.Prev.Payload) == string(payload)}
-	if j.Event {
-		res.Again = ConfirmAfter // GitHub's listing can lag the event that caused this run
+	if j.Event && res.Unchanged {
+		res.Again = ConfirmAfter // the event found nothing new: GitHub's listing may be seconds behind it. One that found a change needs no second read
 	}
 	return res, nil
 }

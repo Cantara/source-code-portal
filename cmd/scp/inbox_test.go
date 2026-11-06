@@ -42,7 +42,7 @@ type got struct {
 }
 
 func newInbox(p *memPark, now *time.Time, out *[]got) *inbox {
-	return &inbox{park: p, log: slog.New(slog.NewTextHandler(io.Discard, nil)), now: func() time.Time { return *now },
+	return &inbox{park: p, handled: func(sync.Event, snapshot.RepoKey, string, time.Time) bool { return false }, log: slog.New(slog.NewTextHandler(io.Discard, nil)), now: func() time.Time { return *now },
 		deliver: func(ev sync.Event, repo snapshot.RepoKey, source string) { *out = append(*out, got{ev, repo, source}) }}
 }
 
@@ -61,7 +61,8 @@ func TestInboxTakesEvents(t *testing.T) {
 	}
 }
 
-// What a process left parked is passed on after its restart, once for events alike; the sweep drops what is older than inboxKeep.
+// What a process left parked is passed on after its restart, once for identical events, unless the engine has acted on it already. The
+// sweep drops what the engine has acted on, keeps the rest however long it waits, and drops it after inboxKeep.
 func TestInboxReplaysAndSweeps(t *testing.T) {
 	p := &memPark{rows: map[string]string{}}
 	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
@@ -70,14 +71,15 @@ func TestInboxReplaysAndSweeps(t *testing.T) {
 	for _, e := range []struct {
 		ev   sync.Event
 		repo snapshot.RepoKey
-	}{{"issues", "acme/one"}, {"issues", "acme/one"}, {"pull_request", "acme/two"}} {
+	}{{"issues", "acme/one"}, {"issues", "acme/one"}, {"pull_request", "acme/two"}, {"issues", "acme/done"}} {
 		now = now.Add(time.Second)
 		if err := old.take(e.ev, e.repo, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
-	var after []got // the restarted process
+	var after []got // the restarted process, whose engine has already acted on acme/done
 	b := newInbox(p, &now, &after)
+	b.handled = func(_ sync.Event, repo snapshot.RepoKey, _ string, _ time.Time) bool { return repo == "acme/done" }
 	b.replay(t.Context())
 	want := []got{{"issues", "acme/one", ""}, {"pull_request", "acme/two", ""}}
 	if !cmp.Equal(after, want, cmp.AllowUnexported(got{})) {
@@ -85,9 +87,14 @@ func TestInboxReplaysAndSweeps(t *testing.T) {
 	}
 	b.sweep(t.Context())
 	if len(p.rows) != 3 {
-		t.Errorf("a sweep right after dropped events: %d left", len(p.rows))
+		t.Errorf("a sweep kept %d rows, want the 3 not acted on", len(p.rows))
 	}
-	now = now.Add(inboxKeep + time.Second)
+	now = now.Add(48 * time.Hour)
+	b.sweep(t.Context())
+	if len(p.rows) != 3 {
+		t.Errorf("a sweep after two days kept %d rows: events not acted on must wait", len(p.rows))
+	}
+	now = now.Add(inboxKeep)
 	b.sweep(t.Context())
 	if len(p.rows) != 0 {
 		t.Errorf("a sweep after %v left %d", inboxKeep, len(p.rows))

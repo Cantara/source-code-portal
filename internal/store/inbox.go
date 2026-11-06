@@ -9,8 +9,25 @@ import (
 const inboxPrefix = "inbox/"
 
 // Park keeps a webhook event under id until Unpark removes it, so an event the process never acted on (a crash, a restart) is not lost.
-func (s *DB) Park(ctx context.Context, id, value string) error {
-	return s.SetMeta(ctx, inboxPrefix+id, value)
+// The write is synced to disk before it returns (the store's own writes are not: a cache may lose its last seconds to a power cut, but
+// GitHub has been told the delivery arrived and will not send it again).
+func (s *DB) Park(ctx context.Context, id, value string) (err error) {
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close() }()
+	if _, err := conn.ExecContext(ctx, "PRAGMA synchronous = FULL"); err != nil {
+		return err
+	}
+	defer func() { // the connection goes back to the pool
+		if _, e := conn.ExecContext(context.WithoutCancel(ctx), "PRAGMA synchronous = NORMAL"); e != nil && err == nil {
+			err = e
+		}
+	}()
+	_, err = conn.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+		inboxPrefix+id, value)
+	return err
 }
 
 // Parked returns the parked events, by id.

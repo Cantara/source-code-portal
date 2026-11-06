@@ -127,7 +127,7 @@ every other path is a page, proxied to the web UI server (behaviour 3).
    The scheduled listing covers any lost delivery, and so does the inbox and the App's delivery log (P-80): the `Sink` returns an error
    when the event could not be parked in the store (503 `unavailable`, the delivery id forgotten so a resend is acted on); `cmd/scp`'s
    `inbox` writes each event to the store's `meta` rows (`inbox/<time>-<salt>`) before passing it on, replays what is left at the start
-   once the engine is warm and drops rows older than 10 minutes; `webhook.CatchUp` (one per App source) reads `GET /app/hook/deliveries`
+   once the engine is warm (an event whose jobs have run since is not passed on again) and drops a row when `Engine.Handled` says every job that listens for the event has finished a run since it arrived and none fails, else after 72 hours (the parking write is `synchronous=FULL`, the rest of the store's `NORMAL`); `webhook.CatchUp` (one per App source) reads `GET /app/hook/deliveries`
    every 2 minutes, from the last complete read less 5 minutes (kept in `meta` `webhook/caught-up/<source>`, at most three days, first
    an hour), and passes every delivery that was not answered 2xx to the `Sink` as if it had arrived (push stands for the default branch
    and a tag; a repository it cannot resolve is left to the listing); the metric result `caught_up`.

@@ -632,7 +632,7 @@ spec:
 
 Expose only the `public` port through your ingress. The ingress must pass `X-Forwarded-For` from an address in
 `server.trusted_proxies`, keep request bodies up to 25 MiB for `/webhooks/github`, and pass `/api/v1/events` unbuffered with a read
-timeout above 30 seconds (the stream sends a comment every 25 seconds; nginx honours the `X-Accel-Buffering: no` it sends).
+timeout above 30 seconds (the stream sends a `ping` event every 25 seconds; nginx honours the `X-Accel-Buffering: no` it sends).
 
 **Outbound.** Besides GitHub, the portal fetches the external images documents show (`https` on port 443, public addresses only, at
 most 5 MiB, cached in memory for an hour). Where it may not reach the internet those images show their alt text.

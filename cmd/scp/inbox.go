@@ -17,9 +17,9 @@ import (
 	"github.com/cantara/source-code-portal/internal/webhook"
 )
 
-// inboxKeep is how long a webhook event stays parked after it was handed to the engine: long enough for the jobs it asked for to have
-// run. Past it the row is dropped; a restart before then reads the repository again, which costs a conditional request.
-const inboxKeep = 10 * time.Minute
+// inboxKeep is the longest a webhook event stays parked. It is dropped earlier, as soon as the jobs it asked for have run (handled); this
+// only bounds the rows of an event nothing can act on (a job that fails for days).
+const inboxKeep = 72 * time.Hour
 
 // parking is the part of the store the inbox keeps its events in.
 type parking interface {
@@ -34,6 +34,8 @@ type parking interface {
 type inbox struct {
 	park    parking
 	deliver func(ev sync.Event, repo snapshot.RepoKey, source string)
+	// handled says the engine has acted on the event (sync.Engine.Handled): its row may go.
+	handled func(ev sync.Event, repo snapshot.RepoKey, source string, at time.Time) bool
 	log     *slog.Logger
 	now     func() time.Time
 	// catchUps read the delivery logs of the Apps (internal/webhook): what GitHub sent while the portal could not take it.
@@ -62,7 +64,7 @@ func (b *inbox) take(ev sync.Event, repo snapshot.RepoKey, source string) error 
 	return err
 }
 
-// replay passes on every parked event once, the newest of identical ones.
+// replay passes on every parked event that is not handled yet, once for identical ones.
 func (b *inbox) replay(ctx context.Context) []string {
 	rows, err := b.park.Parked(ctx)
 	if err != nil {
@@ -80,8 +82,9 @@ func (b *inbox) replay(ctx context.Context) []string {
 		if json.Unmarshal([]byte(rows[id]), &p) != nil {
 			continue
 		}
+		at := p.At
 		p.At = time.Time{}
-		if done[p] {
+		if done[p] || b.handled(p.Event, p.Repo, p.Source, at) {
 			continue
 		}
 		done[p] = true
@@ -93,7 +96,7 @@ func (b *inbox) replay(ctx context.Context) []string {
 	return ids
 }
 
-// sweep drops the parked events older than inboxKeep.
+// sweep drops the parked events the engine has acted on, and those older than inboxKeep.
 func (b *inbox) sweep(ctx context.Context) {
 	rows, err := b.park.Parked(ctx)
 	if err != nil {
@@ -102,7 +105,7 @@ func (b *inbox) sweep(ctx context.Context) {
 	var old []string
 	for id, v := range rows {
 		var p parkedEvent
-		if json.Unmarshal([]byte(v), &p) != nil || b.now().Sub(p.At) > inboxKeep {
+		if json.Unmarshal([]byte(v), &p) != nil || b.now().Sub(p.At) > inboxKeep || b.handled(p.Event, p.Repo, p.Source, p.At) {
 			old = append(old, id)
 		}
 	}
@@ -124,7 +127,7 @@ func (b *inbox) run(ctx context.Context, warm <-chan struct{}) {
 		return
 	}
 	b.replay(ctx)
-	t := time.NewTicker(time.Minute)
+	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
 	for {
 		select {

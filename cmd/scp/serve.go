@@ -277,7 +277,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
 	routes = append(routes, catalog.Legacy(view)...)
 	if cfg.Webhook.Secret.IsSet() {
-		s.inbox = &inbox{park: s.store, deliver: s.deliver, log: log, now: time.Now}
+		s.inbox = &inbox{park: s.store, deliver: s.deliver, handled: s.engine.Handled, log: log, now: time.Now}
 		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.inbox.take, cfg.GitHub.Sources), log)
 		if s.member != nil {
 			rc.Dedupe(s.member.First)

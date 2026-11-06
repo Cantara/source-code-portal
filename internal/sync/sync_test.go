@@ -405,6 +405,51 @@ func TestJobEvent(t *testing.T) {
 	})
 }
 
+// TestHandled: an event is handled once the jobs that listen for it have finished a run since it arrived; not while one runs or fails.
+func TestHandled(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var failing atomic.Bool
+		release := make(chan struct{})
+		r, _ := catalogueRig(t, t.TempDir(), nil, func(ctx context.Context, j Job) (Result, error) {
+			if j.Repo == "acme/a" && j.Event {
+				select {
+				case <-release:
+				case <-ctx.Done():
+				}
+				if failing.Load() {
+					return Result{}, fakeErr{code: "boom"}
+				}
+			}
+			return Result{Payload: []byte("c")}, nil
+		})
+		r.run()
+		time.Sleep(time.Second)
+		at := time.Now()
+		if !r.eng.Handled(EventPush, "acme/a", "", at.Add(-time.Hour)) {
+			t.Error("an event from before the last run is not handled")
+		}
+		if r.eng.Handled(EventPush, "acme/a", "", at) {
+			t.Error("an event no run has followed is handled")
+		}
+		if !r.eng.Handled("nothing-listens", "acme/a", "", at) || !r.eng.Handled(EventPush, "acme/gone", "", at) {
+			t.Error("an event no job listens for, or about a repository nobody has, has nothing to do")
+		}
+		time.Sleep(time.Second)
+		r.eng.Notify(EventPush, "acme/a")
+		synctest.Wait() // running, held
+		if r.eng.Handled(EventPush, "acme/a", "", at) {
+			t.Error("handled while its job runs")
+		}
+		failing.Store(true)
+		close(release)
+		time.Sleep(time.Second)
+		if r.eng.Handled(EventPush, "acme/a", "", at) {
+			t.Error("handled although its job failed")
+		}
+		r.stop()
+	})
+}
+
 func TestConcurrencyLimit(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var cur, peak atomic.Int32

@@ -29,7 +29,7 @@ activity first, with the exact total.**
   with 3 open pull requests costs 1 point and one with 100 about 3), only when the listing changed, when a held pull request's checks are pending or its
   mergeability unknown (GitHub computes it lazily), or once an hour (checks change without touching the listing).
 - **Triggers.** The job runs on the webhook events `pull_request` and `pull_request_review` (not `check_suite` or `status`, P-73: running checks are asked again on their steps) (already passed
-  through by `webhook.Normalise` under their own names), on `EventPush` (a new branch is often a new pull request), on `EventOpen` (the catalogue's listing saw the repository's count of open issues and pull requests move: the safety net when no webhook came), and on its TTL; a run an event caused (`Job.Event`) reads again within 30 seconds (`ConfirmAfter`), because GitHub's listing can be seconds behind the webhook:
+  through by `webhook.Normalise` under their own names), on `EventPush` (a new branch is often a new pull request), on `EventOpen` (the catalogue's listing saw the repository's count of open issues and pull requests move: the safety net when no webhook came), and on its TTL; a run an event caused (`Job.Event`) that found nothing new reads again within 30 seconds (`ConfirmAfter`), because GitHub's listing can be seconds behind the webhook:
   15 minutes for the listing, `Result.Again` while checks are pending or mergeability unknown, at 5, 10, 20 then 60 minutes (a
   required check that never reports cannot keep a repository at 12 queries an hour). An archived repository is read once and again
   only when the listing says it was unarchived: its pull requests cannot change.
