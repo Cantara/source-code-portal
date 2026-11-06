@@ -49,3 +49,26 @@ test.describe("without JavaScript", () => {
     await expect(page.getByRole("list", { name: "Release list" }).getByRole("listitem").first()).toContainText("v1.2.0")
   })
 })
+
+test("a group and a repository show their releases, and a group its retired repositories", async ({ page }) => {
+  await page.goto("/groups/whydah")
+  const panel = page.getByRole("region", { name: "Releases" })
+  await expect(panel).toContainText("acme/whydah-core")
+  await expect(panel).toContainText("v1.2.0")
+  await expect(panel.getByRole("link", { name: /retired/ })).toHaveCount(0)
+  await panel.getByRole("link", { name: "All releases" }).click()
+  await expect(page).toHaveURL(/\/releases\?group=whydah$/)
+
+  await page.goto("/repos/acme/whydah-core")
+  const repo = page.getByRole("region", { name: "Releases" })
+  await expect(repo.getByRole("listitem")).toHaveCount(2)
+  await expect(repo).toContainText("Pre-release")
+  await expect(repo.getByRole("link", { name: "All 2 held" })).toHaveAttribute(
+    "href",
+    "/releases?repo=acme%2Fwhydah-core&variant=all",
+  )
+
+  await page.goto("/groups/other")
+  await page.getByRole("link", { name: "1 retired" }).click()
+  await expect(page).toHaveURL(/\/alumni\?group=other$/)
+})

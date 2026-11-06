@@ -1,8 +1,8 @@
-import { groupQuery, issuesQuery, pullsQuery } from "@/lib/api/queries"
+import { alumniQuery, groupQuery, issuesQuery, pullsQuery, releasesQuery } from "@/lib/api/queries"
 import { load, peek, prefetch } from "@/lib/load"
 import type { Route } from "@/lib/page"
 import { groupPath } from "@/lib/paths"
-import { groupCommitsQuery, groupIssues, groupPulls } from "./api"
+import { groupCommitsQuery, groupIssues, groupPulls, groupReleases, groupRetired } from "./api"
 import { GroupView } from "./view"
 import { crumbs } from "@/lib/crumbs"
 import { ld } from "@/lib/seo"
@@ -17,6 +17,8 @@ export const groupRoute: Route<Params> = {
       prefetch(qc, groupCommitsQuery(api, group)),
       prefetch(qc, pullsQuery(api, groupPulls(group))),
       prefetch(qc, issuesQuery(api, groupIssues(group))),
+      prefetch(qc, releasesQuery(api, groupReleases(group))),
+      prefetch(qc, alumniQuery(api, groupRetired(group))),
     ]),
   async metadata({ api, qc, params: { group } }) {
     const g = await peek(qc, groupQuery(api, group))

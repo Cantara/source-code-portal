@@ -69,3 +69,7 @@ export const repoReleases = (owner: string, name: string): ReleaseFilter => ({
   variant: "all",
   size: 10,
 })
+
+/** releasesPath is the address of /releases for a filter, at its first page. */
+export const releasesPath = (filter: ReleaseFilter) =>
+  `/releases${releasesSearch({ filter, page: 1, size: defaultReleaseSize }, defaultReleaseSize)}`
