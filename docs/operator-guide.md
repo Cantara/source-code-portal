@@ -145,7 +145,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `access.private_groups` | `[]` | groups whose members see private repositories; `"*"` is every authenticated user |
 | `access.require_auth` | `false` | no public view: an anonymous request gets 401 (a browser's page request goes to `/signin`), except sign-in, `/api/v1/me`, `/webhooks/` and `robots.txt` (which then disallows everything) |
 | `auth.session_key_file` | empty | at least 32 random bytes that seal the sign-in cookies; the same file on every instance; needed for sign-in (section 2.2) |
-| `auth.session_ttl` | `12h` | how long a sign-in lasts, `5m` to `720h`; it is renewed while in use |
+| `auth.session_ttl` | `12h` | how long a sign-in lasts, `5m` to `720h`; it is renewed while in use, for at most 7 days from the sign-in (then the provider is asked again), or `session_ttl` when that is longer |
 | `auth.admin_emails` | `[]` | verified email addresses of the administrators (case-insensitive) |
 | `auth.admin_groups` | `[]` | groups whose members are administrators |
 | `auth.tokens[]` | `[]` | access tokens: `name` (`[a-z0-9-]`), `secret_file` (at least 32 characters), `groups`, `admin` |

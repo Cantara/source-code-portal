@@ -24,7 +24,7 @@ on every request from the config, so a change to the lists applies at once. A wr
 - No server state: the cookie is the session, sealed with AES-256-GCM under a key derived by HKDF-SHA256 from `auth.session_key_file`
   (at least 32 bytes; label `scp session v1`), the cookie name as additional data. It holds `{iss, sub, email, name, groups, iat, exp}`.
 - `auth.session_ttl` (default 12 h): past it the viewer signs in again (at the provider, silently while its own session lasts). A
-  session older than half its lifetime is resealed on a page request, so an active reader stays signed in.
+  session older than half its lifetime is resealed on a page request, so an active reader stays signed in, for at most 7 days (`sessionMax`, or `session_ttl` when longer) from the sign-in: the provider is asked again then, so a person it has removed is let go.
 - `HttpOnly`, `Path=/`, `SameSite=Lax`, `Secure` when `server.public_url` is https.
 - Every instance of a cluster reads the same key file, so a session works on each. Revocation is a key rotation (everyone signs in
   again); a person removed at the provider loses access when the session ends.
