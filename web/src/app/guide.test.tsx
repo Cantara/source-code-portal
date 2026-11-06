@@ -9,12 +9,17 @@ describe("guide", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1)
     const contents = within(screen.getByRole("navigation", { name: "Guide" })).getAllByRole("link")
     expect(contents).toHaveLength(container.querySelectorAll("section[id]").length)
+    // Every picture in both themes, but another program's window (webmcp), which has one theme of its own.
+    const themed = [...container.querySelectorAll("img")].filter((img) =>
+      /-(light|dark)\.webp$/.test(img.getAttribute("src") ?? ""),
+    )
     for (const img of container.querySelectorAll("img")) {
-      const name = (img.getAttribute("src") ?? "").replace(/^\/guide\/|-(light|dark)\.webp$/g, "")
+      const name = (img.getAttribute("src") ?? "").replace(/^\/guide\/|(-(light|dark))?\.webp$/g, "")
       expect(Object.keys(shots.sizes)).toContain(name)
       expect(img).toHaveAttribute("alt")
     }
-    expect(container.querySelectorAll("img").length % 2).toBe(0)
+    expect(themed.length % 2).toBe(0)
+    expect(container.querySelectorAll("img").length - themed.length).toBe(1)
     expect(container.querySelectorAll("svg[role=img] circle")).toHaveLength(Object.keys(shots.callouts).length)
     expect(screen.getByLabelText("Run the container").textContent).toMatch(
       /--cap-drop=ALL \\\n {2}-p .*source-code-portal:2\.0\.1 serve/s,

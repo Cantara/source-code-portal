@@ -47,7 +47,8 @@ test("the guide's pictures load in the theme shown, and every section is in its 
     await shown.last().scrollIntoViewIfNeeded()
     for (const img of await shown.all()) {
       await img.scrollIntoViewIfNeeded()
-      await expect(img).toHaveAttribute("src", new RegExp(`-${scheme}\\.webp$`))
+      // Another program's window has one picture, its own theme (the WebMCP inspector); the portal's in the theme shown.
+      await expect(img).toHaveAttribute("src", new RegExp(`(-${scheme}|^/guide/webmcp)\\.webp$`))
       // A lazy picture loads once scrolled into view: wait for it rather than read it at once.
       await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)
     }

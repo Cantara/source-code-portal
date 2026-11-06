@@ -65,6 +65,10 @@
     "telemetry": {
       "width": 1232,
       "height": 183
+    },
+    "webmcp": {
+      "width": 378,
+      "height": 1084
     }
   }
 }

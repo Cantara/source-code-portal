@@ -91,10 +91,16 @@ function sample(range: string): number {
   return Math.round((lo + hi) / 2)
 }
 
-function Shot({ name, alt, className }: { name: Shot; alt: string; className?: string }) {
+function Shot({ name, alt, className, one }: { name: Shot; alt: string; className?: string; one?: boolean }) {
   const { width, height } = shots.sizes[name]
   // At its own size (the capture's CSS pixels) and never larger: smaller on a narrow screen.
   const img = "mx-auto block h-auto max-w-full rounded-lg"
+  // One picture for both themes: another program's window, which has its own.
+  if (one) {
+    return (
+      <img src={`/guide/${name}.webp`} alt={alt} width={width} height={height} loading="lazy" className={cn(img, className)} />
+    )
+  }
   return (
     <>
       <img
@@ -1166,6 +1172,99 @@ claude mcp add --transport http scp https://portal.example.org/mcp \
             repository&apos;s health and its packages. What they return is marked as text written in repositories, so an agent
             treats it as data, not instructions. No language model runs on the portal for this: the agent brings its own.
           </p>
+          <div className="flex flex-col gap-6">
+            <h3 id="webmcp" className="text-lg font-semibold">
+              Try WebMCP in Chrome
+            </h3>
+            <p className="max-w-prose text-sm text-muted-foreground">
+              WebMCP lets an agent in your browser use the portal&apos;s tools on the page you have open, as you, signed in or
+              not. Chrome has it behind a flag for testing; an inspector extension shows the tools and lets a Gemini model call
+              them.
+            </p>
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <ol className="flex flex-col gap-6">
+                <Step n={1} title="Turn on WebMCP">
+                  <p>
+                    Chrome 146 or newer (Beta, Dev or Canary when your Chrome is older). Open the address below, set{" "}
+                    <em>WebMCP for testing</em> to <em>Enabled</em> and press <em>Relaunch</em>.
+                  </p>
+                  <Code label="Chrome's flag">chrome://flags/#enable-webmcp-testing</Code>
+                </Step>
+                <Step n={2} title="Install the inspector">
+                  <p>
+                    Add <em>Model Context Tool Inspector</em> from the{" "}
+                    <a
+                      href="https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd"
+                      rel="noreferrer"
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      Chrome Web Store
+                    </a>{" "}
+                    and pin it to the toolbar.
+                  </p>
+                </Step>
+                <Step n={3} title="Make a Gemini API key">
+                  <p>
+                    In{" "}
+                    <a
+                      href="https://aistudio.google.com/api-keys"
+                      rel="noreferrer"
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      Google AI Studio
+                    </a>
+                    , <em>Create API key</em>; the free tier is enough for trying. The key stays in the extension and goes to
+                    Google only, never to the portal.
+                  </p>
+                </Step>
+                <Step n={4} title="Open the portal and the inspector">
+                  <p>
+                    Open a page of the portal (a repository&apos;s page is a good start), sign in if you want the private view,
+                    and click the extension&apos;s icon: its side panel lists the page&apos;s tools under <em>WebMCP Tools</em>,
+                    its badge their number. Then <em>Set Gemini API key</em> and paste the key.
+                  </p>
+                </Step>
+                <Step n={5} title="Call a tool yourself">
+                  <p>
+                    Under <em>Interact with the Page</em>, choose a <em>Tool</em> (
+                    <code className="font-mono text-xs">current_page</code> first), adjust its <em>Input Arguments</em> and press{" "}
+                    <em>Execute Tool</em>: the answer shows in <em>Tool Results</em>, as an agent would get it.
+                  </p>
+                </Step>
+                <Step n={6} title="Ask in your own words">
+                  <p>
+                    Write a <em>User Prompt</em> and press <em>Send</em>: Gemini picks the tools, fills in their arguments and
+                    answers. For example:
+                  </p>
+                  <blockquote className="rounded-lg border-l-2 border-primary/60 bg-muted/50 px-4 py-3 text-foreground">
+                    Can you check what repository I&apos;m currently looking at, show me its open bug issues waiting for triage,
+                    and check its health score?
+                  </blockquote>
+                  <p>
+                    <em>Copy trace</em> copies every call and answer as JSON, for a bug report.
+                  </p>
+                </Step>
+              </ol>
+              <Figure
+                caption="The inspector on a repository's page: the portal's tools, and a prompt that uses them."
+                className="mx-auto lg:mx-0"
+              >
+                <Shot
+                  name="webmcp"
+                  one
+                  alt="The Model Context Tool Inspector in Chrome's side panel: the portal's WebMCP tools with their descriptions, a user prompt, the Send button, and the list of tools from current_page to set_preferences."
+                  className="lg:max-w-[18rem]"
+                />
+              </Figure>
+            </div>
+            <p className="max-w-prose text-sm text-muted-foreground">
+              Besides the catalogue&apos;s tools the page adds three of its own:{" "}
+              <code className="font-mono text-xs">current_page</code> (what you are looking at),{" "}
+              <code className="font-mono text-xs">open_page</code> (go to a page of the portal) and{" "}
+              <code className="font-mono text-xs">set_preferences</code> (your Settings). The catalogue&apos;s tools only read;
+              the last two change only your own page and Settings, and no tool reaches what an administrator does.
+            </p>
+          </div>
         </Section>
 
         <Section

@@ -17,7 +17,7 @@ the groups, check, run), sign-in and private repositories (what an anonymous,
 a signed-in and an administrator viewer see, that the server filters every answer, access tokens first, in three steps (the
 secrets, the configuration, handing them out and signing in), then single sign-on: any OpenID Connect provider, GitHub accounts through Dex), packages and private registries (what is read
 per language, the release chip, private registries with their credentials), agents (MCP clients at `/mcp` with or without a
-token, browser agents through WebMCP, the read-only tools), and options and documents (the
+token, browser agents through WebMCP, the read-only tools, and *Try WebMCP in Chrome*: the flag, the Model Context Tool Inspector, a Gemini key from Google AI Studio, a tool by hand and a prompt, beside the inspector's picture), and options and documents (the
 options, the documents and the plugin).
 
 - **Contents**: one `nav` "Guide" grouped by part; chips under the hero on a narrow screen, a sticky "On this page" list beside the
