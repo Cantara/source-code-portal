@@ -4,6 +4,26 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.7
+
+Three new pages and their tools. No configuration change is needed to upgrade; nothing new is asked of GitHub (the App's *Contents*
+permission and the *Release* event are already required).
+
+- **Releases** (`/releases`, `GET /api/v1/releases`): the 20 newest published releases of each repository, newest first, as the latest
+  stable release of each repository (the default), every release, the stable ones or the pre-releases, with a time window and four
+  sorts. A repository's page and a product's page show their own. One read per repository now serves both the badges' latest release
+  and this list.
+- **Alumni** (`/alumni`, `GET /api/v1/alumni`): the retired repositories, those GitHub archived and those whose `scp.yaml` says
+  `lifecycle: deprecated`, with why, when last active, how many repositories still depend on them and how many people wrote their
+  recent commits (counted, never named). A product's page says `N retired`.
+- **Insights** (`/insights`, `GET /api/v1/insights`): how often the fleet ships, what it is built on, which internal libraries most
+  repositories lean on, which repositories are mostly one person's (the repository, never the person) and which have gone quiet. Derived
+  from what the portal holds; no new job and no GitHub call.
+- The assistant, MCP and WebMCP get the tools `recent_releases`, `retired_repositories` and `fleet_insights`; search finds releases
+  (`in:release`); `llms.txt` and a repository's Markdown page say the latest release and mark retired repositories.
+- The header's links scroll sideways on a phone instead of wrapping into a taller bar.
+- Internal: the browser tests and the load check no longer run in CI (they run in `make check`); the leak and twin tests are far faster.
+
 ## 2.2.6
 
 Dependency updates only; no configuration change is needed to upgrade.
