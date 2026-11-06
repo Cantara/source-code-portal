@@ -15,7 +15,6 @@ Node.js 24 (the bundle starts and serves under it) but the documentation names 2
   carry security fixes (HTTP agent, TLS IP checks, permission model, brotli, OpenSSL 3.5.9, undici). TypeScript stays on 6 for the tooling
   API and on 7.0 for `tsc`; Renovate holds 7.1.
 - The Guide's pictures show the default work that counts (every kind, automation included), the pull requests tile and the side panel.
-
 - New issues and pull requests show without waiting for the next poll: a run a webhook caused that found nothing new reads again after 30 seconds (GitHub's
   listing can lag the event), and the catalogue's listing every 5 minutes asks for a read when a repository's count of open issues and
   pull requests moved, so a missed webhook costs minutes, not the 15-minute TTL. The event stream sends a `ping` event every 25 seconds;
