@@ -1,6 +1,5 @@
 "use client"
 
-import { useInfiniteQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { api, type Commit } from "@/lib/api/client"
@@ -12,8 +11,9 @@ import { by, type Work } from "@/lib/preferences"
 import { AiMark } from "@/entities/commit/ai-mark"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { DiffStat } from "@/entities/commit/diffstat"
-import { moreQuery, morePages } from "./api"
-import { dedupe } from "./latest"
+import { moreQuery } from "./api"
+import { commitKey } from "./latest"
+import { useMore } from "./more"
 import { SectionFold, type Section } from "./side"
 
 /** idleTop is how long a scrolled column waits untouched before it goes back to the newest commits (a screen on a wall). */
@@ -45,42 +45,14 @@ export function Stream({
   const now = useNow()
   // The commits of the first render; a row's animation runs once, when it mounts, and only for one that arrived at the top.
   const [shown] = useState(() => new Set(commits.map((c) => c.repo + c.sha)))
-  const [more, setMore] = useState(false)
-  const q = useInfiniteQuery({ ...moreQuery(api, work), enabled: more })
-  const read = more ? (q.data?.pages.flatMap((p) => p.commits) ?? []) : []
+  const list = useRef<HTMLOListElement>(null)
+  const end = useRef<HTMLLIElement>(null)
+  const more = useMore(moreQuery(api, work), commits, (p) => p.commits.filter(keep), commitKey, end, section?.open !== false)
   const top = new Set(commits.map((c) => c.repo + c.sha))
-  const rows = dedupe([...commits, ...read.filter(keep)]).map((c) => {
+  const rows = more.items.map((c) => {
     const id = c.repo + c.sha
     return { c, id, fresh: top.has(id) && !shown.has(id) }
   })
-  const list = useRef<HTMLOListElement>(null)
-  const end = useRef<HTMLLIElement>(null)
-  const visible = useRef(false)
-  const next = useRef(() => {})
-  const pages = q.data?.pages.length ?? 0
-  useEffect(() => {
-    next.current = () => {
-      if (!more) setMore(true)
-      else if (q.hasNextPage && !q.isFetching && pages < morePages) void q.fetchNextPage()
-    }
-  })
-  useEffect(() => {
-    const root = list.current
-    const el = end.current
-    if (!root || !el || typeof IntersectionObserver === "undefined") return
-    const seen = new IntersectionObserver(
-      (es) => {
-        visible.current = es.some((e) => e.isIntersecting)
-        if (visible.current) next.current()
-      },
-      { root, rootMargin: "0px 0px 300px 0px" },
-    )
-    seen.observe(el)
-    return () => seen.disconnect()
-  }, [])
-  useEffect(() => {
-    if (more && !q.isFetching && visible.current) next.current()
-  }, [more, q.isFetching, pages])
   // Back to the newest after a minute untouched.
   const idle = useRef<number | undefined>(undefined)
   const scrolled = () => {
@@ -88,7 +60,7 @@ export function Stream({
     if ((list.current?.scrollTop ?? 0) === 0) return
     idle.current = window.setTimeout(() => {
       list.current?.scrollTo({ top: 0, behavior: "smooth" })
-      setMore(false)
+      more.reset()
     }, idleTop)
   }
   useEffect(() => () => window.clearTimeout(idle.current), [])
@@ -159,11 +131,7 @@ export function Stream({
             )
           })}
           <li ref={end} aria-hidden="true" className="px-3 py-2 text-center text-xs text-muted-foreground">
-            {more && q.isFetching
-              ? "Loading more…"
-              : more && (pages >= morePages || (q.isSuccess && !q.hasNextPage))
-                ? "The rest is under All commits"
-                : ""}
+            {more.loading ? "Loading more…" : more.done ? "The rest is under All commits" : ""}
           </li>
         </ol>
       )}

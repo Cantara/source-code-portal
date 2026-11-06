@@ -1,28 +1,19 @@
 "use client"
 
-import { useInfiniteQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/cn"
 import { api, type Commit, type Schemas } from "@/lib/api/client"
 import { CommitList } from "@/entities/commit/commit-list"
 import { sameWork, type Work } from "@/lib/preferences"
-import { moreQuery, morePages } from "./api"
-import { scroller } from "./more"
+import { moreQuery } from "./api"
+import { useMore } from "./more"
 import { ShowPicker, useShow } from "./show"
 import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
-/** dedupe keeps each commit once, the first time it comes: new commits move older ones to later pages while the reader scrolls. */
-export function dedupe(commits: Commit[]): Commit[] {
-  const seen = new Set<string>()
-  return commits.filter((c) => {
-    const k = `${c.repo}@${c.sha}`
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  })
-}
+/** commitKey is one commit once, however many pages it came in: new commits move older ones to later pages while the reader scrolls. */
+export const commitKey = (c: Commit) => `${c.repo}@${c.sha}`
 
 /**
  * LatestCommits are the newest commits of the kinds the reader shows them (ShowPicker: the work that counts until they choose).
@@ -83,45 +74,14 @@ export function LatestCommits({
 /** Feed is the list of one choice of kinds: the dashboard's commits when it is the work that counts, else read page by page. */
 function Feed({ counted, shown }: { counted?: Commit[]; shown: Work }) {
   const own = counted === undefined
-  const [more, setMore] = useState(own)
-  const q = useInfiniteQuery({ ...moreQuery(api, shown), enabled: more })
-  const read = more ? (q.data?.pages.flatMap((p) => p.commits) ?? []) : []
-  const commits = dedupe([...(counted ?? []), ...read])
   const end = useRef<HTMLDivElement>(null)
-  const visible = useRef(false)
-  const next = useRef(() => {})
-  const pages = q.data?.pages.length ?? 0
-  useEffect(() => {
-    next.current = () => {
-      if (!more) setMore(true)
-      else if (q.hasNextPage && !q.isFetching && pages < morePages) void q.fetchNextPage()
-    }
-  })
-  // The end of the list in view (in the panel's own scroll on a wide screen, the page's on a phone) reads the next page.
-  useEffect(() => {
-    const el = end.current
-    if (!el || typeof IntersectionObserver === "undefined") return // without it the list stays, "All commits" has the rest
-    const seen = new IntersectionObserver(
-      (es) => {
-        visible.current = es.some((e) => e.isIntersecting)
-        if (visible.current) next.current()
-      },
-      { root: scroller(el), rootMargin: "0px 0px 300px 0px" },
-    )
-    seen.observe(el)
-    return () => seen.disconnect()
-  }, [])
-  // A page that left the end in view (a tall panel, a short page) reads the next at once.
-  useEffect(() => {
-    if (!q.isFetching && visible.current) next.current()
-  }, [q.isFetching, pages])
-  const done = more && q.isSuccess && !q.hasNextPage
+  const more = useMore(moreQuery(api, shown), counted ?? [], (p) => p.commits, commitKey, end, true, own)
   return (
     <>
-      {own && !q.data ? <p className="text-sm text-muted-foreground">Loading…</p> : <CommitList commits={commits} />}
+      {own && !more.loaded ? <p className="text-sm text-muted-foreground">Loading…</p> : <CommitList commits={more.items} />}
       <div ref={end} aria-live="polite" className="text-center text-xs text-muted-foreground">
-        {q.isFetching && more && q.data ? "Loading more…" : null}
-        {done || (pages >= morePages && !q.isFetching) ? (
+        {more.loading ? "Loading more…" : null}
+        {more.done && !more.loading ? (
           <Link href="/commits" className="hover:text-primary hover:underline">
             Every commit, with filters
           </Link>
