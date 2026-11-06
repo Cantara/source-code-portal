@@ -1146,13 +1146,14 @@ components:
         releases: { type: integer }
     InsightProduct:
       type: object
-      required: [group, name, releases]
+      required: [group, name, releases, weekly]
       properties:
         group: { type: string }
         name: { type: string }
         releases: { type: integer, description: Stable releases held across the product }
         medianDays: { type: [integer, "null"], description: "Median days between its last stable releases; null with fewer than two" }
         last: { type: [string, "null"], format: date-time, description: Its newest stable release }
+        weekly: { type: array, items: { type: integer }, description: "Stable releases of each of the last 52 weeks, oldest first (the week starts on Monday, UTC)" }
     InsightCount:
       type: object
       required: [name, repos, share]
@@ -1160,14 +1161,21 @@ components:
         name: { type: string }
         repos: { type: integer }
         share: { type: number, description: "Of the repositories in scope, 0 to 1" }
+    InsightVersion:
+      type: object
+      required: [version, repos]
+      properties:
+        version: { type: string, description: The version as a manifest states it }
+        repos: { type: integer }
     InsightRuntime:
       type: object
-      required: [name, repos, oldest, newest]
+      required: [name, repos, oldest, newest, versions]
       properties:
         name: { type: string, description: "go, node or java" }
         repos: { type: integer }
         oldest: { type: string }
         newest: { type: string }
+        versions: { type: array, items: { $ref: "#/components/schemas/InsightVersion" }, description: "Every version named, oldest first" }
     InsightLibrary:
       type: object
       required: [repo, dependants, dependantRepos]
@@ -1177,6 +1185,25 @@ components:
         dependantRepos: { type: array, items: { type: string }, description: The first ten }
         release: { type: [string, "null"], description: Its latest stable release }
         retired: { $ref: "#/components/schemas/AlumniReason" }
+    InsightMatrixRow:
+      type: object
+      required: [repo, uses]
+      properties:
+        repo: { type: string, description: owner/name }
+        uses: { type: array, items: { type: integer }, description: Indexes into the matrix's libraries that this repository depends on }
+    InsightMatrix:
+      type: object
+      required: [libraries, repos]
+      properties:
+        libraries: { type: array, items: { type: string }, description: The listed libraries, most dependants first }
+        repos: { type: array, items: { $ref: "#/components/schemas/InsightMatrixRow" }, description: "The repositories using most of them, at most 24" }
+    InsightBand:
+      type: object
+      required: [from, to, repos]
+      properties:
+        from: { type: integer, description: Percent, inclusive }
+        to: { type: integer, description: "Percent, exclusive except for the last band" }
+        repos: { type: integer }
     InsightRepo:
       type: object
       required: [repo, commits]
@@ -1189,10 +1216,21 @@ components:
       properties:
         repo: { type: string, description: owner/name }
         lastChange: { type: [string, "null"], format: date-time }
+    InsightActivity:
+      type: object
+      required: [group, name, active, recent, quiet, dormant]
+      properties:
+        group: { type: string }
+        name: { type: string }
+        active: { type: integer }
+        recent: { type: integer }
+        quiet: { type: integer }
+        dormant: { type: integer }
     InsightAgeing:
       type: object
-      required: [active, recent, quiet, dormant, dormantRepos]
+      required: [active, recent, quiet, dormant, dormantRepos, products]
       properties:
+        products: { type: array, items: { $ref: "#/components/schemas/InsightActivity" }, description: Each product's repositories by activity }
         active: { type: integer }
         recent: { type: integer }
         quiet: { type: integer }
@@ -1214,13 +1252,15 @@ components:
         unknown: { type: integer, description: Repositories whose manifests name no language }
     Insights:
       type: object
-      required: [repos, thresholds, cadence, technology, libraries, singleAuthor, ageing, freshness]
+      required: [repos, thresholds, cadence, technology, libraries, matrix, singleAuthor, concentration, ageing, freshness]
       properties:
         repos: { type: integer, description: Repositories in scope, retired ones left out }
         thresholds: { $ref: "#/components/schemas/InsightThresholds" }
         cadence: { $ref: "#/components/schemas/InsightCadence" }
         technology: { $ref: "#/components/schemas/InsightTechnology" }
         libraries: { type: array, items: { $ref: "#/components/schemas/InsightLibrary" } }
+        matrix: { $ref: "#/components/schemas/InsightMatrix" }
+        concentration: { type: array, items: { $ref: "#/components/schemas/InsightBand" }, description: "How much of the people's recent commits the busiest author wrote, in ten bands, over the repositories with enough commits held" }
         singleAuthor: { type: array, items: { $ref: "#/components/schemas/InsightRepo" } }
         ageing: { $ref: "#/components/schemas/InsightAgeing" }
         freshness: { $ref: "#/components/schemas/Freshness" }

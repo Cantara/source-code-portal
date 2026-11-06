@@ -160,6 +160,74 @@ func TestInsights(t *testing.T) {
 	}
 }
 
+// TestInsightGraphs: the numbers each graph draws.
+func TestInsightGraphs(t *testing.T) {
+	s, api := fleet(t)
+	in := get(t, s, api, nil, nil)
+
+	// The release rhythm: 52 weeks a product; tools has 7 stable releases, 6 of them inside the year (core's 400 days ago is outside),
+	// the last one 3 days ago in the last weeks.
+	var tools oapi.InsightProduct
+	for _, p := range in.Cadence.Products {
+		if p.Group == "tools" {
+			tools = p
+		}
+	}
+	sum := 0
+	for _, n := range tools.Weekly {
+		sum += n
+	}
+	if len(tools.Weekly) != Weeks || sum != 6 || tools.Weekly[Weeks-1]+tools.Weekly[Weeks-2] == 0 {
+		t.Errorf("weekly = %v (sum %d)", tools.Weekly, sum)
+	}
+
+	// The version ladder: go 1.21, 1.23, 1.27 once each, oldest first; node >=18.
+	var goRt oapi.InsightRuntime
+	for _, r := range in.Technology.Runtimes {
+		if r.Name == "go" {
+			goRt = r
+		}
+	}
+	var versions []string
+	for _, v := range goRt.Versions {
+		versions = append(versions, v.Version)
+		if v.Repos != 1 {
+			t.Errorf("go %s in %d repositories, want 1", v.Version, v.Repos)
+		}
+	}
+	if strings.Join(versions, " ") != "1.21 1.23 1.27" {
+		t.Errorf("go versions = %v, want oldest first", versions)
+	}
+
+	// The dependency matrix: core is used by web and api (old is retired); old is used by web. Web uses both.
+	m := in.Matrix
+	if len(m.Libraries) != 2 || m.Libraries[0] != "acme/core" || m.Libraries[1] != "acme/old" || len(m.Repos) != 2 ||
+		m.Repos[0].Repo != "acme/web" || len(m.Repos[0].Uses) != 2 || m.Repos[1].Repo != "acme/api" || len(m.Repos[1].Uses) != 1 || m.Repos[1].Uses[0] != 0 {
+		t.Errorf("matrix = %+v", m)
+	}
+
+	// The concentration: api 48/50 and secret 100/100 land in the top band (96%, 100%), quiet 22/25 (88%) in the 80s, core 20/40 and web
+	// 10/30 below; old (retired) is not counted.
+	got := make([]int, bands)
+	total := 0
+	for i, b := range in.Concentration {
+		got[i] = b.Repos
+		total += b.Repos
+	}
+	if len(in.Concentration) != bands || got[9] != 2 || got[8] != 1 || got[5] != 1 || got[3] != 1 || total != 5 {
+		t.Errorf("concentration = %v", got)
+	}
+
+	// The ageing by product: tools has core active and web recent; rest has api quiet or recent, quiet dormant, secret active.
+	by := map[string]oapi.InsightActivity{}
+	for _, p := range in.Ageing.Products {
+		by[p.Group] = p
+	}
+	if by["tools"].Active != 1 || by["tools"].Recent+by["tools"].Quiet != 1 || by["rest"].Dormant != 1 || by["rest"].Active != 1 {
+		t.Errorf("ageing by product = %+v", in.Ageing.Products)
+	}
+}
+
 // TestInsightsPublicView: the public view of the same fleet counts and lists nothing of the private repository.
 func TestInsightsPublicView(t *testing.T) {
 	s, api := fleet(t)

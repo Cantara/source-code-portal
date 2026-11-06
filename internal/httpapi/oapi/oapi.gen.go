@@ -1542,6 +1542,16 @@ type HistoryPage struct {
 	Page  Page `json:"page"`
 }
 
+// InsightActivity defines model for InsightActivity.
+type InsightActivity struct {
+	Active  int    `json:"active"`
+	Dormant int    `json:"dormant"`
+	Group   string `json:"group"`
+	Name    string `json:"name"`
+	Quiet   int    `json:"quiet"`
+	Recent  int    `json:"recent"`
+}
+
 // InsightAgeing defines model for InsightAgeing.
 type InsightAgeing struct {
 	Active  int `json:"active"`
@@ -1549,8 +1559,21 @@ type InsightAgeing struct {
 
 	// DormantRepos The longest dormant first
 	DormantRepos []InsightDormant `json:"dormantRepos"`
-	Quiet        int              `json:"quiet"`
-	Recent       int              `json:"recent"`
+
+	// Products Each product's repositories by activity
+	Products []InsightActivity `json:"products"`
+	Quiet    int               `json:"quiet"`
+	Recent   int               `json:"recent"`
+}
+
+// InsightBand defines model for InsightBand.
+type InsightBand struct {
+	// From Percent
+	From  int `json:"from"`
+	Repos int `json:"repos"`
+
+	// To Percent, exclusive except for the last band
+	To int `json:"to"`
 }
 
 // InsightCadence defines model for InsightCadence.
@@ -1595,6 +1618,24 @@ type InsightLibrary struct {
 	Retired *AlumniReason `json:"retired,omitempty"`
 }
 
+// InsightMatrix defines model for InsightMatrix.
+type InsightMatrix struct {
+	// Libraries The listed libraries
+	Libraries []string `json:"libraries"`
+
+	// Repos The repositories using most of them, at most 24
+	Repos []InsightMatrixRow `json:"repos"`
+}
+
+// InsightMatrixRow defines model for InsightMatrixRow.
+type InsightMatrixRow struct {
+	// Repo owner/name
+	Repo string `json:"repo"`
+
+	// Uses Indexes into the matrix's libraries that this repository depends on
+	Uses []int `json:"uses"`
+}
+
 // InsightMonth defines model for InsightMonth.
 type InsightMonth struct {
 	// Month YYYY-MM (UTC)
@@ -1615,6 +1656,9 @@ type InsightProduct struct {
 
 	// Releases Stable releases held across the product
 	Releases int `json:"releases"`
+
+	// Weekly Stable releases of each of the last 52 weeks, oldest first (the week starts on Monday, UTC)
+	Weekly []int `json:"weekly"`
 }
 
 // InsightRepo defines model for InsightRepo.
@@ -1633,6 +1677,9 @@ type InsightRuntime struct {
 	Newest string `json:"newest"`
 	Oldest string `json:"oldest"`
 	Repos  int    `json:"repos"`
+
+	// Versions Every version named, oldest first
+	Versions []InsightVersion `json:"versions"`
 }
 
 // InsightTechnology defines model for InsightTechnology.
@@ -1663,12 +1710,24 @@ type InsightThresholds struct {
 	SingleAuthorShare int `json:"singleAuthorShare"`
 }
 
+// InsightVersion defines model for InsightVersion.
+type InsightVersion struct {
+	Repos int `json:"repos"`
+
+	// Version The version as a manifest states it
+	Version string `json:"version"`
+}
+
 // Insights defines model for Insights.
 type Insights struct {
-	Ageing    InsightAgeing    `json:"ageing"`
-	Cadence   InsightCadence   `json:"cadence"`
-	Freshness Freshness        `json:"freshness"`
-	Libraries []InsightLibrary `json:"libraries"`
+	Ageing  InsightAgeing  `json:"ageing"`
+	Cadence InsightCadence `json:"cadence"`
+
+	// Concentration How much of the people's recent commits the busiest author wrote, in ten bands, over the repositories with enough commits held
+	Concentration []InsightBand    `json:"concentration"`
+	Freshness     Freshness        `json:"freshness"`
+	Libraries     []InsightLibrary `json:"libraries"`
+	Matrix        InsightMatrix    `json:"matrix"`
 
 	// Repos Repositories in scope
 	Repos        int               `json:"repos"`

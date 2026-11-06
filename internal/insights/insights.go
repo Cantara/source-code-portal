@@ -28,6 +28,9 @@ const (
 	Libraries           = 10 // shared libraries listed
 	listed              = 10 // dependants named per library
 	dormantListed       = 50 // dormant repositories listed
+	Weeks               = 52 // weeks of the release rhythm
+	MatrixRepos         = 24 // repositories of the dependency matrix
+	bands               = 10 // bands of the concentration
 	day                 = 24 * time.Hour
 )
 
@@ -90,13 +93,15 @@ func (a API) build(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, now time.
 		Repos: len(live),
 		Thresholds: oapi.InsightThresholds{Months: Months, Releases: Releases, SingleAuthorShare: SingleAuthorShare,
 			SingleAuthorCommits: SingleAuthorCommits, SharedLibraries: Libraries},
-		Cadence:      oapi.InsightCadence{Months: months(live, now), Products: products(s, scopeKeys, live)},
-		Technology:   technology(live),
-		Libraries:    libraries(s, scopeKeys, a),
-		SingleAuthor: singleAuthor(live),
-		Ageing:       ageing(live, now),
-		Freshness:    scope.Freshness(s, scopeKeys, now, a.Fresh),
+		Cadence:       oapi.InsightCadence{Months: months(live, now), Products: products(s, scopeKeys, live, now)},
+		Technology:    technology(live),
+		SingleAuthor:  singleAuthor(live),
+		Concentration: concentration(live),
+		Ageing:        ageing(s, live, now),
+		Freshness:     scope.Freshness(s, scopeKeys, now, a.Fresh),
 	}
+	libs := libraries(s, scopeKeys, a)
+	out.Libraries, out.Matrix = libraryRows(libs), matrix(libs)
 	return out
 }
 
@@ -118,7 +123,7 @@ func months(live []row, now time.Time) []oapi.InsightMonth {
 }
 
 // products is each group's stable releases over its live members in scope, and the median days between its newest Releases.
-func products(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, live []row) []oapi.InsightProduct {
+func products(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, live []row, now time.Time) []oapi.InsightProduct {
 	byKey := map[snapshot.RepoKey]*row{}
 	for i := range live {
 		byKey[live[i].key] = &live[i]
@@ -139,7 +144,7 @@ func products(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, live []row) []
 			continue
 		}
 		slices.SortFunc(times, func(x, y time.Time) int { return y.Compare(x) })
-		p := oapi.InsightProduct{Group: g.ID, Name: g.Name, Releases: len(times)}
+		p := oapi.InsightProduct{Group: g.ID, Name: g.Name, Releases: len(times), Weekly: weekly(times, now)}
 		if len(times) > 0 {
 			p.Last = &times[0]
 		}
@@ -153,6 +158,22 @@ func products(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, live []row) []
 			p.MedianDays = &m
 		}
 		out = append(out, p)
+	}
+	return out
+}
+
+// weekly counts times per week over the last Weeks weeks, oldest first; a week starts on Monday (UTC) and the last one is this week.
+func weekly(times []time.Time, now time.Time) []int {
+	monday := func(t time.Time) time.Time {
+		t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		return t.AddDate(0, 0, -((int(t.Weekday()) + 6) % 7))
+	}
+	first := monday(now).AddDate(0, 0, -7*(Weeks-1))
+	out := make([]int, Weeks)
+	for _, t := range times {
+		if i := int(monday(t.UTC()).Sub(first) / (7 * day)); i >= 0 && i < Weeks {
+			out[i]++
+		}
 	}
 	return out
 }
@@ -190,6 +211,8 @@ func technology(live []row) oapi.InsightTechnology {
 		repos          int
 		oldest, newest string
 		lo, hi         []int
+		versions       map[string]int
+		parsed         map[string][]int
 	}
 	runtimes := map[string]*span{}
 	t := oapi.InsightTechnology{Languages: []oapi.InsightCount{}, BuildTools: []oapi.InsightCount{}, Runtimes: []oapi.InsightRuntime{}}
@@ -202,7 +225,7 @@ func technology(live []row) oapi.InsightTechnology {
 		if r.BuildTool != "" {
 			tools[r.BuildTool]++
 		}
-		seen := map[string]bool{}
+		seen := map[[2]string]bool{}
 		for _, rt := range r.Runtimes {
 			v, ok := version(rt[1])
 			if !ok {
@@ -210,12 +233,17 @@ func technology(live []row) oapi.InsightTechnology {
 			}
 			sp := runtimes[rt[0]]
 			if sp == nil {
-				sp = &span{}
+				sp = &span{versions: map[string]int{}, parsed: map[string][]int{}}
 				runtimes[rt[0]] = sp
 			}
-			if !seen[rt[0]] {
+			if !seen[[2]string{rt[0], ""}] {
 				sp.repos++
-				seen[rt[0]] = true
+				seen[[2]string{rt[0], ""}] = true
+			}
+			if !seen[rt] {
+				sp.versions[rt[1]]++
+				sp.parsed[rt[1]] = v
+				seen[rt] = true
 			}
 			if sp.lo == nil || slices.Compare(v, sp.lo) < 0 {
 				sp.lo, sp.oldest = v, rt[1]
@@ -227,15 +255,31 @@ func technology(live []row) oapi.InsightTechnology {
 	}
 	t.Languages, t.BuildTools = counted(langs, len(live)), counted(tools, len(live))
 	for n, sp := range runtimes {
-		t.Runtimes = append(t.Runtimes, oapi.InsightRuntime{Name: n, Repos: sp.repos, Oldest: sp.oldest, Newest: sp.newest})
+		rt := oapi.InsightRuntime{Name: n, Repos: sp.repos, Oldest: sp.oldest, Newest: sp.newest, Versions: []oapi.InsightVersion{}}
+		for v, c := range sp.versions {
+			rt.Versions = append(rt.Versions, oapi.InsightVersion{Version: v, Repos: c})
+		}
+		slices.SortFunc(rt.Versions, func(x, y oapi.InsightVersion) int {
+			return cmp.Or(slices.Compare(sp.parsed[x.Version], sp.parsed[y.Version]), cmp.Compare(x.Version, y.Version))
+		})
+		t.Runtimes = append(t.Runtimes, rt)
 	}
 	slices.SortFunc(t.Runtimes, func(x, y oapi.InsightRuntime) int { return cmp.Compare(x.Name, y.Name) })
 	return t
 }
 
-// libraries are the repositories of the scope that the most live repositories depend on, a retired one still used marked.
-func libraries(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, a API) []oapi.InsightLibrary {
-	out := []oapi.InsightLibrary{}
+// library is a repository of the scope that live repositories depend on, with all of them.
+type library struct {
+	repo    snapshot.RepoKey
+	users   []string // sorted
+	release string
+	retired *oapi.AlumniReason
+}
+
+// libraries are the repositories of the scope that the most live repositories depend on, a retired one still used marked: the
+// Libraries most depended on.
+func libraries(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, a API) []library {
+	var out []library
 	for _, k := range scopeKeys {
 		e := s.Repos[k]
 		if e == nil {
@@ -252,19 +296,52 @@ func libraries(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, a API) []oapi
 			continue
 		}
 		slices.Sort(users)
-		l := oapi.InsightLibrary{Repo: string(k), Dependants: len(users), DependantRepos: users[:min(len(users), listed)]}
-		if f.LatestTag != "" {
-			l.Release = &f.LatestTag
-		}
+		l := library{repo: k, users: users, release: f.LatestTag}
 		if why := a.Retired(e); why != "" {
-			l.Retired = &why
+			l.retired = &why
 		}
 		out = append(out, l)
 	}
-	slices.SortFunc(out, func(x, y oapi.InsightLibrary) int {
-		return cmp.Or(cmp.Compare(y.Dependants, x.Dependants), cmp.Compare(x.Repo, y.Repo))
+	slices.SortFunc(out, func(x, y library) int {
+		return cmp.Or(cmp.Compare(len(y.users), len(x.users)), cmp.Compare(x.repo, y.repo))
 	})
 	return out[:min(len(out), Libraries)]
+}
+
+// libraryRows are the libraries as the API lists them: ten dependants named each.
+func libraryRows(libs []library) []oapi.InsightLibrary {
+	out := make([]oapi.InsightLibrary, 0, len(libs))
+	for _, l := range libs {
+		row := oapi.InsightLibrary{Repo: string(l.repo), Dependants: len(l.users), DependantRepos: l.users[:min(len(l.users), listed)], Retired: l.retired}
+		if l.release != "" {
+			rel := l.release
+			row.Release = &rel
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+// matrix is the libraries against the MatrixRepos repositories that use most of them: a repository tied to many libraries is a
+// column filled in many rows, a library everything leans on a full row.
+func matrix(libs []library) oapi.InsightMatrix {
+	m := oapi.InsightMatrix{Libraries: make([]string, 0, len(libs)), Repos: []oapi.InsightMatrixRow{}}
+	uses := map[string][]int{}
+	for i, l := range libs {
+		m.Libraries = append(m.Libraries, string(l.repo))
+		for _, u := range l.users {
+			uses[u] = append(uses[u], i)
+		}
+	}
+	repos := make([]string, 0, len(uses))
+	for r := range uses {
+		repos = append(repos, r)
+	}
+	slices.SortFunc(repos, func(x, y string) int { return cmp.Or(cmp.Compare(len(uses[y]), len(uses[x])), cmp.Compare(x, y)) })
+	for _, r := range repos[:min(len(repos), MatrixRepos)] {
+		m.Repos = append(m.Repos, oapi.InsightMatrixRow{Repo: r, Uses: uses[r]})
+	}
+	return m
 }
 
 // singleAuthor are the live repositories where one author wrote at least SingleAuthorShare percent of the people's commits held,
@@ -282,11 +359,29 @@ func singleAuthor(live []row) []oapi.InsightRepo {
 	return out
 }
 
-func ageing(live []row, now time.Time) oapi.InsightAgeing {
-	out := oapi.InsightAgeing{DormantRepos: []oapi.InsightDormant{}}
-	dormant := []oapi.InsightDormant{}
+// concentration is how much of the people's recent commits the busiest author wrote, in ten bands of 10%, over the live repositories
+// with at least SingleAuthorCommits of them: the shape of the fleet's knowledge, never a person.
+func concentration(live []row) []oapi.InsightBand {
+	out := make([]oapi.InsightBand, bands)
+	for i := range out {
+		out[i] = oapi.InsightBand{From: i * 100 / bands, To: (i + 1) * 100 / bands}
+	}
 	for _, r := range live {
-		switch health.ActivityOf(r.LastChange, false, now) {
+		if r.People >= SingleAuthorCommits {
+			out[min(r.Top*bands/r.People, bands-1)].Repos++
+		}
+	}
+	return out
+}
+
+func ageing(s *snapshot.Snapshot, live []row, now time.Time) oapi.InsightAgeing {
+	out := oapi.InsightAgeing{DormantRepos: []oapi.InsightDormant{}, Products: []oapi.InsightActivity{}}
+	dormant := []oapi.InsightDormant{}
+	band := map[snapshot.RepoKey]health.Activity{}
+	for _, r := range live {
+		a := health.ActivityOf(r.LastChange, false, now)
+		band[r.key] = a
+		switch a {
 		case health.Active:
 			out.Active++
 		case health.Recent:
@@ -301,6 +396,24 @@ func ageing(live []row, now time.Time) oapi.InsightAgeing {
 				d.LastChange = &t
 			}
 			dormant = append(dormant, d)
+		}
+	}
+	for _, g := range s.Groups {
+		p := oapi.InsightActivity{Group: g.ID, Name: g.Name}
+		for _, m := range g.Members {
+			switch band[m] {
+			case health.Active:
+				p.Active++
+			case health.Recent:
+				p.Recent++
+			case health.Quiet:
+				p.Quiet++
+			case health.Dormant:
+				p.Dormant++
+			}
+		}
+		if p.Active+p.Recent+p.Quiet+p.Dormant > 0 {
+			out.Products = append(out.Products, p)
 		}
 	}
 	slices.SortFunc(dormant, func(x, y oapi.InsightDormant) int {
