@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"crypto/subtle"
 	"log/slog"
@@ -66,7 +67,8 @@ type session struct {
 	Verified bool     `json:"ev,omitempty"` // the provider verified the email: only then does it match auth.admin_emails
 	Name     string   `json:"name,omitempty"`
 	Groups   []string `json:"groups,omitempty"`
-	Token    string   `json:"tok,omitempty"` // a token's sign-in: the token is looked up on every request, so removing it ends the session
+	Token    string   `json:"tok,omitempty"`   // a token's sign-in: the token is looked up on every request, so removing it ends the session
+	Began    int64    `json:"began,omitempty"` // when the person signed in: a renewed session keeps it, and ends sessionMax after it
 	Issued   int64    `json:"iat"`
 	Expires  int64    `json:"exp"`
 }
@@ -75,6 +77,9 @@ const (
 	sessionLabel = "scp session v1"
 	flowLabel    = "scp oidc v1"
 	maxGroups    = 64
+	// sessionMax is the longest a sign-in lasts, however it is renewed: groups and the verified email come from the provider at sign-in,
+	// so someone it has since removed or disabled is let go within this time (a longer auth.session_ttl is the limit then).
+	sessionMax = 7 * 24 * time.Hour
 )
 
 // New returns the authenticator of o.
@@ -138,7 +143,7 @@ func (a *Auth) Identify(w http.ResponseWriter, r *http.Request) (httpapi.Identit
 	}
 	var s session
 	now := a.o.Now()
-	if !a.sessions.open(a.session, c.Value, &s) || now.Unix() >= s.Expires {
+	if !a.sessions.open(a.session, c.Value, &s) || now.Unix() >= s.Expires || a.pastMax(s, now) {
 		a.clear(w, a.session) // sealed under another key, tampered or ended: anonymous, not refused
 		return httpapi.Identity{}, false, nil
 	}
@@ -191,10 +196,19 @@ func (s session) identity() httpapi.Identity {
 	return id
 }
 
-// start seals s into the session cookie, issued now.
+// pastMax says whether a sign-in is older than it may be renewed to (a session from before Began is counted from when it was issued).
+func (a *Auth) pastMax(s session, now time.Time) bool {
+	began := cmp.Or(s.Began, s.Issued)
+	return now.Sub(time.Unix(began, 0)) >= max(sessionMax, a.o.SessionTTL)
+}
+
+// start seals s into the session cookie, issued now; a new sign-in begins now, a renewal keeps when it began.
 func (a *Auth) start(w http.ResponseWriter, s session) error {
 	now := a.o.Now()
 	s.Issued, s.Expires = now.Unix(), now.Add(a.o.SessionTTL).Unix()
+	if s.Began == 0 {
+		s.Began = s.Issued
+	}
 	if len(s.Groups) > maxGroups {
 		s.Groups = s.Groups[:maxGroups]
 	}

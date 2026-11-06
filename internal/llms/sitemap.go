@@ -24,10 +24,24 @@ type entry struct {
 }
 
 // sitemap is the files of one view of a snapshot at one origin: the URL set, or an index and its parts.
+// sitemap is a view's files, built once with a placeholder where the origin goes (raw); a portal that says its own address fills it in
+// once (origin, files), one that reads it from the request fills it in per request: a request naming another Host never rebuilds.
 type sitemap struct {
 	view   *snapshot.Snapshot
+	raw    [][]byte // [0] is /sitemap.xml
 	origin string
-	files  [][]byte // [0] is /sitemap.xml
+	files  [][]byte // raw with origin filled in
+}
+
+// originMark stands for the origin in a built sitemap; it is never a real address.
+const originMark = "https://origin.scp.invalid"
+
+func fill(raw [][]byte, origin string) [][]byte {
+	out := make([][]byte, len(raw))
+	for i, f := range raw {
+		out[i] = bytes.ReplaceAll(f, []byte(originMark), []byte(escape(origin)))
+	}
+	return out
 }
 
 // Sitemap serves /sitemap.xml, and /sitemaps/{n}.xml (the pattern's {file}) when the pages pass maxURLs.
@@ -93,11 +107,19 @@ func (l *LLMs) sitemaps(r *http.Request) [][]byte {
 		slot = 1
 	}
 	l.mu.Lock()
-	defer l.mu.Unlock()
-	if m := l.maps[slot]; m.view != s || m.origin != origin {
-		l.maps[slot] = sitemap{view: s, origin: origin, files: l.buildSitemap(s, origin, maxURLs)}
+	m := l.maps[slot]
+	if m.view != s {
+		m = sitemap{view: s, raw: l.buildSitemap(s, originMark, maxURLs)}
 	}
-	return l.maps[slot].files
+	if l.base != "" && m.origin != origin { // the portal's own address: filled in once per view
+		m.origin, m.files = origin, fill(m.raw, origin)
+	}
+	l.maps[slot] = m
+	l.mu.Unlock()
+	if l.base != "" {
+		return m.files
+	}
+	return fill(m.raw, origin)
 }
 
 // pages are the indexable pages of a view: the dashboard, the commit log, the groups, the repositories and their documents, each

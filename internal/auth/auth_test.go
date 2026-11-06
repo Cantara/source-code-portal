@@ -325,3 +325,32 @@ func TestReturnTo(t *testing.T) {
 		}
 	}
 }
+
+// A session renewed again and again still ends sessionMax after the sign-in: what the provider said then (groups, the verified email)
+// is asked again.
+func TestSessionEndsAtItsMaximum(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	a := newPortal(t, Options{SessionKey: key(), SessionTTL: time.Hour, Now: func() time.Time { return now }}).auth
+	rec := httptest.NewRecorder()
+	if err := a.start(rec, session{Subject: "u-1", Name: "Ada"}); err != nil {
+		t.Fatal(err)
+	}
+	cookie := rec.Result().Cookies()[0]
+	started := now
+	for now.Sub(started) < sessionMax+time.Hour {
+		now = now.Add(31 * time.Minute) // each use is past half the lifetime: the session is renewed
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.AddCookie(cookie)
+		w := httptest.NewRecorder()
+		_, ok, err := a.Identify(w, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if set := w.Result().Cookies(); ok && len(set) == 1 {
+			cookie = set[0]
+		}
+		if want := now.Sub(started) < sessionMax; ok != want {
+			t.Fatalf("%v after the sign-in: signed in %v, want %v", now.Sub(started), ok, want)
+		}
+	}
+}

@@ -20,6 +20,9 @@ Fixes from a review of the code; no configuration change.
   found by its id, not its place; the assistant's answer is read out once whole and a broken stream frame is skipped; a screen's
   wake lock is held once; full screen that the browser refuses is not an error; the search shortcut `/` goes to the page's own search
   first.
+- A sign-in lasts at most 7 days however it is renewed (or `auth.session_ttl` when that is longer): the groups and the verified email
+  come from the provider at sign-in, so someone it removed is let go. An index that cannot be built keeps its last good value and
+  the rest of a publish goes out. The sitemap is built once per snapshot, whatever Host a request names.
 
 ## 2.2.4
 

@@ -150,14 +150,37 @@ func TestPanickingUpdateIsDroppedAlone(t *testing.T) {
 	}
 }
 
-func TestPanickingIndexKeepsSnapshot(t *testing.T) {
-	const bad Index[int] = "bad"
-	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), bad.Build(func(*Snapshot) int { panic("boom") }))
+// An index that cannot be built keeps its last good value: the rest of the batch is published, and the feature does not go dark.
+func TestPanickingIndexKeepsItsLastValue(t *testing.T) {
+	const flaky Index[int] = "flaky"
+	broken := false
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), flaky.Build(func(s *Snapshot) int {
+		if broken {
+			panic("boom")
+		}
+		return len(s.Groups) + 1
+	}))
 	defer p.Close()
 	p.Update(func(b *Builder) { b.SetCatalogued() })
 	p.Flush()
-	if got := p.Current(); !got.BuiltAt.IsZero() || got.Catalogued {
-		t.Fatal("a snapshot whose index panicked was published")
+	if got := flaky.Get(p.Current()); got != 1 {
+		t.Fatalf("index before = %d, want 1", got)
+	}
+	broken = true
+	p.Update(func(b *Builder) { b.SetGroups([]Group{{ID: "g"}}) })
+	p.Flush()
+	cur := p.Current()
+	if len(cur.Groups) != 1 {
+		t.Fatal("the batch of a panicking index was dropped")
+	}
+	if got := flaky.Get(cur); got != 1 {
+		t.Errorf("index kept = %d, want its last good value 1", got)
+	}
+	broken = false
+	p.Update(func(b *Builder) { b.SetGroups([]Group{{ID: "g"}, {ID: "h"}}) })
+	p.Flush()
+	if got := flaky.Get(p.Current()); got != 3 {
+		t.Errorf("index after the fix = %d, want 3", got)
 	}
 }
 
