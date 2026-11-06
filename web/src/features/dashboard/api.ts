@@ -31,6 +31,10 @@ export const workQuery = (api: Api, work: Work, limit: number) =>
 /** morePages is how many pages the latest commits read as the reader scrolls; past them "All commits" has the rest. */
 export const morePages = 10
 
+/** nextPage is the page after a numbered page, none after the last: the cursor of every list that goes on as it is scrolled. */
+const nextPage = (last: { page: { number: number; pages: number } }) =>
+  last.page.number < last.page.pages ? last.page.number + 1 : undefined
+
 /** moreQuery is the newest commits of a lens, page after page of 50, for the latest commits that go on as they are scrolled. */
 export const moreQuery = (api: Api, work: Work) =>
   infiniteQueryOptions({
@@ -38,7 +42,7 @@ export const moreQuery = (api: Api, work: Work) =>
     queryFn: ({ signal, pageParam }) =>
       unwrap(api.GET("/commits", { params: { query: { work, limit: 50, page: pageParam } }, signal })),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
+    getNextPageParam: nextPage,
   })
 
 /** moreSize is a page of the pull requests and issues their sections read as the reader scrolls. */
@@ -56,7 +60,7 @@ export const morePullsQuery = (api: Api, f: PullFilter) =>
         }),
       ),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
+    getNextPageParam: nextPage,
   })
 
 /** moreIssuesQuery is a lens's open issues, the newest first, page after page, for the section that goes on as it is scrolled. */
@@ -71,7 +75,7 @@ export const moreIssuesQuery = (api: Api, f: IssueFilter) =>
         }),
       ),
     initialPageParam: 1,
-    getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
+    getNextPageParam: nextPage,
   })
 
 /** StoredLayout is the admin's layout of a page as the design mode edits it (out of the contract, behind the admin role). */

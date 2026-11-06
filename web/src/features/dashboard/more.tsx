@@ -8,6 +8,7 @@ import { morePages } from "./api"
  * useMore is a section's list that goes on as it is scrolled (design/layout.md, "Loads more at the end"), as the latest commits do:
  * the first items come from the element's own query; once the list's end (end) comes into view it reads the same list page by
  * page, up to morePages pages, and items has them all once each (key). The caller holds end, the element after the list. done: nothing more to read, the page's link has the rest.
+ * loaded: the first page is in. reset forgets the pages read (a list that went back to its top).
  */
 export function useMore<T, P extends { page: { number: number; pages: number } }>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the options of any infinite query of pages
@@ -15,10 +16,12 @@ export function useMore<T, P extends { page: { number: number; pages: number } }
   first: T[],
   of: (p: P) => T[],
   key: (t: T) => string,
-  end: RefObject<HTMLDivElement | null>,
+  end: RefObject<HTMLElement | null>,
   watch: boolean,
+  /** read from the first render, without waiting for the end to come near */
+  start = false,
 ) {
-  const [more, setMore] = useState(false)
+  const [more, setMore] = useState(start)
   const q = useInfiniteQuery({ ...opts, enabled: more })
   const pages = more ? (q.data?.pages.length ?? 0) : 0
   const seen = new Set<string>()
@@ -56,7 +59,13 @@ export function useMore<T, P extends { page: { number: number; pages: number } }
     if (more && watch && !q.isFetching && el && near(el)) next.current()
   }, [end, more, watch, q.isFetching, pages])
   const done = (more && q.isSuccess && !q.hasNextPage) || pages >= morePages
-  return { items, loading: more && q.isFetching && q.data !== undefined, done }
+  return {
+    items,
+    loading: more && q.isFetching && q.data !== undefined,
+    done,
+    loaded: q.data !== undefined,
+    reset: () => setMore(false),
+  }
 }
 
 /** near says whether el is within 300 px below the bottom of the area that scrolls it (the page, else), as the observer's margin. */
