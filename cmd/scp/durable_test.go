@@ -16,7 +16,6 @@ import (
 	gogh "github.com/google/go-github/v92/github"
 
 	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
 	"github.com/cantara/source-code-portal/internal/store"
 )
@@ -170,33 +169,4 @@ func mapKeys(m map[string]int) []string {
 		out = append(out, k)
 	}
 	return out
-}
-
-// The issues and pull requests wait an hour for an event only when everything tells the portal of a change: webhooks are on and every
-// source is an App.
-func TestEventDrivenTTL(t *testing.T) {
-	srv := githubtest.New(t)
-	srv.AddToken("ghp_test")
-	app := config.Source{ID: "app", BaseURL: srv.BaseURL(), Orgs: []string{"acme"},
-		App: &config.App{ID: srv.AppID, PrivateKey: config.NewSecret(srv.PrivateKeyPEM())}}
-	token := config.Source{ID: "tok", BaseURL: srv.BaseURL(), Orgs: []string{"other"}, TokenFile: "x", Token: config.NewSecret([]byte("ghp_test"))}
-	for _, tc := range []struct {
-		name    string
-		hooks   bool
-		sources []config.Source
-		want    time.Duration
-	}{{"an App with webhooks", true, []config.Source{app}, time.Hour}, {"an App without webhooks", false, []config.Source{app}, 0},
-		{"an App and a token", true, []config.Source{app, token}, 0}} {
-		cfg := config.Config{GitHub: config.GitHub{Sources: tc.sources}}
-		if tc.hooks {
-			cfg.Webhook.Secret = config.NewSecret([]byte("hooks"))
-		}
-		c, err := github.New(cfg.GitHub, nil, slog.New(slog.DiscardHandler))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := eventDrivenTTL(cfg, c); got != tc.want {
-			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
-		}
-	}
 }

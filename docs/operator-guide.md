@@ -76,9 +76,9 @@ it answers GitHub (an event it cannot keep is answered 503, so GitHub's delivery
 restart passes on what was still parked (an update restarts the portal). With an App it also reads the App's webhook delivery log
 every two minutes (a read, with the App's own token; no permission needed) and acts on every delivery from the last days that it did
 not answer with a success: one that arrived while the portal was down, full or restarting is found within minutes of its return. A
-webhook on an organisation or a repository has no such log: there the listing below is the net. When every source is an App and a
-webhook secret is set, issues and pull requests are read again only after an hour without an event, not every 15 minutes; the listing
-every five minutes also asks for a read when a repository's count of open issues and pull requests moved.
+webhook on an organisation or a repository has no such log: there the listing below is the net. Issues and pull
+requests are also read every 15 minutes whatever arrives (a 304 costs no rate limit), and the listing every five minutes asks for a
+read when a repository's count of open issues and pull requests moved.
 
 Without a webhook the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
 commits, documents, descriptors and manifests are also re-read on their own schedule.

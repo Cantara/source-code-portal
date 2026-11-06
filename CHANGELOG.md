@@ -14,8 +14,7 @@ Fixes from a review of the code; no configuration change.
   the page opens a silent or closed stream again and when the tab or the network comes back.
 - A webhook is not lost: every event is parked in the store before GitHub is answered (503 when it cannot be kept) and passed on again
   after a restart until the jobs it asked for have run; with an App, the App's webhook delivery log is read every two minutes and every delivery the portal did not answer
-  with a success (it was down, restarting or full) is acted on. With every source an App and webhooks on, issues and pull requests are
-  read again after an hour without an event, not 15 minutes. New result labels `unavailable` and `caught_up` on
+  with a success (it was down, restarting or full) is acted on. New result labels `unavailable` and `caught_up` on
   `scp_webhook_deliveries_total`.
 - The dashboard and `/present` refresh their data at most once in 15 seconds (a run of snapshots was one refresh each) and no longer
   prefetch every repository link.

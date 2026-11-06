@@ -201,14 +201,13 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		return snapshot.Repo{}, false
 	}
-	eventTTL := eventDrivenTTL(cfg, gh)
 	specs := []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
 		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec()}
 	if f.Pulls {
-		specs = append(specs, pulls.New(openPulls, pulls.Options{Repo: catalogued, TTL: eventTTL}).Spec())
+		specs = append(specs, pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec())
 	}
 	if f.Issues {
-		specs = append(specs, issues.New(issueFetchers, issues.Options{Repo: catalogued, TTL: eventTTL}).Spec())
+		specs = append(specs, issues.New(issueFetchers, issues.Options{Repo: catalogued}).Spec())
 	}
 	for _, spec := range specs {
 		if err := s.engine.Register(spec); err != nil {
@@ -633,19 +632,4 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, 
 	}
 	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(public, private, registries), Registries: registries,
 		Public: cfg.Public, Repo: repo})
-}
-
-// eventDrivenTTL is how long the issues and pull requests of a repository stand without an event: an hour when every source is an App
-// and webhooks are on (a change is announced, parked until acted on and, if the portal was away, read from the App's delivery log;
-// the listing every few minutes notices a moved count of open items besides), else the jobs' own 15 minutes (0).
-func eventDrivenTTL(cfg config.Config, gh *github.Client) time.Duration {
-	if !cfg.Webhook.Secret.IsSet() {
-		return 0
-	}
-	for _, s := range cfg.GitHub.Sources {
-		if !gh.Source(s.ID).App() {
-			return 0
-		}
-	}
-	return time.Hour
 }
