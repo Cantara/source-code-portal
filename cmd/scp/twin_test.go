@@ -39,6 +39,8 @@ func TestPublicTwin(t *testing.T) {
 	extra := "access: {private_groups: [staff]}\nauth: {tokens: [{name: outsider, secret_file: $DIR/outsider}]}\n"
 	get, base := privatePortalAt(t, extra)
 	twin, twinBase := publicTwin(t, extra)
+	untilListed(t, get)
+	untilListed(t, twin)
 	outsider := []string{"Authorization", "Bearer " + outsiderSecret}
 	for _, p := range append(publicPaths(t), edgePaths...) {
 		for _, h := range [][]string{{"Accept", "*/*"}, {"Accept", "text/markdown"}, outsider} {

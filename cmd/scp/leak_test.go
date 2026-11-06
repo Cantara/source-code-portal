@@ -205,6 +205,26 @@ func firstEvents(r io.Reader, n int) string {
 	return b.String()
 }
 
+// untilListed waits until the lists of pull requests, issues and releases hold what the jobs of their own read (a cold start runs
+// them after the catalogue's, which privatePortal waits for), so a test that reads them sees their answer and not an unread one.
+func untilListed(t *testing.T, get fetch) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		ready := true
+		for _, p := range []string{"/api/v1/pulls", "/api/v1/issues", "/api/v1/releases"} {
+			var l struct{ Freshness oapi.Freshness }
+			_, b, _ := get(p, staff...)
+			ready = ready && json.Unmarshal([]byte(b), &l) == nil && l.Freshness.Status == "fresh"
+		}
+		if ready {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the lists were not read within 10s")
+		}
+	}
+}
+
 // publicPaths are every GET of the API contract, read from api/openapi.yaml, and every route outside it, with the private
 // repository where a path names one. A new route goes on this list.
 func publicPaths(t *testing.T) []string {
@@ -237,6 +257,7 @@ func publicPaths(t *testing.T) []string {
 // and each address naming it answers word for word as an address that does not exist (no existence leak). A staff member sees it.
 func TestNoLeak(t *testing.T) {
 	get := privatePortal(t, "access: {private_groups: [staff]}\n")
+	untilListed(t, get)
 	clean := regexp.MustCompile(`urn:scp:request:\w+`)
 	for _, p := range publicPaths(t) {
 		for _, accept := range []string{"*/*", "text/markdown"} {
