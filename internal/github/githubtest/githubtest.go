@@ -37,6 +37,8 @@ type Server struct {
 	*httptest.Server
 	AppID int64
 
+	deliveries []Delivery // the App's webhook delivery log, newest first
+
 	mu       sync.Mutex
 	key      *rsa.PrivateKey
 	tokens   map[string]string // accepted personal tokens -> the account login they belong to ("" for none)
@@ -81,6 +83,7 @@ func New(t testing.TB) *Server {
 		releases: map[int64]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", s.listInstallations)
+	mux.HandleFunc("GET /app/hook/deliveries", s.listDeliveries)
 	mux.HandleFunc("POST /app/installations/{id}/access_tokens", s.accessToken)
 	mux.HandleFunc("GET /orgs/{org}/repos", s.listRepos)
 	mux.HandleFunc("GET /users/{user}", s.getUser)
@@ -1222,4 +1225,36 @@ func (s *Server) answerPulls(id int64, query string, repo map[string]any) {
 				"commits":                  map[string]any{"nodes": []any{map[string]any{"commit": map[string]any{"statusCheckRollup": rollup}}}}}
 		}
 	}
+}
+
+// Delivery is a line of the App's webhook delivery log (SetDeliveries).
+type Delivery struct {
+	GUID         string
+	Event        string
+	Action       string
+	RepositoryID int64
+	At           time.Time
+	Status       int // the portal's answer; 0: none
+}
+
+// SetDeliveries sets the App's webhook delivery log, newest first.
+func (s *Server) SetDeliveries(d ...Delivery) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deliveries = slices.Clone(d)
+}
+
+func (s *Server) listDeliveries(w http.ResponseWriter, req *http.Request) {
+	if !s.verifyJWT(req) {
+		writeError(w, http.StatusUnauthorized, "A JSON web token could not be decoded")
+		return
+	}
+	s.mu.Lock()
+	out := make([]map[string]any, 0, len(s.deliveries))
+	for i, d := range s.deliveries {
+		out = append(out, map[string]any{"id": i + 1, "guid": d.GUID, "event": d.Event, "action": d.Action, "repository_id": d.RepositoryID,
+			"delivered_at": d.At.UTC().Format(time.RFC3339), "status_code": d.Status})
+	}
+	s.mu.Unlock()
+	writeJSON(w, http.StatusOK, out)
 }

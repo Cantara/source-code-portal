@@ -149,6 +149,9 @@ type Options struct {
 	// Repo is the catalogued repository at a key: an archived one is read once.
 	Repo func(snapshot.RepoKey) (snapshot.Repo, bool)
 	Now  func() time.Time
+	// TTL is how long a read stands when no event asks for another (0: 15 minutes). A portal that is told of every change (Apps with
+	// webhooks, their delivery log read for what was missed) asks for less.
+	TTL time.Duration
 }
 
 // Pulls is the pull requests feature.
@@ -167,7 +170,11 @@ func New(sources map[string]Fetcher, o Options) *Pulls {
 
 // Spec is the per-repository pull requests job.
 func (p *Pulls) Spec() sync.Spec {
-	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: Events, Settle: eventGap, Run: p.run, Publish: publish}
+	t := p.o.TTL
+	if t <= 0 {
+		t = ttl
+	}
+	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: t, On: Events, Settle: eventGap, Run: p.run, Publish: publish}
 }
 
 func (p *Pulls) run(ctx context.Context, j sync.Job) (sync.Result, error) {

@@ -71,6 +71,15 @@ The open issues are read per repository every 15 minutes, and at once on an issu
 the most recently updated first, as conditional requests (an unchanged page is free), up to 3 pages and 100 issues per repository; the
 pull requests in that listing are left out. No GraphQL.
 
+**A webhook is never lost.** GitHub sends a delivery once and does not send it again. The portal writes every event to its store before
+it answers GitHub (an event it cannot keep is answered 503, so GitHub's delivery log shows it failed), passes it on, and after a
+restart passes on what was still parked (an update restarts the portal). With an App it also reads the App's webhook delivery log
+every two minutes (a read, with the App's own token; no permission needed) and acts on every delivery from the last days that it did
+not answer with a success: one that arrived while the portal was down, full or restarting is found within minutes of its return. A
+webhook on an organisation or a repository has no such log: there the listing below is the net. When every source is an App and a
+webhook secret is set, issues and pull requests are read again only after an hour without an event, not every 15 minutes; the listing
+every five minutes also asks for a read when a repository's count of open issues and pull requests moved.
+
 Without a webhook the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
 commits, documents, descriptors and manifests are also re-read on their own schedule.
 
@@ -696,7 +705,7 @@ Metrics:
 |---|---|---|
 | `scp_http_requests_total` | `listener`, `pattern`, `method`, `code` | requests served |
 | `scp_http_request_duration_seconds` | `listener`, `pattern` | time to serve a request |
-| `scp_webhook_deliveries_total` | `event`, `result` | webhook deliveries: `accepted`, `ignored`, `duplicate`, `ping`, `invalid_signature`, `malformed`, `too_large`, `busy`, `unsupported_media_type` |
+| `scp_webhook_deliveries_total` | `event`, `result` | webhook deliveries: `accepted`, `ignored`, `duplicate`, `ping`, `invalid_signature`, `malformed`, `too_large`, `busy`, `unavailable` (the event could not be kept; 503), `caught_up` (found in the App's delivery log, not received), `unsupported_media_type` |
 | `scp_sync_jobs_total` | `kind`, `result` | finished GitHub jobs: `ok`, `not_modified`, `error`, `rate_limited` |
 | `scp_sync_job_duration_seconds` | `kind` | time a job ran |
 | `scp_sync_queue_depth`, `scp_sync_running` | | jobs due and waiting, jobs running |
@@ -727,6 +736,6 @@ steps, and job failures. Secrets are never logged.
 | `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub prerequisites* card names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation, or switch the feature off with `features.pulls` or `features.issues` (section 1) |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
 | A repository is missing | it must be public, not a fork (unless `include_forks`), not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it) |
-| Pushes show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository, `scp_webhook_deliveries_total` by result |
+| Pushes, issues or pull requests show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository (a delivery shown as failed is read from that log within minutes: `scp_webhook_deliveries_total{result="caught_up"}`), `scp_webhook_deliveries_total` by result; the App must subscribe to *Issues*, *Pull request* and *Pull request review* (the *GitHub prerequisites* card) |
 | The assistant answers with an error | *Test the provider* on the *Admin* page; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |

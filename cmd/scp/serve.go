@@ -114,6 +114,7 @@ type server struct {
 	log               *slog.Logger
 	grace             time.Duration
 	store             *store.DB
+	inbox             *inbox // nil without a webhook secret
 	pub               *snapshot.Publisher
 	engine            *sync.Engine
 	member            *cluster.Member // nil when the instance is alone
@@ -200,13 +201,14 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		return snapshot.Repo{}, false
 	}
+	eventTTL := eventDrivenTTL(cfg, gh)
 	specs := []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
 		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec()}
 	if f.Pulls {
-		specs = append(specs, pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec())
+		specs = append(specs, pulls.New(openPulls, pulls.Options{Repo: catalogued, TTL: eventTTL}).Spec())
 	}
 	if f.Issues {
-		specs = append(specs, issues.New(issueFetchers, issues.Options{Repo: catalogued}).Spec())
+		specs = append(specs, issues.New(issueFetchers, issues.Options{Repo: catalogued, TTL: eventTTL}).Spec())
 	}
 	for _, spec := range specs {
 		if err := s.engine.Register(spec); err != nil {
@@ -275,11 +277,18 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
 	routes = append(routes, catalog.Legacy(view)...)
 	if cfg.Webhook.Secret.IsSet() {
-		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.deliver, cfg.GitHub.Sources), log)
+		s.inbox = &inbox{park: s.store, deliver: s.deliver, log: log, now: time.Now}
+		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.inbox.take, cfg.GitHub.Sources), log)
 		if s.member != nil {
 			rc.Dedupe(s.member.First)
 		}
-		rc.Observe(func(event, result string) { m.delivery(event, result); st.delivery(event, result) })
+		observe := func(event, result string) { m.delivery(event, result); st.delivery(event, result) }
+		rc.Observe(observe)
+		for _, src := range cfg.GitHub.Sources {
+			if g := gh.Source(src.ID); g.App() {
+				s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, webhookSink(s.inbox.take, cfg.GitHub.Sources), observe, log))
+			}
+		}
 		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
 	}
 	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
@@ -481,21 +490,22 @@ func (s *server) deliver(ev sync.Event, repo snapshot.RepoKey, source string) {
 
 // webhookSink hands webhook events on: repository events to the repository's jobs, owner-wide events to the listing of the source
 // that has the owner among its organisations. Owners no source lists are ignored.
-func webhookSink(deliver func(sync.Event, snapshot.RepoKey, string), sources []config.Source) webhook.Sink {
+func webhookSink(take func(sync.Event, snapshot.RepoKey, string) error, sources []config.Source) webhook.Sink {
 	sourceOf := map[string]string{}
 	for _, s := range sources {
 		for _, org := range s.Orgs {
 			sourceOf[strings.ToLower(org)] = s.ID
 		}
 	}
-	return func(ev sync.Event, owner, name string) {
+	return func(ev sync.Event, owner, name string) error {
 		id, ok := sourceOf[strings.ToLower(owner)]
 		switch {
 		case !ok:
+			return nil
 		case name == "" || ev == sync.EventSourceChanged:
-			deliver(ev, "", id)
+			return take(ev, "", id)
 		default:
-			deliver(ev, snapshot.KeyOf(owner, name), "")
+			return take(ev, snapshot.KeyOf(owner, name), "")
 		}
 	}
 }
@@ -514,6 +524,14 @@ func (s *server) run(ctx context.Context) error {
 	go func() { s.notices.Run(layoutsCtx); close(noticesDone) }()
 	defer func() { stopLayouts(); <-noticesDone }()
 	defer func() { stopLayouts(); <-layoutsDone }()
+	inboxDone := make(chan struct{})
+	go func() {
+		if s.inbox != nil {
+			s.inbox.run(layoutsCtx, s.engine.Warm())
+		}
+		close(inboxDone)
+	}()
+	defer func() { stopLayouts(); <-inboxDone }()
 	checksDone := make(chan struct{})
 	go func() { s.watchPrereqs(layoutsCtx); close(checksDone) }()
 	defer func() { stopLayouts(); <-checksDone }()
@@ -615,4 +633,19 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, 
 	}
 	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(public, private, registries), Registries: registries,
 		Public: cfg.Public, Repo: repo})
+}
+
+// eventDrivenTTL is how long the issues and pull requests of a repository stand without an event: an hour when every source is an App
+// and webhooks are on (a change is announced, parked until acted on and, if the portal was away, read from the App's delivery log;
+// the listing every few minutes notices a moved count of open items besides), else the jobs' own 15 minutes (0).
+func eventDrivenTTL(cfg config.Config, gh *github.Client) time.Duration {
+	if !cfg.Webhook.Secret.IsSet() {
+		return 0
+	}
+	for _, s := range cfg.GitHub.Sources {
+		if !gh.Source(s.ID).App() {
+			return 0
+		}
+	}
+	return time.Hour
 }

@@ -15,6 +15,7 @@ import (
 	"mime"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	gosync "sync"
 	"time"
@@ -43,8 +44,9 @@ var (
 	eventPattern     = regexp.MustCompile(`^[a-z_]{1,40}$`) // GitHub event names; also metric labels
 )
 
-// Sink receives normalised events. name is empty for events about an owner's set of repositories.
-type Sink func(ev sync.Event, owner, name string)
+// Sink receives normalised events. name is empty for events about an owner's set of repositories. An error means the event could not
+// be kept (parked for a restart): the delivery is answered 503, so GitHub's delivery log shows it failed and it may be sent again.
+type Sink func(ev sync.Event, owner, name string) error
 
 // Receiver is the webhook handler.
 type Receiver struct {
@@ -68,7 +70,7 @@ func New(secret, previous []byte, sink Sink, log *slog.Logger) *Receiver {
 }
 
 // Observe sets fn to receive every delivery's event (empty before the signature is verified) and result: accepted, duplicate, ping,
-// ignored, invalid_signature, too_large, malformed, busy or unsupported_media_type.
+// ignored, invalid_signature, too_large, malformed, busy, unavailable or unsupported_media_type.
 func (rc *Receiver) Observe(fn func(event, result string)) { rc.observe = fn }
 
 // Dedupe sets fn to tell whether a delivery id is new across instances. When fn fails, the receiver de-duplicates locally.
@@ -163,7 +165,13 @@ func (rc *Receiver) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rc.log.Debug("webhook accepted", "delivery", delivery, "event", event, "owner", n.Owner, "name", n.Name)
-		rc.sink(n.Event, n.Owner, n.Name)
+		if err := rc.sink(n.Event, n.Owner, n.Name); err != nil {
+			rc.log.Error("webhook event not kept", "delivery", delivery, "event", printable(event), "err", err)
+			rc.seen.forget(delivery) // a delivery sent again is not a duplicate
+			rc.observe(label, "unavailable")
+			httpapi.WriteProblem(w, http.StatusServiceUnavailable, "unavailable", "The delivery could not be kept; send it again.")
+			return
+		}
 		rc.observe(label, "accepted")
 		accepted(w, "accepted", delivery)
 	}
@@ -290,6 +298,16 @@ type dedupe struct {
 	mu    gosync.Mutex
 	at    map[string]time.Time
 	order []string // insertion order, which is expiry order
+}
+
+// forget removes id: a delivery that was not acted on can be sent again.
+func (d *dedupe) forget(id string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.at, id)
+	if i := slices.Index(d.order, id); i >= 0 {
+		d.order = slices.Delete(d.order, i, i+1)
+	}
 }
 
 // add records id and reports whether it was new.

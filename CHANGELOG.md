@@ -12,6 +12,11 @@ Fixes from a review of the code; no configuration change.
   listing can lag the event), and the catalogue's listing every 5 minutes asks for a read when a repository's count of open issues and
   pull requests moved, so a missed webhook costs minutes, not the 15-minute TTL. The event stream sends a `ping` event every 25 seconds;
   the page opens a silent or closed stream again and when the tab or the network comes back.
+- A webhook is not lost: every event is parked in the store before GitHub is answered (503 when it cannot be kept) and passed on again
+  after a restart; with an App, the App's webhook delivery log is read every two minutes and every delivery the portal did not answer
+  with a success (it was down, restarting or full) is acted on. With every source an App and webhooks on, issues and pull requests are
+  read again after an hour without an event, not 15 minutes. New result labels `unavailable` and `caught_up` on
+  `scp_webhook_deliveries_total`.
 - The dashboard and `/present` refresh their data at most once in 15 seconds (a run of snapshots was one refresh each) and no longer
   prefetch every repository link.
 - GitHub's conditional-request cache is keyed by credential, not by an installation's hourly token, and is bounded by bytes.

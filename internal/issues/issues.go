@@ -138,6 +138,9 @@ func Of(e *snapshot.RepoEntry) (*Set, snapshot.Freshness) { return facet.Get(e) 
 type Options struct {
 	// Repo is the catalogued repository at a key: an archived one is read once.
 	Repo func(snapshot.RepoKey) (snapshot.Repo, bool)
+	// TTL is how long a read stands when no event asks for another (0: 15 minutes). A portal that is told of every change (Apps with
+	// webhooks, their delivery log read for what was missed) asks for less.
+	TTL time.Duration
 }
 
 // Issues is the issues feature.
@@ -151,7 +154,11 @@ func New(sources map[string]Fetcher, o Options) *Issues { return &Issues{sources
 
 // Spec is the per-repository issues job.
 func (f *Issues) Spec() sync.Spec {
-	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: Events, Settle: settle, Run: f.run, Publish: publish}
+	t := f.o.TTL
+	if t <= 0 {
+		t = ttl
+	}
+	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: t, On: Events, Settle: settle, Run: f.run, Publish: publish}
 }
 
 func (f *Issues) run(ctx context.Context, j sync.Job) (sync.Result, error) {
