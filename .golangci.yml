@@ -11,7 +11,9 @@ linters:
     - forbidigo
     - gochecknoglobals
     - gochecknoinits
+    - gocognit
     - gocritic
+    - gocyclo
     - gosec
     - misspell
     - noctx
@@ -20,6 +22,12 @@ linters:
     - unconvert
     - usestdlibvars
   settings:
+    # A ceiling at today's worst, so no function gets harder to read than the worst ones are; the list to bring down is in
+    # .claude/work/plan.md (complexity backlog).
+    gocyclo:
+      min-complexity: 45
+    gocognit:
+      min-complexity: 65
     forbidigo:
       forbid:
         - pattern: ^http\.(Get|Head|Post|PostForm)$
@@ -41,7 +49,7 @@ linters:
         linters: [gochecknoglobals]
         text: (version|build) is a global
       - path: _test\.go
-        linters: [gosec, noctx]
+        linters: [gosec, noctx, gocognit, gocyclo] # a long test reads top to bottom
 
 formatters:
   enable:

@@ -133,6 +133,7 @@ type resolved struct {
 	text  string
 }
 
+//nolint:gocognit // the scoring loop of one query, kept in one place for its hot path; splitting it is on the complexity backlog (plan.md)
 func (ix *Index) run(ctx context.Context, q Query, o runOpts) run {
 	var r run
 	r.corrections = ix.correct(&q)
