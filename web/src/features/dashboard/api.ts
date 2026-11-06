@@ -41,6 +41,29 @@ export const moreQuery = (api: Api, work: Work) =>
     getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
   })
 
+/** moreSize is a page of the pull requests and issues their sections read as the reader scrolls. */
+export const moreSize = 25
+
+/** morePullsQuery is a lens's open pull requests, whose turn first, page after page, for the section that goes on as it is scrolled. */
+export const morePullsQuery = (api: Api, f: PullFilter) =>
+  infiniteQueryOptions({
+    queryKey: ["pulls", "more", f.group ?? "", f.by ?? ""] as const,
+    queryFn: ({ signal, pageParam }) =>
+      unwrap(api.GET("/pulls", { params: { query: { group: f.group, by: f.by, limit: moreSize, page: pageParam } }, signal })),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
+  })
+
+/** moreIssuesQuery is a lens's open issues, what waits first, page after page, for the section that goes on as it is scrolled. */
+export const moreIssuesQuery = (api: Api, f: IssueFilter) =>
+  infiniteQueryOptions({
+    queryKey: ["issues", "more", f.group ?? "", f.by ?? ""] as const,
+    queryFn: ({ signal, pageParam }) =>
+      unwrap(api.GET("/issues", { params: { query: { group: f.group, by: f.by, limit: moreSize, page: pageParam } }, signal })),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.page.number < last.page.pages ? last.page.number + 1 : undefined),
+  })
+
 /** StoredLayout is the admin's layout of a page as the design mode edits it (out of the contract, behind the admin role). */
 export type StoredLayout = {
   page: string

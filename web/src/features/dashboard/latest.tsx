@@ -9,6 +9,7 @@ import { api, type Commit, type Schemas } from "@/lib/api/client"
 import { CommitList } from "@/entities/commit/commit-list"
 import { sameWork, type Work } from "@/lib/preferences"
 import { moreQuery, morePages } from "./api"
+import { scroller } from "./more"
 import { ShowPicker, useShow } from "./show"
 import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
@@ -105,7 +106,7 @@ function Feed({ counted, shown }: { counted?: Commit[]; shown: Work }) {
         visible.current = es.some((e) => e.isIntersecting)
         if (visible.current) next.current()
       },
-      { rootMargin: "200px" },
+      { root: scroller(el), rootMargin: "0px 0px 300px 0px" },
     )
     seen.observe(el)
     return () => seen.disconnect()

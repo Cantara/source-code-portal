@@ -2,13 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
+import { useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { api, type Schemas } from "@/lib/api/client"
 import { pullsQuery } from "@/lib/api/queries"
 import { cn } from "@/lib/cn"
 import { count } from "@/lib/format"
 import type { Work } from "@/lib/preferences"
-import { byWork, pullsFilter } from "./api"
+import { byWork, pullsFilter, morePullsQuery } from "./api"
+import { useMore } from "./more"
 import { PullList } from "@/entities/pull/pull"
 import { sectionBody, sectionCard, SectionFold, SectionTitle, type Section } from "./side"
 
@@ -35,9 +37,13 @@ export function Pulls({
   section?: Section
   wall?: boolean
 }) {
-  const { data } = useQuery(pullsQuery(api, pullsFilter(work, n, group)))
+  const f = pullsFilter(work, n, group)
+  const { data } = useQuery(pullsQuery(api, f))
+  const first = data?.pulls ?? []
+  const end = useRef<HTMLDivElement>(null)
+  const more = useMore(morePullsQuery(api, f), first, (p) => p.pulls, key, end, section?.open !== false && first.length >= n)
   if (counts.open === 0 && !section) return null
-  const shown = data?.pulls ?? []
+  const shown = more.items
   const q = new URLSearchParams()
   if (group) q.set("group", group)
   if (byWork(work)) q.set("by", "people")
@@ -69,8 +75,19 @@ export function Pulls({
               className={wall ? "grid grid-cols-1 gap-x-6 divide-y-0 @3xl:grid-cols-2" : undefined}
             />
           )}
+          <div ref={end} aria-live="polite" className="text-center text-xs text-muted-foreground">
+            {more.loading ? "Loading more…" : null}
+            {more.done ? (
+              <Link href={all} className="hover:text-primary hover:underline">
+                Every pull request, with filters
+              </Link>
+            ) : null}
+          </div>
         </div>
       )}
     </Card>
   )
 }
+
+/** key is one pull request once, however many pages it came in. */
+const key = (x: { repo: string; number: number }) => `${x.repo}#${x.number}`
