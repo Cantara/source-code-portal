@@ -136,6 +136,16 @@ func searchRead(e *snapshot.RepoEntry) search.Repository {
 		}
 	}
 
+	if set, _ := releases.Of(e); set != nil { // releases by tag, title and first line of the notes; a hit opens them on /releases
+		at := "/releases?repo=" + url.QueryEscape(string(r.Key())) + "&variant=all"
+		for _, rel := range set.Releases {
+			rd := search.Document{Kind: search.KindRelease, Title: releaseTitle(rel), URL: at, At: rel.Published}
+			rd.Fields[search.FieldName], rd.Fields[search.FieldTitle], rd.Fields[search.FieldText] = rel.Tag, rel.Name, rel.Summary
+			rd.Fields[search.FieldAuthor] = rel.Author
+			out.Documents = append(out.Documents, rd)
+		}
+	}
+
 	cs, _ := commits.Of(e)
 	for i := range cs {
 		c := &cs[i]
@@ -167,4 +177,12 @@ func searchWork(s *snapshot.Snapshot, e *snapshot.RepoEntry, item int) string {
 	default:
 		return "hand"
 	}
+}
+
+// releaseTitle is a release as a hit names it: its tag, with its title when that says more.
+func releaseTitle(r releases.Release) string {
+	if r.Name != "" && r.Name != r.Tag {
+		return r.Tag + " " + r.Name
+	}
+	return r.Tag
 }

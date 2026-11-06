@@ -562,7 +562,7 @@ components:
   schemas:
     SearchKind:
       type: string
-      enum: [repo, group, doc, dep, package, commit, pull, issue]
+      enum: [repo, group, doc, dep, package, commit, pull, issue, release]
     TextPart:
       type: object
       required: [text]
@@ -581,7 +581,7 @@ components:
         at: { type: string, format: date-time, description: "When it happened (a commit)" }
     SearchCounts:
       type: object
-      required: [repo, group, doc, dep, package, commit, pull, issue]
+      required: [repo, group, doc, dep, package, commit, pull, issue, release]
       properties:
         repo: { type: integer }
         group: { type: integer }
@@ -591,6 +591,7 @@ components:
         commit: { type: integer }
         pull: { type: integer, description: Open pull requests }
         issue: { type: integer, description: Open issues }
+        release: { type: integer, description: Releases held }
     SearchCorrection:
       type: object
       required: [from, to]

@@ -776,6 +776,7 @@ const (
 	SearchKindIssue   SearchKind = "issue"
 	SearchKindPackage SearchKind = "package"
 	SearchKindPull    SearchKind = "pull"
+	SearchKindRelease SearchKind = "release"
 	SearchKindRepo    SearchKind = "repo"
 )
 
@@ -795,6 +796,8 @@ func (e SearchKind) Valid() bool {
 	case SearchKindPackage:
 		return true
 	case SearchKindPull:
+		return true
+	case SearchKindRelease:
 		return true
 	case SearchKindRepo:
 		return true
@@ -2168,7 +2171,10 @@ type SearchCounts struct {
 
 	// Pull Open pull requests
 	Pull int `json:"pull"`
-	Repo int `json:"repo"`
+
+	// Release Releases held
+	Release int `json:"release"`
+	Repo    int `json:"repo"`
 }
 
 // SearchHit defines model for SearchHit.

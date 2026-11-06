@@ -24,6 +24,7 @@ const (
 	KindCommit
 	KindPull
 	KindIssue
+	KindRelease
 	kinds
 )
 
@@ -43,6 +44,8 @@ func (k Kind) String() string {
 		return "pull"
 	case KindIssue:
 		return "issue"
+	case KindRelease:
+		return "release"
 	default:
 		return "commit"
 	}
@@ -92,8 +95,9 @@ func weights() weighting {
 			KindCommit:  {FieldTitle: 2, FieldText: 0.5, FieldAuthor: 2},
 			KindPull:    {FieldTitle: 3, FieldMeta: 1, FieldAuthor: 2},
 			KindIssue:   {FieldTitle: 3, FieldTags: 2, FieldMeta: 1, FieldAuthor: 2},
+			KindRelease: {FieldName: 4, FieldTitle: 3, FieldText: 1, FieldAuthor: 2},
 		},
-		kind: [kinds]float64{KindRepo: 1.5, KindGroup: 1.5, KindDoc: 1.2, KindDep: 1, KindPackage: 1, KindCommit: 0.8, KindPull: 1, KindIssue: 1},
+		kind: [kinds]float64{KindRepo: 1.5, KindGroup: 1.5, KindDoc: 1.2, KindDep: 1, KindPackage: 1, KindCommit: 0.8, KindPull: 1, KindIssue: 1, KindRelease: 1},
 	}
 }
 
