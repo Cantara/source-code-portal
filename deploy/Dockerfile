@@ -2,7 +2,7 @@
 # Base images are pinned by tag and digest; Renovate updates both.
 #   docker build -f deploy/Dockerfile --build-arg VERSION=2.0.0 --build-arg BUILD_ID=$(git rev-parse HEAD) -t scp:dev .
 
-FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS web
+FROM node:24.22.2-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8 AS web
 ARG PNPM_VERSION=12.17.0
 RUN npm install --global --ignore-scripts pnpm@${PNPM_VERSION}
 WORKDIR /src/web
@@ -25,7 +25,7 @@ RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod --mount=type=cache,id=go-bui
  && /out/scp version
 
 # nodejs24-debian13 carries CA certificates and Node.js for the web server scp supervises.
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:59c479c9b8c123e66047315c968aa2d35e31ae5149c856e4110a79c8b3563f0b
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:b8cec4b2f2126ff7bd034ec9ac207ffb3272667dfdc48376e3b035d3270549ba
 ARG BUILD_ID=dev
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="Source Code Portal" \
