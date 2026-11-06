@@ -39,6 +39,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/mcpserver"
 	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/pulls"
+	"github.com/cantara/source-code-portal/internal/releases"
 	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -149,14 +150,14 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	trees := map[string]docs.GitHub{}
 	manifestTrees := map[string]manifests.GitHub{}
 	packageTrees := map[string]packages.GitHub{}
-	releases := map[string]badges.Releases{}
+	releaseFetchers := map[string]releases.Fetcher{}
 	openPulls := map[string]pulls.Fetcher{}
 	issueFetchers := map[string]issues.Fetcher{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
 		src := gh.Source(s.ID)
 		sources[s.ID], trees[s.ID], manifestTrees[s.ID], packageTrees[s.ID] = src, src, src, src
-		fetchers[s.ID], releases[s.ID], openPulls[s.ID] = commits.FromGitHub(src), badges.FromGitHub(src), pulls.FromGitHub(src)
+		fetchers[s.ID], releaseFetchers[s.ID], openPulls[s.ID] = commits.FromGitHub(src), releases.FromGitHub(src), pulls.FromGitHub(src)
 		issueFetchers[s.ID] = issues.FromGitHub(src)
 		ids = append(ids, s.ID)
 	}
@@ -202,7 +203,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return snapshot.Repo{}, false
 	}
 	specs := []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
-		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec()}
+		releases.New(releaseFetchers).Spec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec()}
 	if f.Pulls {
 		specs = append(specs, pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec())
 	}
@@ -304,7 +305,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		routes = append(routes, a.Routes()...)
 	}
 	// The hooks that add to a repository's summary, in the order of its fields; the pull requests' only when the feature is on.
-	repoHooks := []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo}
+	repoHooks := []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, releases.Repo, manifests.Repo, packages.Repo}
 	if f.Pulls {
 		repoHooks = append(repoHooks, pulls.Repo)
 	}
@@ -434,8 +435,17 @@ func llmsOptions(origin func(*http.Request) string, f config.Features) llms.Opti
 }
 
 // badgeData is what the badges show of the other features; without pull requests there is no pulls badge.
+// latestRelease hands the badges a repository's latest stable release from the releases feature.
+func latestRelease(e *snapshot.RepoEntry) (*badges.Release, snapshot.Freshness) {
+	rel, fresh := releases.Latest(e)
+	if rel == nil {
+		return nil, fresh
+	}
+	return &badges.Release{Tag: rel.Tag, Name: rel.Name, URL: rel.URL, Published: rel.Published}, fresh
+}
+
 func badgeData(f config.Features) badges.Data {
-	d := badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth, Issues: issueCount}
+	d := badges.Data{LastCommit: commits.LastCommit, Release: latestRelease, Health: assess, Product: groupHealth, Issues: issueCount}
 	if f.Pulls {
 		d.Pulls = pulls.Badge
 	}

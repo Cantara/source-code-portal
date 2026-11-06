@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
@@ -12,6 +11,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/pulls"
+	"github.com/cantara/source-code-portal/internal/releases"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
@@ -45,7 +45,7 @@ func assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.R
 // released is a repository's newest release: its GitHub release or the newest version of a package it publishes, whichever is
 // newer (a package whose registry gives no date counts when there is no GitHub release).
 func released(e *snapshot.RepoEntry) (string, time.Time, bool) {
-	rel, _ := badges.ReleaseOf(e)
+	rel, _ := releases.Latest(e)
 	pk := packages.Newest(e)
 	switch {
 	case pk != nil && (rel == nil || pk.Latest.Published.After(rel.Published)):

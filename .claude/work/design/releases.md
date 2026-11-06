@@ -1,6 +1,6 @@
 # Releases: what was shipped and when (RL1 to RL3)
 
-Status: in progress (plan.md section 4, P-82). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
+Status: RL1 built, RL2 and RL3 in progress (plan.md section 4, P-82). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
 
 The portal holds only the **latest** release of a repository (the badge's job, `badges.release`). A team that wants to know what the
 fleet shipped this week has nothing to look at. The portal lists the recent releases of the fleet, a product and a repository, newest

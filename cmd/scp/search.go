@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/docs"
@@ -13,6 +12,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/pulls"
+	"github.com/cantara/source-code-portal/internal/releases"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -48,7 +48,7 @@ func searchRead(e *snapshot.RepoEntry) search.Repository {
 		meta = append(meta, "archived")
 	}
 	repo.Fields[search.FieldMeta] = strings.Join(meta, " ")
-	if rel, _ := badges.ReleaseOf(e); rel != nil {
+	if rel, _ := releases.Latest(e); rel != nil {
 		repo.Fields[search.FieldText] = rel.Tag + " " + rel.Name
 	}
 	out.Documents = append(out.Documents, repo)
