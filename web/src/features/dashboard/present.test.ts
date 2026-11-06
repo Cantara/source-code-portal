@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Schemas } from "@/lib/api/client"
-import { freshness } from "./present"
+import { freshness } from "./present-status"
 import { byNeed, choose, fits, foldText, plan, type Plan } from "./tiles"
 import { columnDefaults, columnsOf, columnsValue, profileNamed, profileOf } from "@/lib/preferences"
 

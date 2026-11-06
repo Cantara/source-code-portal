@@ -1,23 +1,15 @@
 "use client"
 
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
-import Link from "next/link"
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { useState, type ReactNode } from "react"
 import { api, type Commit, type Schemas } from "@/lib/api/client"
-import { snapshotQuery } from "@/lib/api/snapshot"
 import { useNow } from "@/lib/clock"
 import { cn } from "@/lib/cn"
-import { useConnectionFailing, useLive } from "@/lib/connection"
-import { ago } from "@/lib/format"
-import { addressPath } from "@/lib/paths"
 import {
-  by,
   columnCookie,
   columnDefaults,
   columnsValue,
-  columnWidths,
   forget,
-  profiles,
   remember,
   sameWork,
   presentSectionsCookie,
@@ -29,18 +21,12 @@ import {
   type Work,
 } from "@/lib/preferences"
 import { PanelRightIcon } from "@/components/ui/icons"
-import { Mark } from "@/components/ui/mark"
-import { AiMark } from "@/entities/commit/ai-mark"
-import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { meQuery } from "@/lib/api/queries"
 import { useFeatures } from "@/lib/rules-context"
-import { apply, useTheme, type Choice } from "@/lib/theme"
 import type { Notice } from "@/entities/announcement/announcement"
-import { DiffStat } from "@/entities/commit/diffstat"
 import { Announcements } from "./announcements"
-import { dashboardQuery, moreQuery, morePages, pageQuery, workQuery } from "./api"
-import { dedupe } from "./latest"
+import { dashboardQuery, pageQuery, workQuery } from "./api"
 import { useProfile } from "./profile"
 import { ShowPicker, useShow } from "./show"
 import { Designer } from "./design"
@@ -51,235 +37,13 @@ import { TelemetryStrip } from "./telemetry"
 import { ProductTiles } from "./tiles"
 import { Pulls } from "./pulls"
 import { Issues } from "./issues"
-import { sectionLabels, SectionFold, type Section } from "./side"
-
-/** stale and offline are how long since the data was last known current before the page says so (design/present.md). */
-const stale = 2 * 60_000
-const offline = 10 * 60_000
-
-/** barFor is how long a tap shows the controls. */
-const barFor = 5_000
-
-const themes: Choice[] = ["dark", "light", "system"]
+import { sectionLabels, type Section } from "./side"
+import { Brand, Freshness } from "./present-status"
+import { Stream } from "./present-stream"
+import { Bar, Resizer, columns } from "./present-controls"
 
 /** A commit list asks for at most this many when the page shows only some products, and keeps theirs. */
 const scoped = 200
-
-type State = { level: string; word: string; about: string }
-
-/**
- * freshness is how current the page's data is: live while the event stream is open, else as old as the last snapshot read; stale
- * past 2 minutes, offline past 10 or while the server fails. The colour and a word, never the colour alone.
- */
-export function freshness(live: boolean, failing: boolean, checked: number, now: number): State {
-  const age = now - checked
-  if (failing || (!live && age > offline))
-    return { level: "lvl-danger", word: "Offline", about: "The portal cannot be reached; this is the last data that loaded." }
-  if (!live && age > stale) return { level: "lvl-quiet", word: "Stale", about: "No new data for a few minutes." }
-  return live
-    ? { level: "lvl-active", word: "Live", about: "New data shows within seconds." }
-    : { level: "lvl-recent", word: "Polling", about: "Checking for new data every 30 seconds." }
-}
-
-/**
- * Brand is the portal's mark and name at the top left, the header being left out: the name gives way to the mark alone as the
- * left column narrows. A whole page load to the dashboard, as the bar's link.
- */
-function Brand() {
-  return (
-    <a
-      href="/"
-      title="Source Code Portal: the dashboard"
-      className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
-    >
-      <Mark />
-      <span aria-hidden="true" className="font-mono tracking-widest @max-md:hidden">
-        SCP
-      </span>
-      <span className="sr-only">Source Code Portal, the dashboard</span>
-    </a>
-  )
-}
-
-/** Freshness says at all times how old the page's data is, so a screen on a wall is never silently wrong. */
-function Freshness() {
-  const now = useNow()
-  const live = useLive()
-  const failing = useConnectionFailing()
-  const { data, dataUpdatedAt } = useQuery(snapshotQuery(api))
-  const checked = live ? now : dataUpdatedAt || now
-  const s = freshness(live, failing, checked, now)
-  return (
-    // Two short lines at the strip's end: the word, then the data's age.
-    <p role="status" className={cn(s.level, "flex shrink-0 flex-col items-end leading-tight")} title={s.about}>
-      <span className="flex items-center gap-2">
-        <span aria-hidden="true" className="led led-live" />
-        <span className="font-mono text-sm font-semibold tracking-widest text-(--lvl-fg) uppercase">{s.word}</span>
-      </span>
-      {data?.builtAt && (
-        <span className="text-xs text-muted-foreground" suppressHydrationWarning>
-          <span className="sr-only">data from </span>
-          {ago(data.builtAt, now) === "now" ? "now" : `${ago(data.builtAt, now)} ago`}
-        </span>
-      )}
-    </p>
-  )
-}
-
-/** idleTop is how long a scrolled column waits untouched before it goes back to the newest commits (a screen on a wall). */
-const idleTop = 60_000
-
-/**
- * Stream is the newest commits of the work that counts: the author's avatar while the column is wide enough, then the repository
- * with who and when on one line and the subject on the next, the whole width its own. The column scrolls: at its end it reads
- * the next pages of the same commits (keep: the products the address names), and a minute untouched it goes back to the top and
- * lets the older ones go, so a wall shows the newest again. A commit that arrives while the page is open slides in at the top
- * (not with reduced motion).
- */
-function Stream({
-  commits,
-  work,
-  keep,
-  picker,
-  section,
-}: {
-  commits: Commit[]
-  /** the kinds the column shows */
-  work: Work
-  keep: (c: Commit) => boolean
-  /** the label that chooses the kinds (ShowPicker) */
-  picker?: ReactNode
-  /** its section of the side column */
-  section?: Section
-}) {
-  const now = useNow()
-  // The commits of the first render; a row's animation runs once, when it mounts, and only for one that arrived at the top.
-  const [shown] = useState(() => new Set(commits.map((c) => c.repo + c.sha)))
-  const [more, setMore] = useState(false)
-  const q = useInfiniteQuery({ ...moreQuery(api, work), enabled: more })
-  const read = more ? (q.data?.pages.flatMap((p) => p.commits) ?? []) : []
-  const top = new Set(commits.map((c) => c.repo + c.sha))
-  const rows = dedupe([...commits, ...read.filter(keep)]).map((c) => {
-    const id = c.repo + c.sha
-    return { c, id, fresh: top.has(id) && !shown.has(id) }
-  })
-  const list = useRef<HTMLOListElement>(null)
-  const end = useRef<HTMLLIElement>(null)
-  const visible = useRef(false)
-  const next = useRef(() => {})
-  const pages = q.data?.pages.length ?? 0
-  useEffect(() => {
-    next.current = () => {
-      if (!more) setMore(true)
-      else if (q.hasNextPage && !q.isFetching && pages < morePages) void q.fetchNextPage()
-    }
-  })
-  useEffect(() => {
-    const root = list.current
-    const el = end.current
-    if (!root || !el || typeof IntersectionObserver === "undefined") return
-    const seen = new IntersectionObserver(
-      (es) => {
-        visible.current = es.some((e) => e.isIntersecting)
-        if (visible.current) next.current()
-      },
-      { root, rootMargin: "0px 0px 300px 0px" },
-    )
-    seen.observe(el)
-    return () => seen.disconnect()
-  }, [])
-  useEffect(() => {
-    if (more && !q.isFetching && visible.current) next.current()
-  }, [more, q.isFetching, pages])
-  // Back to the newest after a minute untouched.
-  const idle = useRef<number | undefined>(undefined)
-  const scrolled = () => {
-    window.clearTimeout(idle.current)
-    if ((list.current?.scrollTop ?? 0) === 0) return
-    idle.current = window.setTimeout(() => {
-      list.current?.scrollTo({ top: 0, behavior: "smooth" })
-      setMore(false)
-    }, idleTop)
-  }
-  useEffect(() => () => window.clearTimeout(idle.current), [])
-  return (
-    <section
-      aria-labelledby="stream"
-      className={cn("panel flex min-h-0 flex-col overflow-hidden", section && (section.open ? "flex-1 basis-0" : "flex-none"))}
-    >
-      <div
-        className={cn("flex items-center justify-between gap-2 px-3 py-2", section?.open !== false && "border-b border-border")}
-      >
-        <h2
-          id="stream"
-          className="shrink-0 text-xs font-medium tracking-widest whitespace-nowrap text-muted-foreground uppercase"
-        >
-          Latest commits
-        </h2>
-        <span className="flex min-w-0 items-center gap-1">
-          {section?.open !== false && (picker ?? <span className="text-xs text-muted-foreground">{by(work)}</span>)}
-          <SectionFold id="stream" section={section} />
-        </span>
-      </div>
-      {/* A container: the avatars show while the column is wide enough for them. */}
-      {section?.open !== false && (
-        <ol
-          ref={list}
-          onScroll={scrolled}
-          tabIndex={0}
-          id="stream-body"
-          aria-label="Latest commits, newest first"
-          className="@container min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring [scrollbar-width:thin]"
-        >
-          {rows.map(({ c, id, fresh }) => {
-            const who = c.authorLogin || c.authorName
-            return (
-              <li key={id} className={cn("flex items-center gap-2.5 px-3 py-2", fresh && "arrive")}>
-                <span className="@max-[17rem]:hidden">
-                  <InitialsAvatar name={c.authorName || c.authorLogin} />
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <p className="flex items-baseline gap-2 text-[0.9375rem]">
-                    <Link prefetch={false} href={addressPath(c.repo)} className="min-w-0 truncate font-semibold hover:underline">
-                      {c.repo.split("/")[1]}
-                    </Link>
-                    <span className="ml-auto flex max-w-[55%] shrink-0 items-baseline gap-1.5 text-sm text-muted-foreground">
-                      <span className="truncate">{who}</span>
-                      <span aria-hidden="true">·</span>
-                      <time dateTime={c.committedAt} className="shrink-0 font-mono" suppressHydrationWarning>
-                        {ago(c.committedAt, now)}
-                      </time>
-                    </span>
-                  </p>
-                  <p className="flex min-w-0 items-center gap-1.5 text-[0.9375rem]">
-                    <AiMark commit={c} />
-                    {c.url ? (
-                      <a href={c.url} className="truncate hover:underline" rel="noreferrer" title={c.subject}>
-                        {c.subject}
-                      </a>
-                    ) : (
-                      <span className="truncate" title={c.subject}>
-                        {c.subject}
-                      </span>
-                    )}
-                    <DiffStat stats={c.stats} className="ml-auto pl-2 @max-[22rem]:hidden" />
-                  </p>
-                </div>
-              </li>
-            )
-          })}
-          <li ref={end} aria-hidden="true" className="px-3 py-2 text-center text-xs text-muted-foreground">
-            {more && q.isFetching
-              ? "Loading more…"
-              : more && (pages >= morePages || (q.isSuccess && !q.hasNextPage))
-                ? "The rest is under All commits"
-                : ""}
-          </li>
-        </ol>
-      )}
-    </section>
-  )
-}
 
 /** within is the groups an element selects (ids; none: every group), kept to those the address names (`?groups=`). */
 function within(all: Schemas["DashboardGroup"][], ids: string[] | undefined, only: string[] | undefined) {
@@ -468,196 +232,6 @@ function Screen({
         </aside>
       )}
     </div>
-  )
-}
-
-/** columns are the landscape grid at each width of the side column, as written classes (the CSP allows no style attribute). */
-const columns: Record<number, string> = {
-  20: "split:grid-cols-[minmax(0,1fr)_0.75rem_20%]",
-  25: "split:grid-cols-[minmax(0,1fr)_0.75rem_25%]",
-  30: "split:grid-cols-[minmax(0,1fr)_0.75rem_30%]",
-  35: "split:grid-cols-[minmax(0,1fr)_0.75rem_35%]",
-  40: "split:grid-cols-[minmax(0,1fr)_0.75rem_40%]",
-  45: "split:grid-cols-[minmax(0,1fr)_0.75rem_45%]",
-  50: "split:grid-cols-[minmax(0,1fr)_0.75rem_50%]",
-  55: "split:grid-cols-[minmax(0,1fr)_0.75rem_55%]",
-  60: "split:grid-cols-[minmax(0,1fr)_0.75rem_60%]",
-}
-
-const clampColumn = (w: number) =>
-  Math.min(columnWidths.max, Math.max(columnWidths.min, Math.round(w / columnWidths.step) * columnWidths.step))
-
-/** A press that moves less than this is a tap, not a drag; two taps within doubleTap bring back the usual width. */
-const slop = 4
-const doubleTap = 400
-
-/**
- * Resizer is the side column's edge in split: dragged (a finger or a pointer) or moved with the arrow keys, in steps of 5% of
- * the screen from 20% to 60%; a double tap or click brings back the profile's usual width. Taps are told apart here, as a touch on a handle
- * that takes the whole gesture (touch-action none) sends no dblclick in every browser, and a tap never moves the column.
- */
-function Resizer({
-  width,
-  usual,
-  onChange,
-}: {
-  width: number
-  /** the profile's width, which a double tap brings back */
-  usual: number
-  onChange?: (width: number, keep: boolean) => void
-}) {
-  const press = useRef<{ x: number; moved: boolean } | null>(null)
-  const lastTap = useRef(Number.NEGATIVE_INFINITY)
-  const at = (e: PointerEvent<HTMLDivElement>) => {
-    const frame = e.currentTarget.parentElement?.getBoundingClientRect()
-    return frame ? clampColumn(((frame.right - e.clientX) / frame.width) * 100) : width
-  }
-  const key = (e: KeyboardEvent<HTMLDivElement>) => {
-    const to = {
-      ArrowLeft: width + columnWidths.step,
-      ArrowRight: width - columnWidths.step,
-      Home: columnWidths.max,
-      End: columnWidths.min,
-    }[e.key]
-    if (to === undefined || !onChange) return
-    e.preventDefault()
-    onChange(clampColumn(to), true)
-  }
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize the side column"
-      aria-valuemin={columnWidths.min}
-      aria-valuemax={columnWidths.max}
-      aria-valuenow={width}
-      aria-valuetext={`${width}% of the screen`}
-      tabIndex={onChange ? 0 : -1}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId)
-        press.current = { x: e.clientX, moved: false }
-      }}
-      onPointerMove={(e) => {
-        const p = press.current
-        if (!p || !e.currentTarget.hasPointerCapture(e.pointerId)) return
-        if (!p.moved && Math.abs(e.clientX - p.x) < slop) return
-        p.moved = true
-        onChange?.(at(e), false)
-      }}
-      onPointerUp={(e) => {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-        const p = press.current
-        press.current = null
-        if (p?.moved) {
-          onChange?.(at(e), true)
-          lastTap.current = Number.NEGATIVE_INFINITY
-          return
-        }
-        if (e.timeStamp - lastTap.current < doubleTap) {
-          onChange?.(usual, true)
-          lastTap.current = Number.NEGATIVE_INFINITY
-        } else lastTap.current = e.timeStamp
-      }}
-      onPointerCancel={() => {
-        press.current = null
-      }}
-      onKeyDown={key}
-      title="Drag to resize; double-tap for the usual width"
-      // As wide as the gap it replaces, a hairline to see; the hit area reaches past it for a finger.
-      className="group relative hidden cursor-col-resize touch-none justify-center outline-none before:absolute before:inset-y-0 before:-inset-x-2 before:content-[''] split:flex"
-    >
-      <span className="my-6 w-px rounded-full bg-border transition-all group-hover:w-0.5 group-hover:bg-primary group-focus-visible:w-0.5 group-focus-visible:bg-primary group-active:w-0.5 group-active:bg-primary" />
-    </div>
-  )
-}
-
-/** Bar is the controls a tap or a key shows for a few seconds: back to the dashboard, the theme, full screen, the design mode. */
-function Bar({
-  profile,
-  size,
-  wall,
-  onWall,
-  onDesign,
-}: {
-  profile: Profile
-  /** the window's size in CSS pixels, so two people can tell they look at the same screen */
-  size?: string
-  wall: boolean
-  onWall: (wall: boolean) => void
-  onDesign?: () => void
-}) {
-  const [shown, setShown] = useState(false)
-  const [within, setWithin] = useState(false)
-  const choice = useTheme()
-  const [full, setFull] = useState(false)
-  // Full screen where the browser has it (not the iPhone), known only in the browser: the server renders without it.
-  const canFull = useSyncExternalStore(
-    () => () => undefined,
-    () => document.fullscreenEnabled,
-    () => false,
-  )
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const wake = () => {
-      setShown(true)
-      clearTimeout(timer)
-      timer = setTimeout(() => setShown(false), barFor)
-    }
-    const screen = () => setFull(!!document.fullscreenElement)
-    document.addEventListener("pointerdown", wake)
-    document.addEventListener("keydown", wake)
-    document.addEventListener("fullscreenchange", screen)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener("pointerdown", wake)
-      document.removeEventListener("keydown", wake)
-      document.removeEventListener("fullscreenchange", screen)
-    }
-  }, [])
-  const next = themes[(themes.indexOf(choice) + 1) % themes.length] ?? "system"
-  const button = "rounded-md px-2.5 py-1.5 text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring outline-none"
-  return (
-    <nav
-      aria-label="Presentation"
-      onFocus={() => setWithin(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setWithin(false)
-      }}
-      className={cn(
-        "fixed bottom-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-border bg-popover/95 p-1 text-popover-foreground shadow-xl backdrop-blur-md transition-opacity motion-reduce:transition-none",
-        shown || within ? "opacity-100" : "pointer-events-none opacity-0",
-      )}
-    >
-      {/* The profile this screen is in, and the wall it can be told it is (a wall has a desk's pixels). */}
-      <span className="px-2 text-xs font-medium tracking-widest text-muted-foreground uppercase">
-        {profiles.find((x) => x.value === profile)?.label}
-        {size && <span className="ml-1.5 font-mono font-normal tracking-normal normal-case">{size}</span>}
-      </span>
-      <button type="button" className={button} aria-pressed={wall} onClick={() => onWall(!wall)}>
-        {wall ? "Not a wall" : "On a wall"}
-      </button>
-      {/* A whole page load: the dashboard draws its own theme and header. */}
-      <a href="/" className={button}>
-        Dashboard
-      </a>
-      <button type="button" className={button} onClick={() => apply(next)}>
-        Theme: {choice === "system" ? "auto" : choice}
-      </button>
-      {canFull && (
-        <button
-          type="button"
-          className={button}
-          onClick={() => void (full ? document.exitFullscreen() : document.documentElement.requestFullscreen())}
-        >
-          {full ? "Leave full screen" : "Full screen"}
-        </button>
-      )}
-      {onDesign && (
-        <button type="button" className={button} onClick={onDesign}>
-          Design this page
-        </button>
-      )}
-    </nav>
   )
 }
 
