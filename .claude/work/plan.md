@@ -64,7 +64,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | CLI and config | `spf13/cobra`, `spf13/viper` (one instance per run, unknown keys rejected) |
 | HTTP | stdlib `net/http`, `log/slog` |
 | API | OpenAPI 3.1, `oapi-codegen` v2 (strict server), `openapi-typescript` and `openapi-fetch` for the web |
-| GitHub | `google/go-github` v92, `bradleyfalzon/ghinstallation` v2, an own ETag and rate transport |
+| GitHub | `google/go-github` v93, `bradleyfalzon/ghinstallation` v2, an own ETag and rate transport |
 | Storage | `modernc.org/sqlite` |
 | Markdown | `yuin/goldmark` v2, `alecthomas/chroma` v2, `microcosm-cc/bluemonday` |
 | Metrics | `prometheus/client_golang` |

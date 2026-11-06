@@ -3,7 +3,7 @@ Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
 `internal/github` reads repositories of one or more GitHub organisations for the sync jobs: App auth or a token, REST reads through
-`google/go-github` v92, a small conditional-request and rate-observer transport, error classes, and the fake server
+`google/go-github` v93, a small conditional-request and rate-observer transport, error classes, and the fake server
 `internal/github/githubtest`. It returns `internal/snapshot` value types. Admission and the removal rule are in `catalog.md`; the rate
 budget, retries and pauses in `sync-snapshot-store.md`; webhook verification and dedupe in `http-api.md` behaviour 4. This note lists the
 webhook events the portal reacts to and the `sync` event each becomes.
