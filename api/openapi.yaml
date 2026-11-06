@@ -105,6 +105,34 @@ paths:
         "304": { $ref: "#/components/responses/NotModified" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /alumni:
+    get:
+      operationId: listAlumni
+      summary: The retired repositories, newest activity first, one page at a time
+      description: |
+        The alumni of the viewer's view (design/alumni.md): repositories GitHub archived or whose `scp.yaml` says `lifecycle: deprecated`
+        (archived wins). Each row says why, when it was last active (the newest default-branch commit, else the last push; no date of
+        retirement is invented), how many other repositories still depend on it and how many authors its recent commits have (counted,
+        never named). `group` narrows to a group's members, `q` to names containing the text, `reason` to one reason, `used` to those
+        something still depends on. `counts` cover the group and `q` whatever the other filters, so they can be offered as filters.
+      parameters:
+        - { name: group, in: query, required: false, schema: { type: string } }
+        - { name: q, in: query, required: false, description: "Part of the repository's name", schema: { type: string, maxLength: 100 } }
+        - { name: reason, in: query, required: false, schema: { $ref: "#/components/schemas/AlumniReason" } }
+        - { name: used, in: query, required: false, description: "Only those another repository still depends on", schema: { type: boolean, default: false } }
+        - { name: sort, in: query, required: false, schema: { $ref: "#/components/schemas/AlumniSort" } }
+        - { $ref: "#/components/parameters/PageNumber" }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: One page of alumni
+          headers: { ETag: { $ref: "#/components/headers/ETag" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlumniPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /prerequisites:
     get:
       operationId: getPrerequisites
@@ -1013,6 +1041,33 @@ components:
       properties:
         pulls: { type: array, items: { $ref: "#/components/schemas/PullRequest" } }
         counts: { $ref: "#/components/schemas/PullCounts" }
+        page: { $ref: "#/components/schemas/Page" }
+        freshness: { $ref: "#/components/schemas/Freshness" }
+    AlumniReason: { type: string, enum: [archived, deprecated], description: "Archived on GitHub, or `lifecycle: deprecated` in scp.yaml" }
+    AlumniSort: { type: string, enum: [active, name, group, used], description: "active: last active first (default); name; group; used: most dependants first" }
+    Alumnus:
+      type: object
+      required: [repo, reason, lastActive, usedBy, authors]
+      properties:
+        repo: { $ref: "#/components/schemas/Repo" }
+        reason: { $ref: "#/components/schemas/AlumniReason" }
+        lastActive: { type: string, format: date-time, description: "The newest default-branch commit the portal holds, else the last push" }
+        usedBy: { type: integer, description: "Other repositories whose manifests still depend on a package it provides; archived ones are not counted" }
+        authors: { type: integer, description: "Authors of its newest default-branch commits, people's work only; counted, never named" }
+    AlumniCounts:
+      type: object
+      required: [total, archived, deprecated, used]
+      properties:
+        total: { type: integer }
+        archived: { type: integer }
+        deprecated: { type: integer }
+        used: { type: integer, description: Those another repository still depends on }
+    AlumniPage:
+      type: object
+      required: [alumni, counts, page, freshness]
+      properties:
+        alumni: { type: array, items: { $ref: "#/components/schemas/Alumnus" } }
+        counts: { $ref: "#/components/schemas/AlumniCounts" }
         page: { $ref: "#/components/schemas/Page" }
         freshness: { $ref: "#/components/schemas/Freshness" }
     CommitPage:

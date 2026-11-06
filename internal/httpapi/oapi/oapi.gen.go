@@ -19,25 +19,67 @@ import (
 
 // Defines values for ActivityLevel.
 const (
-	Active   ActivityLevel = "active"
-	Archived ActivityLevel = "archived"
-	Dormant  ActivityLevel = "dormant"
-	Quiet    ActivityLevel = "quiet"
-	Recent   ActivityLevel = "recent"
+	ActivityLevelActive   ActivityLevel = "active"
+	ActivityLevelArchived ActivityLevel = "archived"
+	ActivityLevelDormant  ActivityLevel = "dormant"
+	ActivityLevelQuiet    ActivityLevel = "quiet"
+	ActivityLevelRecent   ActivityLevel = "recent"
 )
 
 // Valid indicates whether the value is a known member of the ActivityLevel enum.
 func (e ActivityLevel) Valid() bool {
 	switch e {
-	case Active:
+	case ActivityLevelActive:
 		return true
-	case Archived:
+	case ActivityLevelArchived:
 		return true
-	case Dormant:
+	case ActivityLevelDormant:
 		return true
-	case Quiet:
+	case ActivityLevelQuiet:
 		return true
-	case Recent:
+	case ActivityLevelRecent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AlumniReason.
+const (
+	AlumniReasonArchived   AlumniReason = "archived"
+	AlumniReasonDeprecated AlumniReason = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the AlumniReason enum.
+func (e AlumniReason) Valid() bool {
+	switch e {
+	case AlumniReasonArchived:
+		return true
+	case AlumniReasonDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AlumniSort.
+const (
+	AlumniSortActive AlumniSort = "active"
+	AlumniSortGroup  AlumniSort = "group"
+	AlumniSortName   AlumniSort = "name"
+	AlumniSortUsed   AlumniSort = "used"
+)
+
+// Valid indicates whether the value is a known member of the AlumniSort enum.
+func (e AlumniSort) Valid() bool {
+	switch e {
+	case AlumniSortActive:
+		return true
+	case AlumniSortGroup:
+		return true
+	case AlumniSortName:
+		return true
+	case AlumniSortUsed:
 		return true
 	default:
 		return false
@@ -154,22 +196,22 @@ func (e DependencyScope) Valid() bool {
 
 // Defines values for DescriptorLifecycle.
 const (
-	Deprecated   DescriptorLifecycle = "deprecated"
-	Empty        DescriptorLifecycle = ""
-	Experimental DescriptorLifecycle = "experimental"
-	Production   DescriptorLifecycle = "production"
+	DescriptorLifecycleDeprecated   DescriptorLifecycle = "deprecated"
+	DescriptorLifecycleEmpty        DescriptorLifecycle = ""
+	DescriptorLifecycleExperimental DescriptorLifecycle = "experimental"
+	DescriptorLifecycleProduction   DescriptorLifecycle = "production"
 )
 
 // Valid indicates whether the value is a known member of the DescriptorLifecycle enum.
 func (e DescriptorLifecycle) Valid() bool {
 	switch e {
-	case Deprecated:
+	case DescriptorLifecycleDeprecated:
 		return true
-	case Empty:
+	case DescriptorLifecycleEmpty:
 		return true
-	case Experimental:
+	case DescriptorLifecycleExperimental:
 		return true
-	case Production:
+	case DescriptorLifecycleProduction:
 		return true
 	default:
 		return false
@@ -915,6 +957,46 @@ type ActivityRule struct {
 
 	// WithinDays The age of the last change it covers; null: no bound
 	WithinDays *int `json:"withinDays"`
+}
+
+// AlumniCounts defines model for AlumniCounts.
+type AlumniCounts struct {
+	Archived   int `json:"archived"`
+	Deprecated int `json:"deprecated"`
+	Total      int `json:"total"`
+
+	// Used Those another repository still depends on
+	Used int `json:"used"`
+}
+
+// AlumniPage defines model for AlumniPage.
+type AlumniPage struct {
+	Alumni    []Alumnus    `json:"alumni"`
+	Counts    AlumniCounts `json:"counts"`
+	Freshness Freshness    `json:"freshness"`
+	Page      Page         `json:"page"`
+}
+
+// AlumniReason Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
+type AlumniReason string
+
+// AlumniSort active: last active first (default); name; group; used: most dependants first
+type AlumniSort string
+
+// Alumnus defines model for Alumnus.
+type Alumnus struct {
+	// Authors Authors of its newest default-branch commits, people's work only; counted, never named
+	Authors int `json:"authors"`
+
+	// LastActive The newest default-branch commit the portal holds, else the last push
+	LastActive time.Time `json:"lastActive"`
+
+	// Reason Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
+	Reason AlumniReason `json:"reason"`
+	Repo   Repo         `json:"repo"`
+
+	// UsedBy Other repositories whose manifests still depend on a package it provides; archived ones are not counted
+	UsedBy int `json:"usedBy"`
 }
 
 // Announcement A short notice from the portal's admins or its deployment (design/announcements.md): plain text, one https link, a tone. Times keep the offset they were written with and are shown as written.
@@ -2133,6 +2215,23 @@ type BadRequest = Problem
 // NotFound defines model for NotFound.
 type NotFound = Problem
 
+// ListAlumniParams defines parameters for ListAlumni.
+type ListAlumniParams struct {
+	Group *string `form:"group,omitempty" json:"group,omitempty"`
+
+	// Q Part of the repository's name
+	Q      *string       `form:"q,omitempty" json:"q,omitempty"`
+	Reason *AlumniReason `form:"reason,omitempty" json:"reason,omitempty"`
+
+	// Used Only those another repository still depends on
+	Used *bool       `form:"used,omitempty" json:"used,omitempty"`
+	Sort *AlumniSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Page The page, from 1
+	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
+	Limit *int        `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListCommitsParams defines parameters for ListCommits.
 type ListCommitsParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
@@ -2248,6 +2347,9 @@ type SuggestParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListAlumni The retired repositories, newest activity first, one page at a time
+	// (GET /alumni)
+	ListAlumni(w http.ResponseWriter, r *http.Request, params ListAlumniParams)
 	// GetAssistant Whether the assistant is on and the viewer may ask it
 	// (GET /assistant)
 	GetAssistant(w http.ResponseWriter, r *http.Request)
@@ -2321,6 +2423,117 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAlumni operation middleware
+func (siw *ServerInterfaceWrapper) ListAlumni(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAlumniParams
+
+	// ------------- Optional query parameter "group" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group", r.URL.Query(), &params.Group, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "reason" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "reason", r.URL.Query(), &params.Reason, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "reason"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reason", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "used" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "used", r.URL.Query(), &params.Used, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "used"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "used", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAlumni(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetAssistant operation middleware
 func (siw *ServerInterfaceWrapper) GetAssistant(w http.ResponseWriter, r *http.Request) {
@@ -3391,6 +3604,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commits", wrapper.ListCommits)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/pulls", wrapper.ListPulls)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues", wrapper.ListIssues)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/alumni", wrapper.ListAlumni)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prerequisites", wrapper.GetPrerequisites)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group}", wrapper.GetGroup)
@@ -3424,6 +3638,77 @@ type MovedResponse struct {
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
 type NotModifiedResponse struct {
+}
+
+type ListAlumniRequestObject struct {
+	Params ListAlumniParams
+}
+
+type ListAlumniResponseObject interface {
+	VisitListAlumniResponse(w http.ResponseWriter) error
+}
+
+type ListAlumni200ResponseHeaders struct {
+	ETag *string
+}
+
+type ListAlumni200JSONResponse struct {
+	Body    AlumniPage
+	Headers ListAlumni200ResponseHeaders
+}
+
+func (response ListAlumni200JSONResponse) VisitListAlumniResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAlumni304Response = NotModifiedResponse
+
+func (response ListAlumni304Response) VisitListAlumniResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type ListAlumni400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListAlumni400ApplicationProblemPlusJSONResponse) VisitListAlumniResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAlumni404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListAlumni404ApplicationProblemPlusJSONResponse) VisitListAlumniResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetAssistantRequestObject struct {
@@ -4491,6 +4776,9 @@ func (response ListTools200JSONResponse) VisitListToolsResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListAlumni The retired repositories, newest activity first, one page at a time
+	// (GET /alumni)
+	ListAlumni(ctx context.Context, request ListAlumniRequestObject) (ListAlumniResponseObject, error)
 	// GetAssistant Whether the assistant is on and the viewer may ask it
 	// (GET /assistant)
 	GetAssistant(ctx context.Context, request GetAssistantRequestObject) (GetAssistantResponseObject, error)
@@ -4593,6 +4881,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListAlumni operation middleware
+func (sh *strictHandler) ListAlumni(w http.ResponseWriter, r *http.Request, params ListAlumniParams) {
+	var request ListAlumniRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAlumni(ctx, request.(ListAlumniRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAlumni")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAlumniResponseObject); ok {
+		if err := validResponse.VisitListAlumniResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetAssistant operation middleware

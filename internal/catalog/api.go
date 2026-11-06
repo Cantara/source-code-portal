@@ -18,6 +18,7 @@ type API struct {
 	Group     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group)
 	Repo      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo)
 	Detail    []func(*snapshot.RepoEntry, *oapi.RepoDetail)
+	Alumnus   []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Alumnus) // complete a retired repository's row (design/alumni.md)
 }
 
 func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {

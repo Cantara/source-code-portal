@@ -313,7 +313,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
 		Repo:      repoHooks,
-		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
+		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
+		Alumnus:   []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Alumnus){manifests.Alumnus, commits.Alumnus}}
 	if f.Pulls {
 		catalogAPI.Dashboard = append(catalogAPI.Dashboard, pulls.Dashboard)
 	}

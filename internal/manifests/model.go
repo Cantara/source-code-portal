@@ -99,6 +99,16 @@ func Graph() snapshot.Indexer {
 	})
 }
 
+// Alumnus completes a retired repository's row with the repositories that still depend on it, archived ones not counted
+// (design/alumni.md).
+func Alumnus(s *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.Alumnus) {
+	for _, k := range usedBy(s, e.Repo.Key()) {
+		if u := s.Repos[k]; u != nil && !u.Repo.Archived {
+			a.UsedBy++
+		}
+	}
+}
+
 // Repo adds the language of the first manifest that names one to a repository summary.
 func Repo(_ *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	ms, _ := Of(e)
