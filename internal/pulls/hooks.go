@@ -7,20 +7,11 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
-// Repo adds the open pull requests to a repository summary and takes them out of GitHub's open issue count, which holds both.
+// Repo adds the open pull requests to a repository summary.
 func Repo(_ *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	if n := Open(e); n >= 0 {
 		r.OpenPulls = &n
-		r.OpenIssues = Issues(e)
 	}
-}
-
-// Issues is a repository's open issues: GitHub's count less its open pull requests once they are read.
-func Issues(e *snapshot.RepoEntry) int {
-	if n := Open(e); n >= 0 {
-		return max(e.Repo.OpenIssues-n, 0)
-	}
-	return e.Repo.OpenIssues
 }
 
 // ByWork is whose pull requests the work that counts holds: automation's only when it names automation.

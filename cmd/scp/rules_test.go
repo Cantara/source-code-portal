@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/health"
+	"github.com/cantara/source-code-portal/internal/config"
 )
 
 // rulesFixture is the web tests' copy of GET /api/v1/rules; SCP_UPDATE_RULES=1 rewrites it.
@@ -15,7 +15,7 @@ const rulesFixture = "../../web/src/test/rules.json"
 // TestRulesFixture holds the web tests to the rules the server tells, so a change of a threshold or a word fails here until the
 // fixture is rewritten and the web tests pass with it.
 func TestRulesFixture(t *testing.T) {
-	want, err := json.MarshalIndent(rulesOf(health.Describe()), "", "  ")
+	want, err := json.MarshalIndent(rulesFor(config.Features{Pulls: true, Issues: true}), "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}

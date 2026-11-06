@@ -130,11 +130,11 @@ func names(xs []string, name func(string) string) string {
 	return strings.Join(out[:len(out)-1], ", ") + " and " + out[len(out)-1]
 }
 
-// Check is every feature's unmet prerequisites across sources; events count only when webhooks reach the portal. An App's
-// installations that lack the same things are told together.
-func Check(sources []Source, webhooks bool) []Unmet {
+// Check is the unmet prerequisites of needs (Needs, less the features switched off) across sources; events count only when
+// webhooks reach the portal. An App's installations that lack the same things are told together.
+func Check(needs []Need, sources []Source, webhooks bool) []Unmet {
 	var out []Unmet
-	for _, n := range Needs {
+	for _, n := range needs {
 		for _, s := range sources {
 			if s.App {
 				out = append(out, checkApp(n, s, webhooks)...)

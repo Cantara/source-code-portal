@@ -159,6 +159,10 @@ func (h handler) repo(w http.ResponseWriter, r *http.Request) {
 		r := h.Health(s, e, h.now())
 		b, data = score(r.Counted, r.Score, r.Level)
 	case "pulls":
+		if h.Pulls == nil { // switched off (design/features.md): the badge is not there
+			h.write(w, r, unknown(""), http.StatusNotFound, false)
+			return
+		}
 		b, data = h.pulls([]*snapshot.RepoEntry{e})
 	case "license":
 		b.label = "license"
@@ -218,6 +222,10 @@ func (h handler) group(w http.ResponseWriter, r *http.Request) {
 	case "release":
 		b, data = release(groupRelease(s, g))
 	case "pulls":
+		if h.Pulls == nil {
+			h.write(w, r, unknown(""), http.StatusNotFound, false)
+			return
+		}
 		es := make([]*snapshot.RepoEntry, 0, len(g.Members))
 		for _, k := range g.Members {
 			if e := s.Repos[k]; e != nil {
@@ -235,9 +243,6 @@ func (h handler) group(w http.ResponseWriter, r *http.Request) {
 // pulls is the pull requests badge of the repositories es: "3 open, 1 to review", green with none, unknown until every one is read.
 func (h handler) pulls(es []*snapshot.RepoEntry) (badge, bool) {
 	b := badge{label: "pull requests", message: "unknown", color: neutralColor}
-	if h.Pulls == nil {
-		return b, false
-	}
 	open, review := 0, 0
 	for _, e := range es {
 		o, r := h.Pulls(e)

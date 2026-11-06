@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/tools"
@@ -24,6 +26,7 @@ type toolReads struct {
 	pulls            pullsAPI
 	issues           issuesAPI
 	repo, doc, group http.Handler
+	features         config.Features // a switched-off feature has no tool and no search kind (design/features.md)
 }
 
 func schema(required []string, props map[string]any) map[string]any {
@@ -73,14 +76,23 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 		s, l, ru := repo(label, run)
 		return tool(name, title, description, s, l, ru)
 	}
-	return tools.New(
+	holds, kinds := "published packages and default-branch commits", []string{"repo", "group", "doc", "dep", "package", "commit"}
+	switch {
+	case r.features.Pulls && r.features.Issues:
+		holds, kinds = "published packages, default-branch commits, open pull requests and open issues", append(kinds, "pull", "issue")
+	case r.features.Pulls:
+		holds, kinds = "published packages, default-branch commits and open pull requests", append(kinds, "pull")
+	case r.features.Issues:
+		holds, kinds = "published packages, default-branch commits and open issues", append(kinds, "issue")
+	}
+	all := []tools.Tool{
 		tool("search", "Search the portal",
 			"Searches what the portal holds: repositories, groups, document sections (README and docs/), manifests and their dependencies, "+
-				"published packages, default-branch commits, open pull requests and open issues; not source code. The query is words (all required), \"phrases\", "+
-				"-exclusions, OR between two words, and filters: in:repo|group|doc|dep|package|commit|pull|issue, group:, repo:, lang:, topic:, "+
+				holds+"; not source code. The query is words (all required), \"phrases\", "+
+				"-exclusions, OR between two words, and filters: in:"+strings.Join(kinds, "|")+", group:, repo:, lang:, topic:, "+
 				"lifecycle:, author:, kind:hand|ai|automation, dep: (a dependency's name), before: and after: (dates, 2026-11-05). Best first.",
 			schema([]string{"query"}, map[string]any{"query": prop("string", "The query, up to 256 characters"),
-				"in": map[string]any{"type": "string", "enum": []string{"repo", "group", "doc", "dep", "package", "commit", "pull", "issue"},
+				"in": map[string]any{"type": "string", "enum": kinds,
 					"description": "Only hits of this kind; the counts stay every kind's"}, "limit": limit}),
 			func(in map[string]any) string { return "Searching for " + arg(in, "query") }, r.search),
 		tool("list_groups", "List groups", "Lists the groups of repositories with their ids, names and sizes.", schema(nil, map[string]any{}),
@@ -135,7 +147,10 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 			}, r.openIssues),
 		repoTool("repository_health", "Repository health", "Reads a repository's health score, level and findings, its latest release, packages and activity.", "Checking the health of", r.health),
 		repoTool("repository_packages", "Repository packages", "Lists what a repository publishes to package registries (Maven, npm, PyPI, crates.io, Go, NuGet, ...) with the newest release of each.", "Reading the packages of", r.packages),
-	)
+	}
+	return tools.New(slices.DeleteFunc(all, func(t tools.Tool) bool {
+		return t.Name == "open_pull_requests" && !r.features.Pulls || t.Name == "open_issues" && !r.features.Issues
+	})...)
 }
 
 var errNotFound = errors.New("not found in the catalogue")
@@ -455,11 +470,15 @@ func (r toolReads) health(ctx context.Context, in map[string]any) (tools.Result,
 	for _, pk := range p.Packages {
 		fmt.Fprintf(&b, "Publishes %s %s, newest %s at %s.\n", pk.Ecosystem, pk.Name, pk.Version, pk.Registry)
 	}
-	if p.OpenPulls != nil {
-		fmt.Fprintf(&b, "Open issues: %d. Open pull requests: %d. License: %s.\n", p.OpenIssues, *p.OpenPulls, orUnknown(p.License))
-	} else {
-		fmt.Fprintf(&b, "Open issues and pull requests: %d. License: %s.\n", p.OpenIssues, orUnknown(p.License))
+	switch {
+	case p.OpenIssuesWithPulls:
+		fmt.Fprintf(&b, "Open issues and pull requests: %d.", p.OpenIssues)
+	case p.OpenPulls != nil:
+		fmt.Fprintf(&b, "Open issues: %d. Open pull requests: %d.", p.OpenIssues, *p.OpenPulls)
+	default:
+		fmt.Fprintf(&b, "Open issues: %d.", p.OpenIssues)
 	}
+	fmt.Fprintf(&b, " License: %s.\n", orUnknown(p.License))
 	return tools.Result{Source: snapshot.RepoPage(snapshot.RepoKey(p.Address)), Text: b.String()}, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/badges"
 	"github.com/cantara/source-code-portal/internal/catalog"
 	"github.com/cantara/source-code-portal/internal/commits"
+	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/health"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/packages"
@@ -28,8 +29,9 @@ func assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.R
 	d, _ := catalog.DescriptorOf(e)
 	last, commitsFresh := commits.LastCommit(e)
 	sig := health.Signals{Archived: r.Archived, Deprecated: d.Lifecycle == "deprecated", Public: r.Visibility == "public",
-		LastChange: r.PushedAt, LastCommit: last, License: r.License, OpenIssues: pulls.Issues(e),
+		LastChange: r.PushedAt, LastCommit: last, License: r.License,
 		Failing: failing(e.Fresh) || failing(commitsFresh)}
+	sig.OpenIssues, sig.WithPulls = openIssues(e)
 	sig.ReviewIdle, sig.OldUpdates = pulls.Waiting(e, health.UpdatesAfter, now)
 	if at, before := commits.LastAuthored(s, r.Key(), commits.WorkTeam); !at.IsZero() {
 		sig.LastChange, sig.Automated, sig.Before = at, before || last.After(at), before
@@ -130,11 +132,19 @@ func groupHealthAPI(s *snapshot.Snapshot, g snapshot.Group, out *oapi.Group) {
 	out.Health = productAPI(groupHealth(s, g, time.Now()), 0)
 }
 
-// rulesAPI serves the rules the portal judges by (health.Describe), so every page explains the signals in the server's terms.
-type rulesAPI struct{}
+// rulesAPI serves the rules the portal judges by (health.Describe, less a switched-off feature's) and the switches, so every page
+// explains the signals in the server's terms and shows only the parts switched on.
+type rulesAPI struct{ features config.Features }
 
-func (rulesAPI) GetRules(context.Context, oapi.GetRulesRequestObject) (oapi.GetRulesResponseObject, error) {
-	return oapi.GetRules200JSONResponse{Body: rulesOf(health.Describe())}, nil
+func (a rulesAPI) GetRules(context.Context, oapi.GetRulesRequestObject) (oapi.GetRulesResponseObject, error) {
+	return oapi.GetRules200JSONResponse{Body: rulesFor(a.features)}, nil
+}
+
+// rulesFor is the rules and the switches as /rules tells them.
+func rulesFor(f config.Features) oapi.Rules {
+	r := rulesOf(judged(f))
+	r.Features.Pulls, r.Features.Issues = f.Pulls, f.Issues
+	return r
 }
 
 // rulesOf is the rules in the contract's terms.

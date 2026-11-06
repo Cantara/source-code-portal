@@ -104,7 +104,13 @@ func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
 			newest = t
 		}
 	}
-	out := []entry{{"/", newest}, {"/commits", newest}, {"/pulls", newest}, {"/issues", newest}}
+	out := []entry{{"/", newest}, {"/commits", newest}}
+	if l.opts.Pulls != nil { // the pages of a feature switched off are not there (design/features.md)
+		out = append(out, entry{"/pulls", newest})
+	}
+	if l.opts.Issues != nil {
+		out = append(out, entry{"/issues", newest})
+	}
 	for _, g := range s.Groups {
 		var t time.Time
 		for _, k := range g.Members {

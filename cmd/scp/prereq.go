@@ -24,6 +24,7 @@ type prereqs struct {
 	source   func(id string) *github.Source
 	current  func() *snapshot.Snapshot // the full snapshot, private repositories included
 	webhooks bool
+	needs    []prereq.Need // of the features switched on
 	log      *slog.Logger
 
 	mu   gosync.Mutex
@@ -58,7 +59,7 @@ func (p *prereqs) check() []prereq.Unmet {
 		}
 		in = append(in, ps)
 	}
-	unmet := prereq.Check(in, p.webhooks)
+	unmet := prereq.Check(p.needs, in, p.webhooks)
 	p.logChange(unmet)
 	return unmet
 }
@@ -100,7 +101,7 @@ func (p *prereqs) logChange(unmet []prereq.Unmet) {
 		return
 	}
 	if len(lines) == 0 {
-		p.log.Info("prerequisites hold", "features", len(prereq.Needs))
+		p.log.Info("prerequisites hold", "features", len(p.needs))
 		return
 	}
 	for _, u := range unmet {

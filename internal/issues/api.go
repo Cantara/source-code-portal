@@ -20,6 +20,7 @@ const (
 // API serves the open issues from the current snapshot. It implements the issues method of the strict server.
 type API struct {
 	Current func(context.Context) *snapshot.Snapshot // the viewer's view
+	Off     bool                                     // switched off (features.issues): every request is answered 404
 }
 
 func badRequest(detail string) oapi.ListIssues400ApplicationProblemPlusJSONResponse {
@@ -33,6 +34,10 @@ func notFound(detail string) oapi.ListIssues404ApplicationProblemPlusJSONRespons
 }
 
 func (a API) ListIssues(ctx context.Context, req oapi.ListIssuesRequestObject) (oapi.ListIssuesResponseObject, error) {
+	if a.Off {
+		return oapi.ListIssues404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(
+			oapi.NewProblem(http.StatusNotFound, "switched-off", "Not Found", "The open issues are switched off on this portal."))}, nil
+	}
 	s, now, p := a.Current(ctx), time.Now(), req.Params
 	number, size := 1, defaultLimit
 	if p.Page != nil {

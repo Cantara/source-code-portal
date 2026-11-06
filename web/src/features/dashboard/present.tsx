@@ -29,6 +29,7 @@ import { AiMark } from "@/entities/commit/ai-mark"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { meQuery } from "@/lib/api/queries"
+import { useFeatures } from "@/lib/rules-context"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import type { Notice } from "@/entities/announcement/announcement"
 import { DiffStat } from "@/entities/commit/diffstat"
@@ -303,6 +304,7 @@ function Screen({
   notices?: Notice[]
 }) {
   const now = useNow()
+  const features = useFeatures()
   const scope = only ? { ...data, groups: within(data.groups, undefined, only) } : data
   const groups = (el: Element) => within(data.groups, el.groups, only)
   // The older commits the column reads as it scrolls keep to the products the address names, as the newest do.
@@ -330,7 +332,9 @@ function Screen({
         left.push(<Announcements key={i} list={notices} wall />)
         break
       case "pulls":
-        left.push(<Pulls key={i} work={data.work} group={one?.id} counts={one?.pulls ?? data.pulls} n={el.count ?? 8} wall />)
+        if (features.pulls) {
+          left.push(<Pulls key={i} work={data.work} group={one?.id} counts={one?.pulls ?? data.pulls} n={el.count ?? 8} wall />)
+        }
         break
       case "heading":
         left.push(

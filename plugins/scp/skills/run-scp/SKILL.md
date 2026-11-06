@@ -65,7 +65,9 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    accounts. Each permission serves a feature, and a missing one leaves it empty (the table is the operator guide's section 1):
    *Contents* and *Metadata* the catalogue, *Issues* `/issues`, *Pull requests*, *Checks* and *Commit statuses* `/pulls`. Tell
    them that the portal only reads (every permission *Read-only*) and that a later change must be accepted on each installation by an
-   organisation owner (Organization settings, GitHub Apps, *Review request*). A token (fine-grained, public repositories read; or a
+   organisation owner (Organization settings, GitHub Apps, *Review request*). If they do without pull requests or issues, leave
+   those permissions and events out and set `features: {pulls: false}` or `{issues: false}` (released after 2026-11-06; check the
+   operator guide of their version): the feature is then gone, not empty, and nothing warns. A token (fine-grained, public repositories read; or a
    classic one without scopes) is fine to start.
    Walk them through the GitHub pages; they create it.
 3. **Secrets.** In a directory only root and UID 65532 read:

@@ -82,18 +82,23 @@ func TestListPulls(t *testing.T) {
 	if got := numbers(list(oapi.ListPullsParams{Sort: new(oapi.Updated), Limit: new(2), Page: new(2)})); !slices.Equal(got, []int{2, 3}) {
 		t.Errorf("updated, page 2: %v", got)
 	}
+	if res, _ := (API{Current: a.Current, Off: true}).ListPulls(t.Context(), oapi.ListPullsRequestObject{}); res == nil {
+		t.Error("no answer switched off")
+	} else if _, ok := res.(oapi.ListPulls404ApplicationProblemPlusJSONResponse); !ok {
+		t.Errorf("switched off: %T", res)
+	}
 	if res, _ := a.ListPulls(t.Context(), oapi.ListPullsRequestObject{Params: oapi.ListPullsParams{Repo: new("acme/nope")}}); res == nil {
 		t.Error("no answer for an unknown repository")
 	} else if _, ok := res.(oapi.ListPulls404ApplicationProblemPlusJSONResponse); !ok {
 		t.Errorf("unknown repository: %T", res)
 	}
 
-	// The summary hooks: a repository's issues leave its pull requests out; the dashboard counts the work that counts.
+	// The summary hooks: a repository's open pull requests; the dashboard counts the work that counts.
 	e, _ := s.Repo("acme/x")
 	var r oapi.Repo
 	Repo(s, e, &r)
-	if r.OpenPulls == nil || *r.OpenPulls != 3 || r.OpenIssues != 7 {
-		t.Errorf("repo summary: pulls %v, issues %d", r.OpenPulls, r.OpenIssues)
+	if r.OpenPulls == nil || *r.OpenPulls != 3 {
+		t.Errorf("repo summary: pulls %v", r.OpenPulls)
 	}
 	d := oapi.Dashboard{Work: oapi.Work{oapi.WorkKindHand, oapi.WorkKindAi}, Groups: []oapi.DashboardGroup{{Id: "g"}}}
 	Dashboard(s, &d)

@@ -150,18 +150,25 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	packageTrees := map[string]packages.GitHub{}
 	releases := map[string]badges.Releases{}
 	openPulls := map[string]pulls.Fetcher{}
-	openIssues := map[string]issues.Fetcher{}
+	issueFetchers := map[string]issues.Fetcher{}
 	ids := make([]string, 0, len(cfg.GitHub.Sources))
 	for _, s := range cfg.GitHub.Sources {
 		src := gh.Source(s.ID)
 		sources[s.ID], trees[s.ID], manifestTrees[s.ID], packageTrees[s.ID] = src, src, src, src
 		fetchers[s.ID], releases[s.ID], openPulls[s.ID] = commits.FromGitHub(src), badges.FromGitHub(src), pulls.FromGitHub(src)
-		openIssues[s.ID] = issues.FromGitHub(src)
+		issueFetchers[s.ID] = issues.FromGitHub(src)
 		ids = append(ids, s.ID)
 	}
 
-	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log,
-		commits.Feeds(), pulls.Feeds(), issues.Feeds(), manifests.Graph(), search.Indexer(searchOptions()))}
+	f := cfg.Features // a switched-off feature is absent: no job, index, route, tool or page (design/features.md)
+	indexers := []snapshot.Indexer{commits.Feeds(), manifests.Graph(), search.Indexer(searchOptions())}
+	if f.Pulls {
+		indexers = append(indexers, pulls.Feeds())
+	}
+	if f.Issues {
+		indexers = append(indexers, issues.Feeds())
+	}
+	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log, indexers...)}
 	if s.store, err = store.Open(ctx, cfg.Store.Path, log); err != nil {
 		return nil, err
 	}
@@ -193,9 +200,15 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		return snapshot.Repo{}, false
 	}
-	for _, spec := range []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
-		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec(),
-		pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec(), issues.New(openIssues, issues.Options{Repo: catalogued}).Spec()} {
+	specs := []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
+		badges.New(releases).ReleaseSpec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec()}
+	if f.Pulls {
+		specs = append(specs, pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec())
+	}
+	if f.Issues {
+		specs = append(specs, issues.New(issueFetchers, issues.Options{Repo: catalogued}).Spec())
+	}
+	for _, spec := range specs {
 		if err := s.engine.Register(spec); err != nil {
 			return nil, err
 		}
@@ -230,7 +243,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	s.layouts = layout.Open(cfg.Layout.Dir, log)
 	s.notices = announce.Open(cfg.Announcements, cfg.Layout.Dir, time.Now, log)
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: cfg.Webhook.Secret.IsSet(),
-		log: log.With("component", "prerequisites")}
+		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		webhook: cfg.Webhook.Secret.IsSet(), layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
 		deliveries: map[string]int{}}
@@ -244,13 +257,13 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
 			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
 		Observe: m.request, RequireAuth: cfg.Access.RequireAuth}
-	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin))
+	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin, f))
 	external := d.images
 	if external == nil {
 		external = egress.Guarded(10 * time.Second)
 	}
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view,
-		badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth, Issues: pulls.Issues, Pulls: pulls.Badge})},
+		badgeData(f))},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /knowledge.yaml", Handler: md.KCP()}, {Pattern: "GET /.well-known/kcp.json", Handler: md.WellKnown()},
@@ -283,11 +296,16 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		routes = append(routes, a.Routes()...)
 	}
 	catalogAPI := catalog.API{Current: view,
-		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, pulls.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
+		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
 		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
-		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo, pulls.Repo, repoHealthAPI},
+		Repo:      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, badges.Repo, manifests.Repo, packages.Repo, repoIssuesAPI, repoHealthAPI},
 		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail}}
+	if f.Pulls {
+		catalogAPI.Dashboard = append(catalogAPI.Dashboard, pulls.Dashboard)
+		catalogAPI.Repo = slices.Insert(catalogAPI.Repo, 4, pulls.Repo)
+	}
 	commitsAPI := commits.API{Current: view}
+	pullsAPI, issuesAPI := pulls.API{Current: view, Off: !f.Pulls}, issues.API{Current: view, Off: !f.Issues}
 	groupNames := func(ctx context.Context) []string {
 		var names []string
 		for _, g := range view(ctx).Groups {
@@ -296,7 +314,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return names
 	}
 	searchAPI := search.API{Current: view, Observe: m.search}
-	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, pulls: pulls.API{Current: view}, issues: issues.API{Current: view}, repo: md.Repo(), doc: md.Doc(), group: md.Group()}.catalogue()
+	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, pulls: pullsAPI, issues: issuesAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group(), features: f}.catalogue()
 	if err != nil {
 		return nil, err
 	}
@@ -311,9 +329,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
-	features := api{catalogAPI, commitsAPI, pulls.API{Current: view}, issues.API{Current: view}, docs.API{Current: view}, manifests.API{Current: view},
-		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For},
-		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{}, s.prereqs}
+	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, docs.API{Current: view}, manifests.API{Current: view},
+		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For, Off: offElements(f)},
+		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{f}, s.prereqs}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}
@@ -363,8 +381,8 @@ func newAuth(cfg config.Config, log *slog.Logger) (*auth.Auth, error) {
 
 // llmsOptions is what the Markdown surface shows of the other features: documents, the descriptor, the manifests' summary and the
 // commits' freshness.
-func llmsOptions(origin func(*http.Request) string) llms.Options {
-	return llms.Options{
+func llmsOptions(origin func(*http.Request) string, f config.Features) llms.Options {
+	o := llms.Options{
 		Docs: func(e *snapshot.RepoEntry) ([]llms.Doc, snapshot.Freshness) {
 			ds, fresh := docs.Of(e)
 			out := make([]llms.Doc, 0, len(ds))
@@ -390,10 +408,24 @@ func llmsOptions(origin func(*http.Request) string) llms.Options {
 		},
 		Freshness:  func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
 		LastCommit: func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
-		Pulls:      pulls.Badge,
-		Issues:     issues.Summary,
 		Origin:     origin,
 	}
+	if f.Pulls {
+		o.Pulls = pulls.Badge
+	}
+	if f.Issues {
+		o.Issues = issues.Summary
+	}
+	return o
+}
+
+// badgeData is what the badges show of the other features; without pull requests there is no pulls badge.
+func badgeData(f config.Features) badges.Data {
+	d := badges.Data{LastCommit: commits.LastCommit, Health: assess, Product: groupHealth, Issues: issueCount}
+	if f.Pulls {
+		d.Pulls = pulls.Badge
+	}
+	return d
 }
 
 // newToken is the secret of this process the web UI server shows on its API calls (httpapi.Options.WebToken).

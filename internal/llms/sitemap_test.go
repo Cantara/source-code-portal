@@ -18,6 +18,8 @@ func sitemapOptions() Options {
 		}
 		return time.Time{}
 	}
+	o.Pulls = func(*snapshot.RepoEntry) (int, int) { return -1, 0 }
+	o.Issues = func(*snapshot.RepoEntry) (int, int) { return -1, 0 }
 	return o
 }
 
@@ -46,6 +48,12 @@ func TestSitemap(t *testing.T) {
 	golden(t, "sitemap.xml", rec.Body.String())
 	if again := get(mux, "/sitemap.xml", "If-None-Match", rec.Header().Get("ETag")); again.Code != http.StatusNotModified {
 		t.Errorf("If-None-Match: %d", again.Code)
+	}
+	off := sitemapOptions()
+	off.Pulls, off.Issues = nil, nil
+	if b := get(New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", off).Sitemap(), "/sitemap.xml").Body.String(); strings.Contains(b, "/pulls") ||
+		strings.Contains(b, "/issues") || !strings.Contains(b, "/commits") {
+		t.Errorf("switched off, the sitemap names their pages:\n%s", b)
 	}
 	if rec := get(mux, "/sitemaps/1.xml"); rec.Code != http.StatusNotFound {
 		t.Errorf("a part of a sitemap without parts: %d", rec.Code)

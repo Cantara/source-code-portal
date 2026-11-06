@@ -9,6 +9,7 @@ import { keys } from "@/lib/api/queries"
 import { cn } from "@/lib/cn"
 import { layoutPath, storedLayoutQuery, type Page, type StoredLayout } from "./api"
 import { blank, kindLabel, kinds, type Element, type Kind } from "./layout"
+import { useFeatures } from "@/lib/rules-context"
 
 type Group = Schemas["DashboardGroup"]
 
@@ -160,6 +161,8 @@ export function Designer({
   const { data: stored, error: loadError, refetch } = useQuery(storedLayoutQuery(page))
   const [edited, setDraft] = useState<Element[] | null>(null)
   const [adding, setAdding] = useState<Kind>("heading")
+  const features = useFeatures()
+  const offered = kinds.filter((k) => k.kind !== "pulls" || features.pulls)
   const [dragging, setDragging] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const addId = useId()
@@ -315,7 +318,7 @@ export function Designer({
                 value={adding}
                 onChange={(e) => setAdding(e.target.value as Kind)}
               >
-                {kinds.map((k) => (
+                {offered.map((k) => (
                   <option key={k.kind} value={k.kind}>
                     {k.label}
                   </option>

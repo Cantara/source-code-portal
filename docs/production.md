@@ -35,7 +35,9 @@ In GitHub, the organisation's *Settings*, *Developer settings*, *GitHub Apps*, *
 
 Each permission serves a feature: *Contents* and *Metadata* the catalogue, *Issues* the open issues, *Pull requests*, *Checks* and
 *Commit statuses* the open pull requests and whose turn each is. Without one, that feature stays empty, and the portal says so on its
-page and on the *Admin* page (operator guide, section 1). Changing them later needs the installation to accept them: an organisation
+page and on the *Admin* page (operator guide, section 1). A portal that should do without pull requests or issues leaves their
+permissions and events out and switches the feature off in `scp.yaml`: `features: {pulls: false}` or `{issues: false}`; then nothing
+warns. Changing them later needs the installation to accept them: an organisation
 owner, Organization settings, GitHub Apps, *Review request*.
 
 Create it, note the *App ID*, generate a private key and store it as `/srv/scp/secrets/scp-app.pem` (group 65532, mode 0640). Then

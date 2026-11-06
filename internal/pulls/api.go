@@ -20,6 +20,7 @@ const (
 // API serves the open pull requests from the current snapshot. It implements the pulls method of the strict server.
 type API struct {
 	Current func(context.Context) *snapshot.Snapshot // the viewer's view
+	Off     bool                                     // switched off (features.pulls): every request is answered 404
 }
 
 func badRequest(detail string) oapi.ListPulls400ApplicationProblemPlusJSONResponse {
@@ -33,6 +34,10 @@ func notFound(detail string) oapi.ListPulls404ApplicationProblemPlusJSONResponse
 }
 
 func (a API) ListPulls(ctx context.Context, req oapi.ListPullsRequestObject) (oapi.ListPullsResponseObject, error) {
+	if a.Off {
+		return oapi.ListPulls404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: oapi.NotFoundApplicationProblemPlusJSONResponse(
+			oapi.NewProblem(http.StatusNotFound, "switched-off", "Not Found", "The open pull requests are switched off on this portal."))}, nil
+	}
 	s, now, p := a.Current(ctx), time.Now(), req.Params
 	number, size := 1, defaultLimit
 	if p.Page != nil {

@@ -64,6 +64,10 @@ func TestAssess(t *testing.T) {
 	if f[0].Message != "No change for 2 years: archive it or revive it" || f[1].Message != "Unreleased changes since v2, released 2 years ago" {
 		t.Fatalf("messages %+v", f)
 	}
+	if f := Assess(Signals{Public: true, License: "MIT", LastChange: ago(3), OpenIssues: 21, WithPulls: true}, now).Findings; len(f) != 1 ||
+		f[0].Message != "21 open issues and pull requests" {
+		t.Fatalf("issues with pulls %+v", f)
+	}
 	f = Assess(Signals{LastChange: ago(400), Automated: true, Before: true, LastCommit: ago(2)}, now).Findings
 	if f[0].Message != "No change by a person for more than 13 months" {
 		t.Fatalf("automated message %+v", f)

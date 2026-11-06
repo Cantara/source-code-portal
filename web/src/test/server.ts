@@ -124,6 +124,7 @@ export function repo(name: string, over: Partial<S["Repo"]> = {}): S["Repo"] {
     fork: false,
     stars: 1,
     openIssues: 0,
+    openIssuesWithPulls: false,
     openPulls: 0,
     pushedAt: at,
     lastCommitAt: at,

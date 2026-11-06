@@ -7,6 +7,7 @@ import { pageSizes, sizeCookie, type PagedList } from "@/lib/paging"
 import { forget, kinds, productsViews, remember, viewCookie, workCookie, type ProductsView, type Work } from "@/lib/preferences"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import { PageHeader } from "@/shared/page-header"
+import { useFeatures } from "@/lib/rules-context"
 
 type Settings = { work: Work; view: ProductsView; commits: number; history: number; pulls: number; issues: number }
 
@@ -92,6 +93,7 @@ function Section({ title, about, children }: { title: string; about: string; chi
  * is kept at once in this browser's cookies (the theme in its storage) and the pages follow it; nothing is stored on the server.
  */
 export function SettingsView({ initial }: { initial: Settings }) {
+  const features = useFeatures()
   const router = useRouter()
   const theme = useTheme()
   const [s, setS] = useState(initial)
@@ -159,11 +161,11 @@ export function SettingsView({ initial }: { initial: Settings }) {
             }}
           />
         </Section>
-        <Section title="Page sizes" about="How many commits, pull requests or issues a page of a list shows.">
+        <Section title="Page sizes" about="How many items a page of a list shows.">
           {size("commits", "Commit timelines")}
           {size("history", "Repository histories")}
-          {size("pulls", "Pull requests")}
-          {size("issues", "Issues")}
+          {features.pulls && size("pulls", "Pull requests")}
+          {features.issues && size("issues", "Issues")}
         </Section>
         <Section title="Theme" about="As the system is set, dark or light.">
           <Choices

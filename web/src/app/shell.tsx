@@ -17,6 +17,7 @@ import {
   PresentIcon,
 } from "@/components/ui/icons"
 import { cn } from "@/lib/cn"
+import { useFeatures } from "@/lib/rules-context"
 import type { Schemas } from "@/lib/api/client"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 
@@ -164,6 +165,7 @@ const nav =
 /** MainNav is the header navigation, with Ask when the viewer may use the assistant; the current section is marked. */
 export function MainNav({ ask = false }: { ask?: boolean }) {
   const path = usePathname()
+  const features = useFeatures()
   return (
     <nav aria-label="Main" className="flex gap-1 text-sm">
       <Link href="/" className={nav} aria-current={path === "/" ? "page" : undefined}>
@@ -172,12 +174,16 @@ export function MainNav({ ask = false }: { ask?: boolean }) {
       <Link href="/commits" className={nav} aria-current={path === "/commits" ? "page" : undefined}>
         Commits
       </Link>
-      <Link href="/pulls" className={nav} aria-current={path === "/pulls" ? "page" : undefined}>
-        Pull requests
-      </Link>
-      <Link href="/issues" className={nav} aria-current={path === "/issues" ? "page" : undefined}>
-        Issues
-      </Link>
+      {features.pulls && (
+        <Link href="/pulls" className={nav} aria-current={path === "/pulls" ? "page" : undefined}>
+          Pull requests
+        </Link>
+      )}
+      {features.issues && (
+        <Link href="/issues" className={nav} aria-current={path === "/issues" ? "page" : undefined}>
+          Issues
+        </Link>
+      )}
       {ask && (
         <Link href="/ask" className={nav} aria-current={path === "/ask" ? "page" : undefined}>
           Ask

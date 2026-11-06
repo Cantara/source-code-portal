@@ -1876,8 +1876,11 @@ type Repo struct {
 	License string `json:"license"`
 	Name    string `json:"name"`
 
-	// OpenIssues Open issues; GitHub's count of issues and pull requests together until the pull requests are read
+	// OpenIssues Open issues, the best count held: the issues read, else GitHub's count less the open pull requests read, else GitHub's count of both (openIssuesWithPulls)
 	OpenIssues int `json:"openIssues"`
+
+	// OpenIssuesWithPulls openIssues counts the open pull requests too: neither is read (switched off, or not yet)
+	OpenIssuesWithPulls bool `json:"openIssuesWithPulls"`
 
 	// OpenPulls Open pull requests; null until read
 	OpenPulls *int   `json:"openPulls"`
@@ -1941,7 +1944,16 @@ type RepoList struct {
 
 // Rules defines model for Rules.
 type Rules struct {
-	Activity   []ActivityRule `json:"activity"`
+	Activity []ActivityRule `json:"activity"`
+
+	// Features The parts an operator may switch off (features in scp.yaml); a switched-off one has no pages, data, tools or findings
+	Features struct {
+		// Issues The open issues
+		Issues bool `json:"issues"`
+
+		// Pulls The open pull requests
+		Pulls bool `json:"pulls"`
+	} `json:"features"`
 	Findings   []FindingKind  `json:"findings"`
 	Levels     []LevelRule    `json:"levels"`
 	Severities []SeverityRule `json:"severities"`

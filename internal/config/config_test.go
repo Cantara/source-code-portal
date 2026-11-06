@@ -55,9 +55,20 @@ func TestDefaults(t *testing.T) {
 		Cluster:  Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},
 		Web:      Web{Node: "node"},
 		Packages: Packages{Public: true},
+		Features: Features{Pulls: true, Issues: true},
 	}
 	if diff := cmp.Diff(want, cfg, cmp.Comparer(func(a, b Secret) bool { return string(a.v) == string(b.v) })); diff != "" {
 		t.Errorf("defaults (-want +got):\n%s", diff)
+	}
+}
+
+func TestFeatures(t *testing.T) {
+	cfg, _, err := Load(file(t, "features:\n  pulls: false\n"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Features != (Features{Pulls: false, Issues: true}) {
+		t.Errorf("features = %+v", cfg.Features)
 	}
 }
 
@@ -96,6 +107,7 @@ func TestRefused(t *testing.T) {
 	}{
 		"unknown file key":        {file: "server:\n  public_adr: \":1\"\n", want: "public_adr"},
 		"unknown section":         {file: "sever:\n  x: 1\n", want: "sever"},
+		"unknown feature":         {file: "features:\n  commits: false\n", want: "commits"},
 		"unknown source key":      {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, colour: red}\n", want: "colour"},
 		"wrong type":              {file: "server:\n  shutdown_grace: soon\n", want: "shutdown_grace"},
 		"bad yaml":                {file: "server: [\n", want: "yaml"},
