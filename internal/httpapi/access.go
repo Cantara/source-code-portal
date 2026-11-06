@@ -159,7 +159,8 @@ func SameOrigin(r *http.Request, publicURL string) bool {
 }
 
 // PortalOrigin is the origin the portal answers as: the public URL's, else the request's own (https when it came in over TLS, or
-// forwardedHTTPS: a trusted proxy said so). Everything that tells or compares the portal's origin shares this one.
+// forwardedHTTPS: a trusted proxy said so). Everything that tells or compares the portal's origin shares this one; a guard that does not know the proxies (SameOrigin, the MCP
+// one) passes false, so behind a TLS-terminating proxy it needs server.public_url.
 func PortalOrigin(r *http.Request, publicURL string, forwardedHTTPS bool) string {
 	if u, err := url.Parse(publicURL); err == nil && u.Host != "" {
 		return u.Scheme + "://" + u.Host

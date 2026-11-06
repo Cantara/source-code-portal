@@ -46,7 +46,7 @@ func (t *scpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var cached *cacheEntry
 	if req.Method == http.MethodGet {
 		key = cacheKey(t.rate, req)
-		if cached = t.cache.get(key); cached != nil {
+		if cached = t.cache.get(key); key != "" && cached != nil {
 			req.Header.Set("If-None-Match", cached.etag)
 		}
 	}
@@ -96,6 +96,9 @@ func (t *scpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 // cacheKey binds an entry to the credential (its rate book: one per token and per App installation), as GitHub's ETags depend on who
 // asks. It is not the Authorization header: an installation's token changes about hourly, which would strand every entry.
 func cacheKey(credential *rateBook, req *http.Request) string {
+	if credential == nil {
+		return "" // no credential to bind an entry to: nothing is kept
+	}
 	h := sha256.New()
 	for _, s := range []string{fmt.Sprintf("%p", credential), req.URL.String(), req.Header.Get("Accept")} {
 		h.Write([]byte(s))

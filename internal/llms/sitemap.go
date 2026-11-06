@@ -23,9 +23,9 @@ type entry struct {
 	lastmod time.Time
 }
 
-// sitemap is the files of one view of a snapshot at one origin: the URL set, or an index and its parts.
-// sitemap is a view's files, built once with a placeholder where the origin goes (raw); a portal that says its own address fills it in
-// once (origin, files), one that reads it from the request fills it in per request: a request naming another Host never rebuilds.
+// sitemap is the files of one view of a snapshot (the URL set, or an index and its parts), built once with a placeholder where the
+// origin goes (raw), and filled in for the last origin asked (origin, files): a request naming another Host fills in again, and never
+// builds again.
 type sitemap struct {
 	view   *snapshot.Snapshot
 	raw    [][]byte // [0] is /sitemap.xml
@@ -111,15 +111,12 @@ func (l *LLMs) sitemaps(r *http.Request) [][]byte {
 	if m.view != s {
 		m = sitemap{view: s, raw: l.buildSitemap(s, originMark, maxURLs)}
 	}
-	if l.base != "" && m.origin != origin { // the portal's own address: filled in once per view
+	if m.origin != origin || m.files == nil { // the portal's own address: once per view; a request's: until another host asks
 		m.origin, m.files = origin, fill(m.raw, origin)
 	}
 	l.maps[slot] = m
 	l.mu.Unlock()
-	if l.base != "" {
-		return m.files
-	}
-	return fill(m.raw, origin)
+	return m.files
 }
 
 // pages are the indexable pages of a view: the dashboard, the commit log, the groups, the repositories and their documents, each

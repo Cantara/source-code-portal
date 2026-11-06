@@ -141,8 +141,11 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !httpapi.RequireJSON(w, r, "the layout") || !h.writable(w, r) {
+		return
+	}
 	var body saveBody
-	if !h.writable(w, r) || !httpapi.JSONBody(w, r, &body, "the layout", "The body is not a layout.") {
+	if !httpapi.DecodeStrict(w, r, &body, "The body is not a layout.") {
 		return
 	}
 	h.finish(w, page, func() error {
