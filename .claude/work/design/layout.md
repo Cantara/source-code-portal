@@ -1,6 +1,38 @@
 # Landing page and layouts
 Status: as built (L1 to L4). Binding order: ../plan.md > this note.
 
+## Terms
+The words the owner's instructions and these notes use for the pages built from layouts (owner, 2026-11-06). Internal: `docs/` keeps
+the readers' words. A new part of a page gets its term here first.
+
+| Term | What it is | In code |
+|---|---|---|
+| **Layout** | A page's ordered list of elements: the built-in one, or the one an admin stored | `/api/v1/pages/{page}`, `<layout.dir>/<page>.json` |
+| **Element** | One block of a page, of a kind: `announcements`, `telemetry`, `fleet-map`, `products`, `pulls`, `latest-commits`, `heading` | `LayoutElement`; `Elements` in `features/dashboard/elements.tsx` |
+| **Design mode** | Where an admin adds, moves, changes and removes elements and saves the layout | `features/dashboard/design.tsx` |
+| **Main column** | At the left on a wide screen: the `products` element. It grows with its content; the **page scrolls** | `main` of `SidePanel` |
+| **Product card** | One product (a group) in the products' **cards** view; the other view is the **products table** | `ProductCard` in `products.tsx` |
+| **Side panel** | At the right on a wide screen: the elements right after `products` (the pull requests, the latest commits), in order | `SidePanel` in `side.tsx` |
+| **Sticky** | The side panel stays in place while the page scrolls under it | `lg:sticky lg:top-20` |
+| **Viewport-high** | The side panel is never taller than the window below the header, however long the main column is | `lg:max-h-[calc(100dvh-6rem)]` |
+| **Inner scroll** | A part that scrolls on its own, apart from the page: the side panel when its content is taller than it | `lg:overflow-y-auto` |
+| **Loads more at the end** | A list that reads its next page when its end comes into view (the latest commits) | `latest.tsx` |
+| **Fold**, **rail** | The side panel's button folds it to a thin rail and opens it again | cookie `scp-side-commits` |
+| **Resize edge** | The side panel's left edge, dragged (or moved with the arrow keys) to set its width, 18 to 40 rem | cookie `scp-side-commits` |
+| **Stacked** | Below `lg`: no side panel, every element in one column in layout order | — |
+| **Telemetry tiles** | The fleet's numbers in a row at the top of the dashboard, each with its hint | `telemetry.tsx` |
+| **Fleet map** | Every repository as one tile by product, coloured by its last change or its health | `fleet-map.tsx` |
+
+The presentation page (`present.md`) is one screen that never scrolls, with words of its own:
+
+| Term | What it is |
+|---|---|
+| **Status strip** | The telemetry as one line across the top, the brand at its start and the freshness at its end |
+| **Product tiles** | The products as tiles that fold the good ones when they do not fit |
+| **Commit column** | The latest commits at the right at full height (below the rest in portrait), with its inner scroll and its resize edge |
+| **Tap bar** | The controls a tap or a key shows for a few seconds: the profile and the window's size, back to the dashboard, the theme, *On a wall*, full screen, the design mode (admins) |
+| **Profile** | How the page is set for a screen: Handheld portrait, Handheld landscape, Desk, Wall |
+
 ## Scope
 The landing page exists so an engineer sees which products need a look and why. Today it lists every repository with every attribute:
 on a portal of 134 repositories it is 11 screens long, a catch-all group repeats every repository, and about 1,270 chips mostly repeat
