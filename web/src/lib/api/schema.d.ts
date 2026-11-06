@@ -1200,6 +1200,8 @@ export interface components {
        * @description Its newest stable release
        */
       last?: string | null
+      /** @description Stable releases of each of the last 52 weeks, oldest first (the week starts on Monday, UTC) */
+      weekly: number[]
     }
     InsightCount: {
       name: string
@@ -1207,12 +1209,19 @@ export interface components {
       /** @description Of the repositories in scope, 0 to 1 */
       share: number
     }
+    InsightVersion: {
+      /** @description The version as a manifest states it */
+      version: string
+      repos: number
+    }
     InsightRuntime: {
       /** @description go, node or java */
       name: string
       repos: number
       oldest: string
       newest: string
+      /** @description Every version named, oldest first */
+      versions: components["schemas"]["InsightVersion"][]
     }
     InsightLibrary: {
       /** @description owner/name */
@@ -1224,6 +1233,25 @@ export interface components {
       /** @description Its latest stable release */
       release?: string | null
       retired?: components["schemas"]["AlumniReason"]
+    }
+    InsightMatrixRow: {
+      /** @description owner/name */
+      repo: string
+      /** @description Indexes into the matrix's libraries that this repository depends on */
+      uses: number[]
+    }
+    InsightMatrix: {
+      /** @description The listed libraries */
+      libraries: string[]
+      /** @description The repositories using most of them, at most 24 */
+      repos: components["schemas"]["InsightMatrixRow"][]
+    }
+    InsightBand: {
+      /** @description Percent */
+      from: number
+      /** @description Percent, exclusive except for the last band */
+      to: number
+      repos: number
     }
     InsightRepo: {
       /** @description owner/name */
@@ -1237,7 +1265,17 @@ export interface components {
       /** Format: date-time */
       lastChange: string | null
     }
+    InsightActivity: {
+      group: string
+      name: string
+      active: number
+      recent: number
+      quiet: number
+      dormant: number
+    }
     InsightAgeing: {
+      /** @description Each product's repositories by activity */
+      products: components["schemas"]["InsightActivity"][]
       active: number
       recent: number
       quiet: number
@@ -1264,6 +1302,9 @@ export interface components {
       cadence: components["schemas"]["InsightCadence"]
       technology: components["schemas"]["InsightTechnology"]
       libraries: components["schemas"]["InsightLibrary"][]
+      matrix: components["schemas"]["InsightMatrix"]
+      /** @description How much of the people's recent commits the busiest author wrote, in ten bands, over the repositories with enough commits held */
+      concentration: components["schemas"]["InsightBand"][]
       singleAuthor: components["schemas"]["InsightRepo"][]
       ageing: components["schemas"]["InsightAgeing"]
       freshness: components["schemas"]["Freshness"]

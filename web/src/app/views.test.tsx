@@ -64,6 +64,20 @@ describe("pages", () => {
       expect(screen.getByRole("heading", { name: q })).toBeInTheDocument()
     expect(screen.getByText("Go in 3 repositories, 60% of the fleet.")).toBeInTheDocument()
     expect(screen.getByRole("img", { name: /Stable releases per month/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole("img", { name: /Stable releases per week over the last 52 weeks, per product: Identity 3/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: "Versions of go, oldest first: 1.21 in 1, 1.27 in 2" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("img", { name: /Which of the 2 repositories that use most of the libraries depend on which of the 2/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("img", {
+        name: /Repositories by the share of the people's recent commits the busiest author wrote: 0 to 10 percent 0/,
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: /Repositories by activity: The fleet 2 active/ })).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: /Repositories by language: Go 3 · 60%/ })).toBeInTheDocument()
     expect(screen.getByRole("cell", { name: "None released" })).toBeInTheDocument()
     expect(screen.getByText(/Archived, still used/)).toBeInTheDocument()
     const single = within(screen.getByRole("list", { name: "Repositories mostly one person's" }))

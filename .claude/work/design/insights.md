@@ -47,3 +47,30 @@ canonical, in the sitemap. IN2 adds the tool `fleet_insights` (same parameters),
 Each insight against a fixture fleet with known answers (including empty scopes), automation and sweeps excluded from the author
 rule, the author never present in the answer (a test greps the JSON for the fixture's names), a private repository's numbers absent
 from the public answer (twin test), the thresholds equal to `rules`. Playwright with and without JavaScript, axe in both themes.
+
+## IN3: the graphs (owner, 2026-11-06: "truly boring")
+
+The first page was five cards of tables. Each insight now leads with a graph that shows the answer at a glance; the numbers stay as text
+and tables for screen readers and for the exact value. Drawn as inline SVG from the API's numbers (no chart library, the JavaScript
+budget is a sum, P-41), in the theme's tokens: one hue light to dark for magnitude, the fleet map's activity tokens for activity, the
+emphasis colour for the thing the card is about and grey for the rest. The forms follow what engineering dashboards use for each
+question (a deploy heatmap for rhythm, a dependency matrix for reach, a risk-banded distribution for bus factor):
+
+1. **Cadence: release rhythm.** A heatmap of the last 52 weeks, a row per product (the most active first, at most 12), a column per
+   week, the cell's depth the stable releases of that week, the row's median interval written at its end. Beneath it the monthly bars
+   with their months and counts. It reads "who ships, how steadily, and where it went quiet". Only the 20 newest releases of a
+   repository are held (P-82), so a very busy repository's earlier weeks are empty: the page says so.
+2. **Technology: share and the version ladder.** Ranked bars of the languages and of the build tools (one hue); for each runtime a
+   ladder of the versions the manifests name, a dot per version sized by its repositories, the oldest one emphasised: the stragglers are
+   what to see.
+3. **Shared libraries: reach and the dependency matrix.** Ranked bars of the dependants; below them a matrix, the ten libraries as
+   rows and the 24 repositories that use most of them as columns, a filled cell where one uses the other. A column filled in many rows
+   is a repository tied to many libraries, a full row a library everything leans on. A retired library is marked.
+4. **One person's work: the concentration.** A histogram of the share the busiest author wrote, in bands of 10%, over the repositories
+   with at least 20 people's commits held; the bands at or over 90% are the emphasis. The list of repositories stays; never a person.
+5. **Ageing: the fleet by activity.** A bar per product split into active, recent, quiet and dormant (the fleet map's colours and
+   bands, one scale), with the fleet's total on top; the dormant repositories listed.
+
+Every mark has a title (its tooltip on hover and for assistive technology), every chart a text alternative and a hidden table, colour is
+never the only carrier (the numbers are written on or beside the marks), and the dark theme uses the same tokens.
+
