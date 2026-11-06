@@ -1,9 +1,11 @@
 import { useSyncExternalStore } from "react"
 import { ProblemError } from "./api/client"
+import { subscriber } from "./subscribe"
 
 // The connection is failing after a network, 429 or 5xx failure and recovers on the next successful request.
 let failing = false
 const listeners = new Set<() => void>()
+const subscribe = subscriber(listeners)
 
 function set(v: boolean) {
   if (failing === v) return
@@ -21,10 +23,7 @@ export function noteSuccess() {
 
 export function useConnectionFailing(): boolean {
   return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
+    subscribe,
     () => failing,
     () => false,
   )
@@ -33,6 +32,7 @@ export function useConnectionFailing(): boolean {
 // The live stream (/api/v1/events) is open; the header shows it.
 let live = false
 const liveListeners = new Set<() => void>()
+const subscribeLive = subscriber(liveListeners)
 
 export function setLive(v: boolean) {
   if (live === v) return
@@ -42,10 +42,7 @@ export function setLive(v: boolean) {
 
 export function useLive(): boolean {
   return useSyncExternalStore(
-    (l) => {
-      liveListeners.add(l)
-      return () => liveListeners.delete(l)
-    },
+    subscribeLive,
     () => live,
     () => false,
   )

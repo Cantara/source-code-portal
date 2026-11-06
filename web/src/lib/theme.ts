@@ -65,18 +65,21 @@ export function paint() {
 
 let current: Choice | undefined
 
+/** subscribe is made once, not per render: it holds a media query listener while the theme is shown. */
+function subscribe(l: () => void) {
+  listeners.add(l)
+  const media = window.matchMedia(systemQuery)
+  media.addEventListener("change", paint)
+  return () => {
+    listeners.delete(l)
+    media.removeEventListener("change", paint)
+  }
+}
+
 /** useTheme is the current choice; while it is mounted, the system choice follows the system preference as it changes. */
 export function useTheme(): Choice {
   return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      const media = window.matchMedia(systemQuery)
-      media.addEventListener("change", paint)
-      return () => {
-        listeners.delete(l)
-        media.removeEventListener("change", paint)
-      }
-    },
+    subscribe,
     () => (current ??= stored()),
     () => "system",
   )

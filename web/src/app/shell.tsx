@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import {
   BookIcon,
@@ -207,6 +207,7 @@ function Divider() {
  */
 export function ViewerMenu({ me }: { me: Schemas["Me"] | undefined }) {
   const path = usePathname()
+  const query = useSearchParams().toString()
   const { open, root, dismiss, buttonProps, menuProps } = useMenu()
   if (!me) return null
   if (!me.signedIn) {
@@ -214,7 +215,11 @@ export function ViewerMenu({ me }: { me: Schemas["Me"] | undefined }) {
     return (
       <>
         <Divider />
-        <Link href={`/signin?return_to=${encodeURIComponent(path)}`} className={cn(tool, "px-2 text-sm")} title="Sign in">
+        <Link
+          href={`/signin?return_to=${encodeURIComponent(path + (query ? `?${query}` : ""))}`}
+          className={cn(tool, "px-2 text-sm")}
+          title="Sign in"
+        >
           <LogInIcon className="size-[1.125rem]" />
           <span className="sr-only sm:not-sr-only">Sign in</span>
         </Link>
@@ -246,26 +251,28 @@ export function ViewerMenu({ me }: { me: Schemas["Me"] | undefined }) {
               Signed in as <span className="font-medium text-foreground">{me.name}</span> through {via[me.via] ?? me.via}
               {me.admin ? ", an administrator" : ""}.
             </p>
-            <ul {...menuProps} aria-label="Account" className="flex flex-col border-t border-border pt-1">
-              {me.admin && (
-                <li role="none">
-                  <Link href="/admin" role="menuitem" tabIndex={-1} onClick={dismiss} className={item}>
-                    <ShieldIcon className="size-4" />
-                    Admin
-                  </Link>
-                </li>
-              )}
-              {me.via !== "proxy" && (
-                <li role="none">
-                  <form method="post" action="/auth/logout">
-                    <button type="submit" role="menuitem" tabIndex={-1} className={item}>
-                      <LogOutIcon className="size-4" />
-                      Sign out
-                    </button>
-                  </form>
-                </li>
-              )}
-            </ul>
+            {(me.admin || me.via !== "proxy") && (
+              <ul {...menuProps} aria-label="Account" className="flex flex-col border-t border-border pt-1">
+                {me.admin && (
+                  <li role="none">
+                    <Link href="/admin" role="menuitem" tabIndex={-1} onClick={dismiss} className={item}>
+                      <ShieldIcon className="size-4" />
+                      Admin
+                    </Link>
+                  </li>
+                )}
+                {me.via !== "proxy" && (
+                  <li role="none">
+                    <form method="post" action="/auth/logout">
+                      <button type="submit" role="menuitem" tabIndex={-1} className={item}>
+                        <LogOutIcon className="size-4" />
+                        Sign out
+                      </button>
+                    </form>
+                  </li>
+                )}
+              </ul>
+            )}
           </div>
         )}
       </div>

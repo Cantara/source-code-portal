@@ -34,13 +34,16 @@ export type Api = Client<paths>
 /** querySerializer writes array parameters as the contract has them: comma-separated in one value (work=hand,ai). */
 export const querySerializer = { array: { style: "form", explode: false } } as const
 
+/** apiBase is where /api/v1 is: this page's origin (the tests' own without one). */
+const apiBase = () => `${globalThis.location?.origin ?? "http://localhost"}/api/v1`
+
 /**
  * api is the browser's client. The base is absolute (the tests resolve against jsdom's location) and fetch is looked up per request
  * (the tests intercept it). On the server it is never called: the pages hand their data to the browser's cache. The providers add
  * the build check (lib/build.ts).
  */
 export const api: Api = createClient<paths>({
-  baseUrl: `${globalThis.location?.origin ?? "http://localhost"}/api/v1`,
+  baseUrl: apiBase(),
   fetch: (r) => globalThis.fetch(r),
   querySerializer,
 })
@@ -48,37 +51,32 @@ export const api: Api = createClient<paths>({
 /** Get reads a path of /api/v1 outside the contract (the operator's status) as JSON, failing as unwrap does. */
 export type Get = <T>(path: string, signal?: AbortSignal) => Promise<T>
 
+/** request is a JSON request outside the typed client: its answer's data, or the problem it failed with (see unwrap). */
+function request<T>(url: string, init: RequestInit): Promise<T> {
+  return unwrap<T>(
+    globalThis.fetch(url, init).then(async (response) => {
+      const body: unknown = await response.json().catch(() => undefined)
+      return response.ok ? { data: body as T, response } : { error: body, response }
+    }),
+  )
+}
+
 /** getter is a Get against base with headers. */
 export function getter(base: string, headers: Record<string, string> = {}): Get {
   return <T>(path: string, signal?: AbortSignal) =>
-    unwrap<T>(
-      globalThis
-        .fetch(`${base}${path}`, { headers: { Accept: "application/json", ...headers }, signal })
-        .then(async (response) => {
-          const body: unknown = await response.json().catch(() => undefined)
-          return response.ok ? { data: body as T, response } : { error: body, response }
-        }),
-    )
+    request<T>(`${base}${path}`, { headers: { Accept: "application/json", ...headers }, signal })
 }
 
 /** get is the browser's Get. */
-export const get: Get = (path, signal) => getter(`${globalThis.location?.origin ?? "http://localhost"}/api/v1`)(path, signal)
+export const get: Get = (path, signal) => getter(apiBase())(path, signal)
 
 /** send writes to a path of /api/v1 outside the contract (the admin's layouts) with a JSON body, failing as unwrap does. */
 export function send<T>(method: "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
-  const base = `${globalThis.location?.origin ?? "http://localhost"}/api/v1`
-  return unwrap<T>(
-    globalThis
-      .fetch(`${base}${path}`, {
-        method,
-        headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      })
-      .then(async (response) => {
-        const data: unknown = await response.json().catch(() => undefined)
-        return response.ok ? { data: data as T, response } : { error: data, response }
-      }),
-  )
+  return request<T>(`${apiBase()}${path}`, {
+    method,
+    headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
 }
 
 interface Result<T> {

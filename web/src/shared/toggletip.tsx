@@ -30,7 +30,13 @@ export function Toggletip({ label, children, className }: { label: string; child
     }
   }, [open])
   return (
-    <span ref={root} className={cn("relative inline-flex", className)}>
+    <span
+      ref={root}
+      className={cn("relative inline-flex", className)}
+      onBlur={(e) => {
+        if (!root.current?.contains(e.relatedTarget)) setOpen(false) // focus left: the panel does not stay over the page
+      }}
+    >
       <button
         ref={button}
         type="button"
@@ -42,14 +48,17 @@ export function Toggletip({ label, children, className }: { label: string; child
       >
         <span aria-hidden="true">ⓘ</span>
       </button>
-      <div
-        id={id}
-        role="note"
-        aria-label={label}
-        hidden={!open}
-        className="absolute top-full left-0 z-20 mt-1 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-border bg-popover p-3 text-xs leading-relaxed font-normal tracking-normal normal-case text-popover-foreground shadow-lg"
-      >
-        {children}
+      {/* A live region that is there before its text is: opening it puts the text in, so a screen reader reads it out. */}
+      <div id={id} role="status">
+        {open && (
+          <div
+            role="note"
+            aria-label={label}
+            className="absolute top-full left-0 z-20 mt-1 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-border bg-popover p-3 text-xs leading-relaxed font-normal tracking-normal normal-case text-popover-foreground shadow-lg"
+          >
+            {children}
+          </div>
+        )}
       </div>
     </span>
   )

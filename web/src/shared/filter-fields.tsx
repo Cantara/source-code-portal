@@ -13,7 +13,8 @@ export function ProductField({ value }: { value: string | undefined }) {
   return (
     <label className="flex flex-col">
       Product
-      <select name="group" defaultValue={value ?? ""} className={filterField}>
+      {/* Uncontrolled: it is made again when the products arrive, so the chosen one is selected whenever they do. */}
+      <select key={groups.data ? "ready" : "loading"} name="group" defaultValue={value ?? ""} className={filterField}>
         <option value="">All products</option>
         {groups.data?.groups.map((g) => (
           <option key={g.id} value={g.id}>

@@ -2,10 +2,11 @@ import Link from "next/link"
 import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { addressPath } from "@/lib/paths"
-import { DiffStat } from "@/entities/commit/diffstat"
+import { DiffStat } from "@/shared/diffstat"
 import { EmptyState } from "@/shared/empty-state"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { RelativeTime } from "@/shared/relative-time"
+import { StateChip } from "@/shared/state-chip"
 
 export type Pull = Schemas["PullRequest"]
 export type PullState = Schemas["PullState"]
@@ -27,7 +28,7 @@ export const pullStates: { state: PullState; label: string; waits: string; dot: 
   { state: "unknown", label: "Not read yet", waits: "its state is not read yet", dot: "bg-muted-foreground/50" },
 ]
 
-/** stateOf is a state's words and dot. */
+/** unread is the state an unknown one falls back to. */
 const unread = {
   state: "unknown",
   label: "Not read yet",
@@ -35,24 +36,12 @@ const unread = {
   dot: "bg-muted-foreground/50",
 } as const
 
+/** stateOf is a state's words and dot. */
 export const stateOf = (s: PullState) => pullStates.find((x) => x.state === s) ?? unread
 
 /** PullStateChip is a pull request's state: its dot and its words, with whose turn it is for a screen reader and on hover. */
 export function PullStateChip({ state, className }: { state: PullState; className?: string }) {
-  const s = stateOf(state)
-  return (
-    <span
-      title={`${s.label}: ${s.waits}`}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2 py-px text-xs font-medium whitespace-nowrap text-foreground",
-        className,
-      )}
-    >
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", s.dot)} />
-      {s.label}
-      <span className="sr-only">, {s.waits}</span>
-    </span>
-  )
+  return <StateChip state={stateOf(state)} className={className} />
 }
 
 /** checksWords are the head commit's checks in a word, none when there are none. */

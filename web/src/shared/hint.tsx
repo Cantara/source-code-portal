@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn"
 export type HintTrigger = {
   ref: (el: HTMLElement | null) => void
   onPointerDown: (e: PointerEvent) => void
+  onPointerCancel: (e: PointerEvent) => void
   onPointerEnter: (e: PointerEvent) => void
   onPointerLeave: (e: PointerEvent) => void
   onFocus: (e: FocusEvent) => void
@@ -120,6 +121,10 @@ export function Hint({
     onPointerDown: (e) => {
       // A finger's press comes before the focus and the click it causes: it is kept on the element, read at once by both.
       if (e.currentTarget instanceof HTMLElement) e.currentTarget.dataset.touch = String(e.pointerType !== "mouse")
+    },
+    // A press that is not followed by a click (a scroll takes it) must not leave its mark for the next focus or click.
+    onPointerCancel: (e) => {
+      if (e.currentTarget instanceof HTMLElement) delete e.currentTarget.dataset.touch
     },
     onPointerEnter: (e) => {
       if (e.pointerType === "mouse") show()
