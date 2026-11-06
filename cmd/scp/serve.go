@@ -331,7 +331,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return names
 	}
 	searchAPI := search.API{Current: view, Observe: m.search}
-	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, pulls: pullsAPI, issues: issuesAPI, repo: md.Repo(), doc: md.Doc(), group: md.Group(), features: f}.catalogue()
+	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, pulls: pullsAPI, issues: issuesAPI, releases: releases.API{Current: view}, repo: md.Repo(), doc: md.Doc(), group: md.Group(), features: f}.catalogue()
 	if err != nil {
 		return nil, err
 	}
@@ -426,6 +426,14 @@ func llmsOptions(origin func(*http.Request) string, f config.Features) llms.Opti
 		Freshness:  func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
 		LastCommit: func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
 		Origin:     origin,
+		Release: func(e *snapshot.RepoEntry) (llms.Release, bool) {
+			rel, _ := releases.Latest(e)
+			if rel == nil {
+				return llms.Release{}, false
+			}
+			return llms.Release{Tag: rel.Tag, URL: rel.URL, Published: rel.Published}, true
+		},
+		Retired: func(e *snapshot.RepoEntry) string { return string(catalog.Retired(e)) },
 	}
 	if f.Pulls {
 		o.Pulls = pulls.Badge

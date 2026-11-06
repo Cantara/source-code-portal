@@ -25,6 +25,7 @@ type toolReads struct {
 	commits          commitsAPI
 	pulls            pullsAPI
 	issues           issuesAPI
+	releases         releasesAPI
 	repo, doc, group http.Handler
 	features         config.Features // a switched-off feature has no tool and no search kind (design/features.md)
 }
@@ -76,14 +77,14 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 		s, l, ru := repo(label, run)
 		return tool(name, title, description, s, l, ru)
 	}
-	holds, kinds := "published packages and default-branch commits", []string{"repo", "group", "doc", "dep", "package", "commit"}
+	holds, kinds := "published packages, default-branch commits and releases", []string{"repo", "group", "doc", "dep", "package", "commit", "release"}
 	switch {
 	case r.features.Pulls && r.features.Issues:
-		holds, kinds = "published packages, default-branch commits, open pull requests and open issues", append(kinds, "pull", "issue")
+		holds, kinds = "published packages, default-branch commits, releases, open pull requests and open issues", append(kinds, "pull", "issue")
 	case r.features.Pulls:
-		holds, kinds = "published packages, default-branch commits and open pull requests", append(kinds, "pull")
+		holds, kinds = "published packages, default-branch commits, releases and open pull requests", append(kinds, "pull")
 	case r.features.Issues:
-		holds, kinds = "published packages, default-branch commits and open issues", append(kinds, "issue")
+		holds, kinds = "published packages, default-branch commits, releases and open issues", append(kinds, "issue")
 	}
 	all := []tools.Tool{
 		tool("search", "Search the portal",
@@ -145,6 +146,32 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 				}
 				return "Reading the open issues"
 			}, r.openIssues),
+		tool("recent_releases", "Recent releases",
+			"Lists the recent releases (the 20 newest of each repository are held) of everything, a group or one repository, newest first: "+
+				"by default the latest stable release of each repository; variant all lists every release held, stable only the stable ones, "+
+				"pre only the pre-releases. Each has its tag, title, whether it is a pre-release, when it was published and by whom (a person "+
+				"or automation), and the counts by variant.",
+			schema(nil, map[string]any{"group": prop("string", "A group id"), "repo": prop("string", "A repository as owner/name"),
+				"variant": map[string]any{"type": "string", "enum": []string{"latest", "all", "stable", "pre"}, "description": "Which releases; default latest"},
+				"since":   prop("string", "Only releases published since this RFC 3339 time or number of days such as 30d"),
+				"sort":    map[string]any{"type": "string", "enum": []string{"newest", "oldest", "repo", "group"}, "description": "The order; default newest"},
+				"limit":   limit}),
+			func(in map[string]any) string {
+				if s := arg(in, "repo") + arg(in, "group"); s != "" {
+					return "Reading the releases of " + s
+				}
+				return "Reading the recent releases"
+			}, r.recentReleases),
+		tool("retired_repositories", "Retired repositories",
+			"Lists the retired repositories (Alumni): archived on GitHub, or marked deprecated in scp.yaml, last active first. Each has why it is "+
+				"retired, when it was last active, how many authors its recent commits had (counted, never named) and how many repositories "+
+				"still depend on it; used limits the list to those another repository still depends on.",
+			schema(nil, map[string]any{"group": prop("string", "A group id"), "q": prop("string", "Part of the repository's name"),
+				"reason": map[string]any{"type": "string", "enum": []string{"archived", "deprecated"}, "description": "Only retired for this reason"},
+				"used":   map[string]any{"type": "boolean", "description": "Only those another repository still depends on"},
+				"sort":   map[string]any{"type": "string", "enum": []string{"active", "name", "group", "used"}, "description": "The order; default last active first"},
+				"limit":  limit}),
+			func(map[string]any) string { return "Reading the retired repositories" }, r.retired),
 		repoTool("repository_health", "Repository health", "Reads a repository's health score, level and findings, its latest release, packages and activity.", "Checking the health of", r.health),
 		repoTool("repository_packages", "Repository packages", "Lists what a repository publishes to package registries (Maven, npm, PyPI, crates.io, Go, NuGet, ...) with the newest release of each.", "Reading the packages of", r.packages),
 	}
@@ -250,6 +277,107 @@ func (r toolReads) openPulls(ctx context.Context, in map[string]any) (tools.Resu
 		b.WriteString("No open pull requests.\n")
 	}
 	return tools.Result{Source: "/pulls", Text: b.String()}, nil
+}
+
+// recentReleases lists the recent releases (design/releases.md) with the counts by variant.
+func (r toolReads) recentReleases(ctx context.Context, in map[string]any) (tools.Result, error) {
+	limit := intArg(in, "limit", 20, 50)
+	params := oapi.ListReleasesParams{Limit: &limit}
+	if g := arg(in, "group"); g != "" {
+		params.Group = &g
+	}
+	if p := strings.ToLower(arg(in, "repo")); p != "" {
+		params.Repo = &p
+	}
+	if v := arg(in, "variant"); v != "" {
+		x := oapi.ReleaseVariant(v)
+		params.Variant = &x
+	}
+	if v := arg(in, "since"); v != "" {
+		params.Since = &v
+	}
+	if v := arg(in, "sort"); v != "" {
+		x := oapi.ReleaseSort(v)
+		params.Sort = &x
+	}
+	res, err := r.releases.ListReleases(ctx, oapi.ListReleasesRequestObject{Params: params})
+	if err != nil {
+		return tools.Result{}, err
+	}
+	ok, isOK := res.(oapi.ListReleases200JSONResponse)
+	if !isOK {
+		return tools.Result{}, fmt.Errorf("the group, the repository, the variant or the time is not valid, or is %w", errNotFound)
+	}
+	c := ok.Body.Counts
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d releases held (%d stable, %d pre-releases); the latest of %d repositories.\n\n", c.All, c.Stable, c.Pre, c.Latest)
+	for _, e := range ok.Body.Releases {
+		fmt.Fprintf(&b, "- [%s %s](%s)", e.Repo, e.Tag, e.Url)
+		if e.Prerelease {
+			b.WriteString(" pre-release")
+		}
+		if e.Title != "" && e.Title != e.Tag {
+			fmt.Fprintf(&b, ": %s", e.Title)
+		}
+		fmt.Fprintf(&b, ", published %s", e.PublishedAt.UTC().Format("2006-01-02"))
+		if e.Author != "" {
+			b.WriteString(" by " + e.Author)
+			if e.Bot {
+				b.WriteString(" (automation)")
+			}
+		}
+		b.WriteString("\n")
+	}
+	if len(ok.Body.Releases) == 0 {
+		b.WriteString("No releases.\n")
+	}
+	return tools.Result{Source: "/releases", Text: b.String()}, nil
+}
+
+// retired lists the retired repositories (design/alumni.md) with the counts by reason.
+func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result, error) {
+	limit := intArg(in, "limit", 20, 50)
+	params := oapi.ListAlumniParams{Limit: &limit}
+	if g := arg(in, "group"); g != "" {
+		params.Group = &g
+	}
+	if q := arg(in, "q"); q != "" {
+		params.Q = &q
+	}
+	if v := arg(in, "reason"); v != "" {
+		x := oapi.AlumniReason(v)
+		params.Reason = &x
+	}
+	if used, _ := in["used"].(bool); used {
+		params.Used = &used
+	}
+	if v := arg(in, "sort"); v != "" {
+		x := oapi.AlumniSort(v)
+		params.Sort = &x
+	}
+	res, err := r.catalog.ListAlumni(ctx, oapi.ListAlumniRequestObject{Params: params})
+	if err != nil {
+		return tools.Result{}, err
+	}
+	ok, isOK := res.(oapi.ListAlumni200JSONResponse)
+	if !isOK {
+		return tools.Result{}, fmt.Errorf("the group, the reason or the sort is not valid, or is %w", errNotFound)
+	}
+	c := ok.Body.Counts
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d retired (%d archived, %d deprecated); %d still depended on.\n\n", c.Total, c.Archived, c.Deprecated, c.Used)
+	for _, a := range ok.Body.Alumni {
+		fmt.Fprintf(&b, "- [%s](%s) %s, last active %s, %d authors", a.Repo.Address, snapshot.RepoPage(snapshot.RepoKey(a.Repo.Address)), a.Reason,
+			a.LastActive.UTC().Format("2006-01-02"), a.Authors)
+		if a.UsedBy > 0 {
+			fmt.Fprintf(&b, ", still used by %d", a.UsedBy)
+		}
+		b.WriteString("\n")
+	}
+	if len(ok.Body.Alumni) == 0 {
+		b.WriteString("No retired repositories.\n")
+	}
+	return tools.Result{Source: "/alumni", Text: b.String()}, nil
 }
 
 func day(t *time.Time) string {

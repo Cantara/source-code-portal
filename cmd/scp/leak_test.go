@@ -244,10 +244,12 @@ func TestNoLeakThroughTools(t *testing.T) {
 	input := func(name, repo string) string {
 		return map[string]string{
 			"search": `{"input":{"query":"` + repo + `"}}`, "list_groups": `{"input":{}}`, "get_group": `{"input":{"group":"all"}}`,
-			"get_document":       `{"input":{"owner":"acme","name":"` + repo + `","path":"docs/guide.md"}}`,
-			"recent_commits":     `{"input":{"repo":"acme/` + repo + `","work":["hand","ai","automation"]}}`,
-			"open_pull_requests": `{"input":{"repo":"acme/` + repo + `"}}`,
-			"open_issues":        `{"input":{"repo":"acme/` + repo + `"}}`,
+			"get_document":         `{"input":{"owner":"acme","name":"` + repo + `","path":"docs/guide.md"}}`,
+			"recent_commits":       `{"input":{"repo":"acme/` + repo + `","work":["hand","ai","automation"]}}`,
+			"open_pull_requests":   `{"input":{"repo":"acme/` + repo + `"}}`,
+			"open_issues":          `{"input":{"repo":"acme/` + repo + `"}}`,
+			"recent_releases":      `{"input":{"repo":"acme/` + repo + `","variant":"all"}}`,
+			"retired_repositories": `{"input":{"q":"` + repo + `"}}`,
 		}[name]
 	}
 	nonce := regexp.MustCompile(`id=\\"[0-9a-f]+\\"`)
