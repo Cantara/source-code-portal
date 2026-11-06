@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/scope"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
 
@@ -35,7 +36,7 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 		return oapi.GetHistory400ApplicationProblemPlusJSONResponse{BadRequestApplicationProblemPlusJSONResponse: oapi.BadRequestApplicationProblemPlusJSONResponse(
 			historyProblem(http.StatusBadRequest, code, detail))}, nil
 	}
-	number, limit, problem := pageParams(p.Page, p.Limit, defaultHistoryLimit)
+	number, limit, problem := scope.Params(p.Page, p.Limit, defaultHistoryLimit)
 	if problem != "" {
 		return bad("validation-failed", problem)
 	}
@@ -84,7 +85,7 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 			number, out.At = i/limit+1, &list[i].SHA
 		}
 	}
-	start, end, pg := paging(len(list), number, limit)
+	start, end, pg := scope.Paging(len(list), number, limit)
 	out.Page = pg
 	for _, l := range h.Labels {
 		out.Labels = append(out.Labels, labelOf(l))
