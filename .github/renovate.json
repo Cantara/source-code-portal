@@ -29,6 +29,16 @@
       "labels": ["dependencies", "major-update"]
     },
     {
+      "description": "TypeScript stays on 6 for the tooling API (typescript is @typescript/typescript6, which typescript-eslint and Next.js read)",
+      "matchDepNames": ["typescript"],
+      "allowedVersions": "<7.0.0"
+    },
+    {
+      "description": "tsc is TypeScript 7.0 (@typescript/native); 7.1 waits until the owner moves to it. Patch releases of 7.0 still come",
+      "matchDepNames": ["@typescript/native"],
+      "allowedVersions": "<7.1.0"
+    },
+    {
       "description": "The go directive of go.mod follows the toolchain release",
       "matchManagers": ["gomod"],
       "matchDepTypes": ["golang"],
