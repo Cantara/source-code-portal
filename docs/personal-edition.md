@@ -23,6 +23,10 @@ The page walks you through four steps:
    - **Sign in with GitHub** (the device flow). The page shows a code and a link to GitHub; you type the code there, approve, and
      the page moves on by itself. This needs the *client id* of an OAuth app or a GitHub App registered on that host (below),
      given with `--client-id`.
+   - **Use my GitHub CLI login.** Offered when the GitHub CLI (`gh`) is installed: SCP asks `gh auth token --hostname <host>` for the
+     token `gh` already holds and uses it like a pasted one. Nothing is registered and nothing opens on GitHub. The token is
+     whatever `gh auth login` granted (by default `repo`, which on GitHub also allows writing; SCP never writes), so a fine-grained
+     token is the safer grant.
    - **Paste a token.** A fine-grained personal access token with read access to the repositories you want (Contents, Metadata, and
      for the pull requests and issues pages Pull requests, Issues and Commit statuses), or a classic one with the scopes `repo` and
      `read:org`. The input is not shown again.

@@ -107,5 +107,5 @@ session sees nothing; the public view never knew the private repositories), and 
 - The first-run page is served on a loopback address only, by the same process, for as long as the setup lasts. Its link carries a
   random code that works once and gives the browser a `SameSite=Strict`, `HttpOnly` cookie; a request with another `Host` header
   (DNS rebinding) or from another origin is refused, bodies are JSON and capped, and its script and style come from the page's own
-  address under a strict content security policy. The token a person pastes or receives from GitHub stays in the process: the page
+  address under a strict content security policy. The token a person pastes, receives from GitHub or takes from the GitHub CLI (`gh auth token`, run by the portal on that person's click) stays in the process: the page
   is never sent it back, and it is sealed, not logged, when the setup ends.

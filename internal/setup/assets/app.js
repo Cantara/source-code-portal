@@ -100,7 +100,14 @@ function signIn() {
         flow.state === "failed" ? h("p", { class: "error", role: "alert" }, flow.error) : null)
     : h("p", { class: "note" }, "There is no app client id for this host, so the code sign-in is not offered. Paste a token, or give a client id under Host.")
 
-  const token = h("details", { open: !st.canCode },
+  const cli = st.canCli
+    ? h("div", { class: "row" },
+        h("button", { type: "button", disabled: busy, on: { click: () => act(async () => { st = await api("cli", {}); if (st.user) await toAccounts() }) } },
+          "Use my GitHub CLI login"),
+        h("span", { class: "note" }, "Takes the token `gh` already holds for this host. It stays on this computer and is sealed there; SCP only reads. That token may be allowed to write, so a fine-grained token is the safer grant."))
+    : null
+
+  const token = h("details", { open: !st.canCode && !st.canCli },
     h("summary", {}, "Use a token instead"),
     h("p", { class: "note" }, "A fine-grained token with read access to Contents and Metadata (and Pull requests, Issues for those pages), or a classic one with the scopes repo and read:org. It is sent to your own computer only and sealed there."),
     h("form", { on: { submit: (e) => {
@@ -114,7 +121,7 @@ function signIn() {
       h("input", { id: "token", type: "password", autocomplete: "off", spellcheck: "false" }),
       h("div", { class: "row" }, h("button", { type: "submit", class: "primary", disabled: busy }, "Check the token"))))
 
-  return h("section", { class: "card" }, h("h2", {}, "Sign in to GitHub"), code, token, hostBox)
+  return h("section", { class: "card" }, h("h2", {}, "Sign in to GitHub"), code, cli, token, hostBox)
 }
 
 function pending(flow) {

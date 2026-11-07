@@ -15,6 +15,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -65,6 +66,8 @@ type Config struct {
 	Host     string // the host text the page starts with
 	ClientID string // the client id of the app for the code sign-in on Host; empty: the person pastes a token
 	Scope    string // OAuth scopes asked with the code
+	// CLIToken returns the token the GitHub CLI holds for a host name (github.com, github.example.org); nil: the page does not offer it.
+	CLIToken func(ctx context.Context, hostname string) (string, error)
 	HTTP     *http.Client
 	Sleep    func(context.Context, time.Duration) error
 	Now      func() time.Time
@@ -139,6 +142,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /setup/api/host", s.api(s.setHost))
 	mux.Handle("POST /setup/api/device", s.api(s.startDevice))
 	mux.Handle("POST /setup/api/token", s.api(s.pasteToken))
+	mux.Handle("POST /setup/api/cli", s.api(s.cliLogin))
 	mux.Handle("POST /setup/api/signout", s.api(s.signOut))
 	mux.Handle("POST /setup/api/repos", s.api(s.listRepos))
 	mux.Handle("POST /setup/api/finish", s.api(s.finish))
@@ -273,6 +277,7 @@ type stateOut struct {
 	Host     string   `json:"host"` // the host text
 	Web      string   `json:"web"`  // the host's web address, when it is valid
 	HostOK   bool     `json:"hostOk"`
+	CanCLI   bool     `json:"canCli"`   // the GitHub CLI's login can be used
 	CanCode  bool     `json:"canCode"`  // a client id is known: the code sign-in is offered
 	ClientID string   `json:"clientId"` // the id in use (not a secret)
 	Flow     flow     `json:"flow"`
@@ -284,7 +289,7 @@ type stateOut struct {
 }
 
 func (s *Server) snapshot() stateOut {
-	out := stateOut{Host: s.hostText, HostOK: s.hostSet, CanCode: s.hostSet && s.clientID != "", ClientID: s.clientID, Flow: s.flow,
+	out := stateOut{Host: s.hostText, HostOK: s.hostSet, CanCLI: s.cfg.CLIToken != nil, CanCode: s.hostSet && s.clientID != "", ClientID: s.clientID, Flow: s.flow,
 		User: s.user, Orgs: s.orgs, Done: s.finished, Launch: s.launch}
 	if s.hostSet {
 		out.Web = s.host.Web
@@ -452,6 +457,37 @@ func (s *Server) pasteToken(ctx context.Context, body []byte) (any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.snapshot(), nil
+}
+
+// cliLogin takes the token the GitHub CLI holds for the host and checks it like a pasted one. The token is read on this computer by
+// this process and never leaves it for the page.
+func (s *Server) cliLogin(ctx context.Context, _ []byte) (any, error) {
+	if s.cfg.CLIToken == nil {
+		return nil, bad("The GitHub CLI is not available.")
+	}
+	s.mu.Lock()
+	s.ensureHost()
+	if !s.hostSet {
+		s.mu.Unlock()
+		return nil, bad("Choose the host first.")
+	}
+	web := s.host.Web
+	s.mu.Unlock()
+	u, err := url.Parse(web)
+	if err != nil || u.Hostname() == "" {
+		return nil, bad("Choose the host first.")
+	}
+	tok, err := s.cfg.CLIToken(ctx, u.Hostname())
+	tok = strings.TrimSpace(tok)
+	if err != nil || tok == "" || len(tok) > 512 || strings.ContainsAny(tok, " \t\r\n") {
+		return nil, bad("The GitHub CLI has no login for %s. Run `gh auth login --hostname %s` in a terminal, or use another way.", u.Hostname(), u.Hostname())
+	}
+	return s.pasteToken(ctx, mustJSON(map[string]string{"token": tok}))
+}
+
+func mustJSON(v any) []byte {
+	b, _ := json.Marshal(v)
+	return b
 }
 
 func (s *Server) signOut(_ context.Context, _ []byte) (any, error) {

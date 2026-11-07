@@ -33,7 +33,7 @@ personal edition (`scp personal`). No configuration change is needed to upgrade.
   (`scp serve` refuses it); new store table `credential` (migration 0003, a copy first); new dependencies `go-keyring` and `x/term`.
 - **A first run in the browser**: `scp personal` opens a page on this computer that signs you in (a code on GitHub with `--client-id`,
   or a pasted token), lists your accounts and repositories and lets you sort them into products (suggested from the names), then
-  starts the portal and signs you in. `--terminal` keeps the questions in the terminal, `--no-browser` only prints the link.
+  starts the portal and signs you in (a button takes the token the GitHub CLI already holds). `--terminal` keeps the questions in the terminal, `--no-browser` only prints the link.
 
 ## 2.2.9
 

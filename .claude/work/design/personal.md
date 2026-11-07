@@ -101,6 +101,7 @@ default first run is a page (`internal/setup`, `cmd/scp/personal_setup.go`); `--
   at most 256 KiB. The CSP allows only the page's own script and style (no inline). The token lives in the setup server's memory and
   is never sent to the page; a sign-in cancelled by another is dropped by a generation counter. Nothing the page shows is
   repository-authored except names, which are drawn as text nodes.
+- **The GitHub CLI.** When `gh` is on the `PATH`, the page offers its login: `POST /setup/api/cli` runs `gh auth token --hostname <host>` (10 s limit, the host name a parsed URL's) and checks the token like a pasted one; nothing is registered. The token is as broad as `gh` was granted (usually `repo`, write-capable on GitHub; SCP never writes), which the page says.
 - **Client id.** `defaultClientID` in `personal_setup.go` is empty until a GitHub App with device flow and read-only permissions is
   registered; until then github.com signs in by pasted token or `--client-id`.
 - **Not done.** A credential that has ended signs in again through the terminal wizard, not the page.

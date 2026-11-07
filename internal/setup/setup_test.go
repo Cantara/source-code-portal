@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -82,15 +83,18 @@ type rig struct {
 	client   *http.Client
 	code     string
 	finished chan Result
-	bodies   *bytes.Buffer // every answer the page was given
+	bodies   *bytes.Buffer                         // every answer the page was given
+	cli      func(hostname string) (string, error) // the GitHub CLI's answer
 }
 
 func newRig(t *testing.T, clientID string, sleep func(context.Context, time.Duration) error) *rig {
 	t.Helper()
 	gh := host(t, nil)
-	r := &rig{gh: gh, code: "entry-code-0123456789", finished: make(chan Result, 1), bodies: &bytes.Buffer{}}
+	r := &rig{gh: gh, code: "entry-code-0123456789", finished: make(chan Result, 1), bodies: &bytes.Buffer{},
+		cli: func(string) (string, error) { return "", errors.New("no login") }}
 	ts := httptest.NewUnstartedServer(nil)
 	r.s = New(Config{Addr: ts.Listener.Addr().String(), Code: r.code, Host: gh.URL, ClientID: clientID, Sleep: sleep, HTTP: &http.Client{Transport: noKeepAlive},
+		CLIToken: func(_ context.Context, hostname string) (string, error) { return r.cli(hostname) },
 		Finish: func(_ context.Context, res Result) (string, error) {
 			r.finished <- res
 			return "/auth/launch?code=once", nil
@@ -405,5 +409,35 @@ func TestSuggest(t *testing.T) {
 	}
 	if p := Suggest(many); len(p) != 1 || len(p[0].Repos) != MaxPerProduct {
 		t.Errorf("a product is capped at what the configuration allows: %+v", p)
+	}
+}
+
+func TestWithTheGitHubCLI(t *testing.T) {
+	r := newRig(t, "", nil)
+	r.enter(t)
+	var asked string
+	r.cli = func(hostname string) (string, error) { asked = hostname; return token + "\n", nil }
+	if _, st := r.call(t, http.MethodGet, "/setup/api/state", nil); st["canCli"] != true {
+		t.Fatalf("the button is not offered: %v", st)
+	}
+	code, st := r.call(t, http.MethodPost, "/setup/api/cli", map[string]string{})
+	if code != 200 || st["user"] != "octo" {
+		t.Fatalf("cli: %d %v", code, st)
+	}
+	if want := strings.Split(strings.TrimPrefix(r.gh.URL, "http://"), ":")[0]; asked != want {
+		t.Errorf("the CLI was asked for %q, want %q", asked, want)
+	}
+	if strings.Contains(r.bodies.String(), token) {
+		t.Error("the token reached the page")
+	}
+
+	r2 := newRig(t, "", nil)
+	r2.enter(t)
+	if code, o := r2.call(t, http.MethodPost, "/setup/api/cli", map[string]string{}); code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(o), "gh auth login") {
+		t.Errorf("no login: %d %v", code, o)
+	}
+	r2.cli = func(string) (string, error) { return "not-a-token", nil }
+	if code, o := r2.call(t, http.MethodPost, "/setup/api/cli", map[string]string{}); code != http.StatusBadRequest || strings.Contains(fmt.Sprint(o), "not-a-token") {
+		t.Errorf("a token GitHub refuses: %d %v", code, o)
 	}
 }
