@@ -16,6 +16,7 @@ const minPrefix = 3
 // (whydah-sso, whydah-admin, whydah-ui: Whydah), then, when the repositories come from several accounts, the rest by account. What
 // it leaves out stays outside any product. The person changes all of it.
 func Suggest(repos []ghlogin.Repo) []Product {
+	repos = OnePerName(repos)
 	words := map[string][]string{}
 	for _, r := range repos {
 		if w := firstWord(r.Name); w != "" {
@@ -44,9 +45,17 @@ func Suggest(repos []ghlogin.Repo) []Product {
 		all[strings.ToLower(r.Owner)] = true
 	}
 	if len(all) > 1 {
+		used := map[string]bool{}
+		for _, p := range out {
+			used[strings.ToLower(p.Name)] = true
+		}
 		for o, names := range owners {
 			if len(names) >= 2 {
-				out = append(out, Product{Name: o, Repos: firstN(names)})
+				name := o
+				if used[strings.ToLower(name)] { // the account's name is also a first word: two products never share a name
+					name = o + " (other)"
+				}
+				out = append(out, Product{Name: name, Repos: firstN(names)})
 			}
 		}
 	}
@@ -57,6 +66,20 @@ func Suggest(repos []ghlogin.Repo) []Product {
 		return cmp.Or(cmp.Compare(len(b.Repos), len(a.Repos)), strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)))
 	})
 	return out[:min(len(out), MaxProducts)]
+}
+
+// OnePerName keeps the first of the repositories that share a name (the most recently pushed, as listed): a group matches by name
+// alone, so the same name in two accounts is one repository to the portal, and the page shows it once.
+func OnePerName(repos []ghlogin.Repo) []ghlogin.Repo {
+	seen := make(map[string]bool, len(repos))
+	out := make([]ghlogin.Repo, 0, len(repos))
+	for _, r := range repos {
+		if !seen[r.Name] {
+			seen[r.Name] = true
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func firstN(names []string) []string {

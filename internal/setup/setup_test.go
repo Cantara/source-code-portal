@@ -412,6 +412,36 @@ func TestSuggest(t *testing.T) {
 	}
 }
 
+// TestSuggestNoDuplicates holds what a real list showed: one name in two accounts, and an account named like a first word.
+func TestSuggestNoDuplicates(t *testing.T) {
+	var repos []ghlogin.Repo
+	for i := range 70 { // more than a product holds: the rest falls to the account's product, which must not share the name
+		repos = append(repos, ghlogin.Repo{Owner: "Cantara", Name: fmt.Sprintf("cantara-%03d", i)})
+	}
+	repos = append(repos,
+		ghlogin.Repo{Owner: "Cantara", Name: ".github"}, ghlogin.Repo{Owner: "DNB", Name: ".github"},
+		ghlogin.Repo{Owner: "descoped", Name: "same"}, ghlogin.Repo{Owner: "oranheim", Name: "same"})
+	if got := OnePerName(repos); len(got) != 70+1+1 {
+		t.Fatalf("one per name: %d", len(got))
+	}
+	names, held := map[string]bool{}, map[string]bool{}
+	for _, p := range Suggest(repos) {
+		if names[strings.ToLower(p.Name)] {
+			t.Errorf("two products named %q", p.Name)
+		}
+		names[strings.ToLower(p.Name)] = true
+		for _, n := range p.Repos {
+			if held[n] {
+				t.Errorf("%q is in two products", n)
+			}
+			held[n] = true
+		}
+	}
+	if !names["cantara"] || !names["cantara (other)"] {
+		t.Errorf("products: %v", names)
+	}
+}
+
 func TestWithTheGitHubCLI(t *testing.T) {
 	r := newRig(t, "", nil)
 	r.enter(t)
