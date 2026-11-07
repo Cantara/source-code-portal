@@ -466,21 +466,21 @@ func TestSuggest(t *testing.T) {
 	for i := range 100 {
 		many = append(many, ghlogin.Repo{Owner: "a", Name: fmt.Sprintf("big-%03d", i)})
 	}
-	if p := Suggest(many); len(p) != 1 || len(p[0].Repos) != MaxPerProduct {
-		t.Errorf("a product is capped at what the configuration allows: %+v", p)
+	if p := Suggest(many); len(p) != 1 || len(p[0].Repos) != 100 {
+		t.Errorf("a product holds all its repositories; rules, not a cap, keep the matchers within the limit: %d", len(p))
 	}
 }
 
 // TestSuggestNoDuplicates holds what a real list showed: one name in two accounts, and an account named like a first word.
 func TestSuggestNoDuplicates(t *testing.T) {
 	var repos []ghlogin.Repo
-	for i := range 70 { // more than a product holds: the rest falls to the account's product, which must not share the name
+	for i := range 3 { // the first word cantara is also an account: the account's leftovers must not take the same product name
 		repos = append(repos, ghlogin.Repo{Owner: "Cantara", Name: fmt.Sprintf("cantara-%03d", i)})
 	}
-	repos = append(repos,
+	repos = append(repos, ghlogin.Repo{Owner: "Cantara", Name: "left-1"}, ghlogin.Repo{Owner: "Cantara", Name: "left-2"},
 		ghlogin.Repo{Owner: "Cantara", Name: ".github"}, ghlogin.Repo{Owner: "DNB", Name: ".github"},
 		ghlogin.Repo{Owner: "descoped", Name: "same"}, ghlogin.Repo{Owner: "oranheim", Name: "same"})
-	if got := OnePerName(repos); len(got) != 70+1+1 {
+	if got := OnePerName(repos); len(got) != 3+2+1+1 {
 		t.Fatalf("one per name: %d", len(got))
 	}
 	names, held := map[string]bool{}, map[string]bool{}
@@ -576,5 +576,66 @@ func TestListingProgressAndCancel(t *testing.T) {
 	}
 	if job := r.list(t, "acme", "zeta"); job["state"] != "done" || job["done"] != 6.0 {
 		t.Errorf("other accounts: %v", job)
+	}
+}
+
+func TestRulesPreviewTestAndFinish(t *testing.T) {
+	r := newRig(t, "", nil)
+	r.enter(t)
+	r.call(t, http.MethodPost, "/setup/api/token", map[string]string{"token": token})
+	accounts := []string{"octo", "acme"}
+	if code, _ := r.call(t, http.MethodPost, "/setup/api/rules", map[string]any{"accounts": accounts, "products": []Product{}}); code != http.StatusBadRequest {
+		t.Errorf("a preview before the read: %d", code)
+	}
+	r.list(t, accounts...)
+	products := []Product{{Name: "Whydah", Repos: []string{"whydah-sso", "whydah-admin"}}}
+	code, out := r.call(t, http.MethodPost, "/setup/api/rules", map[string]any{"accounts": accounts, "products": products})
+	if code != 200 {
+		t.Fatalf("rules: %d %v", code, out)
+	}
+	b, _ := json.Marshal(out["products"])
+	for _, want := range []string{`"kind":"prefix"`, `"value":"whydah-"`, `"own":2`, `"extra":["whydah-ui"]`, `"open":true`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("the preview lacks %s: %s", want, b)
+		}
+	}
+	// A topic every member has is a rule too.
+	_, out = r.call(t, http.MethodPost, "/setup/api/rules", map[string]any{"accounts": accounts, "products": []Product{{Name: "I", Repos: []string{"whydah-ui", "whydah-sso"}}}})
+	if b, _ = json.Marshal(out["products"]); !strings.Contains(string(b), `"kind":"topic"`) && !strings.Contains(string(b), `"whydah-"`) {
+		t.Errorf("rules: %s", b)
+	}
+	// Testing a rule.
+	_, out = r.call(t, http.MethodPost, "/setup/api/rule-test", map[string]any{"accounts": accounts, "kind": "prefix", "value": "WHYDAH-"})
+	if names, _ := out["names"].([]any); out["matches"] != 3.0 || len(names) != 3 {
+		t.Errorf("rule-test: %v", out)
+	}
+	if _, out = r.call(t, http.MethodPost, "/setup/api/rule-test", map[string]any{"accounts": accounts, "kind": "regexp", "value": "("}); out["error"] == nil || out["error"] == "" {
+		t.Errorf("a bad regexp was not refused: %v", out)
+	}
+	// A fixed product has no derived rules, only its repositories.
+	_, out = r.call(t, http.MethodPost, "/setup/api/rules", map[string]any{"accounts": accounts, "products": []Product{{Name: "F", Repos: []string{"whydah-sso", "whydah-admin"}, Fixed: true}}})
+	if b, _ = json.Marshal(out["products"]); strings.Contains(string(b), `"kind"`) && !strings.Contains(string(b), `"pinned":["whydah-admin","whydah-sso"]`) {
+		t.Errorf("a fixed product: %s", b)
+	}
+	// Finishing: a bad rule of the person's own is refused; a good product is written with its derived matchers.
+	bad := []Product{{Name: "Whydah", Repos: []string{"whydah-sso"}, Rules: []Rule{{Kind: "regexp", Value: "("}}}}
+	if code, _ := r.call(t, http.MethodPost, "/setup/api/finish", map[string]any{"accounts": accounts, "products": bad}); code != http.StatusBadRequest {
+		t.Errorf("a bad rule: %d", code)
+	}
+	good := []Product{{Name: "Whydah", Repos: []string{"whydah-sso", "whydah-admin"}, Rules: []Rule{{Kind: "glob", Value: "tool*"}}}, {Name: "Notes", Repos: []string{"notes"}}}
+	if code, o := r.call(t, http.MethodPost, "/setup/api/finish", map[string]any{"accounts": accounts, "products": good}); code != 200 {
+		t.Fatalf("finish: %d %v", code, o)
+	}
+	res := <-r.finished
+	w := res.Products[0].Matchers
+	if len(w) != 2 || w[0].Kind != "glob" || w[1].Kind != "prefix" || w[1].Value != "whydah-" {
+		t.Errorf("matchers: %+v", w)
+	}
+	if n := res.Products[1].Matchers; len(n) != 1 || n[0].Kind != "exact" || n[0].Value != "notes" {
+		t.Errorf("a lone repository is pinned: %+v", n)
+	}
+	// What no product selects is the portal's "Other": whydah-ui is caught by the prefix, tools by the glob.
+	if !slices.Equal(res.Unassigned, []string{}) && len(res.Unassigned) != 0 {
+		t.Errorf("unassigned: %v", res.Unassigned)
 	}
 }

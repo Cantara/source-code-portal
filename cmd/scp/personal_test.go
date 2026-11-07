@@ -520,7 +520,7 @@ func TestPersonalBrowserSetup(t *testing.T) {
 		t.Fatalf("setup: %v %+v", got.err, got.launch)
 	}
 	yamlBytes, _ := os.ReadFile(filepath.Join(dir, "personal.yaml"))
-	for _, want := range []string{`id: whydah-iam`, `name: "Whydah (IAM)"`, `{exact: "whydah-sso"}`, `exclude: [{exact: "scratch"}]`,
+	for _, want := range []string{`id: whydah-iam`, `name: "Whydah (IAM)"`, `{prefix: "whydah-"}`, `exclude: [{exact: "scratch"}]`,
 		`id: other`, `unclaimed: true`, `orgs: ["octo", "acme"]`, `login: "octo"`} {
 		if !strings.Contains(string(yamlBytes), want) {
 			t.Errorf("personal.yaml lacks %q:\n%s", want, yamlBytes)

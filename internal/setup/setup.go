@@ -30,10 +30,11 @@ var assets embed.FS
 
 // Limits the configuration allows, kept here so the page cannot make a file the portal refuses.
 const (
-	MaxProducts   = 50
-	MaxPerProduct = 64 // matchers of a group
-	MaxHidden     = 64 // matchers of a source's exclude
-	maxBody       = 256 << 10
+	MaxProducts = 50
+	MaxMatchers = 64 // matchers of a group
+	MaxRules    = 20 // rules a person writes for one product
+	MaxHidden   = 64 // matchers of a source's exclude
+	maxBody     = 256 << 10
 )
 
 var (
@@ -45,6 +46,12 @@ var (
 type Product struct {
 	Name  string   `json:"name"`
 	Repos []string `json:"repos"`
+	// Fixed: no rules are derived, the product holds exactly its repositories (and the person's own rules).
+	Fixed bool `json:"fixed,omitempty"`
+	// Rules are the person's own rules for the product (kind and value); the others are derived from Repos (Derive).
+	Rules []Rule `json:"rules,omitempty"`
+	// Matchers is what the configuration gets for the product (set when the person has finished): rules, then the pinned repositories.
+	Matchers []Rule `json:"-"`
 }
 
 // Result is what the person chose.
@@ -150,6 +157,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /setup/api/list", s.api(s.startListing))
 	mux.Handle("POST /setup/api/list/cancel", s.api(s.cancelListing))
 	mux.Handle("POST /setup/api/repos", s.api(s.listRepos))
+	mux.Handle("POST /setup/api/rules", s.api(s.previewRules))
+	mux.Handle("POST /setup/api/rule-test", s.api(s.testRule))
 	mux.Handle("POST /setup/api/finish", s.api(s.finish))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/setup/", http.StatusSeeOther) })
 	return s.guard(mux)
@@ -514,10 +523,11 @@ func (s *Server) signOut(_ context.Context, _ []byte) (any, error) {
 }
 
 type repoOut struct {
-	Owner    string `json:"owner"`
-	Name     string `json:"name"`
-	Private  bool   `json:"private,omitempty"`
-	Archived bool   `json:"archived,omitempty"`
+	Owner    string   `json:"owner"`
+	Name     string   `json:"name"`
+	Private  bool     `json:"private,omitempty"`
+	Archived bool     `json:"archived,omitempty"`
+	Topics   []string `json:"topics,omitempty"`
 }
 
 type reposOut struct {
@@ -525,9 +535,9 @@ type reposOut struct {
 	More      bool      `json:"more,omitempty"`
 	Suggested []Product `json:"suggested"`
 	Limits    struct {
-		Products   int `json:"products"`
-		PerProduct int `json:"perProduct"`
-		Hidden     int `json:"hidden"`
+		Products int `json:"products"`
+		Matchers int `json:"matchers"`
+		Hidden   int `json:"hidden"`
 	} `json:"limits"`
 }
 
@@ -581,9 +591,9 @@ func (s *Server) listRepos(_ context.Context, body []byte) (any, error) {
 	}
 	mine = OnePerName(mine)
 	out := reposOut{More: more, Suggested: Suggest(mine)}
-	out.Limits.Products, out.Limits.PerProduct, out.Limits.Hidden = MaxProducts, MaxPerProduct, MaxHidden
+	out.Limits.Products, out.Limits.Matchers, out.Limits.Hidden = MaxProducts, MaxMatchers, MaxHidden
 	for _, r := range mine {
-		out.Repos = append(out.Repos, repoOut{Owner: r.Owner, Name: r.Name, Private: r.Private, Archived: r.Archived})
+		out.Repos = append(out.Repos, repoOut{Owner: r.Owner, Name: r.Name, Private: r.Private, Archived: r.Archived, Topics: r.Topics[:min(len(r.Topics), 5)]})
 	}
 	return out, nil
 }
@@ -626,17 +636,25 @@ func (s *Server) finish(ctx context.Context, body []byte) (any, error) {
 			break
 		}
 	}
-	var rest []string
-	for _, r := range s.repos {
-		if r.Fork || !slices.ContainsFunc(accounts, func(a string) bool { return strings.EqualFold(a, r.Owner) }) || !namePattern.MatchString(r.Name) {
-			continue
-		}
-		if !slices.Contains(in.Hidden, r.Name) && !slices.ContainsFunc(in.Products, func(p Product) bool { return slices.Contains(p.Repos, r.Name) }) {
-			rest = append(rest, r.Name)
-		}
-	}
 	for i := range in.Products {
 		in.Products[i].Name = strings.TrimSpace(in.Products[i].Name)
+	}
+	mine := s.mine(accounts)
+	derived := Derive(mine, in.Products, in.Hidden)
+	for i, d := range derived {
+		if d.TooMany {
+			return nil, bad("The product %q needs more than %d matchers. Add a rule that covers some of its repositories, or split it.", in.Products[i].Name, MaxMatchers)
+		}
+		in.Products[i].Matchers = d.Entries
+	}
+	var rest []string // what no product selects: the portal's "Other"
+	for _, r := range mine {
+		if slices.Contains(in.Hidden, r.Name) || !namePattern.MatchString(r.Name) {
+			continue
+		}
+		if !slices.ContainsFunc(in.Products, func(p Product) bool { return selects(p.Matchers, r) }) {
+			rest = append(rest, r.Name)
+		}
 	}
 	launch, err := s.cfg.Finish(ctx, Result{Host: s.host, Token: s.token, User: s.user, Accounts: accounts, Products: in.Products,
 		Hidden: in.Hidden, Unassigned: rest, Default: def})
@@ -646,6 +664,83 @@ func (s *Server) finish(ctx context.Context, body []byte) (any, error) {
 	s.finished, s.launch = true, launch
 	close(s.done)
 	return s.snapshot(), nil
+}
+
+// selects reports whether any of the matchers selects the repository.
+func selects(matchers []Rule, r ghlogin.Repo) bool {
+	for _, m := range matchers {
+		if fn, err := compile(m.Kind, m.Value); err == nil && fn(r.Name, r.Topics) {
+			return true
+		}
+	}
+	return false
+}
+
+// mine are the listed repositories the portal would take from the chosen accounts: no forks, valid names, one per name. Callers
+// hold s.mu.
+func (s *Server) mine(accounts []string) []ghlogin.Repo {
+	var out []ghlogin.Repo
+	for _, r := range s.repos {
+		if !r.Fork && slices.ContainsFunc(accounts, func(a string) bool { return strings.EqualFold(a, r.Owner) }) && namePattern.MatchString(r.Name) {
+			out = append(out, r)
+		}
+	}
+	return OnePerName(out)
+}
+
+// previewRules answers, for the products as the page has them now, what each comes to: its rules and what they catch, the pinned
+// repositories, the matchers.
+func (s *Server) previewRules(_ context.Context, body []byte) (any, error) {
+	var in struct {
+		Accounts []string  `json:"accounts"`
+		Products []Product `json:"products"`
+		Hidden   []string  `json:"hidden"`
+	}
+	if err := decode(body, &in); err != nil {
+		return nil, err
+	}
+	if len(in.Products) > MaxProducts {
+		return nil, bad("At most %d products.", MaxProducts)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	accounts, err := s.chosen(in.Accounts)
+	if err != nil {
+		return nil, err
+	}
+	if !s.listed || !slices.Equal(slices.Sorted(slices.Values(accounts)), s.listedFor) {
+		return nil, bad("The repositories are not read yet.")
+	}
+	return map[string]any{"products": Derive(s.mine(accounts), in.Products, in.Hidden)}, nil
+}
+
+// testRule tells what one rule would select among the chosen accounts' repositories, for the page's "add a rule".
+func (s *Server) testRule(_ context.Context, body []byte) (any, error) {
+	var in struct {
+		Accounts []string `json:"accounts"`
+		Kind     string   `json:"kind"`
+		Value    string   `json:"value"`
+	}
+	if err := decode(body, &in); err != nil {
+		return nil, err
+	}
+	fn, err := compile(in.Kind, strings.TrimSpace(in.Value))
+	if err != nil {
+		return map[string]any{"error": err.Error()}, nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	accounts, err := s.chosen(in.Accounts)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, r := range s.mine(accounts) {
+		if fn(r.Name, r.Topics) {
+			names = append(names, r.Name)
+		}
+	}
+	return map[string]any{"matches": len(names), "names": names}, nil
 }
 
 // checkProducts holds the products and the hidden repositories to the configuration's limits and to the repositories listed.
@@ -677,8 +772,14 @@ func checkProducts(products []Product, hidden []string, known map[string]bool) e
 			return bad("There are two products called %q.", name)
 		case len(p.Repos) == 0:
 			return bad("The product %q has no repositories.", name)
-		case len(p.Repos) > MaxPerProduct:
-			return bad("The product %q has more than %d repositories.", name, MaxPerProduct)
+		}
+		if len(p.Rules) > MaxRules {
+			return bad("The product %q has more than %d rules of your own.", name, MaxRules)
+		}
+		for _, r := range p.Rules {
+			if _, err := compile(r.Kind, r.Value); err != nil {
+				return bad("A rule of %q (%s %s): %v", name, r.Kind, r.Value, err)
+			}
 		}
 		names[strings.ToLower(name)] = true
 		for _, n := range p.Repos {
