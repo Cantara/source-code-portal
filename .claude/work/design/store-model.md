@@ -1,6 +1,6 @@
 # Store model for a personal edition and shared instances (SM1)
 
-Status: design, verified by prototypes, not built (plan.md section 4, P-89, P-90). Binding order: ../plan.md > this note > `sync-snapshot-store.md`,
+Status: design, verified by prototypes, not built (plan.md section 4, P-89, P-90, P-91). Binding order: ../plan.md > this note > `sync-snapshot-store.md`,
 `access.md`, `hardening.md`, `auth.md`.
 
 The owner wants a personal edition (one person signs in to GitHub, the portal reads the repositories that person can read; several
@@ -167,27 +167,49 @@ On a copy of the live database (never the original), in a scratch worktree:
    repositories, a group whose default is hidden, a search term present only in hidden documents.
 3. The view cache's fallback to the public view tested under load and under a failed build.
 
+## The ladder (owner, 2026-11-07)
+
+The goal is a shared site on a team's AWS account where people sign in with their own account and see what they may, from data fetched
+once (polling plus webhooks) and shared, not fetched per person. It has to be shown first, before the organisation's IT department allows
+a wider audience, so it is built in rungs; each rung is a complete, safe product and asks IT for one more thing. Collection and
+entitlement stay apart on every rung: **one credential per source collects each repository once; a person's access only decides what
+that person is shown and never collects.**
+
+| Rung | Who | How a person is known and what they see | Collected by | New code | IT is asked for |
+|---|---|---|---|---|---|
+| 0. Demo | the owner, on a laptop or a personal server | one principal sees what their own token reads | their own credential (the wizard) | SM-a, the personal edition's minimum | nothing but a token their SSO allows |
+| 1. Pilot site | a pilot group on the team's AWS | signs in with Entra ID through the existing OIDC; everyone who passes sees one catalogue, the repositories the instance's credential was given | one read-only credential: a GitHub App installed on chosen repositories or organisations (or a machine user's token) | none for access (today's model: one audience, `auth.oidc`, `access.private_groups`, `require_auth`); GitHub Enterprise Server checks and docs | an Entra app registration, the App's installation, a network path for webhooks (polling alone works) |
+| 2. Teams | several teams | Entra groups name repository sets (matchers as the groups use); a viewer sees the union of their groups' sets | as rung 1 | `ViewOf` per distinct set, the generalised leak and twin tests (SM-b) | group claims in the Entra token |
+| 3. Own access | everyone | the person authorises the App; entitlement is what GitHub says both the App's installation and the person can read (`GET /user/installations/{id}/repositories`, to be confirmed on the Enterprise Server version in use), computed at sign-in and renewed with the session, kept as `visible` rows that expire with the session; the person's token is discarded, so no user credential is stored | as rung 1 | as rung 2, plus the authorisation flow | the App's user authorisation allowed |
+
+- Rungs 0 and 1 serve **one audience** each (I3): nothing about the security model changes. Rungs 2 and 3 serve several audiences from
+  one instance and wait for the gates above (I1, the generalised leak and twin tests); until they pass the instance serves one.
+- **Why the shared site, not one personal instance per person** (this withdraws P-90's isolation clause): one instance per person would
+  poll the host once per person, spend each person's rate limit and discard the saving that fetching once gives. Isolation stays
+  available to a person who wants their own portal (rung 0).
+- **Sync is fetched once**: the existing job engine, the webhook route and the App's delivery catch-up serve the shared site as they
+  serve an operator's today; a source is one host (`base_url`), so a Cantara and an Enterprise host sit side by side in one instance.
+  The rate limit is the host's setting and is checked on the host in use.
+- **Fail closed on every rung**: a session past its end, an entitlement past `access.max_staleness`, a refused credential, a failed
+  view build: the public view, or none with `require_auth`.
+
 ## Decisions (owner delegated them, 2026-11-07: best technical and safe solution)
 
 - **Addresses: first claim wins now; the qualified address (`owner@source/name`) waits** until a real collision needs both. It touches
   about 90 files and the wire format, and one person's own login on two hosts is the only likely case.
-- **Several people: isolation, not shared views.** A business that wants a shared platform runs one personal instance per person,
-  each with its own database, credential and process: the security boundary is the instance (H1's rule), and none of the per-viewer
-  view machinery (the gates above) is needed. The `ViewOf` generalisation stays as SM-b's refactor, still with two views; a viewer
-  per entitlement set is built only if a deployment needs one instance to serve people with different access, and then behind the
-  gates. What a central instance may hold for everyone (public and `internal` repositories, read with a service credential) can later
-  be fed to each personal instance as one more source, so a person adds their private repositories to a shared base without any
-  private data being shared.
+- **The ladder above**, rung by rung, each shown to the organisation before the next is asked for. A rung is not started until the one
+  below is working and demonstrated.
 - **The sealing key of the personal edition lives in the operating system's keychain**, not in a file beside the database; the
   operator deployment keeps `store.key_file`.
 - **The personal edition's first value is "my work"**: the identity of the signed-in person puts the pull requests that wait on them,
   their review requests and their repositories first, and their own groups and layouts are theirs. Its own design note.
-- **Sync scope is chosen in the wizard** (my repositories, selected organisations or teams): a cold start of 1,000 repositories is
-  about 3 hours of GitHub time under the budget, and a person's rate limit is their own. Repositories that are opened sync first.
+- **Sync scope is chosen in the wizard on rung 0** (my repositories, selected organisations or teams): a cold start of 1,000
+  repositories is about 3 hours of GitHub time under the budget, and a person's rate limit is their own. Repositories that are opened
+  sync first. On the shared rungs the instance's credential reads what it was given.
 
 ## Order
 
-SM-a (the migration, `repo.visibility`, the conflict rule, the pre-migration copy; no behaviour change) -> SM-b (`ViewOf`, `Public()`
-as its special case, the viewer seam, the gates' test generalisation, still with two views) -> SM-c (the personal edition: one
-principal, sealed credential, the person's listing, the wizard, "my work"; a design note of its own). Several principals on one
-instance is not planned (see the decisions).
+SM-a (the migration, `repo.visibility`, the conflict rule, the pre-migration copy; no behaviour change) -> rung 0: the personal edition
+(one principal, sealed credential, the wizard, "my work"; a design note of its own) -> rung 1: the pilot site (Enterprise Server
+checks, Entra sign-in on the existing OIDC, a deployment guide for the team's AWS account) -> SM-b (`ViewOf`, `Public()` as its
+special case, the viewer seam, the leak and twin tests for many viewers) -> rung 2 (Entra groups) -> rung 3 (the person's own access).
