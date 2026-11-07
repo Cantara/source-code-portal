@@ -307,3 +307,47 @@ func (c *Client) Newest(ctx context.Context, token string) (string, error) {
 	}
 	return r[0].Name, nil
 }
+
+// Repo is a repository the token can read, as the setup page lists it.
+type Repo struct {
+	Owner, Name string
+	Private     bool
+	Fork        bool
+	Archived    bool
+	Pushed      time.Time
+}
+
+// MaxRepos is how many repositories Repos reads (5 pages of 100, the most recently pushed first).
+const MaxRepos = 500
+
+// Repos lists the repositories the token can read, the most recently pushed first, up to MaxRepos (GET /user/repos with the owner,
+// collaborator and organisation member affiliations). more is true when there were more.
+func (c *Client) Repos(ctx context.Context, token string) (repos []Repo, more bool, err error) {
+	for page := 1; page <= MaxRepos/100; page++ {
+		var r []struct {
+			Name     string `json:"name"`
+			Private  bool   `json:"private"`
+			Fork     bool   `json:"fork"`
+			Archived bool   `json:"archived"`
+			Pushed   string `json:"pushed_at"`
+			Owner    struct {
+				Login string `json:"login"`
+			} `json:"owner"`
+		}
+		path := "user/repos?affiliation=owner,collaborator,organization_member&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+		if _, err := c.get(ctx, token, path, &r); err != nil {
+			return nil, false, err
+		}
+		for _, x := range r {
+			if x.Name == "" || x.Owner.Login == "" {
+				continue
+			}
+			pushed, _ := time.Parse(time.RFC3339, x.Pushed)
+			repos = append(repos, Repo{Owner: x.Owner.Login, Name: x.Name, Private: x.Private, Fork: x.Fork, Archived: x.Archived, Pushed: pushed})
+		}
+		if len(r) < 100 {
+			return repos, false, nil
+		}
+	}
+	return repos, true, nil
+}
