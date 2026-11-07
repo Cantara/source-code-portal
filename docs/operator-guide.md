@@ -464,8 +464,12 @@ finding. They need the App's *Issues* read permission (section 1); without it Gi
 
 **Releases** in the header (`/releases`) lists what the repositories published, newest first. The portal keeps each repository's 20
 newest published releases (drafts are never listed): it reads them when GitHub sends a *Release* event and every 6 hours as a safety
-net, as a conditional request that costs no rate limit when nothing changed. By default the page shows the latest stable release of
-each repository; the filter panel at the left switches to every release, the stable ones or the pre-releases, each with its count. The
+net, as a conditional request that costs no rate limit when nothing changed. By default the page shows the latest release of
+each repository, the newer of its latest stable GitHub release and the newest release of the packages it publishes to registries
+(Maven, npm, PyPI and the others the portal reads, section 2.5): a repository that publishes only to a registry is listed too, with the
+registry's name beside its version. The *Source* choice limits the page to GitHub's releases or to the packages'; the portal holds a
+package's newest release only, so the page shows no earlier versions of it, and a package whose registry gives no publication date is not
+listed. A package published with the version of a GitHub release is that release and is listed once; the filter panel at the left switches to every release, the stable ones or the pre-releases, each with its count. The
 product, the repository, a window (the last 7, 30, 90 days or year) and the order (newest, oldest, repository, product) are in the same
 panel: every choice is in view, applied as it is made, and the panel hides and shows with its button (the choice is kept for every list
 page). Without JavaScript the panel is a form with an Apply button. A

@@ -23,7 +23,7 @@ import { PageHeader } from "@/shared/page-header"
 import { Pager } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { ReleaseList } from "@/entities/release/release"
-import { releaseSorts, releasesSearch, releasesState, releaseVariants, releaseWindows } from "./api"
+import { releaseSorts, releasesSearch, releasesState, releaseSources, releaseVariants, releaseWindows } from "./api"
 
 /**
  * ReleasesView is the recent releases of the reader's view (design/releases.md): the filters in the panel at the left, every choice
@@ -71,6 +71,19 @@ export function ReleasesView({ defaultSize, filters }: { defaultSize: number; fi
                 value={f.variant ?? "latest"}
                 onPick={(variant) => pick({ variant })}
                 options={releaseVariants.map((v) => ({ value: v.value, label: v.label, count: data?.counts[v.value] }))}
+              />
+            </FilterGroup>
+            <FilterGroup title="Source">
+              <Choices
+                name="source"
+                label="Source"
+                value={f.source ?? "all"}
+                onPick={(source) => pick({ source })}
+                options={releaseSources.map((x) => ({
+                  value: x.value,
+                  label: x.label,
+                  count: data && x.value !== "all" ? data.counts[x.value] : undefined, // "all" is not a sum: a repository counts once
+                }))}
               />
             </FilterGroup>
             <ProductChoices value={f.group ?? ""} onPick={(group) => pick({ group })} />

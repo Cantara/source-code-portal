@@ -112,6 +112,48 @@ describe("pages", () => {
     expect(screen.getByRole("form", { name: "Filter the releases" })).toHaveAttribute("action", "/releases")
   })
 
+  it("lists a published package beside the GitHub releases, with its source and a Source choice", async () => {
+    let asked: URLSearchParams | undefined
+    server.use(
+      http.get("/releases", ({ request, response }) => {
+        asked = new URL(request.url).searchParams
+        return response(200).json({
+          releases: [
+            {
+              repo: "acme/core",
+              name: "core",
+              groups: [],
+              source: "npm",
+              package: "core-js",
+              tag: "2.2.0",
+              title: "",
+              summary: "",
+              url: "https://www.npmjs.com/package/core-js",
+              publishedAt: "2026-11-05T10:00:00Z",
+              prerelease: false,
+              author: "",
+              bot: false,
+              assets: 0,
+            },
+          ],
+          counts: { latest: 1, all: 1, stable: 1, pre: 0, github: 2, packages: 1 },
+          page: { number: 1, size: 50, total: 1, pages: 1 },
+          freshness: fresh,
+        })
+      }),
+    )
+    show(<ReleasesView defaultSize={50} filters={noFilters} />, "/releases?source=packages")
+    const source = within(await screen.findByRole("radiogroup", { name: "Source" }))
+    expect(await source.findByRole("radio", { name: /Packages 1/ })).toBeChecked()
+    expect(source.getByRole("radio", { name: /GitHub releases 2/ })).not.toBeChecked()
+    expect(source.getByRole("radio", { name: "GitHub and packages" })).not.toBeChecked()
+    expect(asked?.get("source")).toBe("packages")
+    const row = within(await screen.findByRole("list", { name: "Releases" })).getByRole("listitem")
+    expect(row).toHaveTextContent("core-js")
+    expect(row).toHaveTextContent("npm")
+    expect(within(row).getByRole("link", { name: "2.2.0" })).toHaveAttribute("href", "https://www.npmjs.com/package/core-js")
+  })
+
   it("lists the retired repositories with why, when they were last active and what still depends on them", async () => {
     show(<ArchiveView defaultSize={50} filters={noFilters} />, "/archive")
     expect(await screen.findByRole("heading", { level: 1, name: "Archive" })).toBeInTheDocument()

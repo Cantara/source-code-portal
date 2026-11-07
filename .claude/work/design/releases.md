@@ -1,6 +1,6 @@
 # Releases: what was shipped and when (RL1 to RL3)
 
-Status: RL1 to RL3 built (plan.md section 4, P-82, P-84). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
+Status: RL1 to RL4 built (plan.md section 4, P-82, P-84). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
 
 The portal holds only the **latest** release of a repository (the badge's job, `badges.release`). A team that wants to know what the
 fleet shipped this week has nothing to look at. The portal lists the recent releases of the fleet, a product and a repository, newest
@@ -48,7 +48,32 @@ Built: the tool `recent_releases` (same parameters), the search kind `release` (
 the repository's releases, `/releases?repo=&variant=all`), the repository Markdown page's *Latest release* section and, in `llms.txt`, the
 JSON links to the releases and the retired repositories; the badges are unchanged in address. Docs, the Guide, the plugin.
 
+## Published packages (RL4)
+
+A release is also what a repository publishes to a registry: the product page already shows the newest package where a repository has no
+GitHub release, and `/releases` listed none of them (owner, 2026-11-07). The packages feature holds each package's newest release
+only (version, when published, the registry's link), not a history, so a package is **one row**: its newest release.
+
+- **Rows.** `source` is `github` or the package's ecosystem (`maven`, `npm`, ...), `package` the package's name (empty for GitHub's),
+  `tag` the version. A package is never a pre-release (the registries' newest stable is kept), has no author and no summary.
+- **Left out.** A package whose version is the tag of one of the repository's GitHub releases (`v` ignored) is that release, listed
+  once, as GitHub's. A package whose registry gives no date is not listed: a list of releases is in time.
+- **Wiring.** `releases.API.Packages` is a hook (`cmd/scp/releases.go`, `publishedOf`, from the `packages` facet): the releases
+  feature does not import the packages feature.
+- **Latest.** `variant=latest` is one row per repository: the newest of its latest stable GitHub release and its packages' newest
+  (GitHub's when they are as new), so a repository that publishes only to a registry is listed. The product page's Release column
+  uses the same rule (`entities/repo/packages.ts`, `shipped`).
+- **`source`** (`all`, `github`, `packages`; default `all`) limits the rows to one kind; with `latest` it is the newest of that kind.
+  The counts of the variants follow `source` and those of the sources follow `variant`, so each choice shows what it lists.
+- **Page.** The filter panel has a *Source* group (GitHub releases, Packages; each its count); a row shows the version, the package's
+  name, a source chip (GitHub, Maven, npm, ...) and, as before, the repository chip and when it was published. A repository's
+  and a group's panels list them too, with the package's name.
+- **Agents.** `recent_releases` takes `source` and says each package row's package and registry.
+
 ## Tests
+
+The package rows: a repository whose only release is a package, a package that is GitHub's release (listed once), an undated one,
+the latest of both, the counts by source and variant, `since`; the public view hides a private repository's packages (twin).
 
 The job against the fake GitHub: the listing's pagination bound, 304 replay, a pre-release and a draft, a repository without
 releases (not a failure), a webhook `release` event that makes the new release appear, the badge reading the same data, a private

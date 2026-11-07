@@ -3,12 +3,19 @@ import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { addressPath } from "@/lib/paths"
 import { Badge } from "@/components/ui/badge"
+import { ecosystemLabel } from "@/entities/repo/packages"
 import { EmptyState } from "@/shared/empty-state"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ListRow } from "@/shared/list-row"
 import { RelativeTime } from "@/shared/relative-time"
 
 export type Release = Schemas["ReleaseEntry"]
+
+/** sourceLabel is where a release comes from, as people write it: GitHub, or a package manager. */
+const sourceLabel = (source: string) => (source === "github" ? "GitHub" : ecosystemLabel(source))
+
+/** sourceTitle says it in a hint: a package's name and its registry, else GitHub. */
+const sourceTitle = (r: Release) => (r.package ? `${r.package} on ${sourceLabel(r.source)}` : "A GitHub release")
 
 /**
  * ReleaseList is releases as the server orders them (design/releases.md), each a row like a pull request's: the author's avatar, the
@@ -40,10 +47,14 @@ export function ReleaseList({
             lead={<InitialsAvatar name={r.author || r.repo.split("/")[1] || r.repo} />}
             title={
               <span className="min-w-0 break-words">
-                <a href={r.url} rel="noreferrer" className="font-mono hover:underline">
-                  {r.tag}
-                </a>
-                {r.title && r.title !== r.tag && <> {r.title}</>}
+                {r.url ? (
+                  <a href={r.url} rel="noreferrer" className="font-mono hover:underline">
+                    {r.tag}
+                  </a>
+                ) : (
+                  <span className="font-mono">{r.tag}</span>
+                )}
+                {r.package ? <> {r.package}</> : r.title && r.title !== r.tag && <> {r.title}</>}
               </span>
             }
             aside={
@@ -62,6 +73,7 @@ export function ReleaseList({
                     {r.repo}
                   </Link>
                 )}
+                <Badge title={sourceTitle(r)}>{sourceLabel(r.source)}</Badge>
                 {r.prerelease && <Badge variant="warn">Pre-release</Badge>}
                 {r.author && (
                   <span>
@@ -86,9 +98,14 @@ export function ReleaseList({
               {r.repo}
             </Link>
           )}
-          <a href={r.url} className="font-mono underline-offset-2 hover:underline">
-            {r.tag}
-          </a>
+          {r.url ? (
+            <a href={r.url} className="font-mono underline-offset-2 hover:underline">
+              {r.tag}
+            </a>
+          ) : (
+            <span className="font-mono">{r.tag}</span>
+          )}
+          {r.package && <span title={sourceTitle(r)}>{r.package}</span>}
           {r.prerelease && <Badge variant="warn">Pre-release</Badge>}
           {r.title && r.title !== r.tag && <span>{r.title}</span>}
           <span className="text-muted-foreground">

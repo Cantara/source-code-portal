@@ -114,11 +114,15 @@ paths:
         listed: `latest` (the default) is one row per repository, its newest stable release; `all` every kept release; `stable` the
         non-pre-releases; `pre` the pre-releases. `since` keeps the releases published at or after a time, an RFC 3339 time or a number
         of days such as `30d`. `group` and `repo` intersect. `counts` cover the scope and `since` whatever the variant, so the variants
-        can be offered as filters.
+        can be offered as filters. A repository's published packages are releases too: each package's newest release (the registry's, as
+        a repository's `packages` say) is a row of source `maven`, `npm` and so on beside the GitHub releases (source `github`), unless a
+        GitHub release of the same version is listed. `source` limits the list to one kind; `latest` is then one row per repository, the
+        newest of that kind (of both for `all`). The counts of the variants follow `source`, those of the sources follow `variant`.
       parameters:
         - { name: group, in: query, required: false, schema: { type: string } }
         - { name: repo, in: query, required: false, description: "owner/name", schema: { type: string } }
         - { name: variant, in: query, required: false, schema: { $ref: "#/components/schemas/ReleaseVariant" } }
+        - { name: source, in: query, required: false, schema: { $ref: "#/components/schemas/ReleaseSource" } }
         - { name: since, in: query, required: false, description: "An RFC 3339 time or days such as 30d", schema: { type: string, maxLength: 40 } }
         - { name: sort, in: query, required: false, schema: { $ref: "#/components/schemas/ReleaseSort" } }
         - { $ref: "#/components/parameters/PageNumber" }
@@ -1096,15 +1100,18 @@ components:
         page: { $ref: "#/components/schemas/Page" }
         freshness: { $ref: "#/components/schemas/Freshness" }
     ReleaseVariant: { type: string, enum: [latest, all, stable, pre], description: "latest: one row per repository, its newest stable release (default); all; stable; pre" }
+    ReleaseSource: { type: string, enum: [all, github, packages], description: "all: GitHub releases and published packages (default); github; packages (the newest release of each package a repository publishes)" }
     ReleaseSort: { type: string, enum: [newest, oldest, repo, group], description: "newest first (default); oldest first; by repository; by product, then newest" }
     ReleaseEntry:
       type: object
-      required: [repo, name, groups, tag, title, summary, url, publishedAt, prerelease, author, bot, assets]
+      required: [repo, name, groups, source, package, tag, title, summary, url, publishedAt, prerelease, author, bot, assets]
       properties:
         repo: { type: string, description: "Lower-case owner/name, used in URLs" }
         name: { type: string, description: The repository's name }
         groups: { type: array, items: { type: string }, description: Group ids in configuration order }
-        tag: { type: string }
+        source: { type: string, description: "github for a GitHub release, else the package manager's ecosystem (maven, npm, pypi, cargo, go, swift, cocoapods, nuget, rubygems, packagist)" }
+        package: { type: string, description: The package's name; empty for a GitHub release }
+        tag: { type: string, description: "The release's tag; a package's version" }
         title: { type: string, description: "The release's name; empty when it has none" }
         summary: { type: string, description: "The first line of its notes, cleaned; empty when it has none" }
         url: { type: string }
@@ -1115,12 +1122,14 @@ components:
         assets: { type: integer }
     ReleaseCounts:
       type: object
-      required: [latest, all, stable, pre]
+      required: [latest, all, stable, pre, github, packages]
       properties:
-        latest: { type: integer, description: Repositories with a stable release }
+        latest: { type: integer, description: "Repositories with a stable release of the chosen source" }
         all: { type: integer }
         stable: { type: integer }
         pre: { type: integer }
+        github: { type: integer, description: "The rows the chosen variant lists that are GitHub releases" }
+        packages: { type: integer, description: "The rows the chosen variant lists that are published packages" }
     ReleasePage:
       type: object
       required: [releases, counts, page, freshness]

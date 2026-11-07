@@ -4,6 +4,7 @@ import type { Repo } from "@/lib/api/client"
 import { product, repo, rules } from "@/test/server"
 import { FindingList, HealthScore } from "./health/findings"
 import { activity, byActivity } from "./repo/health"
+import { shipped } from "./repo/packages"
 import { VisibilityBadge } from "./repo/visibility-badge"
 
 const day = 24 * 3600 * 1000
@@ -92,5 +93,29 @@ describe("health", () => {
     // The kind and weight are named for screen readers; the points show in the hint, not the row.
     expect(screen.getByText(/Dormant, high, costs 30 points/)).toBeInTheDocument()
     expect(screen.queryByText("−30")).toBeNull()
+  })
+})
+
+describe("shipped", () => {
+  const pkg = {
+    ecosystem: "maven",
+    name: "core",
+    version: "2.0.0",
+    url: "https://repo/core",
+    registry: "",
+    publishedAt: "2026-11-05T00:00:00Z",
+  }
+  const gh = { tag: "v1.0.0", url: "https://github.com/acme/core/releases/v1.0.0", publishedAt: "2026-10-01T00:00:00Z" }
+  const base = repo("core")
+
+  it("is the newer of the GitHub release and the newest package, as /releases says", () => {
+    expect(shipped({ ...base, release: gh, packages: [pkg] })).toMatchObject({ from: "Maven", version: "2.0.0", name: "core" })
+    expect(shipped({ ...base, release: { ...gh, publishedAt: "2026-11-06T00:00:00Z" }, packages: [pkg] })).toMatchObject({
+      from: "GitHub",
+      version: "v1.0.0",
+    })
+    expect(shipped({ ...base, release: gh, packages: [{ ...pkg, publishedAt: null }] })?.from).toBe("GitHub")
+    expect(shipped({ ...base, release: null, packages: [pkg] })?.from).toBe("Maven")
+    expect(shipped({ ...base, release: null, packages: [] })).toBeUndefined()
   })
 })
