@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { api, ProblemError } from "@/lib/api/client"
 import { crumbs } from "@/lib/crumbs"
+import type { Filters } from "@/lib/preferences"
+import { Choices, FilterForm, FilterGroup, FilterLayout } from "@/shared/filters"
 import { PageHeader } from "@/shared/page-header"
 import { Pager } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -26,14 +28,14 @@ export interface Problem {
  * SearchView is `/search`: the form, the kinds with their counts, the hits of the page with their snippets, and the pager; problem
  * is the server's answer to a query it refused.
  */
-export function SearchView({ problem }: { problem?: Problem }) {
+export function SearchView({ problem, filters }: { problem?: Problem; filters: Filters }) {
   const st = searchState(Object.fromEntries(useSearchParams()))
   return (
     <>
       <PageHeader title="Search" trail={crumbs.search()}>
         <SearchForm key={st.q} q={st.q} />
       </PageHeader>
-      {st.q ? <Results st={st} problem={problem} /> : <Help />}
+      {st.q ? <Results st={st} problem={problem} filters={filters} /> : <Help />}
     </>
   )
 }
@@ -71,7 +73,8 @@ function SearchForm({ q }: { q: string }) {
   )
 }
 
-function Results({ st, problem }: { st: SearchState; problem?: Problem }) {
+function Results({ st, problem, filters }: { st: SearchState; problem?: Problem; filters: Filters }) {
+  const router = useRouter()
   // A query the server refused is not asked again.
   const { data, error, isPending } = useQuery({ ...searchQuery(api, st), enabled: !problem })
   if (error) return <ProblemAlert error={error} />
@@ -79,65 +82,68 @@ function Results({ st, problem }: { st: SearchState; problem?: Problem }) {
     return <ProblemAlert error={new ProblemError(problem.status, problem.code, problem.detail, problem.requestId)} />
   if (isPending) return <p aria-live="polite">Searching…</p>
   const all = Object.values(data.counts).reduce((a, b) => a + b, 0)
+  const present = kinds.filter((k) => data.counts[k.kind] > 0 || st.in === k.kind)
   return (
-    <section aria-label="Results" className="max-w-4xl">
-      <nav aria-label="Kinds" className="mb-4 flex flex-wrap gap-1 border-b border-border pb-2 text-sm">
-        <Tab st={st} count={all} label="All" />
-        {kinds
-          .filter((k) => data.counts[k.kind] > 0 || st.in === k.kind)
-          .map((k) => (
-            <Tab key={k.kind} st={st} kind={k.kind} count={data.counts[k.kind]} label={k.tab} />
-          ))}
-      </nav>
-      {data.corrections.length > 0 && (
-        <p className="mb-3 text-sm text-muted-foreground">
-          Nothing holds{" "}
-          {data.corrections.map((c, i) => (
-            <span key={c.from}>
-              {i > 0 && ", "}
-              <q className="font-medium text-foreground">{c.from}</q> (searched for{" "}
-              <q className="font-medium text-foreground">{c.to}</q>)
-            </span>
-          ))}
-          .
-        </p>
-      )}
-      {data.hits.length === 0 ? (
-        <>
-          <p className="mb-4">
-            Nothing found for <q className="font-medium">{data.query}</q>.
-          </p>
-          <Help />
-        </>
-      ) : (
-        <>
-          <p className="sr-only" aria-live="polite">
-            {data.page.total} hits
-          </p>
-          <ol className="flex flex-col gap-4">
-            {data.hits.map((h) => (
-              <HitItem key={h.url + h.kind} hit={h} />
-            ))}
-          </ol>
-          <div className="mt-6">
-            <Pager page={data.page} href={(n) => searchHref({ ...st, page: n })} label="Pages of hits" noun="hits" />
-          </div>
-        </>
-      )}
-    </section>
-  )
-}
-
-function Tab({ st, kind, count, label }: { st: SearchState; kind?: SearchState["in"]; count: number; label: string }) {
-  const current = st.in === kind
-  return (
-    <Link
-      href={searchHref({ q: st.q, page: 1, ...(kind && { in: kind }) })}
-      aria-current={current ? "page" : undefined}
-      className="rounded-md px-2.5 py-1 text-muted-foreground hover:bg-accent hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+    <FilterLayout
+      initial={filters}
+      label="Filter the hits"
+      clear={st.in ? searchHref({ q: st.q, page: 1 }) : undefined}
+      filters={
+        <FilterForm action="/search" label="Filter the hits">
+          <input type="hidden" name="q" value={st.q} />
+          <FilterGroup title="Kind">
+            <Choices
+              name="in"
+              label="Kind"
+              value={st.in ?? ""}
+              onPick={(k) => router.push(searchHref({ q: st.q, page: 1, ...(k && { in: k as NonNullable<SearchState["in"]> }) }))}
+              options={[
+                { value: "", label: "All", count: all },
+                ...present.map((k) => ({ value: k.kind, label: k.tab, count: data.counts[k.kind] })),
+              ]}
+            />
+          </FilterGroup>
+        </FilterForm>
+      }
     >
-      {label} <span className="tabular-nums">{count}</span>
-    </Link>
+      <section aria-label="Results" className="max-w-4xl">
+        {data.corrections.length > 0 && (
+          <p className="mb-3 text-sm text-muted-foreground">
+            Nothing holds{" "}
+            {data.corrections.map((c, i) => (
+              <span key={c.from}>
+                {i > 0 && ", "}
+                <q className="font-medium text-foreground">{c.from}</q> (searched for{" "}
+                <q className="font-medium text-foreground">{c.to}</q>)
+              </span>
+            ))}
+            .
+          </p>
+        )}
+        {data.hits.length === 0 ? (
+          <>
+            <p className="mb-4">
+              Nothing found for <q className="font-medium">{data.query}</q>.
+            </p>
+            <Help />
+          </>
+        ) : (
+          <>
+            <p className="sr-only" aria-live="polite">
+              {data.page.total} hits
+            </p>
+            <ol className="flex flex-col gap-4">
+              {data.hits.map((h) => (
+                <HitItem key={h.url + h.kind} hit={h} />
+              ))}
+            </ol>
+            <div className="mt-6">
+              <Pager page={data.page} href={(n) => searchHref({ ...st, page: n })} label="Pages of hits" noun="hits" />
+            </div>
+          </>
+        )}
+      </section>
+    </FilterLayout>
   )
 }
 

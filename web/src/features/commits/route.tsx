@@ -8,6 +8,7 @@ import { defaultHistorySize, historyQuery, historyState, request } from "./histo
 import { NavigatorView } from "./navigator"
 import { AllCommitsView, GroupCommitsView } from "./view"
 import { crumbs } from "@/lib/crumbs"
+import { filtersCookie, filtersOf } from "@/lib/preferences"
 import { ld } from "@/lib/seo"
 
 /** logSize and historySize are the reader's page sizes: the one they chose last, else the default. */
@@ -27,7 +28,7 @@ export const allCommitsRoute: Route<object> = {
     alternates: { canonical: "/commits" },
   }),
   structured: (_, base) => [ld.page(base, "/commits", "Commits"), ld.breadcrumbs(base, crumbs.commits())],
-  render: (ctx) => <AllCommitsView defaultSize={logSize(ctx)} />,
+  render: (ctx) => <AllCommitsView defaultSize={logSize(ctx)} filters={filtersOf(ctx.cookies[filtersCookie])} />,
 }
 
 /** groupCommitsRoute is `/groups/{group}/commits`. */
@@ -57,7 +58,9 @@ export const groupCommitsRoute: Route<{ group: string }> = {
       ld.breadcrumbs(base, crumbs.groupCommits(g.id, g.name)),
     ]
   },
-  render: (ctx) => <GroupCommitsView group={ctx.params.group} defaultSize={logSize(ctx)} />,
+  render: (ctx) => (
+    <GroupCommitsView group={ctx.params.group} defaultSize={logSize(ctx)} filters={filtersOf(ctx.cookies[filtersCookie])} />
+  ),
 }
 
 type RepoParams = { owner: string; name: string }
@@ -96,5 +99,12 @@ export const repoCommitsRoute: Route<RepoParams> = {
       ld.breadcrumbs(base, crumbs.repoCommits(r.owner, r.name, d.group)),
     ]
   },
-  render: (ctx) => <NavigatorView owner={ctx.params.owner} name={ctx.params.name} defaultSize={historySize(ctx)} />,
+  render: (ctx) => (
+    <NavigatorView
+      owner={ctx.params.owner}
+      name={ctx.params.name}
+      defaultSize={historySize(ctx)}
+      filters={filtersOf(ctx.cookies[filtersCookie])}
+    />
+  ),
 }

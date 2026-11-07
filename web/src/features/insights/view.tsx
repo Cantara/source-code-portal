@@ -4,14 +4,14 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { ReactNode } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Schemas } from "@/lib/api/client"
 import { insightsQuery } from "@/lib/api/queries"
 import { crumbs } from "@/lib/crumbs"
 import { count, plural } from "@/lib/format"
 import { addressPath } from "@/lib/paths"
-import { ProductField } from "@/shared/filter-fields"
+import type { Filters } from "@/lib/preferences"
+import { FilterForm, FilterLayout, ProductChoices } from "@/shared/filters"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -25,39 +25,35 @@ type Insights = Schemas["Insights"]
  * first and the detail below it. The charts are inline SVG from the server's numbers, and every figure is also a table or a sentence.
  * It names repositories, never people.
  */
-export function InsightsView() {
+export function InsightsView({ filters }: { filters: Filters }) {
   const group = useSearchParams().get("group") ?? ""
   const router = useRouter()
   const { data, error } = useQuery(insightsQuery(api, group))
+  const pick = (g: string) => router.push(g === "" ? "/insights" : `/insights?group=${encodeURIComponent(g)}`)
   return (
     <>
-      <PageHeader title="Insights" trail={crumbs.insights()} meta={data && <FreshnessBadge freshness={data.freshness} />}>
-        <form
-          action="/insights"
-          className="flex flex-wrap items-end gap-3 text-sm"
-          aria-label="Narrow the insights"
-          onSubmit={(e) => {
-            e.preventDefault()
-            const g = new FormData(e.currentTarget).get("group")
-            router.push(typeof g === "string" && g !== "" ? `/insights?group=${encodeURIComponent(g)}` : "/insights")
-          }}
-        >
-          <ProductField value={group || undefined} />
-          <Button type="submit" variant="outline">
-            Apply
-          </Button>
-        </form>
-      </PageHeader>
-      {error && !data && <ProblemAlert error={error} />}
-      {data && (
-        <div className="flex flex-col gap-6">
-          <Cadence data={data} />
-          <Technology data={data} />
-          <Libraries data={data} />
-          <SingleAuthor data={data} />
-          <Ageing data={data} />
-        </div>
-      )}
+      <PageHeader title="Insights" trail={crumbs.insights()} meta={data && <FreshnessBadge freshness={data.freshness} />} />
+      <FilterLayout
+        initial={filters}
+        label="Narrow the insights"
+        clear={group === "" ? undefined : "/insights"}
+        filters={
+          <FilterForm action="/insights" label="Narrow the insights">
+            <ProductChoices value={group} onPick={pick} />
+          </FilterForm>
+        }
+      >
+        {error && !data && <ProblemAlert error={error} />}
+        {data && (
+          <div className="flex flex-col gap-6">
+            <Cadence data={data} />
+            <Technology data={data} />
+            <Libraries data={data} />
+            <SingleAuthor data={data} />
+            <Ageing data={data} />
+          </div>
+        )}
+      </FilterLayout>
     </>
   )
 }

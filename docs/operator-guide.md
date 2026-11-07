@@ -465,8 +465,10 @@ finding. They need the App's *Issues* read permission (section 1); without it Gi
 **Releases** in the header (`/releases`) lists what the repositories published, newest first. The portal keeps each repository's 20
 newest published releases (drafts are never listed): it reads them when GitHub sends a *Release* event and every 6 hours as a safety
 net, as a conditional request that costs no rate limit when nothing changed. By default the page shows the latest stable release of
-each repository; the chips switch to every release, the stable ones or the pre-releases, each with its count. The product, a window
-(the last 7, 30, 90 days or year) and the order (newest, oldest, repository, product) are a form that works without JavaScript. A
+each repository; the filter panel at the left switches to every release, the stable ones or the pre-releases, each with its count. The
+product, the repository, a window (the last 7, 30, 90 days or year) and the order (newest, oldest, repository, product) are in the same
+panel: every choice is in view, applied as it is made, and the panel hides and shows with its button (the choice is kept for every list
+page). Without JavaScript the panel is a form with an Apply button. A
 release shows its tag (a link to GitHub), its name, the first line of its notes, who published it and when; one published by a bot
 says so. The latest stable release is also what the release badges and a repository's summary show. It needs the App's *Contents*
 permission and the *Release* event, which the portal already asks for.

@@ -44,7 +44,7 @@ knew it (P-76, the leak test lists the route).
 
 ## Pages
 
-`/archive` in the header (after Pulls and Issues): a list, a GET form without JavaScript (search, reason chips, *still used*, sort),
+`/archive` in the header (after Pulls and Issues): a list, the filter panel at the left (`design/filters.md`: reason with its counts, product, name, *still used*, sort),
 numbered pages, each row a link to its repository page. Server-rendered, a canonical address, in the sitemap, JSON-LD breadcrumb.
 Empty: one sentence ("No repository has been retired."), not an error. A repository page of an archive entry shows a notice at its top
 saying why it is retired and since when it was last active.

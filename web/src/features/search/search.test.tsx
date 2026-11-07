@@ -9,7 +9,10 @@ import { setLocation } from "@/test/navigation"
 import { http, server } from "@/test/server"
 import { SearchBox } from "./box"
 import { searchHref, searchState } from "./api"
+import type { Filters } from "@/lib/preferences"
 import { SearchView } from "./view"
+
+const noFilters: Filters = { open: true, chosen: false }
 
 /** Where shows the in-memory location the views navigate. */
 function Where() {
@@ -57,14 +60,14 @@ describe("search", () => {
         return response(200).json(result())
       }),
     )
-    show(<SearchView />, "/search?q=sesion&page=1")
+    show(<SearchView filters={noFilters} />, "/search?q=sesion&page=1")
     expect(await screen.findByRole("link", { name: /Session/ })).toHaveAttribute("href", "/repos/acme/whydah-core#session")
     expect(asked?.get("q")).toBe("sesion")
     expect(asked?.get("limit")).toBe("25")
-    const tabs = screen.getByRole("navigation", { name: "Kinds" })
-    expect(within(tabs).getByRole("link", { name: "All 3" })).toHaveAttribute("aria-current", "page")
-    expect(within(tabs).getByRole("link", { name: "Documents 2" })).toHaveAttribute("href", "/search?q=sesion&in=doc")
-    expect(within(tabs).queryByRole("link", { name: /Groups/ })).toBeNull()
+    const kinds = within(screen.getByRole("radiogroup", { name: "Kind" }))
+    expect(kinds.getByRole("radio", { name: /All 3/ })).toBeChecked()
+    expect(kinds.getByRole("radio", { name: /Documents 2/ })).not.toBeChecked()
+    expect(kinds.queryByRole("radio", { name: /Groups/ })).toBeNull()
     expect(screen.getAllByText("session", { selector: "mark" })).toHaveLength(1)
     expect(screen.getByText(/Nothing holds/)).toHaveTextContent("Nothing holds sesion (searched for session).")
     expect(screen.getByRole("navigation", { name: "Pages of hits" })).toBeInTheDocument()
@@ -72,7 +75,7 @@ describe("search", () => {
   })
 
   it("explains the query language before a search and when nothing is found, and shows a bad query's problem", async () => {
-    show(<SearchView />, "/search")
+    show(<SearchView filters={noFilters} />, "/search")
     expect(screen.getByRole("heading", { name: "How to search" })).toBeInTheDocument()
 
     server.use(
@@ -86,7 +89,7 @@ describe("search", () => {
         ),
       ),
     )
-    show(<SearchView />, "/search?q=nothing")
+    show(<SearchView filters={noFilters} />, "/search?q=nothing")
     expect(await screen.findByText(/Nothing found for/)).toBeInTheDocument()
 
     server.use(
@@ -101,7 +104,7 @@ describe("search", () => {
         }),
       ),
     )
-    show(<SearchView />, "/search?q=a+b")
+    show(<SearchView filters={noFilters} />, "/search?q=a+b")
     expect(await screen.findByRole("alert")).toHaveTextContent("more than 12 words")
   })
 

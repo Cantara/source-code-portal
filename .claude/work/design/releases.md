@@ -36,7 +36,7 @@ viewer's view; the leak test lists the route.
 
 ## Pages
 
-`/releases` in the header: the variants as chips and the sorts as links, a GET form without JavaScript, a row per release (repository,
+`/releases` in the header: the variants with their counts and the sorts in the filter panel at the left (`design/filters.md`), a row per release (repository,
 tag, name, how long ago with the exact time in a hint, a *pre-release* chip, the link to GitHub). A repository page gets a *Releases*
 panel (its last ten); a group page the latest of each of its repositories, with the way to its retired repositories. Server-rendered, canonical, in the sitemap. There is no `releases` element on the
 dashboard or `/present` (P-84): the side panel already shares its height among three sections and the work-that-counts lens does not apply

@@ -6,7 +6,7 @@ test("a document section is found by a word and opens at its heading", async ({ 
   await page.goto("/search?q=configure")
   const hit = page.getByRole("link", { name: /Setup › Configure/ })
   await expect(hit).toHaveAttribute("href", "/repos/acme/whydah-core/docs/docs/setup#doc-configure")
-  await expect(page.getByRole("navigation", { name: "Kinds" }).getByRole("link", { name: /^Documents \d+$/ })).toBeVisible()
+  await expect(page.getByRole("radiogroup", { name: "Kind" }).getByRole("radio", { name: /^Documents \d+$/ })).toBeVisible()
   await hit.click()
   await expect(page).toHaveURL(/\/repos\/acme\/whydah-core\/docs\/docs\/setup#doc-configure$/)
   await expect(page.getByRole("heading", { name: "Configure" })).toBeVisible()

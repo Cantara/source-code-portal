@@ -401,7 +401,7 @@ function GroupReleases({ group }: { group: string }) {
         {data && <FreshnessBadge freshness={data.freshness} />}
       </div>
       {error && !data && <ProblemAlert error={error} />}
-      {data && <ReleaseList releases={data.releases} empty="None published" />}
+      {data && <ReleaseList releases={data.releases} compact empty="None published" />}
       <div className="mt-2 flex flex-wrap gap-x-4 text-sm">
         <Link href={`/releases?group=${encodeURIComponent(group)}`} className="hover:underline">
           All releases

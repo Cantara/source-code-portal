@@ -52,8 +52,8 @@ unassigned, then assigned, the longest idle first.
 
 ## Where it shows
 
-1. **`/issues`, "Issues" in the header** after Pull requests: every open issue of the viewer's view, server-rendered with a GET form
-   (no JavaScript needed): the states as chips with their counts, which filter; kind, product, repository, opened by, order.
+1. **`/issues`, "Issues" in the header** after Pull requests: every open issue of the viewer's view, server-rendered, the filters in
+   the panel at the left (`design/filters.md`): the states with their counts, which filter; kind, product, repository, opened by, order.
    Each row: state, kind, title linking to GitHub, `repo #12`, the author, assignees, comments, idle and age, labels, milestone.
    Numbered pages, the page size remembered (P-26).
 2. **Repository page**: a panel "Open issues" (`issues/panels.tsx`): the ten that wait longest, the counts by state, links to
@@ -76,7 +76,7 @@ API and the tool.
   `IssueCounts`, `IssuePage`; the labels of pull requests and issues are one schema, `IssueLabel` (GitHub's labels are issue labels);
   the order is one schema, `QueueSort`, for both lists.
 - The fake GitHub: `SetIssues(owner, name, ...Issue)`, served by the issues listing with the pull requests of `SetPulls` among them.
-- `/pulls` and `/issues` share their state chips and filter form (`shared/queue.tsx`: `QueueChips`, `QueueForm`).
+- Every list shares the filter panel and the row (`design/filters.md`: `shared/filters.tsx`, `shared/list-row.tsx`).
 - The GitHub App needs **Issues: read** and the event **Issues**.
 
 ## Milestones

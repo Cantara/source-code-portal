@@ -28,7 +28,7 @@ export function RepoReleases({ owner, name }: { owner: string; name: string }) {
       {data && data.counts.all === 0 && <p className="mt-1 text-sm text-muted-foreground">None published.</p>}
       {data && data.counts.all > 0 && (
         <>
-          <ReleaseList releases={data.releases} showRepo={false} className="mt-2" />
+          <ReleaseList releases={data.releases} showRepo={false} compact className="mt-2" />
           <Link href={releasesPath({ repo: address, variant: "all" })} className="mt-2 inline-block text-sm hover:underline">
             All {count(data.counts.all)} held
           </Link>

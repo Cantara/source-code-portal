@@ -101,6 +101,17 @@ export function PanelRightIcon({ open, className }: { open: boolean; className?:
   )
 }
 
+/** PanelLeftIcon stands for a panel at the left: folded (the chevron points to open it) or open (it points to fold it). */
+export function PanelLeftIcon({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <Icon className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+      <path d={open ? "M16 10l-2 2 2 2" : "M14 10l2 2-2 2"} />
+    </Icon>
+  )
+}
+
 /** CheckIcon marks the chosen item of a menu. */
 export function CheckIcon({ className }: { className?: string }) {
   return (

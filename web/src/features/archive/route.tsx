@@ -3,6 +3,7 @@ import { crumbs } from "@/lib/crumbs"
 import { list, prefetch } from "@/lib/load"
 import type { Ctx, Route } from "@/lib/page"
 import { pageSize, sizeCookie } from "@/lib/paging"
+import { filtersCookie, filtersOf } from "@/lib/preferences"
 import { ld } from "@/lib/seo"
 import { archiveState, defaultArchiveSize } from "./api"
 import { ArchiveView } from "./view"
@@ -26,5 +27,5 @@ export const archiveRoute: Route<object> = {
     alternates: { canonical: "/archive" },
   }),
   structured: (_, base) => [ld.page(base, "/archive", "Archive"), ld.breadcrumbs(base, crumbs.archive())],
-  render: (ctx) => <ArchiveView defaultSize={size(ctx)} />,
+  render: (ctx) => <ArchiveView defaultSize={size(ctx)} filters={filtersOf(ctx.cookies[filtersCookie])} />,
 }

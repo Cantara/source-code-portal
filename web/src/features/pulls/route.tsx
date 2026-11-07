@@ -3,6 +3,7 @@ import { crumbs } from "@/lib/crumbs"
 import { list, prefetch } from "@/lib/load"
 import type { Ctx, Route } from "@/lib/page"
 import { pageSize, sizeCookie } from "@/lib/paging"
+import { filtersCookie, filtersOf } from "@/lib/preferences"
 import { ld } from "@/lib/seo"
 import { defaultPullSize, pullsState } from "./api"
 import { PullsView } from "./view"
@@ -25,5 +26,5 @@ export const pullsRoute: Route<object> = {
     alternates: { canonical: "/pulls" },
   }),
   structured: (_, base) => [ld.page(base, "/pulls", "Pull requests"), ld.breadcrumbs(base, crumbs.pulls())],
-  render: (ctx) => <PullsView defaultSize={size(ctx)} />,
+  render: (ctx) => <PullsView defaultSize={size(ctx)} filters={filtersOf(ctx.cookies[filtersCookie])} />,
 }

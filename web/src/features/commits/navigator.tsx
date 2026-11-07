@@ -1,18 +1,8 @@
 "use client"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { usePathname, useSearchParams } from "next/navigation"
-import {
-  createContext,
-  useContext,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { createContext, useContext, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { Alert } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api/client"
@@ -27,26 +17,30 @@ import { GraphCell, maxLanes } from "@/entities/commit/graph-cell"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
-import { Pager, PageSizeField } from "@/shared/pager"
+import { Pager } from "@/shared/pager"
+import { Choices, FilterForm, FilterGroup, FilterLayout, SizeChoices, TextFilter, Toggle } from "@/shared/filters"
+import type { Filters } from "@/lib/preferences"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { DiffStat, said } from "@/shared/diffstat"
-import {
-  historyQuery,
-  historyState,
-  request,
-  search,
-  type HistoryCommit,
-  type HistoryFilter,
-  type HistoryState,
-  type Label,
-} from "./history"
+import { historyQuery, historyState, request, search, type HistoryCommit, type HistoryState, type Label } from "./history"
 
 const searchId = "history-search"
 
 /** NavigatorView is a repository's history as a git graph in numbered pages: filters, the rows, the selected commit's details. */
-export function NavigatorView({ owner, name, defaultSize }: { owner: string; name: string; defaultSize: number }) {
+export function NavigatorView({
+  owner,
+  name,
+  defaultSize,
+  filters,
+}: {
+  owner: string
+  name: string
+  defaultSize: number
+  filters: Filters
+}) {
   // The state of the address, made again only when the address changes: the effects below depend on its filter.
+  const path = usePathname()
   const query = useSearchParams().toString()
   const st = useMemo(() => historyState(Object.fromEntries(new URLSearchParams(query)), defaultSize), [query, defaultSize])
   const detail = useQuery(repoQuery(api, owner, name)).data
@@ -59,14 +53,21 @@ export function NavigatorView({ owner, name, defaultSize }: { owner: string; nam
         title={`Commits in ${repo ? `${repo.owner}/${repo.name}` : `${owner}/${name}`}`}
         trail={crumbs.repoCommits(repo?.owner ?? owner, repo?.name ?? name, detail?.group)}
       />
-      <Navigator
-        key={search({ filter: st.filter, size: defaultSize }, defaultSize)}
-        owner={owner}
-        name={name}
-        st={st}
-        defaultSize={defaultSize}
-        github={repo?.htmlUrl}
-      />
+      <FilterLayout
+        initial={filters}
+        label="Filter commits"
+        clear={search({ filter: st.filter, size: defaultSize }, defaultSize) === "" ? undefined : path}
+        filters={<HistoryFilters owner={owner} name={name} st={st} defaultSize={defaultSize} />}
+      >
+        <Navigator
+          key={search({ filter: st.filter, size: defaultSize }, defaultSize)}
+          owner={owner}
+          name={name}
+          st={st}
+          defaultSize={defaultSize}
+          github={repo?.htmlUrl}
+        />
+      </FilterLayout>
     </PullHeads>
   )
 }
@@ -179,11 +180,6 @@ function Navigator({
     select(i)
   })
 
-  function setSize(n: number) {
-    rememberSize("history", n)
-    write({ ...st, size: n, page: firstPageOf(number, st.size, n), sha: undefined }, true)
-  }
-
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const n = commits.length
     if (n === 0 || !data) return
@@ -215,14 +211,6 @@ function Navigator({
 
   return (
     <section aria-label="History" className="flex flex-col gap-3">
-      <FilterForm
-        path={path}
-        st={st}
-        defaultSize={defaultSize}
-        labels={data.labels}
-        onFilter={(f) => write({ filter: f, size: st.size }, true)}
-        onSize={setSize}
-      />
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <FreshnessBadge freshness={data.freshness} />
         {data.filtered && (
@@ -313,63 +301,71 @@ function Navigator({
   )
 }
 
-function FilterForm({
-  path,
+/**
+ * HistoryFilters are the history's filters in the panel at the left: the branch or tag (every one listed, from the labels of the
+ * page that is read), the author, the search (press /), automation and the page size. The page's read is the navigator's own, the
+ * same query, so it is asked once.
+ */
+function HistoryFilters({
+  owner,
+  name,
   st,
   defaultSize,
-  labels,
-  onFilter,
-  onSize,
 }: {
-  path: string
+  owner: string
+  name: string
   st: HistoryState
   defaultSize: number
-  labels: Label[]
-  onFilter: (f: HistoryFilter) => void
-  onSize: (n: number) => void
 }) {
-  const filter = st.filter
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = new FormData(e.currentTarget)
-    onFilter(historyState(Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)])), st.size).filter)
+  const qc = useQueryClient()
+  const path = usePathname()
+  const router = useRouter()
+  const { data } = useQuery(historyQuery(api, qc, owner, name, st.filter, st.size, request(st)))
+  const f = st.filter
+  const pick = (patch: Record<string, string>) => {
+    const fields = { ref: f.ref, author: f.author, q: f.q, automation: f.automation === false ? "false" : undefined, ...patch }
+    router.push(path + search({ filter: historyState(fields, st.size).filter, size: st.size }, defaultSize))
   }
-  const field = "mt-1 min-h-9 rounded-md border border-input bg-background px-2"
+  const pickSize = (n: number) => {
+    rememberSize("history", n)
+    const number = data?.page.number ?? st.page ?? 1
+    window.history.pushState(
+      null,
+      "",
+      path + search({ ...st, size: n, page: firstPageOf(number, st.size, n), sha: undefined }, defaultSize),
+    )
+  }
+  const labels = data?.labels ?? []
+  const refs = [
+    { value: "", label: "All branches" },
+    ...labels.map((l) => ({
+      value: l.name,
+      label: l.kind === "tag" ? `Tag ${l.name}` : l.default ? `${l.name} (default)` : l.name,
+    })),
+  ]
+  if (f.ref && !refs.some((o) => o.value === f.ref)) refs.push({ value: f.ref, label: f.ref })
   return (
-    <form onSubmit={submit} action={path} className="flex flex-wrap items-end gap-3 text-sm" aria-label="Filter commits">
-      <label className="flex flex-col">
-        Branch or tag
-        <select name="ref" defaultValue={filter.ref ?? ""} className={field}>
-          <option value="">All branches</option>
-          {labels.map((l) => (
-            <option key={l.kind + l.name} value={l.name}>
-              {l.kind === "tag" ? `Tag ${l.name}` : l.default ? `${l.name} (default)` : l.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col">
-        Author
-        <input name="author" defaultValue={filter.author ?? ""} className={field} />
-      </label>
-      <label className="flex flex-col">
-        Search (press /)
-        <input id={searchId} type="search" name="q" defaultValue={filter.q ?? ""} className={field} />
-      </label>
-      <label className="flex min-h-9 items-center gap-2">
-        <input type="checkbox" name="automation" value="false" defaultChecked={filter.automation === false} />
-        Hide automation
-      </label>
-      <PageSizeField value={st.size} onSize={onSize} />
-      <Button type="submit" variant="outline">
-        Apply
-      </Button>
-      {search({ filter, size: defaultSize }, defaultSize) !== "" && (
-        <a href={path} className="min-h-9 content-center hover:underline">
-          Clear
-        </a>
-      )}
-    </form>
+    <FilterForm action={path} label="Filter commits">
+      <FilterGroup title="Branch or tag">
+        <Choices name="ref" label="Branch or tag" value={f.ref ?? ""} onPick={(ref) => pick({ ref })} options={refs} scroll />
+      </FilterGroup>
+      <FilterGroup title="Author">
+        <TextFilter name="author" label="Author" value={f.author ?? ""} onPick={(author) => pick({ author })} />
+      </FilterGroup>
+      <FilterGroup title="Search (press /)">
+        <TextFilter id={searchId} name="q" label="Search the commits" value={f.q ?? ""} onPick={(q) => pick({ q })} />
+      </FilterGroup>
+      <FilterGroup title="Show">
+        <Toggle
+          name="automation"
+          value="false"
+          label="Hide automation"
+          checked={f.automation === false}
+          onPick={(on) => pick({ automation: on ? "false" : "" })}
+        />
+      </FilterGroup>
+      <SizeChoices value={st.size} onPick={pickSize} />
+    </FilterForm>
   )
 }
 

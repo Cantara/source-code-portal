@@ -91,11 +91,11 @@ test("the commit log pages by number and remembers the page size", async ({ page
   await expect(pager.getByText(/^51–100 of /)).toBeVisible()
   await page.getByRole("navigation", { name: "Pages, at the end" }).getByRole("link", { name: "Previous" }).click()
   await expect(page).toHaveURL("/commits")
-  await page.getByLabel("Per page").selectOption("100")
+  await page.getByRole("radio", { name: "100", exact: true }).click()
   await expect(commits).toHaveCount(100)
   await page.reload()
   await expect(commits).toHaveCount(100) // the choice is remembered
-  await expect(page.getByLabel("Per page")).toHaveValue("100")
+  await expect(page.getByRole("radio", { name: "100", exact: true })).toBeChecked()
 })
 
 test("the README renders with highlighting and no script", async ({ page }) => {

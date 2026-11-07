@@ -20,6 +20,7 @@ import { StatusBanners } from "@/features/status/banners"
 import { setLocation } from "@/test/navigation"
 import { MainNav } from "./shell"
 import { RulesProvider } from "@/lib/rules-context"
+import type { Filters } from "@/lib/preferences"
 import { activity, commit, fresh, http, noPulls, rules, server, snapshot } from "@/test/server"
 
 function client() {
@@ -37,21 +38,24 @@ function show(view: ReactNode, path = "/", qc = client()) {
   )
 }
 
+/** noFilters is the filter panel of a reader who has not chosen: open on a wide screen. */
+const noFilters: Filters = { open: true, chosen: false }
+
 describe("pages", () => {
   it("lists the open pull requests whose turn first, the states as filters", async () => {
-    show(<PullsView defaultSize={50} />, "/pulls")
+    show(<PullsView defaultSize={50} filters={noFilters} />, "/pulls")
     expect(await screen.findByRole("heading", { level: 1, name: "Pull requests" })).toBeInTheDocument()
-    const chips = within(await screen.findByRole("navigation", { name: "By whose turn" }))
-    expect(chips.getByRole("link", { name: /All open 2/ })).toHaveAttribute("aria-current", "page")
-    expect(chips.getByRole("link", { name: /Needs review 1/ })).toHaveAttribute("href", "/pulls?state=review")
-    expect(chips.getByRole("link", { name: /Ready to merge 1/ })).toBeInTheDocument()
-    expect(chips.queryByRole("link", { name: /Failing checks/ })).toBeNull()
+    const turn = within(await screen.findByRole("radiogroup", { name: "Whose turn" }))
+    expect(await turn.findByRole("radio", { name: /All open 2/ })).toBeChecked()
+    expect(turn.getByRole("radio", { name: /Needs review 1/ })).not.toBeChecked()
+    expect(turn.getByRole("radio", { name: /Ready to merge 1/ })).toBeEnabled()
+    expect(turn.getByRole("radio", { name: /Failing checks 0/ })).toBeDisabled() // none: dimmed, still in view
     expect(screen.getByRole("link", { name: "Change 1" })).toHaveAttribute("href", "https://github.com/acme/core/pull/1")
     expect(screen.getByRole("form", { name: "Filter pull requests" })).toHaveAttribute("action", "/pulls")
   })
 
   it("answers five questions about the fleet, naming repositories and no one", async () => {
-    show(<InsightsView />, "/insights")
+    show(<InsightsView filters={noFilters} />, "/insights")
     expect(await screen.findByRole("heading", { level: 1, name: "Insights" })).toBeInTheDocument()
     expect(await screen.findByText("3 stable releases in the last 12 months.")).toBeInTheDocument()
     for (const q of [
@@ -88,13 +92,13 @@ describe("pages", () => {
   })
 
   it("lists the recent releases, the variants as filters with their counts", async () => {
-    show(<ReleasesView defaultSize={50} />, "/releases")
+    show(<ReleasesView defaultSize={50} filters={noFilters} />, "/releases")
     expect(await screen.findByRole("heading", { level: 1, name: "Releases" })).toBeInTheDocument()
-    const chips = within(await screen.findByRole("navigation", { name: "By variant" }))
-    expect(chips.getByRole("link", { name: /Latest per repository 2/ })).toHaveAttribute("aria-current", "true")
-    expect(chips.getByRole("link", { name: /Every release 3/ })).toHaveAttribute("href", "/releases?variant=all")
-    expect(chips.getByRole("link", { name: /Pre-releases 1/ })).toHaveAttribute("href", "/releases?variant=pre")
-    const rows = within(screen.getByRole("list", { name: "Release list" })).getAllByRole("listitem")
+    const which = within(await screen.findByRole("radiogroup", { name: "Which releases" }))
+    expect(await which.findByRole("radio", { name: /Latest per repository 2/ })).toBeChecked()
+    expect(which.getByRole("radio", { name: /Every release 3/ })).not.toBeChecked()
+    expect(which.getByRole("radio", { name: /Pre-releases 1/ })).toBeEnabled()
+    const rows = within(await screen.findByRole("list", { name: "Releases" })).getAllByRole("listitem")
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveTextContent("acme/core")
     expect(rows[0]).toHaveTextContent("Pre-release")
@@ -109,13 +113,13 @@ describe("pages", () => {
   })
 
   it("lists the retired repositories with why, when they were last active and what still depends on them", async () => {
-    show(<ArchiveView defaultSize={50} />, "/archive")
+    show(<ArchiveView defaultSize={50} filters={noFilters} />, "/archive")
     expect(await screen.findByRole("heading", { level: 1, name: "Archive" })).toBeInTheDocument()
-    const chips = within(await screen.findByRole("navigation", { name: "By reason" }))
-    expect(chips.getByRole("link", { name: /All 2/ })).toHaveAttribute("aria-current", "true")
-    expect(chips.getByRole("link", { name: /Archived 1/ })).toHaveAttribute("href", "/archive?reason=archived")
-    expect(chips.getByRole("link", { name: /Deprecated 1/ })).toHaveAttribute("href", "/archive?reason=deprecated")
-    const rows = within(screen.getByRole("list", { name: "Archive" })).getAllByRole("listitem")
+    const why = within(await screen.findByRole("radiogroup", { name: "Reason" }))
+    expect(await why.findByRole("radio", { name: /All 2/ })).toBeChecked()
+    expect(why.getByRole("radio", { name: /Archived 1/ })).not.toBeChecked()
+    expect(why.getByRole("radio", { name: /Deprecated 1/ })).not.toBeChecked()
+    const rows = within(await screen.findByRole("list", { name: "Archive" })).getAllByRole("listitem")
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveTextContent("Archived")
     expect(rows[0]).toHaveTextContent("used by 2")
@@ -126,13 +130,13 @@ describe("pages", () => {
   })
 
   it("lists the open issues what waits first, the states as filters", async () => {
-    show(<IssuesView defaultSize={50} />, "/issues")
+    show(<IssuesView defaultSize={50} filters={noFilters} />, "/issues")
     expect(await screen.findByRole("heading", { level: 1, name: "Issues" })).toBeInTheDocument()
-    const chips = within(await screen.findByRole("navigation", { name: "By where they stand" }))
-    expect(chips.getByRole("link", { name: /All open 2/ })).toHaveAttribute("aria-current", "page")
-    expect(chips.getByRole("link", { name: /Needs triage 1/ })).toHaveAttribute("href", "/issues?state=triage")
-    expect(chips.queryByRole("link", { name: /Unassigned/ })).toBeNull()
-    const list = within(screen.getByRole("list", { name: "Issues" }))
+    const stands = within(await screen.findByRole("radiogroup", { name: "Where it stands" }))
+    expect(await stands.findByRole("radio", { name: /All open 2/ })).toBeChecked()
+    expect(stands.getByRole("radio", { name: /Needs triage 1/ })).toBeEnabled()
+    expect(stands.getByRole("radio", { name: /Unassigned 0/ })).toBeDisabled()
+    const list = within(await screen.findByRole("list", { name: "Issues" }))
     expect(list.getByRole("link", { name: "Problem 1" })).toHaveAttribute("href", "https://github.com/acme/core/issues/1")
     expect(list.getByText("for bo")).toBeInTheDocument()
     expect(list.getByText("Bug")).toBeInTheDocument()
@@ -145,7 +149,7 @@ describe("pages", () => {
         response(200).json({ unmet: [{ feature: "issues", title: "Issues", effect: "Open issues are not read." }] }),
       ),
     )
-    show(<IssuesView defaultSize={50} />, "/issues")
+    show(<IssuesView defaultSize={50} filters={noFilters} />, "/issues")
     const notice = await screen.findByRole("status", { name: "Disabled feature" })
     expect(notice).toHaveTextContent("Open issues are not read.")
     expect(notice).toHaveTextContent("An administrator of the portal can grant what it needs on GitHub.")
@@ -172,7 +176,7 @@ describe("pages", () => {
         }),
       ),
     )
-    show(<PullsView defaultSize={50} />, "/pulls")
+    show(<PullsView defaultSize={50} filters={noFilters} />, "/pulls")
     const notice = await screen.findByRole("status", { name: "Disabled feature" })
     expect(notice).toHaveTextContent("Missing read permissions: Pull requests, Checks.")
     expect(notice).toHaveTextContent("Installation: acme (source gh).")
@@ -183,7 +187,7 @@ describe("pages", () => {
   })
 
   it("shows no warning when every prerequisite holds", async () => {
-    show(<IssuesView defaultSize={50} />, "/issues")
+    show(<IssuesView defaultSize={50} filters={noFilters} />, "/issues")
     expect(await screen.findByRole("heading", { level: 1, name: "Issues" })).toBeInTheDocument()
     expect(screen.queryByRole("status", { name: "Disabled feature" })).toBeNull()
   })
@@ -395,7 +399,7 @@ describe("commit log", () => {
     pages()
     const user = userEvent.setup()
     const qc = client()
-    show(<AllCommitsView defaultSize={50} />, "/commits", qc)
+    show(<AllCommitsView defaultSize={50} filters={noFilters} />, "/commits", qc)
     await screen.findByText("Commit 0")
     await waitFor(() => expect(qc.getQueryData(["snapshot"])).toBeDefined())
     const pager = screen.getByRole("navigation", { name: "Pages" })
@@ -414,7 +418,7 @@ describe("commit log", () => {
     await user.click(button)
     await waitFor(() => expect(screen.queryByRole("button", { name: "New commits" })).not.toBeInTheDocument())
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Per page" }), "25")
+    await user.click(screen.getByRole("radio", { name: "25" }))
     expect(window.location.search).toBe("?page=3&per=25") // the first commit shown, 51, is on page 3 of 25
     expect(await within(screen.getByRole("navigation", { name: "Pages" })).findByText("51–55 of 55 commits")).toBeInTheDocument()
     expect(document.cookie).toContain("scp-per-commits=25")

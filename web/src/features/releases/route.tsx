@@ -3,6 +3,7 @@ import { crumbs } from "@/lib/crumbs"
 import { list, prefetch } from "@/lib/load"
 import type { Ctx, Route } from "@/lib/page"
 import { pageSize, sizeCookie } from "@/lib/paging"
+import { filtersCookie, filtersOf } from "@/lib/preferences"
 import { ld } from "@/lib/seo"
 import { defaultReleaseSize, releasesState } from "./api"
 import { ReleasesView } from "./view"
@@ -25,5 +26,5 @@ export const releasesRoute: Route<object> = {
     alternates: { canonical: "/releases" },
   }),
   structured: (_, base) => [ld.page(base, "/releases", "Releases"), ld.breadcrumbs(base, crumbs.releases())],
-  render: (ctx) => <ReleasesView defaultSize={size(ctx)} />,
+  render: (ctx) => <ReleasesView defaultSize={size(ctx)} filters={filtersOf(ctx.cookies[filtersCookie])} />,
 }

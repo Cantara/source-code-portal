@@ -5,6 +5,7 @@ import { addressPath } from "@/lib/paths"
 import { DiffStat } from "@/shared/diffstat"
 import { EmptyState } from "@/shared/empty-state"
 import { InitialsAvatar } from "@/shared/initials-avatar"
+import { Dot, ListRow } from "@/shared/list-row"
 import { RelativeTime } from "@/shared/relative-time"
 import { StateChip } from "@/shared/state-chip"
 
@@ -77,21 +78,23 @@ export function PullList({
   return (
     <ol aria-label={label} className={cn("divide-y divide-border", className)}>
       {pulls.map((p) => (
-        <li key={`${p.repo}#${p.number}`} className={cn("flex gap-3", compact ? "py-1.5" : "py-2")}>
-          {!compact && <InitialsAvatar name={p.author} />}
-          <div className="min-w-0 flex-1">
-            <p className={cn("flex items-baseline gap-2", compact && "text-sm")}>
-              <a
-                href={p.url}
-                rel="noreferrer"
-                className={cn("min-w-0 hover:underline", compact ? "truncate" : "break-words")}
-                title={p.title}
-              >
-                {p.title}
-              </a>
-              {!compact && p.stats && <DiffStat stats={p.stats} className="ml-auto self-center" />}
-            </p>
-            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-muted-foreground">
+        <ListRow
+          key={`${p.repo}#${p.number}`}
+          compact={compact}
+          lead={<InitialsAvatar name={p.author} />}
+          title={
+            <a
+              href={p.url}
+              rel="noreferrer"
+              className={cn("min-w-0 hover:underline", compact ? "truncate" : "break-words")}
+              title={p.title}
+            >
+              {p.title}
+            </a>
+          }
+          aside={p.stats && <DiffStat stats={p.stats} />}
+          meta={
+            <>
               <PullStateChip state={p.state} />
               {showRepo ? (
                 <Link
@@ -108,20 +111,20 @@ export function PullList({
                 {p.author}
                 {p.bot && <span className="text-xs"> (automation)</span>}
               </span>
-              <span aria-hidden="true">·</span>
+              <Dot />
               <span title="the last activity">
                 {!compact && "updated "}
                 <RelativeTime at={p.updatedAt} />
               </span>
               {!compact && (
                 <>
-                  <span aria-hidden="true">·</span>
+                  <Dot />
                   <span>
                     opened <RelativeTime at={p.createdAt} />
                   </span>
                   {checksWords[p.checks] && (
                     <>
-                      <span aria-hidden="true">·</span>
+                      <Dot />
                       <span>{checksWords[p.checks]}</span>
                     </>
                   )}
@@ -132,9 +135,9 @@ export function PullList({
                   ))}
                 </>
               )}
-            </p>
-          </div>
-        </li>
+            </>
+          }
+        />
       ))}
     </ol>
   )
