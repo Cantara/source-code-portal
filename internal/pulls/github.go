@@ -195,19 +195,7 @@ func readPulls(body io.Reader) ([]Listed, error) {
 			case "requested_teams":
 				err = d.Array(func() error { p.Requested++; return d.Skip() })
 			case "requested_reviewers":
-				err = d.Array(func() error {
-					p.Requested++
-					return d.Object(func(k string) (err error) {
-						if k != "login" {
-							return d.Skip()
-						}
-						var login string
-						if login, err = d.String(maxField); err == nil && len(p.Reviewers) < maxReviewers && login != "" {
-							p.Reviewers = append(p.Reviewers, login)
-						}
-						return err
-					})
-				})
+				err = readReviewers(d, &p)
 			default:
 				err = d.Skip()
 			}
@@ -304,4 +292,21 @@ type detailJSON struct {
 			} `json:"commit"`
 		} `json:"nodes"`
 	} `json:"commits"`
+}
+
+// readReviewers reads the people asked to review: counted, and the first maxReviewers kept by login.
+func readReviewers(d *jsonstream.Reader, p *Listed) error {
+	return d.Array(func() error {
+		p.Requested++
+		return d.Object(func(k string) (err error) {
+			if k != "login" {
+				return d.Skip()
+			}
+			var login string
+			if login, err = d.String(maxField); err == nil && len(p.Reviewers) < maxReviewers && login != "" {
+				p.Reviewers = append(p.Reviewers, login)
+			}
+			return err
+		})
+	})
 }
