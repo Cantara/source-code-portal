@@ -163,14 +163,17 @@ announcements:
 		b, _ := io.ReadAll(resp.Body)
 		return resp.StatusCode, string(b), resp.Header
 	}
-	// A cold start runs more jobs after the ones the readiness below reads (packages, releases, ...): until the queue is idle a
-	// repository's digest, and with it the snapshot's version, may still move, which a test comparing versions must not mistake
+	// A cold start runs more jobs after the ones the readiness below reads (packages, releases, ...), and their results join the snapshot at its next publish: until the
+	// queue is idle and published a repository's digest, and with it the snapshot's version, may still move, which a test comparing versions must not mistake
 	// for its own change.
 	idle := func() {
 		t.Helper()
 		for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
 			if waiting, running := srv.engine.Depth(); waiting+running == 0 {
-				return
+				srv.pub.Flush() // a finished job's result waits for the next publish, up to a second: it is part of the cold start too
+				if waiting, running = srv.engine.Depth(); waiting+running == 0 {
+					return
+				}
 			}
 			if time.Now().After(deadline) {
 				t.Fatal("the jobs of the cold start did not finish within 10s")
