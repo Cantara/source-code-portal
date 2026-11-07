@@ -163,16 +163,32 @@ announcements:
 		b, _ := io.ReadAll(resp.Body)
 		return resp.StatusCode, string(b), resp.Header
 	}
+	// A cold start runs more jobs after the ones the readiness below reads (packages, releases, ...): until the queue is idle a
+	// repository's digest, and with it the snapshot's version, may still move, which a test comparing versions must not mistake
+	// for its own change.
+	idle := func() {
+		t.Helper()
+		for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+			if waiting, running := srv.engine.Depth(); waiting+running == 0 {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("the jobs of the cold start did not finish within 10s")
+			}
+		}
+	}
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
 		var d oapi.Dashboard
 		_, b, _ := get("/api/v1/dashboard", staff...)
 		_, docs, _ := get("/api/v1/repos/acme/zq-hidden/docs", staff...)
 		_, mf, _ := get("/api/v1/repos/acme/open/manifests", staff...)
 		if !private && json.Unmarshal([]byte(b), &d) == nil && d.Freshness.Fresh == 1 && len(d.Latest) == 1 && strings.Contains(mf, "example.com/lib/q7") {
+			idle()
 			return get, base
 		}
 		if json.Unmarshal([]byte(b), &d) == nil && d.Freshness.Fresh == 2 && len(d.Latest) == 2 && strings.Contains(docs, "guide") &&
 			strings.Contains(mf, "zq-hidden") {
+			idle()
 			return get, base
 		}
 		if time.Now().After(deadline) {

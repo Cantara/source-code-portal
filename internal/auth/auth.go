@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"crypto/sha256"
 	"crypto/subtle"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -18,13 +19,23 @@ type Options struct {
 	SessionKey []byte        // at least 32 bytes; nil: no sessions
 	SessionTTL time.Duration // a session's lifetime; one older than half of it is resealed on use
 	Tokens     []Token
-	OIDC       *OIDC  // nil: no provider
-	PublicURL  string // server.public_url: the redirect URI's base and whether cookies are Secure
+	// Launch, when set, adds GET /auth/launch: a link that signs in as the named token once (design/personal.md).
+	Launch    *Launch
+	OIDC      *OIDC  // nil: no provider
+	PublicURL string // server.public_url: the redirect URI's base and whether cookies are Secure
 	// Keep returns the groups a session keeps of the provider's, those the access lists name: a session must fit in a cookie.
 	Keep   func(groups []string) []string
 	Client *http.Client // to the provider; nil: one with timeouts
 	Now    func() time.Time
 	Log    *slog.Logger
+}
+
+// Launch is a sign-in link for the person who started the portal: its code is random, valid until Expires and for one use, and it
+// signs in as the token named Token (a session that looks the token up on every request, as a token's sign-in does).
+type Launch struct {
+	Code    string
+	Token   string
+	Expires time.Time
 }
 
 // Token is a bearer credential.
@@ -52,6 +63,7 @@ type Auth struct {
 	session  string // the session cookie's name
 	flow     string // the pending sign-in cookie's name
 	provider *provider
+	launch   *launchState
 }
 
 type token struct {
@@ -112,6 +124,12 @@ func New(o Options) (*Auth, error) {
 	}
 	if a.flows, err = newSealer(o.SessionKey, flowLabel); err != nil {
 		return nil, err
+	}
+	if o.Launch != nil {
+		if _, ok := a.named(o.Launch.Token); !ok || o.Launch.Code == "" {
+			return nil, errors.New("auth: the launch link needs a code and the name of a configured token")
+		}
+		a.launch = &launchState{Launch: *o.Launch, digest: sha256.Sum256([]byte(o.Launch.Code))}
 	}
 	if o.OIDC != nil {
 		a.provider = &provider{o: *o.OIDC, client: o.Client, redirect: o.PublicURL + "/auth/callback", log: o.Log}

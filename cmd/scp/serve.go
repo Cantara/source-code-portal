@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -142,10 +143,16 @@ type deps struct {
 	registries http.RoundTripper
 	public     map[string]string
 	cluster    func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
+	launch     *auth.Launch                                   // the personal edition's one-use sign-in link
 }
 
 // newServer opens the store, wires the features and binds both listeners.
 func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger) (_ *server, err error) {
+	for i, src := range cfg.GitHub.Sources {
+		if src.Credential && !src.Token.IsSet() { // scp personal resolves it from the vault before it gets here
+			return nil, fmt.Errorf("github.sources[%d].credential: the credential is in the vault of scp personal; serve reads app or token_file", i)
+		}
+	}
 	gh, err := github.New(cfg.GitHub, d.github, log)
 	if err != nil {
 		return nil, err
@@ -299,7 +306,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
 	me := httpapi.MeAPI{}
 	if cfg.Auth.SignIn() || len(cfg.Auth.Tokens) > 0 {
-		a, err := newAuth(cfg, log)
+		a, err := newAuth(cfg, log, d.launch)
 		if err != nil {
 			return nil, err
 		}
@@ -379,10 +386,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 
 // newAuth builds sign-in from the config. A session keeps only the provider's groups the access lists name, so it fits a cookie;
 // a group added to a list applies at the next sign-in, one removed at once.
-func newAuth(cfg config.Config, log *slog.Logger) (*auth.Auth, error) {
+func newAuth(cfg config.Config, log *slog.Logger, launch *auth.Launch) (*auth.Auth, error) {
 	a := cfg.Auth
 	named := slices.Concat(cfg.Access.PrivateGroups, a.AdminGroups)
-	o := auth.Options{SessionTTL: a.SessionTTL, PublicURL: cfg.Server.PublicURL, Log: log,
+	o := auth.Options{SessionTTL: a.SessionTTL, PublicURL: cfg.Server.PublicURL, Log: log, Launch: launch,
 		Keep: func(groups []string) []string {
 			return slices.DeleteFunc(slices.Clone(groups), func(g string) bool { return !slices.Contains(named, g) })
 		}}

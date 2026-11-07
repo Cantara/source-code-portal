@@ -6,8 +6,8 @@ subjects.
 
 ## Unreleased
 
-Release notes on the Releases page, the repository's and the product's pages, and a store that migrates without losing data (the first
-step towards a personal edition: `design/store-model.md`). No configuration change is needed to upgrade.
+Release notes on the Releases page, the repository's and the product's pages, and a store that migrates without losing data, plus a
+personal edition (`scp personal`). No configuration change is needed to upgrade.
 
 - **Release notes**: a release's notes show under its row as a disclosure ("Release notes"), on `/releases` and in the Releases panels of
   a repository and a product. They are the GitHub release's own text; a package release, and a GitHub release without a body, shows the
@@ -20,6 +20,12 @@ step towards a personal edition: `design/store-model.md`). No configuration chan
 - **Two sources that list one `owner/name` no longer take it from each other**: the source whose id sorts first owns it and the other's
   repository is left out and named in the log (before, the address changed hands at every listing and its data was deleted each time).
   Not reachable with today's configuration, which keeps an account in one source.
+
+- **A personal edition**: `scp personal` signs you in to GitHub (github.com, a GitHub Enterprise Server or a GHE.com tenant) with a code
+  on GitHub or a pasted token, keeps the credential sealed in the store (the key in the operating system's keychain, else a 0600 file),
+  writes an editable `personal.yaml` and serves a portal on this computer only that refuses every request without a session; a link
+  that works once signs the owner in. See [the personal edition](docs/personal-edition.md). New key `github.sources[].credential`
+  (`scp serve` refuses it); new store table `credential` (migration 0003, a copy first); new dependencies `go-keyring` and `x/term`.
 
 ## 2.2.9
 

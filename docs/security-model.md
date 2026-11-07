@@ -89,3 +89,18 @@ none of the operator duties below except the network layout.
 - Access rules per document or per path inside a repository.
 - Mutual TLS between the proxy and the portal, or rate limiting of its own.
 - Writing to GitHub: the portal reads, and every change stays on GitHub.
+
+## The personal edition
+
+[`scp personal`](personal-edition.md) runs the same portal for one person, with the same guarantees (a request without that person's
+session sees nothing; the public view never knew the private repositories), and adds a credential held by the portal itself:
+
+- The token is sealed in the store (AES-256-GCM, with the credential's id, source and kind as additional data, so a copied value does
+  not open elsewhere). The key is not in the store: it is in the operating system's keychain, else in a file readable by the owner
+  only. The token is never written to a log, the status page, a snapshot or an API answer.
+- The portal serves loopback addresses only (it refuses a configuration that does not) and refuses every request without a session.
+  The owner signs in with a link whose code is random, valid ten minutes and for one use, and gets a sealed session cookie.
+- A token held on a computer can be used by whoever controls that computer's files and keychain. A fine-grained token or a GitHub
+  App with read-only permissions limits what that is; a classic OAuth token with the scope `repo` can also write to GitHub, which SCP
+  never does itself (the fake GitHub of the tests fails on any write).
+- It does not refresh a token that ends: it says so and asks the person to sign in again.

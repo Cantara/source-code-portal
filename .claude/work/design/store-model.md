@@ -220,3 +220,8 @@ SM-a (the migration, `repo.visibility`, the conflict rule, the pre-migration cop
 (one principal, sealed credential, the wizard, "my work"; a design note of its own) -> rung 1: the pilot site (Enterprise Server
 checks, Entra sign-in on the existing OIDC, a deployment guide for the team's AWS account) -> SM-b (`ViewOf`, `Public()` as its
 special case, the viewer seam, the leak and twin tests for many viewers) -> rung 2 (Entra groups) -> rung 3 (the person's own access).
+
+## Update (PE1)
+
+The personal edition (`personal.md`) built only the `credential` table of this note's tables (migration 0003): `principal`, `visible`,
+`source` and `item.credential_id` wait for rung 1 and on, each with its code.

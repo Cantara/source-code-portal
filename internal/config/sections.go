@@ -30,12 +30,14 @@ type GitHub struct {
 
 // Source is one GitHub host with one credential: a GitHub App or a token.
 type Source struct {
-	ID           string   `mapstructure:"id"`
-	BaseURL      string   `mapstructure:"base_url"` // REST base with a trailing slash; GHES: https://host/api/v3/
-	Orgs         []string `mapstructure:"orgs"`     // organisations and user accounts
-	App          *App     `mapstructure:"app"`
-	TokenFile    string   `mapstructure:"token_file"`
-	IncludeForks bool     `mapstructure:"include_forks"`
+	ID        string   `mapstructure:"id"`
+	BaseURL   string   `mapstructure:"base_url"` // REST base with a trailing slash; GHES: https://host/api/v3/
+	Orgs      []string `mapstructure:"orgs"`     // organisations and user accounts
+	App       *App     `mapstructure:"app"`
+	TokenFile string   `mapstructure:"token_file"`
+	// Credential takes the token from the vault (scp personal): the command resolves it before the portal starts; scp serve refuses it.
+	Credential   bool `mapstructure:"credential"`
+	IncludeForks bool `mapstructure:"include_forks"`
 	// Exclude keeps matching repositories out of the catalogue even where the credential reads them (the groups' matcher kinds).
 	Exclude []Match `mapstructure:"exclude"`
 	// IncludePrivate admits private and internal repositories; access.private_groups says who sees them.
@@ -44,6 +46,17 @@ type Source struct {
 	RawIncludeArchived *bool  `mapstructure:"include_archived"`
 	IncludeArchived    bool   `mapstructure:"-"`
 	Token              Secret `mapstructure:"-"` // read from TokenFile
+}
+
+// credentials counts the credentials a source names.
+func (s Source) credentials() int {
+	n := 0
+	for _, set := range []bool{s.App != nil, s.TokenFile != "", s.Credential} {
+		if set {
+			n++
+		}
+	}
+	return n
 }
 
 // App is a GitHub App credential.
@@ -278,10 +291,10 @@ func (g GitHub) validate() []string {
 			}
 		}
 		switch {
-		case s.App != nil && s.TokenFile != "":
-			p = append(p, at+": set either app or token_file, not both")
-		case s.App == nil && s.TokenFile == "":
-			p = append(p, at+": set app or token_file")
+		case s.credentials() > 1:
+			p = append(p, at+": set one of app, token_file or credential")
+		case s.credentials() == 0:
+			p = append(p, at+": set app, token_file or credential")
 		case s.App != nil:
 			if s.App.ID <= 0 {
 				p = append(p, at+".app.id: required")
