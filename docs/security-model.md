@@ -104,3 +104,8 @@ session sees nothing; the public view never knew the private repositories), and 
   App with read-only permissions limits what that is; a classic OAuth token with the scope `repo` can also write to GitHub, which SCP
   never does itself (the fake GitHub of the tests fails on any write).
 - It does not refresh a token that ends: it says so and asks the person to sign in again.
+- The first-run page is served on a loopback address only, by the same process, for as long as the setup lasts. Its link carries a
+  random code that works once and gives the browser a `SameSite=Strict`, `HttpOnly` cookie; a request with another `Host` header
+  (DNS rebinding) or from another origin is refused, bodies are JSON and capped, and its script and style come from the page's own
+  address under a strict content security policy. The token a person pastes or receives from GitHub stays in the process: the page
+  is never sent it back, and it is sealed, not logged, when the setup ends.

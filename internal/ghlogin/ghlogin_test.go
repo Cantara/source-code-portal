@@ -46,12 +46,13 @@ func TestParseHost(t *testing.T) {
 
 type fakeHost struct {
 	*httptest.Server
-	mu       sync.Mutex
-	answers  []string // the access_token endpoint's JSON answers, in order
-	polls    int
-	scope    string
-	expiry   string
-	orgPages int
+	mu        sync.Mutex
+	answers   []string // the access_token endpoint's JSON answers, in order
+	polls     int
+	scope     string
+	expiry    string
+	orgPages  int
+	repoPages int // pages of 100 repositories the listing has; 0: three repositories on one page
 }
 
 func newFake(t *testing.T) *fakeHost {
@@ -92,11 +93,29 @@ func newFake(t *testing.T) *fakeHost {
 		fmt.Fprint(w, `{"login":"octo"}`)
 	})
 	mux.HandleFunc("GET /api/v3/user/repos", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("sort") != "pushed" || r.URL.Query().Get("per_page") != "1" {
+		q := r.URL.Query()
+		if q.Get("sort") != "pushed" || r.Header.Get("Authorization") != "Bearer good" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		fmt.Fprint(w, `[{"name":"newest"}]`)
+		if q.Get("per_page") == "1" {
+			fmt.Fprint(w, `[{"name":"newest"}]`)
+			return
+		}
+		if q.Get("per_page") != "100" || !strings.Contains(q.Get("affiliation"), "organization_member") {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if f.repoPages > 0 {
+			var parts []string
+			for i := range 100 {
+				parts = append(parts, fmt.Sprintf(`{"name":"r%s-%d","owner":{"login":"acme"}}`, q.Get("page"), i))
+			}
+			fmt.Fprint(w, "["+strings.Join(parts, ",")+"]")
+			return
+		}
+		fmt.Fprint(w, `[{"name":"api","private":true,"pushed_at":"2026-11-01T10:00:00Z","owner":{"login":"acme"}},`+
+			`{"name":"old","fork":true,"archived":true,"owner":{"login":"octo"}},{"name":"","owner":{"login":"x"}},{"name":"nobody"}]`)
 	})
 	mux.HandleFunc("GET /api/v3/user/orgs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer good" {
@@ -249,5 +268,29 @@ func TestWhoamiAndOrgs(t *testing.T) {
 	}
 	if _, err := c.Orgs(ctx, "wrong"); !errors.Is(err, ErrBadToken) {
 		t.Errorf("%v", err)
+	}
+}
+
+func TestRepos(t *testing.T) {
+	ctx := context.Background()
+	f := newFake(t)
+	c := f.client(t, nil)
+	repos, more, err := c.Repos(ctx, "good")
+	if err != nil || more || len(repos) != 2 {
+		t.Fatalf("%+v %v %v", repos, more, err)
+	}
+	if r := repos[0]; r.Owner != "acme" || r.Name != "api" || !r.Private || r.Fork || !r.Pushed.Equal(time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)) {
+		t.Errorf("first: %+v", r)
+	}
+	if r := repos[1]; r.Owner != "octo" || !r.Fork || !r.Archived || !r.Pushed.IsZero() {
+		t.Errorf("second: %+v", r)
+	}
+	f.repoPages = 9
+	repos, more, err = c.Repos(ctx, "good")
+	if err != nil || !more || len(repos) != MaxRepos {
+		t.Errorf("capped: %d %v %v", len(repos), more, err)
+	}
+	if _, _, err := c.Repos(ctx, "wrong"); err == nil {
+		t.Error("a wrong token listed repositories")
 	}
 }

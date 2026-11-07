@@ -16,11 +16,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	gogh "github.com/google/go-github/v93/github"
 
+	"github.com/cantara/source-code-portal/internal/auth"
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/ghlogin"
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
@@ -54,7 +56,12 @@ func fakeHost(t *testing.T, header map[string]string) *httptest.Server {
 	})
 	mux.HandleFunc("GET /api/v3/user/repos", func(w http.ResponseWriter, r *http.Request) {
 		if authed(w, r) {
-			fmt.Fprint(w, `[{"name":"newest"}]`)
+			fmt.Fprint(w, `[{"name":"newest","private":true,"pushed_at":"2026-11-02T10:00:00Z","owner":{"login":"octo"}},`+
+				`{"name":"whydah-sso","pushed_at":"2026-11-01T10:00:00Z","owner":{"login":"acme"}},`+
+				`{"name":"whydah-admin","pushed_at":"2026-10-30T10:00:00Z","owner":{"login":"acme"}},`+
+				`{"name":"whydah-ui","pushed_at":"2026-10-29T10:00:00Z","owner":{"login":"acme"}},`+
+				`{"name":"tools","pushed_at":"2026-10-28T10:00:00Z","owner":{"login":"acme"}},`+
+				`{"name":"scratch","pushed_at":"2026-10-27T10:00:00Z","owner":{"login":"octo"}}]`)
 		}
 	})
 	mux.HandleFunc("POST /login/device/code", func(w http.ResponseWriter, _ *http.Request) {
@@ -320,7 +327,7 @@ func TestPersonalPortal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	yaml := personalYAML(dir, ghHost(gh.BaseURL()), "ann", []string{"acme"}, "open", "", n)
+	yaml := personalYAML(dir, ghHost(gh.BaseURL()), "ann", []string{"acme"}, nil, nil, nil, "open", "", n)
 	cfgPath := filepath.Join(dir, "personal.yaml")
 	if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
@@ -413,3 +420,131 @@ func TestPersonalPortal(t *testing.T) {
 
 // ghHost is the Host whose REST base is base (the fake GitHub's).
 func ghHost(base string) ghlogin.Host { return ghlogin.Host{Web: "https://github.com", API: base} }
+
+func TestPersonalBrowserSetup(t *testing.T) {
+	ring := &memRing{}
+	host := fakeHost(t, nil)
+	dir := filepath.Join(t.TempDir(), "scp")
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, _ := strconv.Atoi(ln.Addr().String()[strings.LastIndex(ln.Addr().String(), ":")+1:])
+	_ = ln.Close()
+	p, _ := newPersonal(t, ring, dir, host.URL, "", personalFlags{port: port, noBrowser: true})
+	out := &lockedBuffer{}
+	p.out = out
+	p.http = &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
+	type outcome struct {
+		launch *auth.Launch
+		err    error
+	}
+	done := make(chan outcome, 1)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() {
+		l, err := p.browserSetup(ctx, dir, filepath.Join(dir, "personal.yaml"))
+		done <- outcome{l, err}
+	}()
+	// The link is printed; the page is the person's to open.
+	var link string
+	for deadline := time.Now().Add(5 * time.Second); link == ""; time.Sleep(10 * time.Millisecond) {
+		if _, rest, ok := strings.Cut(out.String(), "  http://"); ok {
+			link = "http://" + strings.TrimSpace(strings.SplitN(rest, "\n", 2)[0])
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no link printed:\n%s", out)
+		}
+	}
+	jar, _ := cookiejar.New(nil)
+	c := &http.Client{Jar: jar, Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	base, _, _ := strings.Cut(link, "/setup/")
+	call := func(method, path string, body string) (int, string) {
+		t.Helper()
+		req, _ := http.NewRequestWithContext(t.Context(), method, base+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		res, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b)
+	}
+	res, err := c.Get(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("the page: %d", res.StatusCode)
+	}
+	if code, b := call(http.MethodPost, "/setup/api/token", `{"token":"ghp_personal"}`); code != 200 || !strings.Contains(b, `"user":"octo"`) {
+		t.Fatalf("token: %d %s", code, b)
+	}
+	if code, b := call(http.MethodPost, "/setup/api/repos", `{"accounts":["octo","acme"]}`); code != 200 || !strings.Contains(b, `"Whydah"`) {
+		t.Fatalf("repos: %d %s", code, b)
+	}
+	code, b := call(http.MethodPost, "/setup/api/finish", `{"accounts":["octo","acme"],"products":[{"name":"Whydah","repos":["whydah-admin","whydah-sso","whydah-ui"]},{"name":"Whydah","repos":["tools"]}],"hidden":["scratch"]}`)
+	if code != http.StatusBadRequest {
+		t.Fatalf("two products with one name: %d %s", code, b)
+	}
+	code, b = call(http.MethodPost, "/setup/api/finish", `{"accounts":["octo","acme"],"products":[{"name":"Whydah (IAM)","repos":["whydah-admin","whydah-sso","whydah-ui"]}],"hidden":["scratch"]}`)
+	if code != 200 || !strings.Contains(b, `"launch":"/auth/launch?code=`) {
+		t.Fatalf("finish: %d %s", code, b)
+	}
+	got := <-done
+	if got.err != nil || got.launch == nil || !strings.Contains(b, got.launch.Code) {
+		t.Fatalf("setup: %v %+v", got.err, got.launch)
+	}
+	yamlBytes, _ := os.ReadFile(filepath.Join(dir, "personal.yaml"))
+	for _, want := range []string{`id: whydah-iam`, `name: "Whydah (IAM)"`, `{exact: "whydah-sso"}`, `exclude: [{exact: "scratch"}]`,
+		`id: other`, `unclaimed: true`, `orgs: ["octo", "acme"]`, `login: "octo"`} {
+		if !strings.Contains(string(yamlBytes), want) {
+			t.Errorf("personal.yaml lacks %q:\n%s", want, yamlBytes)
+		}
+	}
+	if strings.Contains(string(yamlBytes), "ghp_personal") {
+		t.Error("the token is in personal.yaml")
+	}
+	cfg, _, err := config.Load(filepath.Join(dir, "personal.yaml"), nil)
+	if err != nil {
+		t.Fatalf("personal.yaml does not load: %v\n%s", err, yamlBytes)
+	}
+	if err := requireLoopback(cfg); err != nil {
+		t.Error(err)
+	}
+	if sec := credentialOf(t, ring, dir); sec.Value != "ghp_personal" || sec.Source != host.URL {
+		t.Errorf("credential: %v", sec)
+	}
+	for _, f := range []string{"session.key", "owner.token", "scp.db"} {
+		if st, err := os.Stat(filepath.Join(dir, f)); err != nil || st.Mode().Perm()&0o077 != 0 {
+			t.Errorf("%s: %v %v", f, st, err)
+		}
+	}
+	// The port is free again for the portal.
+	l, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+	if err != nil {
+		t.Fatalf("the setup page still holds its port: %v", err)
+	}
+	_ = l.Close()
+}
+
+// lockedBuffer is a writer one goroutine writes while another reads.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
