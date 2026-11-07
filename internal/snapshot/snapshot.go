@@ -20,6 +20,11 @@ type RepoKey string
 // KeyOf returns the address of owner/name.
 func KeyOf(owner, name string) RepoKey { return RepoKey(strings.ToLower(owner + "/" + name)) }
 
+// Outranks reports whether source a owns an address that sources a and b both list: the one whose id sorts first. The rule has no
+// state and does not depend on which listing came first, so the store, the engine and the snapshot agree whatever the order of their
+// listings, and an address does not change hands again and again (design/store-model.md).
+func Outranks(a, b string) bool { return a < b }
+
 // Owner returns the owner segment of the address.
 func (k RepoKey) Owner() string { o, _, _ := strings.Cut(string(k), "/"); return o }
 

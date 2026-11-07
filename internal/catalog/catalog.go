@@ -152,7 +152,7 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	}
 	res := sync.Result{Payload: payload, Catalogue: make([]store.Repo, 0, len(next.Repos))}
 	for _, t := range next.Repos {
-		res.Catalogue = append(res.Catalogue, store.Repo{Key: t.Repo.Key(), ID: t.Repo.ID})
+		res.Catalogue = append(res.Catalogue, store.Repo{Key: t.Repo.Key(), ID: t.Repo.ID, Visibility: t.Repo.Visibility})
 	}
 	res.Unchanged = j.Prev.State == snapshot.StateOK && bytes.Equal(payload, j.Prev.Payload)
 	if slices.ContainsFunc(next.Repos, func(t Tracked) bool { return t.Misses > 0 }) {

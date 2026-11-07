@@ -51,6 +51,9 @@ func (b *Builder) ReplaceSource(source string, repos []*RepoEntry, aliases map[R
 	}
 	for _, e := range repos {
 		k := e.Repo.Key()
+		if held := b.s.Repos[k]; held != nil && held.Repo.ID.Source != source && !Outranks(source, held.Repo.ID.Source) {
+			continue // another source owns the address (every entry of source itself was removed above)
+		}
 		if prev := old[k]; prev != nil && prev.Repo.ID == e.Repo.ID {
 			merged := *prev
 			merged.Repo, merged.Fresh = e.Repo, e.Fresh

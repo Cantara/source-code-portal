@@ -166,8 +166,8 @@ func TestQuarantine(t *testing.T) {
 		}
 		defer func() { _ = db.Close() }()
 		var v int
-		if err := db.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&v); err != nil || v != 1 {
-			t.Errorf("user_version %d %v, want a fresh store at 1", v, err)
+		if err := db.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&v); err != nil || v != latestSchema(t) {
+			t.Errorf("user_version %d %v, want a fresh store at %d", v, err, latestSchema(t))
 		}
 	})
 	t.Run("keeps two", func(t *testing.T) {

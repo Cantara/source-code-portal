@@ -379,3 +379,27 @@ func TestConcurrentPublishesKeepEveryUpdate(t *testing.T) {
 		}
 	}
 }
+
+// TestAddressOwnedByOneSource: two sources that list one address leave it to the source whose id sorts first, whichever published
+// first, and a later listing of either does not change that (the store and the engine apply the same rule).
+func TestAddressOwnedByOneSource(t *testing.T) {
+	for _, order := range [][]string{{"a", "b"}, {"b", "a"}, {"b", "a", "b", "a"}} {
+		p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+		for _, src := range order {
+			id := map[string]int64{"a": 1, "b": 7}[src]
+			p.Update(func(b *Builder) {
+				b.ReplaceSource(src, []*RepoEntry{repo(src, id, "acme", "core"), repo(src, id+100, "acme", src+"-only")}, nil, SourceStatus{ID: src})
+				b.UpdateRepo("acme/core", func(e *RepoEntry) { notes.Set(e, []string{"from " + src}, Freshness{}) })
+			})
+			p.Flush()
+		}
+		s := p.Current()
+		if got := s.Repos["acme/core"]; got == nil || got.Repo.ID.Source != "a" {
+			t.Errorf("order %v: acme/core is %+v, want source a's", order, got)
+		}
+		if s.Repos["acme/a-only"] == nil || s.Repos["acme/b-only"] == nil {
+			t.Errorf("order %v: a source lost its other repositories: %v", order, s.Repos)
+		}
+		p.Close()
+	}
+}
