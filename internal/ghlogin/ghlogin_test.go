@@ -89,6 +89,13 @@ func newFake(t *testing.T) *fakeHost {
 		}
 		fmt.Fprint(w, `{"login":"octo"}`)
 	})
+	mux.HandleFunc("GET /api/v3/user/repos", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("sort") != "pushed" || r.URL.Query().Get("per_page") != "1" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		fmt.Fprint(w, `[{"name":"newest"}]`)
+	})
 	mux.HandleFunc("GET /api/v3/user/orgs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer good" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -226,6 +233,9 @@ func TestWhoamiAndOrgs(t *testing.T) {
 	f.expiry = "2026-12-01 10:00:00 UTC"
 	if u, _ = c.Whoami(ctx, "good"); !u.Expires.Equal(time.Date(2026, 12, 1, 10, 0, 0, 0, time.UTC)) {
 		t.Errorf("the token's end: %v", u.Expires)
+	}
+	if name, err := c.Newest(ctx, "good"); err != nil || name != "newest" {
+		t.Errorf("newest: %q %v", name, err)
 	}
 	orgs, err := c.Orgs(ctx, "good")
 	if err != nil || !slices.Equal(orgs, []string{"acme", "zeta"}) {

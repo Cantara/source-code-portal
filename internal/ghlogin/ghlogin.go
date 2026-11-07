@@ -296,3 +296,14 @@ func (c *Client) Orgs(ctx context.Context, token string) ([]string, error) {
 	}
 	return logins, nil
 }
+
+// Newest names the repository the token's account pushed to last (GET /user/repos), "" when there is none.
+func (c *Client) Newest(ctx context.Context, token string) (string, error) {
+	var r []struct {
+		Name string `json:"name"`
+	}
+	if _, err := c.get(ctx, token, "user/repos?sort=pushed&per_page=1", &r); err != nil || len(r) == 0 {
+		return "", err
+	}
+	return r[0].Name, nil
+}

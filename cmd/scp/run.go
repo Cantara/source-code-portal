@@ -64,7 +64,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	root.SetErr(stderr)
 	root.PersistentFlags().StringVarP(&opts.configPath, "config", "c", "", "YAML configuration file (default: built-in defaults and SCP_* environment)")
 	root.PersistentFlags().String("log-level", "", "log level: debug, info, warn, error (default info)")
-	root.AddCommand(newServeCmd(&opts), newConfigCmd(&opts), newVersionCmd())
+	root.AddCommand(newServeCmd(&opts), newPersonalCmd(&opts), newConfigCmd(&opts), newVersionCmd())
 	return root
 }
 
