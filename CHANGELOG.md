@@ -4,6 +4,24 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.9
+
+One filter panel for every list page, published packages in the Releases page, and a tidier logo. No configuration change is needed to
+upgrade; nothing new is asked of GitHub.
+
+- **Filters at the left**: Commits, Pull requests, Issues, Releases, Archive, Insights, Search and a repository's history have their
+  selectors in a panel at the left, every choice in view with its count (no menus, no Apply button), hidden and shown with a button and
+  kept for every list page. On a phone it starts folded. Without JavaScript it is a form with an Apply button. A *Clear* link undoes
+  the filters.
+- **The same row everywhere**: commits, pull requests, issues, releases and the archive draw their rows alike (avatar, title, what
+  weighs the row at the right, then the details), each list in one card.
+- **Releases include published packages**: each package a repository publishes to a registry (Maven, npm, PyPI, ...) is a row with its
+  newest release, beside the GitHub releases; the latest of a repository is the newer of both, so a repository that only publishes to a
+  registry is listed. A *Source* choice limits the page to GitHub's or the packages'. `GET /api/v1/releases` gains `source` and each
+  row `source` and `package`; the tool `recent_releases` takes `source`. The product page's Release column follows the same rule. A
+  package version equal to a GitHub release's tag is listed once; a package whose registry gives no date is not listed.
+- The header's logo no longer says "Mission control".
+
 ## 2.2.8
 
 Insights are drawn as graphs, and Alumni is now called Archive. No configuration change is needed to upgrade; nothing new is asked of GitHub.
