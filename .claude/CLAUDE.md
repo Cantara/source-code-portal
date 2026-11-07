@@ -12,7 +12,7 @@ the root `AGENTS.md` (imported above).
 - **`.claude/work/plan.md` is the binding plan**: what SCP is, architecture and rules, stack, the work in progress. Read it first.
 - `.claude/work/README.md`: index of the development package.
 - `.claude/work/design/`: one note per area, as built (GitHub, sync/snapshot/store, catalog, content, manifests, access, cluster,
-  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13), `hardening.md` (H1), `layout.md` (L1 to L4), `guide.md` (G1), `packages.md` (R1 to R4), `agents.md` (W1 to W3), `search.md` (Q1 to Q3), `present.md` (K1 to K3), `announcements.md` (N1, N2), `diffstat.md` (D1), `pulls.md` (PR1 to PR3), `issues.md` (IS1, IS2), `prerequisites.md` (PQ1), `features.md` (FT1), `archive.md` (AL1, AL2), `releases.md` (RL1 to RL5), `insights.md` (IN1 to IN3), `filters.md` (FP1) and `embed.md` (E1 to E4, dequeued). Binding below `plan.md`.
+  images and events, HTTP/API, web, build/ops, principles, health, commit navigator), sign-in (`auth.md`, S1), plus `assistant.md` (A1), `seo.md` (M13), `hardening.md` (H1), `layout.md` (L1 to L4), `guide.md` (G1), `packages.md` (R1 to R4), `agents.md` (W1 to W3), `search.md` (Q1 to Q3), `present.md` (K1 to K3), `announcements.md` (N1, N2), `diffstat.md` (D1), `pulls.md` (PR1 to PR3), `issues.md` (IS1, IS2), `prerequisites.md` (PQ1), `features.md` (FT1), `archive.md` (AL1, AL2), `releases.md` (RL1 to RL5), `insights.md` (IN1 to IN3), `filters.md` (FP1), `store-model.md` (SM1, design only: the store for a personal edition and shared instances) and `embed.md` (E1 to E4, dequeued). Binding below `plan.md`.
 - `.claude/work/decisions.md`: the decisions in force.
 - `.claude/skills/guide-page/`: the skill that keeps `/guide` current: the demo catalogue, the screenshots (Playwright MCP,
   `capture.js`, `publish.mjs`) and the design rules.
@@ -28,8 +28,9 @@ never modify it, push to it or open issues or pull requests on it.
 
 ## Working rules
 
-- **Greenfield**: no data needs keeping. Change code, contract, config keys, the store schema
-  (`internal/store/migrations/0001_init.sql`) and documents in place; no compatibility layers, shims, deprecations or extra migrations.
+- **Greenfield**: no data needs keeping. Change code, contract, config keys and documents in place; no compatibility layers, shims or
+  deprecations. The one exception is the store (P-89): the Cantara database is kept, so its schema changes only by an additive migration
+  (`internal/store/migrations/`), with a copy taken first.
   Commit to `main` locally only (Conventional Commits, a few per feature, not one per step) and never push `main`. When a feature is
   complete, open one PR for it (its commits pushed to a branch); CI runs once, on the PR. When the owner explicitly asks to commit and push
   directly, push `main` itself (no branch, no PR): his instruction wins, for that request. Between changes run only the tests of what
