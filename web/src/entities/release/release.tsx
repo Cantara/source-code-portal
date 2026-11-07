@@ -3,6 +3,7 @@ import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { addressPath } from "@/lib/paths"
 import { Badge } from "@/components/ui/badge"
+import { ChevronDownIcon } from "@/components/ui/icons"
 import { ecosystemLabel } from "@/entities/repo/packages"
 import { EmptyState } from "@/shared/empty-state"
 import { InitialsAvatar } from "@/shared/initials-avatar"
@@ -25,8 +26,9 @@ const sourceTitle = (r: Release) => (r.package ? `${r.package} on ${sourceLabel(
 function ReleaseNotes({ r }: { r: Release }) {
   if (!r.notes) return null
   return (
-    <details className="mt-1 text-sm">
-      <summary className="inline-flex min-h-6 cursor-pointer items-center rounded text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+    <details className="group mt-1 text-sm">
+      <summary className="inline-flex min-h-7 cursor-pointer list-none items-center gap-1 rounded-md border border-border px-2 text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+        <ChevronDownIcon className="size-4 -rotate-90 transition-transform group-open:rotate-0" />
         Release notes{r.notesFrom === "changelog" && " from the changelog"}
       </summary>
       <SafeHtml html={r.notes} className="doc mt-1 border-l-2 border-border pl-3" />
