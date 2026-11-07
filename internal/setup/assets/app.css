@@ -113,3 +113,4 @@ ul.rules li.rule { display: block; padding: .3rem 0; border-top: 1px solid var(-
 .meta { color: var(--muted-foreground); font-size: .85rem; margin-right: .4rem; }
 details.add-rule { margin-top: .5rem; }
 @media (max-width: 40rem) { .zones { grid-template-columns: minmax(0, 1fr); } }
+.hint { font-size: .9rem; margin: .3rem 0; padding: .3rem .5rem; border-radius: .4rem; background: color-mix(in oklab, var(--primary) 10%, transparent); }

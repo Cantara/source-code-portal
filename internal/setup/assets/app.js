@@ -426,6 +426,7 @@ function reposPanel() {
     const rows = visible.filter((r) => r.owner.toLowerCase() === acct.toLowerCase())
     const free = all.filter((r) => !assign[r.name]).length
     const n = rowsShown[acct] || PAGE
+    if (rows.length === 0 && (q || view !== "all")) return null // an account with nothing to show while searching is just noise
     return h("details", { open: true, class: "account", "data-id": "acct-" + acct },
       h("summary", {}, `${acct} · ${all.length} repositories${free ? `, ${free} without a product` : ""}`),
       h("ul", { class: "plain repos" }, rows.slice(0, n).map((r) => repoRow(r, names))),
@@ -482,6 +483,12 @@ function ruleLine(p, rule) {
     extra, spill)
 }
 
+// takeHint adds the rule a hint offers and takes the repositories without a product it selects.
+async function takeHint(p, hint) {
+  p.rules.push({ kind: hint.kind, value: hint.value })
+  await claim(p, hint)
+}
+
 async function claim(p, rule) {
   await act(async () => {
     const out = await api("rule-test", { accounts: [...accounts], kind: rule.kind, value: rule.value })
@@ -536,13 +543,15 @@ function productCard(p) {
     h("div", { class: "product" },
       h("label", { for: "n-" + p.key, class: "sr" }, "Product name"),
       h("input", { id: "n-" + p.key, type: "text", value: p.name, maxlength: "120", on: { input: (e) => { p.name = e.target.value; schedulePreview() } } }),
-      h("span", { class: "count" }, `${names.length} repos`),
+      h("span", { class: "count" }, `${names.length} repo${names.length === 1 ? "" : "s"}`),
       h("button", { type: "button", on: { click: () => { for (const n of names) assign[n] = ""; products = products.filter((x) => x !== p); render(); schedulePreview() } } }, "Remove")),
     !d ? h("p", { class: "note" }, "Working out the rules…")
       : h("div", {},
           open.length ? h("p", { class: "fits" }, open.length > 3 ? `New repositories that fit any of its ${open.length} open rules join this product by themselves.` : `New repositories whose ${open.map(say).join(" or ")} join this product by themselves.`)
                       : h("p", { class: "note" }, "A fixed list: a new repository goes to Other until you add it."),
           h("ul", { class: "plain rules" }, d.rules.map((r) => ruleLine(p, r))),
+          (d.hints || []).map((hint) => h("p", { class: "hint" }, `${hint.n} more repositories start with “${hint.value}” (${hint.sample.join(", ")}${hint.n > hint.sample.length ? ", …" : ""}). `,
+            h("button", { type: "button", class: "link", on: { click: () => takeHint(p, hint) } }, "Add them with a rule"))),
           d.pinned.length ? h("details", { "data-id": "pin-" + p.key }, h("summary", {}, `${d.pinned.length} pinned one by one`), h("p", { class: "note" }, d.pinned.join(", "))) : null),
     h("div", { class: "row tight" },
       h("input", { type: "checkbox", id: "fx-" + p.key, checked: !p.fixed, on: { change: (e) => { p.fixed = !e.target.checked; render(); schedulePreview() } } }),
@@ -614,27 +623,45 @@ async function finish() {
 
 // ---- 4. start
 
+let startedAt = 0
+let startPhase = 1 // 1 settings saved, 2 portal answering, 3 opening it
+
 function startStep() {
-  return h("section", { class: "card" }, h("h2", {}, "Starting your portal"),
-    h("p", { role: "status" }, "Your settings are saved. The portal is starting; it opens signed in when it is ready (the first sync of your repositories takes a minute or two)."),
+  const seconds = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0
+  const words = ["", "Your settings are saved. Starting the portal…", "The portal is up. Signing you in…", "Opening your dashboard…"][startPhase]
+  return h("section", { class: "card", "aria-busy": "true" }, h("h2", {}, "Starting your portal"),
+    h("progress", { class: "bar", max: 3, value: startPhase, "aria-label": "Starting" }),
+    h("p", { role: "status" }, words, startPhase === 1 && seconds > 3 ? ` ${seconds} seconds` : ""),
+    h("p", { class: "note" }, "The dashboard opens at once and fills in as the portal reads your repositories from GitHub; the first read takes a minute or two for a long list."),
     error ? errorBox() : null)
 }
 
 async function waitForPortal() {
-  for (let i = 0; i < 120; i++) {
-    await new Promise((r) => setTimeout(r, 1000))
-    try {
-      const res = await fetch("/api/v1/me", { headers: { Accept: "application/json" } })
-      if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
-        location.href = st.launch
-        return
+  startedAt = Date.now()
+  startPhase = 1
+  const tick = setInterval(() => { if (step === "start") render() }, 1000)
+  try {
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 1000))
+      try {
+        const res = await fetch("/api/v1/me", { headers: { Accept: "application/json" } })
+        const json = (res.headers.get("content-type") || "").includes("json") // the setup server answers HTML, the portal JSON
+        if (json && res.ok) {
+          startPhase = 3
+          render()
+          location.href = st.launch
+          return
+        }
+        if (json) startPhase = 2 // the portal has replaced the setup server but does not let this request in yet
+      } catch {
+        // the setup server has stopped and the portal is not up yet
       }
-    } catch {
-      // the setup server has stopped and the portal is not up yet
     }
+    error = "The portal did not start within two minutes. Look at the terminal."
+    render()
+  } finally {
+    clearInterval(tick)
   }
-  error = "The portal did not start within two minutes. Look at the terminal."
-  render()
 }
 
 // ---- the page

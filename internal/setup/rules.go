@@ -26,11 +26,20 @@ type Rule struct {
 	Open   bool     `json:"open"`             // a repository created later can join through it
 }
 
+// Hint is a suggestion: repositories no product holds that start like some of the product's, which a rule would bring in.
+type Hint struct {
+	Kind   string   `json:"kind"`
+	Value  string   `json:"value"`
+	N      int      `json:"n"`
+	Sample []string `json:"sample"`
+}
+
 // Derived is what a product comes to: the rules, the repositories no rule covers, and the matchers the configuration gets.
 type Derived struct {
 	Name    string   `json:"name"`
 	Rules   []Rule   `json:"rules"`
 	Pinned  []string `json:"pinned"`
+	Hints   []Hint   `json:"hints,omitempty"`   // starts of this product's names that repositories of no product share
 	TooMany bool     `json:"tooMany,omitempty"` // more matchers than a group holds
 	Entries []Rule   `json:"-"`                 // rules, then the pinned ones as exact (or alternations when there are too many)
 }
@@ -280,7 +289,43 @@ func deriveOne(repos []ghlogin.Repo, index map[string]int, holder map[string]int
 	}
 	slices.Sort(d.Pinned)
 	d.Entries, d.TooMany = entries(d.Rules, d.Pinned)
+	d.Hints = hintsFor(repos, holder, self, members, d.Rules)
 	return d
+}
+
+// hintsFor looks for starts of the members' names (at least four characters) that two or more repositories of no product share and
+// no member of another product does, and no rule of the product already covers: the three that bring in the most.
+func hintsFor(repos []ghlogin.Repo, holder map[string]int, self int, members []string, rules []Rule) []Hint {
+	seen := map[string]bool{}
+	var out []Hint
+	for _, m := range members {
+		for _, v := range prefixes(m) {
+			if seen[v] || len(v) < 4 {
+				continue
+			}
+			seen[v] = true
+			if slices.ContainsFunc(rules, func(r Rule) bool { return r.Kind == "prefix" && strings.HasPrefix(v, strings.ToLower(r.Value)) }) {
+				continue
+			}
+			var free []string
+			spill := false
+			for _, r := range repos {
+				if !strings.HasPrefix(strings.ToLower(r.Name), v) {
+					continue
+				}
+				if h, held := holder[r.Name]; !held {
+					free = append(free, r.Name)
+				} else if h != self {
+					spill = true
+				}
+			}
+			if !spill && len(free) >= 2 {
+				out = append(out, Hint{Kind: "prefix", Value: v, N: len(free), Sample: free[:min(len(free), 4)]})
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b Hint) int { return cmp.Or(cmp.Compare(b.N, a.N), strings.Compare(a.Value, b.Value)) })
+	return out[:min(len(out), 3)]
 }
 
 // minCover is how many members a rule has to cover in all.

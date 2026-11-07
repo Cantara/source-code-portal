@@ -166,3 +166,20 @@ func TestDeriveBigBucketsNeedThreeForARule(t *testing.T) {
 		t.Errorf("a small product keeps pairs: %v", ruleValues(small))
 	}
 }
+
+func TestDeriveHintsPointAtRelatedUnassignedRepositories(t *testing.T) {
+	all := repoList("kcp-triage", "kcp-a", "kcp-b", "kcp-c", "kcpx", "other-1", "other-2")
+	d := Derive(all, []Product{{Name: "Kcp", Repos: []string{"kcp-triage"}}}, nil)[0]
+	if len(d.Hints) != 1 || d.Hints[0].Value != "kcp-" || d.Hints[0].N != 3 || !slices.Equal(d.Hints[0].Sample, []string{"kcp-a", "kcp-b", "kcp-c"}) {
+		t.Fatalf("hints: %+v", d.Hints)
+	}
+	// Taking them with the rule makes the hint go away; a start another product's member has is not offered.
+	d = Derive(all, []Product{{Name: "Kcp", Repos: []string{"kcp-triage"}, Rules: []Rule{{Kind: "prefix", Value: "kcp-"}}}}, nil)[0]
+	if len(d.Hints) != 0 {
+		t.Errorf("a hint for a start the product has a rule for: %+v", d.Hints)
+	}
+	d = Derive(all, []Product{{Name: "Kcp", Repos: []string{"kcp-triage"}}, {Name: "Other", Repos: []string{"kcp-a"}}}, nil)[0]
+	if len(d.Hints) != 0 {
+		t.Errorf("a hint that would take from another product: %+v", d.Hints)
+	}
+}
