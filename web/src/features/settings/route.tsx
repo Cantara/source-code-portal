@@ -17,7 +17,7 @@ export const settingsRoute: Route<Record<string, never>> = {
         pulls: pageSize(cookies[sizeCookie("pulls")], 0),
         issues: pageSize(cookies[sizeCookie("issues")], 0),
         releases: pageSize(cookies[sizeCookie("releases")], 0),
-        alumni: pageSize(cookies[sizeCookie("alumni")], 0),
+        archive: pageSize(cookies[sizeCookie("archive")], 0),
       }}
     />
   ),

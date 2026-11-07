@@ -70,5 +70,5 @@ test("a group and a repository show their releases, and a group its retired repo
 
   await page.goto("/groups/other")
   await page.getByRole("link", { name: "1 retired" }).click()
-  await expect(page).toHaveURL(/\/alumni\?group=other$/)
+  await expect(page).toHaveURL(/\/archive\?group=other$/)
 })

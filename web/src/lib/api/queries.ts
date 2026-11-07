@@ -46,8 +46,17 @@ export const keys = {
       f.page ?? 1,
     ] as const,
   insights: (group: string) => ["insights", group] as const,
-  alumni: (f: AlumniFilter) =>
-    ["alumni", f.group ?? "", f.q ?? "", f.reason ?? "", f.used ?? false, f.sort ?? "active", f.size ?? 50, f.page ?? 1] as const,
+  archive: (f: ArchiveFilter) =>
+    [
+      "archive",
+      f.group ?? "",
+      f.q ?? "",
+      f.reason ?? "",
+      f.used ?? false,
+      f.sort ?? "active",
+      f.size ?? 50,
+      f.page ?? 1,
+    ] as const,
   issues: (f: IssueFilter) =>
     [
       "issues",
@@ -167,24 +176,24 @@ export const releasesQuery = (api: Api, f: ReleaseFilter) =>
     placeholderData: keepPreviousData,
   })
 
-/** AlumniFilter is a list of retired repositories (GET /alumni): its group, name text, reason, whether still used, the order and the page. */
-export interface AlumniFilter {
+/** ArchiveFilter is a list of retired repositories (GET /archive): its group, name text, reason, whether still used, the order and the page. */
+export interface ArchiveFilter {
   group?: string
   q?: string
-  reason?: Schemas["AlumniReason"]
+  reason?: Schemas["ArchiveReason"]
   used?: boolean
-  sort?: Schemas["AlumniSort"]
+  sort?: Schemas["ArchiveSort"]
   page?: number
   size?: number
 }
 
-/** alumniQuery is one page of the retired repositories, last active first; /alumni reads it. */
-export const alumniQuery = (api: Api, f: AlumniFilter) =>
+/** archiveQuery is one page of the retired repositories, last active first; /archive reads it. */
+export const archiveQuery = (api: Api, f: ArchiveFilter) =>
   queryOptions({
-    queryKey: keys.alumni(f),
+    queryKey: keys.archive(f),
     queryFn: ({ signal }) =>
       unwrap(
-        api.GET("/alumni", {
+        api.GET("/archive", {
           params: {
             query: { group: f.group, q: f.q, reason: f.reason, used: f.used, sort: f.sort, page: f.page, limit: f.size },
           },

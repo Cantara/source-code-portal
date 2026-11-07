@@ -95,9 +95,22 @@ func TestServeForGuide(t *testing.T) {
 		gh.SetFile(id, "README.md", "# "+name+"\n\n"+description+".\n")
 		switch language {
 		case "java":
-			gh.SetFile(id, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>"+name+"</artifactId><version>1.0</version></project>")
+			dep := ""
+			if name == "payments-api" || name == "payments-ledger" || name == "identity-service" {
+				dep = "<dependencies><dependency><groupId>com.acme</groupId><artifactId>payments-sdk</artifactId><version>1.0</version></dependency></dependencies>"
+			}
+			rel := map[string]string{"payments-gateway-legacy": "11", "payments-sdk": "17", "identity-service": "17"}[name]
+			if rel == "" {
+				rel = "21"
+			}
+			gh.SetFile(id, "pom.xml", "<project><groupId>com.acme</groupId><artifactId>"+name+"</artifactId><version>1.0</version>"+
+				"<properties><maven.compiler.release>"+rel+"</maven.compiler.release></properties>"+dep+"</project>")
 		case "go":
-			gh.SetFile(id, "go.mod", "module github.com/acme/"+name+"\n\ngo 1.27\n")
+			ver, req := "1.27", ""
+			if name == "dev-cli" {
+				ver, req = "1.23", "require github.com/acme/identity-sdk-go v0.9.1\n"
+			}
+			gh.SetFile(id, "go.mod", "module github.com/acme/"+name+"\n\ngo "+ver+"\n\n"+req)
 		case "js":
 			gh.SetFile(id, "package.json", `{"name": "`+name+`", "version": "1.0.0"}`)
 		}
@@ -107,7 +120,12 @@ func TestServeForGuide(t *testing.T) {
 
 	api := repo("payments-api", "The payment API", "java", []work{{"ada", 9, 80, 1}, {"bo", 5, 70, 4}, {"ada+claude", 8, 40, 2},
 		{"renovate[bot]", 16, 30, 0}}, true, gogh.Repository{})
-	gh.SetRelease(api, "v4.2.0", "4.2.0", days(3))
+	var apiReleases []githubtest.Release
+	for i := range 14 {
+		apiReleases = append(apiReleases, githubtest.Release{Tag: fmt.Sprintf("v4.%d.0", 14-i), Name: fmt.Sprintf("4.%d.0", 14-i),
+			Published: days(3 + float64(i)*18 + float64(i%3)*4), Author: "ada"})
+	}
+	gh.SetReleases(api, apiReleases...)
 	repo("payments-ledger", "Double-entry ledger", "java", []work{{"chen", 6, 80, 6}, {"chen+claude", 4, 25, 3},
 		{"renovate[bot]", 6, 30, 1}}, true, gogh.Repository{})
 	repo("payments-web", "The checkout pages", "js", []work{{"dana", 4, 60, 8}, {"copilot-swe-agent[bot]", 5, 20, 2},
@@ -117,12 +135,19 @@ func TestServeForGuide(t *testing.T) {
 		gogh.Repository{OpenIssuesCount: new(27)})
 	identity := repo("identity-service", "Sign-in and tokens", "java", []work{{"ada", 7, 70, 2}, {"bo", 6, 60, 5},
 		{"bo+claude", 3, 30, 4}, {"renovate[bot]", 8, 30, 2}}, true, gogh.Repository{})
-	gh.SetRelease(identity, "v2.8.0", "2.8.0", days(140))
+	gh.SetReleases(identity, githubtest.Release{Tag: "v2.8.0", Name: "2.8.0", Published: days(140), Author: "bo"},
+		githubtest.Release{Tag: "v2.7.0", Name: "2.7.0", Published: days(215), Author: "bo"},
+		githubtest.Release{Tag: "v2.6.0", Name: "2.6.0", Published: days(300), Author: "ada"})
 	repo("identity-admin", "The administrators' console", "js", []work{{"dana", 5, 90, 10}, {"dana+claude", 6, 28, 1}}, true,
 		gogh.Repository{})
 	sdk := repo("identity-sdk-go", "Go client for sign-in", "go", []work{{"chen", 5, 100, 12}, {"renovate[bot]", 3, 30, 5}}, true,
 		gogh.Repository{})
-	gh.SetRelease(sdk, "v0.9.1", "0.9.1", days(12))
+	var sdkReleases []githubtest.Release
+	for i := range 9 {
+		sdkReleases = append(sdkReleases, githubtest.Release{Tag: fmt.Sprintf("v0.%d.1", 9-i), Name: fmt.Sprintf("0.%d.1", 9-i),
+			Published: days(12 + float64(i)*21), Author: "chen"})
+	}
+	gh.SetReleases(sdk, sdkReleases...)
 	cli := repo("dev-cli", "The developers' command line", "go", []work{{"bo", 3, 50, 9}, {"bo+claude", 7, 30, 1}}, true,
 		gogh.Repository{OpenIssuesCount: new(56)})
 	gh.SetRelease(cli, "v1.4.0", "1.4.0", days(200))

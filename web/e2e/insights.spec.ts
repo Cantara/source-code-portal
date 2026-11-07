@@ -19,6 +19,9 @@ test("/insights answers its five questions and passes axe in both themes", async
     for (const q of questions) await expect(page.getByRole("heading", { name: q })).toBeVisible()
     await expect(page.getByText("1 stable release in the last 12 months.")).toBeVisible()
     await expect(page.getByRole("img", { name: /Stable releases per month/ })).toBeVisible()
+    await expect(page.getByRole("img", { name: /Stable releases per week over the last 52 weeks/ })).toBeVisible()
+    await expect(page.getByRole("img", { name: /Repositories by activity/ })).toBeVisible()
+    await expect(page.getByRole("img", { name: /Dependants per library/ })).toBeVisible()
     const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()
     expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
   }
@@ -26,7 +29,7 @@ test("/insights answers its five questions and passes axe in both themes", async
     "aria-current",
     "page",
   )
-  await page.getByLabel("Product").selectOption("whydah")
+  await page.getByRole("combobox", { name: "Product" }).selectOption("whydah")
   await page.getByRole("button", { name: "Apply" }).click()
   await expect(page).toHaveURL(/\/insights\?group=whydah$/)
   await expect(page.getByText("1 stable release in the last 12 months.")).toBeVisible()
@@ -38,7 +41,7 @@ test.describe("without JavaScript", () => {
   test("/insights is on the page and the form picks a product", async ({ page }) => {
     await page.goto("/insights")
     for (const q of questions) await expect(page.getByRole("heading", { name: q })).toBeVisible()
-    await page.getByLabel("Product").selectOption("other")
+    await page.getByRole("combobox", { name: "Product" }).selectOption("other")
     await page.getByRole("button", { name: "Apply" }).click()
     await expect(page).toHaveURL(/\/insights\?group=other$/)
     await expect(page.getByRole("heading", { name: questions[0] })).toBeVisible()

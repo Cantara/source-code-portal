@@ -347,7 +347,7 @@ func (l *LLMs) buildIndex(s *snapshot.Snapshot) []byte {
 		"- [Repositories](%s): every repository as JSON\n- [Releases](%s): the recent releases as JSON\n- [Retired repositories](%s): archived and deprecated "+
 		"ones as JSON\n- [Insights](%s): how often the fleet ships, what it is built on and leans on, as JSON\n- [Search](%s): repositories, documents, dependencies, packages and commits by "+
 		"words and filters, as JSON (`?q=`)\n- [MCP](%s): the portal's read-only tools for agents (Model Context Protocol, Streamable HTTP; "+
-		"listed as JSON at %s)\n", l.url("/llms-full.txt"), l.url("/api/v1/openapi.yaml"), l.url("/api/v1/repos"), l.url("/api/v1/releases"), l.url("/api/v1/alumni"), l.url("/api/v1/insights"), l.url("/api/v1/search"),
+		"listed as JSON at %s)\n", l.url("/llms-full.txt"), l.url("/api/v1/openapi.yaml"), l.url("/api/v1/repos"), l.url("/api/v1/releases"), l.url("/api/v1/archive"), l.url("/api/v1/insights"), l.url("/api/v1/search"),
 		l.url("/mcp"), l.url("/api/v1/tools"))
 	if b.Len()+repos.Len()+len(optional) <= maxIndexBytes {
 		b.Write(repos.Bytes())

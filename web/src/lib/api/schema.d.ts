@@ -139,7 +139,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  "/alumni": {
+  "/archive": {
     parameters: {
       query?: never
       header?: never
@@ -148,13 +148,13 @@ export interface paths {
     }
     /**
      * The retired repositories, newest activity first, one page at a time
-     * @description The alumni of the viewer's view (design/alumni.md): repositories GitHub archived or whose `scp.yaml` says `lifecycle: deprecated`
+     * @description The archive of the viewer's view (design/archive.md): repositories GitHub archived or whose `scp.yaml` says `lifecycle: deprecated`
      *     (archived wins). Each row says why, when it was last active (the newest default-branch commit, else the last push; no date of
      *     retirement is invented), how many other repositories still depend on it and how many authors its recent commits have (counted,
      *     never named). `group` narrows to a group's members, `q` to names containing the text, `reason` to one reason, `used` to those
      *     something still depends on. `counts` cover the group and `q` whatever the other filters, so they can be offered as filters.
      */
-    get: operations["listAlumni"]
+    get: operations["listArchive"]
     put?: never
     post?: never
     delete?: never
@@ -1200,6 +1200,8 @@ export interface components {
        * @description Its newest stable release
        */
       last?: string | null
+      /** @description Stable releases of each of the last 52 weeks, oldest first (the week starts on Monday, UTC) */
+      weekly: number[]
     }
     InsightCount: {
       name: string
@@ -1207,12 +1209,19 @@ export interface components {
       /** @description Of the repositories in scope, 0 to 1 */
       share: number
     }
+    InsightVersion: {
+      /** @description The version as a manifest states it */
+      version: string
+      repos: number
+    }
     InsightRuntime: {
       /** @description go, node or java */
       name: string
       repos: number
       oldest: string
       newest: string
+      /** @description Every version named, oldest first */
+      versions: components["schemas"]["InsightVersion"][]
     }
     InsightLibrary: {
       /** @description owner/name */
@@ -1223,7 +1232,26 @@ export interface components {
       dependantRepos: string[]
       /** @description Its latest stable release */
       release?: string | null
-      retired?: components["schemas"]["AlumniReason"]
+      retired?: components["schemas"]["ArchiveReason"]
+    }
+    InsightMatrixRow: {
+      /** @description owner/name */
+      repo: string
+      /** @description Indexes into the matrix's libraries that this repository depends on */
+      uses: number[]
+    }
+    InsightMatrix: {
+      /** @description The listed libraries */
+      libraries: string[]
+      /** @description The repositories using most of them, at most 24 */
+      repos: components["schemas"]["InsightMatrixRow"][]
+    }
+    InsightBand: {
+      /** @description Percent */
+      from: number
+      /** @description Percent, exclusive except for the last band */
+      to: number
+      repos: number
     }
     InsightRepo: {
       /** @description owner/name */
@@ -1237,7 +1265,17 @@ export interface components {
       /** Format: date-time */
       lastChange: string | null
     }
+    InsightActivity: {
+      group: string
+      name: string
+      active: number
+      recent: number
+      quiet: number
+      dormant: number
+    }
     InsightAgeing: {
+      /** @description Each product's repositories by activity */
+      products: components["schemas"]["InsightActivity"][]
       active: number
       recent: number
       quiet: number
@@ -1264,6 +1302,9 @@ export interface components {
       cadence: components["schemas"]["InsightCadence"]
       technology: components["schemas"]["InsightTechnology"]
       libraries: components["schemas"]["InsightLibrary"][]
+      matrix: components["schemas"]["InsightMatrix"]
+      /** @description How much of the people's recent commits the busiest author wrote, in ten bands, over the repositories with enough commits held */
+      concentration: components["schemas"]["InsightBand"][]
       singleAuthor: components["schemas"]["InsightRepo"][]
       ageing: components["schemas"]["InsightAgeing"]
       freshness: components["schemas"]["Freshness"]
@@ -1272,15 +1313,15 @@ export interface components {
      * @description Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
      * @enum {string}
      */
-    AlumniReason: "archived" | "deprecated"
+    ArchiveReason: "archived" | "deprecated"
     /**
      * @description active: last active first (default); name; group; used: most dependants first
      * @enum {string}
      */
-    AlumniSort: "active" | "name" | "group" | "used"
-    Alumnus: {
+    ArchiveSort: "active" | "name" | "group" | "used"
+    ArchiveEntry: {
       repo: components["schemas"]["Repo"]
-      reason: components["schemas"]["AlumniReason"]
+      reason: components["schemas"]["ArchiveReason"]
       /**
        * Format: date-time
        * @description The newest default-branch commit the portal holds, else the last push
@@ -1291,16 +1332,16 @@ export interface components {
       /** @description Authors of its newest default-branch commits, people's work only; counted, never named */
       authors: number
     }
-    AlumniCounts: {
+    ArchiveCounts: {
       total: number
       archived: number
       deprecated: number
       /** @description Those another repository still depends on */
       used: number
     }
-    AlumniPage: {
-      alumni: components["schemas"]["Alumnus"][]
-      counts: components["schemas"]["AlumniCounts"]
+    ArchivePage: {
+      archive: components["schemas"]["ArchiveEntry"][]
+      counts: components["schemas"]["ArchiveCounts"]
       page: components["schemas"]["Page"]
       freshness: components["schemas"]["Freshness"]
     }
@@ -1947,16 +1988,16 @@ export interface operations {
       404: components["responses"]["NotFound"]
     }
   }
-  listAlumni: {
+  listArchive: {
     parameters: {
       query?: {
         group?: string
         /** @description Part of the repository's name */
         q?: string
-        reason?: components["schemas"]["AlumniReason"]
+        reason?: components["schemas"]["ArchiveReason"]
         /** @description Only those another repository still depends on */
         used?: boolean
-        sort?: components["schemas"]["AlumniSort"]
+        sort?: components["schemas"]["ArchiveSort"]
         /** @description The page, from 1 */
         page?: components["parameters"]["PageNumber"]
         limit?: number
@@ -1967,14 +2008,14 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description One page of alumni */
+      /** @description One page of archive */
       200: {
         headers: {
           ETag: components["headers"]["ETag"]
           [name: string]: unknown
         }
         content: {
-          "application/json": components["schemas"]["AlumniPage"]
+          "application/json": components["schemas"]["ArchivePage"]
         }
       }
       304: components["responses"]["NotModified"]

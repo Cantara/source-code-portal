@@ -4,6 +4,18 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.8
+
+Insights are drawn as graphs, and Alumni is now called Archive. No configuration change is needed to upgrade; nothing new is asked of GitHub.
+
+- **Insights as graphs** (`/insights`): a heatmap of releases per product over the last 52 weeks, ranked bars for languages, build tools
+  and dependants, a version ladder per runtime with the oldest version marked, a matrix of the internal libraries against the repositories
+  that use them, a histogram of how much the busiest author wrote (never naming anyone), and activity bars per product. Each graph has a
+  text alternative and its table under *Show as a table*; the charts are inline SVG, so the JavaScript budget is unchanged.
+  `GET /api/v1/insights` gains the numbers they draw.
+- **Alumni is now Archive**: `/alumni` is `/archive` and `GET /api/v1/alumni` is `GET /api/v1/archive` (the list is `archive`, a row an
+  `ArchiveEntry`). The old addresses are gone; the `retired_repositories` tool keeps its name. The 2.2.7 entry below uses the new name.
+
 ## 2.2.7
 
 Three new pages and their tools. No configuration change is needed to upgrade; nothing new is asked of GitHub (the App's *Contents*
@@ -13,7 +25,7 @@ permission and the *Release* event are already required).
   stable release of each repository (the default), every release, the stable ones or the pre-releases, with a time window and four
   sorts. A repository's page and a product's page show their own. One read per repository now serves both the badges' latest release
   and this list.
-- **Alumni** (`/alumni`, `GET /api/v1/alumni`): the retired repositories, those GitHub archived and those whose `scp.yaml` says
+- **Archive** (`/archive`, `GET /api/v1/archive`): the retired repositories, those GitHub archived and those whose `scp.yaml` says
   `lifecycle: deprecated`, with why, when last active, how many repositories still depend on them and how many people wrote their
   recent commits (counted, never named). A product's page says `N retired`.
 - **Insights** (`/insights`, `GET /api/v1/insights`): how often the fleet ships, what it is built on, which internal libraries most

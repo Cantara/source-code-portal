@@ -25,7 +25,7 @@ import { Hint } from "@/shared/hint"
 import { cn } from "@/lib/cn"
 import { FindingList, HealthScore } from "@/entities/health/findings"
 import { VisibilityBadge } from "@/entities/repo/visibility-badge"
-import { alumniQuery, groupQuery, issuesQuery, pullsQuery, releasesQuery } from "@/lib/api/queries"
+import { archiveQuery, groupQuery, issuesQuery, pullsQuery, releasesQuery } from "@/lib/api/queries"
 import { useFeatures } from "@/lib/rules-context"
 import { PullList } from "@/entities/pull/pull"
 import { ReleaseList } from "@/entities/release/release"
@@ -389,10 +389,10 @@ function GroupIssues({ group }: { group: string }) {
 }
 
 /** GroupReleases is the group's latest release of each repository, the newest five, the way to all of them on /releases and, when
- * some of its repositories are retired, the way to them on /alumni; a group with neither: nothing. */
+ * some of its repositories are retired, the way to them on /archive; a group with neither: nothing. */
 function GroupReleases({ group }: { group: string }) {
   const { data, error } = useQuery(releasesQuery(api, groupReleases(group)))
-  const retired = useQuery(alumniQuery(api, groupRetired(group))).data?.counts.total ?? 0
+  const retired = useQuery(archiveQuery(api, groupRetired(group))).data?.counts.total ?? 0
   if (data && data.counts.all === 0 && retired === 0) return null
   return (
     <Card aria-labelledby="releases">
@@ -407,7 +407,7 @@ function GroupReleases({ group }: { group: string }) {
           All releases
         </Link>
         {retired > 0 && (
-          <Link href={`/alumni?group=${encodeURIComponent(group)}`} className="text-muted-foreground hover:underline">
+          <Link href={`/archive?group=${encodeURIComponent(group)}`} className="text-muted-foreground hover:underline">
             {count(retired)} retired
           </Link>
         )}

@@ -8,7 +8,7 @@ import { DashboardView } from "@/features/dashboard/view"
 import { DocView } from "@/features/docs/view"
 import { GroupView } from "@/features/groups/view"
 import { IssuesView } from "@/features/issues/view"
-import { AlumniView } from "@/features/alumni/view"
+import { ArchiveView } from "@/features/archive/view"
 import { PullsView } from "@/features/pulls/view"
 import { InsightsView } from "@/features/insights/view"
 import { ReleasesView } from "@/features/releases/view"
@@ -64,6 +64,20 @@ describe("pages", () => {
       expect(screen.getByRole("heading", { name: q })).toBeInTheDocument()
     expect(screen.getByText("Go in 3 repositories, 60% of the fleet.")).toBeInTheDocument()
     expect(screen.getByRole("img", { name: /Stable releases per month/ })).toBeInTheDocument()
+    expect(
+      screen.getByRole("img", { name: /Stable releases per week over the last 52 weeks, per product: Identity 3/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: "Versions of go, oldest first: 1.21 in 1, 1.27 in 2" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("img", { name: /Which of the 2 repositories that use most of the libraries depend on which of the 2/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("img", {
+        name: /Repositories by the share of the people's recent commits the busiest author wrote: 0 to 10 percent 0/,
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: /Repositories by activity: The fleet 2 active/ })).toBeInTheDocument()
+    expect(screen.getByRole("img", { name: /Repositories by language: Go 3 · 60%/ })).toBeInTheDocument()
     expect(screen.getByRole("cell", { name: "None released" })).toBeInTheDocument()
     expect(screen.getByText(/Archived, still used/)).toBeInTheDocument()
     const single = within(screen.getByRole("list", { name: "Repositories mostly one person's" }))
@@ -95,20 +109,20 @@ describe("pages", () => {
   })
 
   it("lists the retired repositories with why, when they were last active and what still depends on them", async () => {
-    show(<AlumniView defaultSize={50} />, "/alumni")
-    expect(await screen.findByRole("heading", { level: 1, name: "Alumni" })).toBeInTheDocument()
+    show(<ArchiveView defaultSize={50} />, "/archive")
+    expect(await screen.findByRole("heading", { level: 1, name: "Archive" })).toBeInTheDocument()
     const chips = within(await screen.findByRole("navigation", { name: "By reason" }))
     expect(chips.getByRole("link", { name: /All 2/ })).toHaveAttribute("aria-current", "true")
-    expect(chips.getByRole("link", { name: /Archived 1/ })).toHaveAttribute("href", "/alumni?reason=archived")
-    expect(chips.getByRole("link", { name: /Deprecated 1/ })).toHaveAttribute("href", "/alumni?reason=deprecated")
-    const rows = within(screen.getByRole("list", { name: "Alumni" })).getAllByRole("listitem")
+    expect(chips.getByRole("link", { name: /Archived 1/ })).toHaveAttribute("href", "/archive?reason=archived")
+    expect(chips.getByRole("link", { name: /Deprecated 1/ })).toHaveAttribute("href", "/archive?reason=deprecated")
+    const rows = within(screen.getByRole("list", { name: "Archive" })).getAllByRole("listitem")
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveTextContent("Archived")
     expect(rows[0]).toHaveTextContent("used by 2")
     expect(rows[0]).toHaveTextContent("3 authors")
     expect(rows[1]).toHaveTextContent("Deprecated")
     expect(rows[1]).not.toHaveTextContent("used by")
-    expect(screen.getByRole("form", { name: "Filter the alumni" })).toHaveAttribute("action", "/alumni")
+    expect(screen.getByRole("form", { name: "Filter the archive" })).toHaveAttribute("action", "/archive")
   })
 
   it("lists the open issues what waits first, the states as filters", async () => {

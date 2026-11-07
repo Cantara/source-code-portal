@@ -78,7 +78,7 @@ func TestServeForPlaywright(t *testing.T) {
 		history[id] = cs
 	}
 	gh.SetCommits(legacy, githubtest.Commit{SHA: fmt.Sprintf("%040x", 0xd1), Message: "Archive the repository", AuthorName: "Ann Example",
-		AuthorLogin: "ann", Date: start.Add(-400 * 24 * time.Hour)}) // the alumnus, last active long ago
+		AuthorLogin: "ann", Date: start.Add(-400 * 24 * time.Hour)}) // the archive entry, last active long ago
 	// A branch off the main line at 3, a renovate branch the portal leaves out, and tags: four at the head, one further down.
 	core0 := history[core]
 	gh.SetBranch(core, "feature/sso", githubtest.Commit{SHA: fmt.Sprintf("%040x", 0xb2), Message: "Bridge the SSO session",

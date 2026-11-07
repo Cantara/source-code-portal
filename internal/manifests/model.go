@@ -99,9 +99,9 @@ func Graph() snapshot.Indexer {
 	})
 }
 
-// Alumnus completes a retired repository's row with the repositories that still depend on it, archived ones not counted
-// (design/alumni.md).
-func Alumnus(s *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.Alumnus) {
+// ArchiveEntry completes a retired repository's row with the repositories that still depend on it, archived ones not counted
+// (design/archive.md).
+func ArchiveEntry(s *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.ArchiveEntry) {
 	for _, k := range usedBy(s, e.Repo.Key()) {
 		if u := s.Repos[k]; u != nil && !u.Repo.Archived {
 			a.UsedBy++

@@ -1,37 +1,37 @@
-import type { AlumniFilter } from "@/lib/api/queries"
+import type { ArchiveFilter } from "@/lib/api/queries"
 import { pageNumber, pageSize } from "@/lib/paging"
 
-/** defaultAlumniSize is the page size of /alumni until the reader chooses one. */
-export const defaultAlumniSize = 50
+/** defaultArchiveSize is the page size of /archive until the reader chooses one. */
+export const defaultArchiveSize = 50
 
-/** AlumniState is /alumni's URL: its filter, the page and its size. */
-export interface AlumniState {
-  filter: AlumniFilter
+/** ArchiveState is /archive's URL: its filter, the page and its size. */
+export interface ArchiveState {
+  filter: ArchiveFilter
   page: number
   size: number
 }
 
-export const alumniSorts = [
+export const archiveSorts = [
   { value: "active", label: "Last active first" },
   { value: "name", label: "Name" },
   { value: "group", label: "Product" },
   { value: "used", label: "Most depended on first" },
 ] as const
 
-/** alumniState reads /alumni's URL; size falls back to the reader's remembered choice. */
-export function alumniState(s: Record<string, unknown>, size: number): AlumniState {
-  const f: AlumniFilter = {}
+/** archiveState reads /archive's URL; size falls back to the reader's remembered choice. */
+export function archiveState(s: Record<string, unknown>, size: number): ArchiveState {
+  const f: ArchiveFilter = {}
   if (typeof s.group === "string" && s.group !== "") f.group = s.group.slice(0, 100)
   if (typeof s.q === "string" && s.q.trim() !== "") f.q = s.q.trim().slice(0, 100)
   if (s.reason === "archived" || s.reason === "deprecated") f.reason = s.reason
   if (s.used === "true") f.used = true
-  const sort = alumniSorts.find((x) => x.value === s.sort)
+  const sort = archiveSorts.find((x) => x.value === s.sort)
   if (sort && sort.value !== "active") f.sort = sort.value
   return { filter: f, page: pageNumber(s.page), size: pageSize(s.per, size) }
 }
 
-/** alumniSearch is the query string of a state; the size only when it differs from the reader's default. */
-export function alumniSearch(st: AlumniState, defaultSize: number): string {
+/** archiveSearch is the query string of a state; the size only when it differs from the reader's default. */
+export function archiveSearch(st: ArchiveState, defaultSize: number): string {
   const q = new URLSearchParams()
   const f = st.filter
   if (f.group) q.set("group", f.group)

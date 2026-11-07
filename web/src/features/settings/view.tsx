@@ -17,7 +17,7 @@ type Settings = {
   pulls: number
   issues: number
   releases: number
-  alumni: number
+  archive: number
 }
 
 /** Choices is one setting as a group of radio buttons, each with what it means. */
@@ -176,7 +176,7 @@ export function SettingsView({ initial }: { initial: Settings }) {
           {features.pulls && size("pulls", "Pull requests")}
           {features.issues && size("issues", "Issues")}
           {size("releases", "Releases")}
-          {size("alumni", "Alumni")}
+          {size("archive", "Archive")}
         </Section>
         <Section title="Theme" about="As the system is set, dark or light.">
           <Choices

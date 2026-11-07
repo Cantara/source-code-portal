@@ -471,15 +471,15 @@ release shows its tag (a link to GitHub), its name, the first line of its notes,
 says so. The latest stable release is also what the release badges and a repository's summary show. It needs the App's *Contents*
 permission and the *Release* event, which the portal already asks for.
 
-### 2.4.5 Alumni
+### 2.4.5 Archive
 
-**Alumni** in the header (`/alumni`) lists the retired repositories a reader may see: those GitHub archived and those whose
+**Archive** in the header (`/archive`) lists the retired repositories a reader may see: those GitHub archived and those whose
 `scp.yaml` says `lifecycle: deprecated` (archived wins). A quiet repository is not retired, only dormant. Each row says why, when the
 repository was last active (its newest commit; GitHub dates no archive, so the portal does not invent a date of retirement), its
 latest release, how many other repositories still depend on it (archived ones are not counted), and how many people wrote its
 recent commits, counted and never named. The reasons are filters; the product, a name, *still depended on* and the order are a form
 that works without JavaScript. The page needs no setting and nothing from GitHub that the portal does not already read, and a
-private alumnus is shown only to those who may see the repository.
+private archive entry is shown only to those who may see the repository.
 
 ### 2.4.6 Insights
 

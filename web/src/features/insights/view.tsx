@@ -16,6 +16,7 @@ import { FreshnessBadge } from "@/shared/freshness-badge"
 import { PageHeader } from "@/shared/page-header"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
+import { ActivityBars, Concentration, DependencyMatrix, RankedBars, ReleaseRhythm, VersionLadder, type Bar } from "./charts"
 
 type Insights = Schemas["Insights"]
 
@@ -151,6 +152,16 @@ function Bars({ months }: { months: Schemas["InsightMonth"][] }) {
   )
 }
 
+/** AsTable folds a graph's numbers into a table the reader opens: the graph leads, the exact values stay one click away. */
+function AsTable({ children }: { children: ReactNode }) {
+  return (
+    <details className="mt-3 text-sm">
+      <summary className="w-fit cursor-pointer text-muted-foreground hover:text-foreground">Show as a table</summary>
+      {children}
+    </details>
+  )
+}
+
 function Cadence({ data }: { data: Insights }) {
   const { months, products } = data.cadence
   const total = months.reduce((n, m) => n + m.releases, 0)
@@ -164,6 +175,8 @@ function Cadence({ data }: { data: Insights }) {
           : `${plural(total, "stable release", "stable releases")} in the last ${data.thresholds.months} months.`
       }
     >
+      <ReleaseRhythm products={products} />
+      <h3 className="mt-5 text-sm font-medium">Per month</h3>
       <Bars months={months} />
       <div className="sr-only">
         <Table caption="Stable releases per month" head={["Month", "Stable releases"]} plain>
@@ -175,29 +188,39 @@ function Cadence({ data }: { data: Insights }) {
           ))}
         </Table>
       </div>
-      <Table
-        caption="Releases per product"
-        head={["Product", "Stable releases held", `Median days between the last ${data.thresholds.releases}`, "Newest"]}
-      >
-        {products.map((p) => (
-          <tr key={p.group}>
-            <td className={td}>
-              <Link href={`/groups/${encodeURIComponent(p.group)}`} className="underline-offset-2 hover:underline">
-                {p.name}
-              </Link>
-            </td>
-            <td className={td}>{p.releases === 0 ? "None released" : count(p.releases)}</td>
-            <td className={td}>{p.medianDays === null || p.medianDays === undefined ? "–" : p.medianDays}</td>
-            <td className={td}>{p.last ? <RelativeTime at={p.last} /> : "–"}</td>
-          </tr>
-        ))}
-      </Table>
+      <AsTable>
+        <Table
+          caption="Releases per product"
+          head={["Product", "Stable releases held", `Median days between the last ${data.thresholds.releases}`, "Newest"]}
+        >
+          {products.map((p) => (
+            <tr key={p.group}>
+              <td className={td}>
+                <Link href={`/groups/${encodeURIComponent(p.group)}`} className="underline-offset-2 hover:underline">
+                  {p.name}
+                </Link>
+              </td>
+              <td className={td}>{p.releases === 0 ? "None released" : count(p.releases)}</td>
+              <td className={td}>{p.medianDays === null || p.medianDays === undefined ? "–" : p.medianDays}</td>
+              <td className={td}>{p.last ? <RelativeTime at={p.last} /> : "–"}</td>
+            </tr>
+          ))}
+        </Table>
+      </AsTable>
       <p className="mt-2 text-xs text-muted-foreground">
-        A product that ships weekly is not better than one that ships quarterly.
+        A product that ships weekly is not better than one that ships quarterly. Only the 20 newest releases of each repository
+        are held, so the weeks before that are empty for a repository that ships often.
       </p>
     </Insight>
   )
 }
+
+const share = (c: Schemas["InsightCount"]): Bar => ({
+  label: c.name,
+  value: c.repos,
+  text: `${count(c.repos)} · ${Math.round(c.share * 100)}%`,
+  hint: `${c.name}: ${plural(c.repos, "repository", "repositories")}, ${Math.round(c.share * 100)}% of the fleet`,
+})
 
 function Counts({ title, rows }: { title: string; rows: Schemas["InsightCount"][] }) {
   return (
@@ -216,6 +239,7 @@ function Counts({ title, rows }: { title: string; rows: Schemas["InsightCount"][
 function Technology({ data }: { data: Insights }) {
   const t = data.technology
   const first = t.languages[0]
+  const bars = (rows: Schemas["InsightCount"][]) => rows.slice(0, 8).map((c, i) => ({ ...share(c), emphasis: i === 0 }))
   return (
     <Insight
       id="technology"
@@ -226,20 +250,53 @@ function Technology({ data }: { data: Insights }) {
           : "No manifest names a language."
       }
     >
-      {t.languages.length > 0 && <Counts title="Language" rows={t.languages} />}
-      {t.buildTools.length > 0 && <Counts title="Build tool" rows={t.buildTools} />}
-      {t.runtimes.length > 0 && (
-        <Table caption="Runtimes the manifests name" head={["Runtime", "Repositories", "Oldest", "Newest"]}>
-          {t.runtimes.map((r) => (
-            <tr key={r.name}>
-              <td className={td}>{r.name}</td>
-              <td className={td}>{count(r.repos)}</td>
-              <td className={td}>{r.oldest}</td>
-              <td className={td}>{r.newest}</td>
-            </tr>
-          ))}
-        </Table>
+      {t.languages.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-medium">Languages</h3>
+          <RankedBars
+            label="Repositories by language"
+            bars={bars(t.languages)}
+            max={Math.max(1, ...t.languages.map((l) => l.repos))}
+          />
+        </>
       )}
+      {t.buildTools.length > 0 && (
+        <>
+          <h3 className="mt-4 text-sm font-medium">Build tools</h3>
+          <RankedBars
+            label="Repositories by build tool"
+            bars={bars(t.buildTools)}
+            max={Math.max(1, ...t.buildTools.map((l) => l.repos))}
+          />
+        </>
+      )}
+      {t.runtimes.length > 0 && (
+        <>
+          <h3 className="mt-5 text-sm font-medium">Runtime versions the manifests name</h3>
+          <p className="text-xs text-muted-foreground">
+            The oldest version of each runtime is marked: where the fleet is behind.
+          </p>
+          {t.runtimes.map((r) => (
+            <VersionLadder key={r.name} runtime={r} />
+          ))}
+        </>
+      )}
+      <AsTable>
+        {t.languages.length > 0 && <Counts title="Language" rows={t.languages} />}
+        {t.buildTools.length > 0 && <Counts title="Build tool" rows={t.buildTools} />}
+        {t.runtimes.length > 0 && (
+          <Table caption="Runtimes the manifests name" head={["Runtime", "Repositories", "Oldest", "Newest"]}>
+            {t.runtimes.map((r) => (
+              <tr key={r.name}>
+                <td className={td}>{r.name}</td>
+                <td className={td}>{count(r.repos)}</td>
+                <td className={td}>{r.oldest}</td>
+                <td className={td}>{r.newest}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </AsTable>
       <p className="mt-2 text-xs text-muted-foreground">
         Only what manifests say; {plural(t.unknown, "repository", "repositories")} named no language.
       </p>
@@ -250,6 +307,7 @@ function Technology({ data }: { data: Insights }) {
 function Libraries({ data }: { data: Insights }) {
   const libs = data.libraries
   const first = libs[0]
+  const retired = new Set(libs.filter((l) => l.retired).map((l) => l.repo))
   return (
     <Insight
       id="libraries"
@@ -265,31 +323,47 @@ function Libraries({ data }: { data: Insights }) {
       }
     >
       {libs.length > 0 && (
-        <Table caption="Libraries with the most dependants" head={["Library", "Dependants", "Latest release", "Used by"]}>
-          {libs.map((l) => (
-            <tr key={l.repo}>
-              <td className={td}>
-                {repoLink(l.repo)}
-                {l.retired && (
-                  <span className="ml-2 rounded-md border border-border px-1.5 text-xs">
-                    {l.retired === "archived" ? "Archived" : "Deprecated"}, still used
-                  </span>
-                )}
-              </td>
-              <td className={td}>{count(l.dependants)}</td>
-              <td className={td}>{l.release ?? "–"}</td>
-              <td className={td}>
-                {l.dependantRepos.map((r, i) => (
-                  <span key={r}>
-                    {i > 0 && ", "}
-                    {repoLink(r)}
-                  </span>
-                ))}
-                {l.dependants > l.dependantRepos.length && ` and ${l.dependants - l.dependantRepos.length} more`}
-              </td>
-            </tr>
-          ))}
-        </Table>
+        <>
+          <RankedBars
+            label="Dependants per library"
+            bars={libs.map((l, i) => ({
+              label: l.repo.slice(l.repo.indexOf("/") + 1) + (l.retired ? " (retired)" : ""),
+              value: l.dependants,
+              text: count(l.dependants),
+              hint: `${l.repo}: ${plural(l.dependants, "repository depends", "repositories depend")} on it${l.retired ? `; it is ${l.retired} and still used` : ""}`,
+              emphasis: i === 0,
+            }))}
+          />
+          <h3 className="mt-5 text-sm font-medium">Who leans on which</h3>
+          <DependencyMatrix matrix={data.matrix} retired={retired} />
+          <AsTable>
+            <Table caption="Libraries with the most dependants" head={["Library", "Dependants", "Latest release", "Used by"]}>
+              {libs.map((l) => (
+                <tr key={l.repo}>
+                  <td className={td}>
+                    {repoLink(l.repo)}
+                    {l.retired && (
+                      <span className="ml-2 rounded-md border border-border px-1.5 text-xs">
+                        {l.retired === "archived" ? "Archived" : "Deprecated"}, still used
+                      </span>
+                    )}
+                  </td>
+                  <td className={td}>{count(l.dependants)}</td>
+                  <td className={td}>{l.release ?? "–"}</td>
+                  <td className={td}>
+                    {l.dependantRepos.map((r, i) => (
+                      <span key={r}>
+                        {i > 0 && ", "}
+                        {repoLink(r)}
+                      </span>
+                    ))}
+                    {l.dependants > l.dependantRepos.length && ` and ${l.dependants - l.dependantRepos.length} more`}
+                  </td>
+                </tr>
+              ))}
+            </Table>
+          </AsTable>
+        </>
       )}
     </Insight>
   )
@@ -298,6 +372,7 @@ function Libraries({ data }: { data: Insights }) {
 function SingleAuthor({ data }: { data: Insights }) {
   const rows = data.singleAuthor
   const t = data.thresholds
+  const judged = data.concentration.reduce((n, b) => n + b.repos, 0)
   return (
     <Insight
       id="single-author"
@@ -308,6 +383,15 @@ function SingleAuthor({ data }: { data: Insights }) {
           : `${plural(rows.length, "repository", "repositories")} where one person wrote ${t.singleAuthorShare}% or more of the people's recent commits.`
       }
     >
+      {judged > 0 && (
+        <>
+          <p className="mt-1 text-xs text-muted-foreground">
+            How much of the people&apos;s recent commits the busiest author wrote, for the{" "}
+            {plural(judged, "repository", "repositories")} with at least {t.singleAuthorCommits} of them held.
+          </p>
+          <Concentration bands={data.concentration} threshold={t.singleAuthorShare} />
+        </>
+      )}
       {rows.length > 0 && (
         <ul aria-label="Repositories mostly one person's" className="mt-3 divide-y divide-border text-sm">
           {rows.map((r) => (
@@ -319,8 +403,7 @@ function SingleAuthor({ data }: { data: Insights }) {
         </ul>
       )}
       <p className="mt-2 text-xs text-muted-foreground">
-        Places to share the knowledge, not people to watch: the page never says who. Judged from {t.singleAuthorCommits}{" "}
-        people&apos;s commits up; automation and sweeps do not count.
+        Places to share the knowledge, not people to watch: the page never says who. Automation and sweeps do not count.
       </p>
     </Insight>
   )
@@ -338,14 +421,7 @@ function Ageing({ data }: { data: Insights }) {
           : `${plural(a.dormant, "repository is", "repositories are")} dormant, candidates for retirement.`
       }
     >
-      <Table caption="Repositories by activity" head={["Active", "Recent", "Quiet", "Dormant"]}>
-        <tr>
-          <td className={td}>{count(a.active)}</td>
-          <td className={td}>{count(a.recent)}</td>
-          <td className={td}>{count(a.quiet)}</td>
-          <td className={td}>{count(a.dormant)}</td>
-        </tr>
-      </Table>
+      <ActivityBars total={a} products={a.products} />
       {a.dormantRepos.length > 0 && (
         <ul aria-label="Dormant repositories" className="mt-3 divide-y divide-border text-sm">
           {a.dormantRepos.map((r) => (
@@ -358,10 +434,20 @@ function Ageing({ data }: { data: Insights }) {
           ))}
         </ul>
       )}
+      <AsTable>
+        <Table caption="Repositories by activity" head={["Active", "Recent", "Quiet", "Dormant"]}>
+          <tr>
+            <td className={td}>{count(a.active)}</td>
+            <td className={td}>{count(a.recent)}</td>
+            <td className={td}>{count(a.quiet)}</td>
+            <td className={td}>{count(a.dormant)}</td>
+          </tr>
+        </Table>
+      </AsTable>
       <p className="mt-2 text-xs text-muted-foreground">
         Already retired ones are on{" "}
-        <Link href="/alumni" className="underline-offset-2 hover:underline">
-          Alumni
+        <Link href="/archive" className="underline-offset-2 hover:underline">
+          Archive
         </Link>
         .
       </p>

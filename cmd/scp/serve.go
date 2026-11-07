@@ -316,11 +316,11 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 	repoHooks = append(repoHooks, repoIssuesAPI, repoHealthAPI)
 	catalogAPI := catalog.API{Current: view,
-		Dashboard: []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
-		Group:     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
-		Repo:      repoHooks,
-		Detail:    []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
-		Alumnus:   []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Alumnus){manifests.Alumnus, commits.Alumnus}}
+		Dashboard:    []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
+		Group:        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
+		Repo:         repoHooks,
+		Detail:       []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
+		ArchiveEntry: []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.ArchiveEntry){manifests.ArchiveEntry, commits.ArchiveEntry}}
 	if f.Pulls {
 		catalogAPI.Dashboard = append(catalogAPI.Dashboard, pulls.Dashboard)
 	}
