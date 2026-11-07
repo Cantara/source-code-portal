@@ -18,12 +18,14 @@ require (
 	github.com/spf13/pflag v1.1.0
 	github.com/spf13/viper v1.21.0
 	github.com/yuin/goldmark/v2 v2.1.15
+	github.com/zalando/go-keyring v0.2.8
 	go.uber.org/goleak v1.3.0
 	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
+	golang.org/x/term v0.47.0
 	golang.org/x/text v0.43.0
 	modernc.org/sqlite v1.61.1
 	rsc.io/qr v0.2.0
@@ -79,11 +81,9 @@ require (
 	github.com/tklauser/numcpus v0.2.1 // indirect
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	github.com/zalando/go-keyring v0.2.8 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261010193011-f71dc92da45e // indirect
-	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	golang.org/x/vuln v1.9.0 // indirect
