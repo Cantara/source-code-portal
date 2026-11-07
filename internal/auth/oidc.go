@@ -79,6 +79,9 @@ func (a *Auth) Routes() []httpapi.Route {
 	if len(a.tokens) > 0 {
 		routes = append(routes, httpapi.Route{Pattern: "POST /auth/token", Handler: http.HandlerFunc(a.tokenSignIn), MaxBody: 4 << 10})
 	}
+	if a.launch != nil {
+		routes = append(routes, httpapi.Route{Pattern: "GET /auth/launch", Handler: http.HandlerFunc(a.launchSignIn)})
+	}
 	return routes
 }
 

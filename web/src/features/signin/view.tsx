@@ -17,6 +17,7 @@ const errors: Record<string, string> = {
   denied: "The sign-in was cancelled at the provider.",
   state: "The sign-in could not be verified. Start it again.",
   token: "That token is not valid.",
+  launch: "That sign-in link has been used or has run out. Start the portal again for a new one.",
 }
 
 /** safeReturn keeps a path of the portal, else the dashboard (the server checks it again). */
