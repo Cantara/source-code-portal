@@ -61,9 +61,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   <Mark />
                   <span>
                     Source Code Portal
-                    <span className="ml-2 hidden font-mono text-[0.6875rem] font-normal tracking-widest text-muted-foreground uppercase sm:inline">
-                      Mission control
-                    </span>
                     <span className="ml-2 font-mono text-[0.6875rem] font-normal text-muted-foreground" title="Release">
                       {release()}
                     </span>
