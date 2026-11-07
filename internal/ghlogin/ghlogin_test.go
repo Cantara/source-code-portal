@@ -21,7 +21,6 @@ func TestParseHost(t *testing.T) {
 	for in, want := range map[string]Host{
 		"":                             {"https://github.com", "https://api.github.com/"},
 		"github.com":                   {"https://github.com", "https://api.github.com/"},
-		" https://github.com ":         {"https://github.com", "https://api.github.com/"},
 		"ghe.example.org":              {"https://ghe.example.org", "https://ghe.example.org/api/v3/"},
 		"https://ghe.example.org/":     {"https://ghe.example.org", "https://ghe.example.org/api/v3/"},
 		"https://ghe.example.org:8443": {"https://ghe.example.org:8443", "https://ghe.example.org:8443/api/v3/"},
@@ -33,6 +32,9 @@ func TestParseHost(t *testing.T) {
 		if err != nil || got != want {
 			t.Errorf("%q: %+v %v, want %+v", in, got, err, want)
 		}
+	}
+	if h, err := ParseHost("  ghe.example.org \n"); err != nil || h.API != "https://ghe.example.org/api/v3/" {
+		t.Errorf("whitespace around a host: %+v %v", h, err)
 	}
 	for _, in := range []string{"http://ghe.example.org", "https://u:p@ghe.example.org", "https://ghe.example.org/path", "https://ghe.example.org?x=1",
 		"ftp://ghe.example.org", "https://", "https://a b"} {

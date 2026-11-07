@@ -127,7 +127,7 @@ func (p *personal) dir() (string, error) {
 	if d == "" {
 		base, err := os.UserConfigDir()
 		if err != nil {
-			return "", fmt.Errorf("no user configuration directory (%v): name one with --dir", err)
+			return "", fmt.Errorf("no user configuration directory: name one with --dir: %w", err)
 		}
 		d = filepath.Join(base, "scp")
 	}
@@ -138,7 +138,7 @@ func (p *personal) dir() (string, error) {
 	if err := os.MkdirAll(d, 0o700); err != nil {
 		return "", err
 	}
-	return d, os.Chmod(d, 0o700)
+	return d, os.Chmod(d, 0o700) //nolint:gosec // G302: a private directory is 0700
 }
 
 func (p *personal) client(h ghlogin.Host) *ghlogin.Client {
@@ -214,7 +214,7 @@ func (p *personal) setup(ctx context.Context, dir string) (string, error) {
 			return "", err
 		}
 	}
-	if err := os.Chmod(dir, 0o700); err != nil {
+	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a private directory is 0700
 		return "", err
 	}
 	st, err := store.Open(ctx, filepath.Join(dir, "scp.db"), slog.New(slog.DiscardHandler))
@@ -346,7 +346,7 @@ func (p *personal) wizard(ctx context.Context, dir, cfgPath string, v *vault.Vau
 		p.say("\nNote: no web UI bundle was found (web beside this program, or web/bundle here). The API works; name the bundle with --web-dir.")
 	}
 	if old, err := os.ReadFile(cfgPath); err == nil { //nolint:gosec // G304: the person's own file
-		if err := os.WriteFile(cfgPath+".bak", old, 0o600); err != nil {
+		if err := os.WriteFile(cfgPath+".bak", old, 0o600); err != nil { //nolint:gosec // G703: cfgPath is the personal directory's own file
 			return err
 		}
 	}

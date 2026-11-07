@@ -67,7 +67,7 @@ func OpenKey(dir string, ring Ring) (key []byte, where string, err error) {
 		ringUsable = false
 	}
 	file := filepath.Join(dir, "vault.key")
-	if b, err := os.ReadFile(file); err == nil {
+	if b, err := os.ReadFile(file); err == nil { //nolint:gosec // G304: the vault's own file in its private directory
 		k, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(b)))
 		if err != nil || len(k) < 32 {
 			return nil, "", fmt.Errorf("vault: %s is not a vault key", file)

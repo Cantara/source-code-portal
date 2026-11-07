@@ -38,7 +38,7 @@ func ParseHost(s string) (Host, error) {
 		return Host{}, fmt.Errorf("%q is not a host: write github.com or https://host", s)
 	}
 	host := u.Hostname()
-	if u.Scheme != "https" && !(u.Scheme == "http" && loopback(host)) {
+	if u.Scheme != "https" && (u.Scheme != "http" || !loopback(host)) {
 		return Host{}, fmt.Errorf("%q: a host must be https (http only on loopback)", s)
 	}
 	web := u.Scheme + "://" + u.Host

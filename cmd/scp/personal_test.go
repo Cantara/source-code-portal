@@ -14,13 +14,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	gogh "github.com/google/go-github/v93/github"
-	"github.com/zalando/go-keyring"
 
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/ghlogin"
@@ -69,29 +68,38 @@ func fakeHost(t *testing.T, header map[string]string) *httptest.Server {
 	return srv
 }
 
-var mockKeychain sync.Once
+// memRing is the keychain of a test: one vault key in memory, shared by the runs that use the same directory.
+type memRing struct{ key []byte }
 
-func newPersonal(t *testing.T, dir, host, input string, f personalFlags) (*personal, *bytes.Buffer) {
+func (r *memRing) Get() ([]byte, error) {
+	if r.key == nil {
+		return nil, vault.ErrNoKey
+	}
+	return r.key, nil
+}
+
+func (r *memRing) Set(k []byte) error { r.key = k; return nil }
+
+func newPersonal(t *testing.T, ring vault.Ring, dir, host, input string, f personalFlags) (*personal, *bytes.Buffer) {
 	t.Helper()
-	mockKeychain.Do(keyring.MockInit) // once: a second init would lose the keys of the first
 	out := &bytes.Buffer{}
 	f.dir, f.host = dir, host
 	if f.port == 0 {
 		f.port = 9090
 	}
 	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
-	return &personal{flags: f, in: bufio.NewReader(strings.NewReader(input)), out: out,
+	return &personal{flags: f, in: bufio.NewReader(strings.NewReader(input)), out: out, ring: ring,
 		sleep: func(context.Context, time.Duration) error { return nil }, now: func() time.Time { return now }}, out
 }
 
-func credentialOf(t *testing.T, dir string) vault.Secret {
+func credentialOf(t *testing.T, ring vault.Ring, dir string) vault.Secret {
 	t.Helper()
 	st, err := store.Open(t.Context(), filepath.Join(dir, "scp.db"), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	key, _, err := vault.OpenKey(dir, vault.Keychain(dir))
+	key, _, err := vault.OpenKey(dir, ring)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,10 +112,11 @@ func credentialOf(t *testing.T, dir string) vault.Secret {
 }
 
 func TestPersonalWizardWithAToken(t *testing.T) {
+	ring := &memRing{}
 	host := fakeHost(t, nil)
 	dir := filepath.Join(t.TempDir(), "scp")
 	// Enter: no client id (paste a token); the token; the accounts: 1 and 3 (octo and zeta).
-	p, out := newPersonal(t, dir, host.URL, "\nghp_personal\n1,3\n", personalFlags{})
+	p, out := newPersonal(t, ring, dir, host.URL, "\nghp_personal\n1,3\n", personalFlags{})
 	path, err := p.setup(t.Context(), dir)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
@@ -130,7 +139,7 @@ func TestPersonalWizardWithAToken(t *testing.T) {
 	if st, _ := os.Stat(dir); st.Mode().Perm() != 0o700 {
 		t.Errorf("directory %v", st.Mode().Perm())
 	}
-	if sec := credentialOf(t, dir); sec.Value != "ghp_personal" || sec.Source != host.URL {
+	if sec := credentialOf(t, ring, dir); sec.Value != "ghp_personal" || sec.Source != host.URL {
 		t.Errorf("credential: %v", sec)
 	}
 	// The token is nowhere in the clear: not in personal.yaml, the store files or what was printed.
@@ -152,7 +161,7 @@ func TestPersonalWizardWithAToken(t *testing.T) {
 	}
 
 	// The next run asks nothing: no input at all.
-	p2, out2 := newPersonal(t, dir, "", "", personalFlags{})
+	p2, out2 := newPersonal(t, ring, dir, "", "", personalFlags{})
 	if _, err := p2.setup(t.Context(), dir); err != nil {
 		t.Fatalf("second run: %v\n%s", err, out2)
 	}
@@ -162,10 +171,11 @@ func TestPersonalWizardWithAToken(t *testing.T) {
 }
 
 func TestPersonalWizardWithACode(t *testing.T) {
+	ring := &memRing{}
 	host := fakeHost(t, nil)
 	dir := t.TempDir()
 	// The accounts question: Enter for all.
-	p, out := newPersonal(t, dir, host.URL, "\n", personalFlags{clientID: "Iv1.abc", scope: "repo read:org"})
+	p, out := newPersonal(t, ring, dir, host.URL, "\n", personalFlags{clientID: "Iv1.abc", scope: "repo read:org"})
 	if _, err := p.setup(t.Context(), dir); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
@@ -174,12 +184,13 @@ func TestPersonalWizardWithACode(t *testing.T) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
 	}
-	if sec := credentialOf(t, dir); sec.ExpiresAt.IsZero() {
+	if sec := credentialOf(t, ring, dir); sec.ExpiresAt.IsZero() {
 		t.Error("the end of the token was not kept")
 	}
 }
 
 func TestPersonalWizardRefuses(t *testing.T) {
+	ring := &memRing{}
 	host := fakeHost(t, nil)
 	for name, tc := range map[string]struct{ input, host string }{
 		"a wrong token":   {"\nnope\n", host.URL},
@@ -189,7 +200,7 @@ func TestPersonalWizardRefuses(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			p, _ := newPersonal(t, dir, tc.host, tc.input, personalFlags{})
+			p, _ := newPersonal(t, ring, dir, tc.host, tc.input, personalFlags{})
 			if _, err := p.setup(t.Context(), dir); err == nil {
 				t.Error("accepted")
 			}
@@ -201,13 +212,14 @@ func TestPersonalWizardRefuses(t *testing.T) {
 }
 
 func TestPersonalSignsInAgainWhenTheCredentialEnded(t *testing.T) {
+	ring := &memRing{}
 	host := fakeHost(t, map[string]string{"github-authentication-token-expiration": "2026-11-07 11:00:00 UTC"})
 	dir := t.TempDir()
-	p, _ := newPersonal(t, dir, host.URL, "\nghp_personal\n\n", personalFlags{})
+	p, _ := newPersonal(t, ring, dir, host.URL, "\nghp_personal\n\n", personalFlags{})
 	if _, err := p.setup(t.Context(), dir); err != nil { // the header says the token ended an hour ago
 		t.Fatal(err)
 	}
-	if sec := credentialOf(t, dir); !sec.Expired(p.clock()) {
+	if sec := credentialOf(t, ring, dir); !sec.Expired(p.clock()) {
 		t.Fatalf("the end was not read from the header: %v", sec.ExpiresAt)
 	}
 	cfg, _, _ := config.Load(filepath.Join(dir, "personal.yaml"), nil)
@@ -216,12 +228,12 @@ func TestPersonalSignsInAgainWhenTheCredentialEnded(t *testing.T) {
 	}
 	before, _ := os.ReadFile(filepath.Join(dir, "personal.yaml"))
 	// Run again: it signs in again at the same host, and leaves personal.yaml as the person may have edited it.
-	p2, out := newPersonal(t, dir, "", "\nghp_personal\n", personalFlags{})
+	p2, out := newPersonal(t, ring, dir, "", "\nghp_personal\n", personalFlags{})
 	p2.now = func() time.Time { return time.Date(2026, 11, 7, 10, 0, 0, 0, time.UTC) } // before the end: the credential is current
 	if _, err := p2.setup(t.Context(), dir); err != nil || out.Len() != 0 {
 		t.Fatalf("while current: %v %s", err, out)
 	}
-	p3, out3 := newPersonal(t, dir, "", "\nghp_personal\n", personalFlags{})
+	p3, out3 := newPersonal(t, ring, dir, "", "\nghp_personal\n", personalFlags{})
 	if _, err := p3.setup(t.Context(), dir); err != nil || !strings.Contains(out3.String(), "ended on") {
 		t.Fatalf("after the end: %v\n%s", err, out3)
 	}
@@ -231,15 +243,16 @@ func TestPersonalSignsInAgainWhenTheCredentialEnded(t *testing.T) {
 }
 
 func TestPersonalResetKeepsTheOldFile(t *testing.T) {
+	ring := &memRing{}
 	host := fakeHost(t, nil)
 	dir := t.TempDir()
-	p, _ := newPersonal(t, dir, host.URL, "\nghp_personal\n\n", personalFlags{})
+	p, _ := newPersonal(t, ring, dir, host.URL, "\nghp_personal\n\n", personalFlags{})
 	path, err := p.setup(t.Context(), dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	old, _ := os.ReadFile(path)
-	p2, _ := newPersonal(t, dir, host.URL, "\nghp_personal\n1\n", personalFlags{reset: true, port: 9190})
+	p2, _ := newPersonal(t, ring, dir, host.URL, "\nghp_personal\n1\n", personalFlags{reset: true, port: 9190})
 	if _, err := p2.setup(t.Context(), dir); err != nil {
 		t.Fatal(err)
 	}
@@ -271,6 +284,7 @@ func TestServeRefusesTheVaultsCredential(t *testing.T) {
 // TestPersonalPortal is the acceptance test: the portal that scp personal starts reads the private repository the person can read,
 // refuses everyone without a session, and the launch link signs the owner in once.
 func TestPersonalPortal(t *testing.T) {
+	ring := &memRing{}
 	gh := githubtest.New(t)
 	gh.AddToken("ghp_test")
 	gh.AddRepo("acme", gogh.Repository{Name: new("open"), Visibility: new("public")})
@@ -285,12 +299,12 @@ func TestPersonalPortal(t *testing.T) {
 	_ = ln.Close()
 
 	// What the wizard writes, with the fake GitHub as the host and a free port.
-	p, _ := newPersonal(t, dir, "", "", personalFlags{})
+	p, _ := newPersonal(t, ring, dir, "", "", personalFlags{})
 	st, err := store.Open(t.Context(), filepath.Join(dir, "scp.db"), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, _, err := vault.OpenKey(dir, vault.Keychain(dir))
+	key, _, err := vault.OpenKey(dir, ring)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,9 +316,10 @@ func TestPersonalPortal(t *testing.T) {
 	if err := p.secrets(dir); err != nil {
 		t.Fatal(err)
 	}
-	port := addr[strings.LastIndex(addr, ":")+1:]
-	n := 0
-	fmt.Sscan(port, &n)
+	n, err := strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
+	if err != nil {
+		t.Fatal(err)
+	}
 	yaml := personalYAML(dir, ghHost(gh.BaseURL()), []string{"acme"}, "open", "", n)
 	cfgPath := filepath.Join(dir, "personal.yaml")
 	if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
