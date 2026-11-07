@@ -4,6 +4,16 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## Unreleased
+
+Release notes on the Releases page, the repository's and the product's pages.
+
+- **Release notes**: a release's notes show under its row as a disclosure ("Release notes"), on `/releases` and in the Releases panels of
+  a repository and a product. They are the GitHub release's own text; a package release, and a GitHub release without a body, shows the
+  section of the repository's `CHANGELOG.md` (or `CHANGES`, `HISTORY`, `NEWS`, `RELEASES`) for its version, marked "from the changelog".
+  Long notes are cut with a link to the rest. `GET /api/v1/releases` rows carry `notes`, `notesCut` and `notesFrom`. The portal makes
+  two more conditional requests per repository to read the changelog; no new permission.
+
 ## 2.2.9
 
 One filter panel for every list page, published packages in the Releases page, and a tidier logo. No configuration change is needed to

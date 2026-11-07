@@ -1,6 +1,6 @@
 # Releases: what was shipped and when (RL1 to RL3)
 
-Status: RL1 to RL4 built (plan.md section 4, P-82, P-84). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
+Status: RL1 to RL5 built (plan.md section 4, P-82, P-84, P-87, P-88). Binding order: ../plan.md > this note > `pulls.md`, `github.md`, `packages.md`.
 
 The portal holds only the **latest** release of a repository (the badge's job, `badges.release`). A team that wants to know what the
 fleet shipped this week has nothing to look at. The portal lists the recent releases of the fleet, a product and a repository, newest
@@ -69,6 +69,34 @@ only (version, when published, the registry's link), not a history, so a package
   name, a source chip (GitHub, Maven, npm, ...) and, as before, the repository chip and when it was published. A repository's
   and a group's panels list them too, with the package's name.
 - **Agents.** `recent_releases` takes `source` and says each package row's package and registry.
+
+## Release notes (RL5)
+
+A released version usually has notes (owner, 2026-11-07). They are collected, mapped to the row of the release they belong to and shown
+on `/releases`, the repository's and the product's Releases panels. This replaces the RL1 rule "no notes' text": the first line stays
+the row's summary, the notes are kept whole (bounded) beside it.
+
+- **GitHub's body.** `Release.Notes` is the release's body, `untrusted.Strip`ped and cut at 6 KiB at a line end (`NotesCut`: the page
+  says so and links to GitHub). 20 releases of 1,000 repositories hold at most 120 MB; real notes are a tenth of that.
+- **A changelog.** A package release, and a GitHub release with an empty body, has no notes of its own. The job also reads the
+  repository's root changelog (`CHANGELOG`, `CHANGES`, `HISTORY`, `NEWS`, `RELEASES`, `RELEASE_NOTES`, with `.md`; the root tree and
+  the blob through the ETag transport, a file over 512 KiB is not read) and keeps the sections of its 10 newest versions
+  (`Set.Changelog`: version, text cut at 3 KiB). A section starts at a heading (`#` to `####`) that names a version (`## 1.2.3`,
+  `## [1.2.3] - 2026-01-01`, `## v1.2.3 (date)`, `## [1.2.3](link) (date)`) and ends at the next heading of its level or above.
+  A row takes the section of its own version (`v` ignored); `notesFrom` says `release` or `changelog`. No other registry gives
+  notes in a form shared by all (NuGet's nuspec does, PyPI, npm and crates.io do not), so none is read.
+- **Rendering.** The API renders the notes: `releases.API.Render` is a hook (`cmd/scp`, `docs.Notes`), the docs pipeline with
+  the pieces a note must not have: headings become bold paragraphs (a page keeps one h1 and its own heading order), images become
+  their alt text (the image proxy serves only a document's recorded images), links resolve to GitHub. Sanitised by the one policy.
+  Without the hook a row has no notes. `ReleaseEntry` gains `notes` (HTML), `notesCut` and `notesFrom`.
+- **Page.** A row with notes gets a disclosure under its meta line (`<details>`, no JavaScript; the summary line is the first line
+  of the notes or "Release notes", with "from CHANGELOG.md" when that is where they come from). The panels of a repository and of
+  a product show it too, in their compact rows.
+- **Cost.** The job makes two more requests per repository (root tree, changelog blob), both conditional: nearly all 304 and
+  cache replays. 4,000 more a day at 1,000 repositories. Prerequisite unchanged (Contents).
+- **Tests.** The sections parser (heading forms, nesting, `Unreleased`, a section cut), the body cut, a body-less GitHub release and
+  a package taking the changelog's section, the rendering (headings, images, script, links), the job against the fake GitHub with
+  a changelog file, the page (a disclosure, axe in both themes, without JavaScript).
 
 ## Tests
 
