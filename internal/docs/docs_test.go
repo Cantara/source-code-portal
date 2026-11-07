@@ -192,3 +192,22 @@ func TestImagesFollowTheTree(t *testing.T) {
 		}
 	}
 }
+
+// TestNotes: a release's notes are rendered for a page that is not a document: headings are bold paragraphs, images their alt text,
+// links go to the repository on GitHub, and nothing unsafe passes.
+func TestNotes(t *testing.T) {
+	d := New(map[string]GitHub{"gh": &repo{}}, safehtml.New())
+	e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x"}}
+	h := d.Notes(e, "# Big\n\n## What's new\n\n- **faster** [PR](https://github.com/acme/x/pull/3), [file](src/a.go)\n\n![shot](https://e.org/a.png)\n\n<script>alert(1)</script>\n<img src=x onerror=y>\n").String()
+	for _, want := range []string{"<p><strong>Big</strong></p>", "<p><strong>What&#39;s new</strong></p>", "<strong>faster</strong>",
+		`href="https://github.com/acme/x/blob/HEAD/src/a.go"`, "shot"} {
+		if !strings.Contains(h, want) {
+			t.Errorf("missing %s in %s", want, h)
+		}
+	}
+	for _, bad := range []string{"<h1", "<h2", "<img", "<script", "onerror", "/images/"} {
+		if strings.Contains(h, bad) {
+			t.Errorf("holds %s in %s", bad, h)
+		}
+	}
+}

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"log/slog"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 )
@@ -220,5 +222,62 @@ func TestReleasesOfPackages(t *testing.T) {
 	plain := API{Current: a.Current}
 	if res, _ := plain.ListReleases(t.Context(), oapi.ListReleasesRequestObject{}); len(res.(oapi.ListReleases200JSONResponse).Body.Releases) != 4 {
 		t.Error("without the hook: GitHub's four")
+	}
+}
+
+// TestReleaseNotes: a row carries its release's notes, else the changelog's section of its version (a package too); the hook renders
+// them, and without it a row has none.
+func TestReleaseNotes(t *testing.T) {
+	now := time.Now().UTC()
+	ago := func(d int) time.Time { return now.AddDate(0, 0, -d) }
+	set := Set{
+		Releases: []Release{{Tag: "v2.1.0", Notes: "own **notes**", Published: ago(2)}, {Tag: "v2.0.0", Published: ago(9)}, {Tag: "v1.0.0", Published: ago(40)}},
+		Changelog: []Section{{Version: "2.1.0", Notes: "ignored: the release has its own"}, {Version: "2.0.0", Notes: "from the changelog", Cut: true},
+			{Version: "2.2.0", Notes: "the package section"}},
+	}
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	spec := New(nil).Spec()
+	p.Update(func(b *snapshot.Builder) {
+		b.ReplaceSource("gh", []*snapshot.RepoEntry{{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "core", Visibility: "public"}}}, nil, snapshot.SourceStatus{ID: "gh"})
+		payload, _ := json.Marshal(set)
+		spec.Publish(b, store.Item{Repo: "acme/core", State: snapshot.StateOK, Payload: payload}, snapshot.Freshness{State: snapshot.StateOK, FetchedAt: now, CheckedAt: now, TTL: time.Hour})
+	})
+	p.Flush()
+	s := p.Current()
+	render := func(_ *snapshot.RepoEntry, md string) safehtml.SafeHTML { return safehtml.Text(md) }
+	published := func(*snapshot.RepoEntry) []Published {
+		return []Published{{Ecosystem: "maven", Name: "core", Version: "2.2.0", Published: ago(1)}}
+	}
+	list := func(a API) map[string]oapi.ReleaseEntry {
+		t.Helper()
+		all := oapi.ReleaseVariantAll
+		res, err := a.ListReleases(t.Context(), oapi.ListReleasesRequestObject{Params: oapi.ListReleasesParams{Variant: &all}})
+		page, ok := res.(oapi.ListReleases200JSONResponse)
+		if err != nil || !ok {
+			t.Fatalf("list: %T %v", res, err)
+		}
+		out := map[string]oapi.ReleaseEntry{}
+		for _, r := range page.Body.Releases {
+			out[r.Tag] = r
+		}
+		return out
+	}
+	rows := list(API{Current: func(context.Context) *snapshot.Snapshot { return s }, Packages: published, Render: render})
+	if r := rows["v2.1.0"]; r.NotesFrom != oapi.ReleaseEntryNotesFromRelease || !strings.Contains(r.Notes, "own **notes**") || r.NotesCut {
+		t.Errorf("a release's own notes = %+v", r)
+	}
+	if r := rows["v2.0.0"]; r.NotesFrom != oapi.ReleaseEntryNotesFromChangelog || !strings.Contains(r.Notes, "from the changelog") || !r.NotesCut {
+		t.Errorf("a release without notes takes the changelog's section, cut as it was = %+v", r)
+	}
+	if r := rows["2.2.0"]; r.Package != "core" || r.NotesFrom != oapi.ReleaseEntryNotesFromChangelog || !strings.Contains(r.Notes, "the package section") {
+		t.Errorf("a package release takes the changelog's section = %+v", r)
+	}
+	if r := rows["v1.0.0"]; r.Notes != "" || r.NotesFrom != "" || r.NotesCut {
+		t.Errorf("no notes anywhere = %+v", r)
+	}
+	for tag, r := range list(API{Current: func(context.Context) *snapshot.Snapshot { return s }}) {
+		if r.Notes != "" || r.NotesFrom != "" {
+			t.Errorf("%s has notes without a renderer: %+v", tag, r)
+		}
 	}
 }

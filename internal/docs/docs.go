@@ -59,6 +59,20 @@ func New(sources map[string]GitHub, policy *safehtml.Policy) *Docs {
 	return &Docs{sources: sources, pipe: &pipeline{policy: policy}}
 }
 
+// Notes renders a release's notes (Markdown, repository-authored) of the repository e to sanitised HTML for a page that is not a
+// document: headings become bold paragraphs, images their alt text, links point to the repository on GitHub. design/releases.md, RL5.
+func (d *Docs) Notes(e *snapshot.RepoEntry, md string) safehtml.SafeHTML {
+	web := "https://github.com/"
+	if gh := d.sources[e.Repo.ID.Source]; gh != nil {
+		web = gh.WebURL()
+	}
+	h, _, _, _, err := d.pipe.markdown([]byte(md), links{web: web, repo: e.Repo.Key(), notes: true})
+	if err != nil {
+		return safehtml.Text(md)
+	}
+	return h
+}
+
 // record is one stored document. The HTML is untrusted bytes until it passes the sanitiser again at publish.
 type record struct {
 	Path        string         `json:"path"`

@@ -719,6 +719,27 @@ func (e QueueSort) Valid() bool {
 	}
 }
 
+// Defines values for ReleaseEntryNotesFrom.
+const (
+	ReleaseEntryNotesFromChangelog ReleaseEntryNotesFrom = "changelog"
+	ReleaseEntryNotesFromEmpty     ReleaseEntryNotesFrom = ""
+	ReleaseEntryNotesFromRelease   ReleaseEntryNotesFrom = "release"
+)
+
+// Valid indicates whether the value is a known member of the ReleaseEntryNotesFrom enum.
+func (e ReleaseEntryNotesFrom) Valid() bool {
+	switch e {
+	case ReleaseEntryNotesFromChangelog:
+		return true
+	case ReleaseEntryNotesFromEmpty:
+		return true
+	case ReleaseEntryNotesFromRelease:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReleaseSort.
 const (
 	ReleaseSortGroup  ReleaseSort = "group"
@@ -2226,6 +2247,15 @@ type ReleaseEntry struct {
 	// Name The repository's name
 	Name string `json:"name"`
 
+	// Notes The release's notes as sanitised HTML (headings as bold paragraphs, images as their alt text); empty when it has none
+	Notes string `json:"notes"`
+
+	// NotesCut The notes were cut; the rest is on the release's page
+	NotesCut bool `json:"notesCut"`
+
+	// NotesFrom release: the GitHub release's own notes; changelog: the section of the repository's changelog for the version; empty with no notes
+	NotesFrom ReleaseEntryNotesFrom `json:"notesFrom"`
+
 	// Package The package's name; empty for a GitHub release
 	Package     string    `json:"package"`
 	Prerelease  bool      `json:"prerelease"`
@@ -2247,6 +2277,9 @@ type ReleaseEntry struct {
 	Title string `json:"title"`
 	Url   string `json:"url"`
 }
+
+// ReleaseEntryNotesFrom release: the GitHub release's own notes; changelog: the section of the repository's changelog for the version; empty with no notes
+type ReleaseEntryNotesFrom string
 
 // ReleasePage defines model for ReleasePage.
 type ReleasePage struct {

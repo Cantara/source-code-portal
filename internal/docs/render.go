@@ -56,6 +56,7 @@ type links struct {
 	dir     string           // the document's directory, "" at the root
 	indexed map[string]bool  // repository paths with a portal page
 	images  map[string]Image // filled with the images the document shows, by id
+	notes   bool             // a release's notes in a page of other content: headings become bold paragraphs, images their alt text
 }
 
 // rendered is the outcome of the pipeline for one file.
@@ -353,6 +354,16 @@ func rewrite(in []byte, l links) (rewritten, error) {
 				capture.WriteString(tok.Data)
 			}
 		case xhtml.StartTagToken, xhtml.SelfClosingTagToken:
+			if l.notes {
+				switch tok.Data {
+				case "img":
+					buf.WriteString(html.EscapeString(attr(tok.Attr, "alt")))
+					continue
+				case "h1", "h2", "h3", "h4", "h5", "h6":
+					buf.WriteString("<p><strong>")
+					continue
+				}
+			}
 			as, keep := rewriteAttrs(tok.Data, tok.Attr, l)
 			if !keep {
 				if tok.Data == "img" {
@@ -367,6 +378,10 @@ func rewrite(in []byte, l links) (rewritten, error) {
 			}
 		case xhtml.EndTagToken:
 			if tok.Data == "source" || tok.Data == "picture" {
+				continue
+			}
+			if l.notes && len(tok.Data) == 2 && tok.Data[0] == 'h' && tok.Data[1] >= '1' && tok.Data[1] <= '6' {
+				buf.WriteString("</strong></p>")
 				continue
 			}
 			if capture != nil && tok.Data == captureTag {
