@@ -71,7 +71,8 @@ A repository may be in several groups; repositories in none are counted on the d
 
 ## For one person: `scp personal`
 
-Someone who wants a portal only for themselves on their own computer needs no `scp.yaml`: `scp personal` asks for the GitHub host
-(github.com, an Enterprise Server or a GHE.com tenant), signs them in (a code with their own app's client id, or a pasted token),
-seals the credential in the store and serves on loopback with a one-time sign-in link. Its settings are `personal.yaml` in the
+Someone who wants a portal only for themselves on their own computer needs no `scp.yaml`: `scp personal` opens a page in the
+browser where they choose the GitHub host (github.com, an Enterprise Server or a GHE.com tenant), sign in (a code with their own
+app's client id, or a pasted token), pick their repositories and sort them into products; it seals the credential in the store and
+serves on loopback with a one-time sign-in link (`--terminal` asks in the terminal instead). Its settings are `personal.yaml` in the
 directory it prints; read `docs/personal-edition.md` of the release. Use `scp serve` for a portal several people use.

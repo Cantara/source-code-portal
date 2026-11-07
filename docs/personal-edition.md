@@ -7,25 +7,37 @@ private ones too. It is for one person. Nothing is exposed beyond the computer, 
 scp personal
 ```
 
-The first run asks a few questions; every later run starts at once and prints a link that signs you in to the portal. To share a
-portal with other people use `scp serve` ([operator guide](operator-guide.md)).
+The first run opens a page in your browser (a link on `127.0.0.1`, printed in the terminal too); every later run starts at once
+and prints a link that signs you in to the portal. To share a portal with other people use `scp serve` ([operator
+guide](operator-guide.md)).
 
 You need the `scp` program, the web UI bundle beside it (`web/`, from the release's `scp-web_<version>.tar.gz`; `--web-dir` names it
 elsewhere) and Node.js on the `PATH`.
 
 ## The first run
 
-1. **The host.** `github.com`, a GitHub Enterprise Server (`https://github.example.org`) or a GHE.com tenant (`https://name.ghe.com`).
-2. **How you sign in.** Either of:
-   - **A code on GitHub** (the device flow). You need the *client id* of an OAuth app or a GitHub App you registered on that host
-     (below). SCP shows a code and a page; you confirm on GitHub and SCP receives a token. Give the id with `--client-id` or at the
-     question.
-   - **A pasted token.** A fine-grained personal access token with read access to the repositories you want (Contents, Metadata, and
-     for the pull requests and issues pages Pull requests, Issues and Commit statuses), or a classic one with the scopes `repo` and
-     `read:org`. The input is not shown.
-3. **Which accounts.** Your own account and the organisations GitHub lists for you; choose by number, or Enter for all.
+The page walks you through four steps:
 
-SCP checks the token (it asks GitHub who you are), seals it and writes `personal.yaml`. Then it starts.
+1. **Sign in.** Choose the host (`github.com`, a GitHub Enterprise Server such as `https://github.example.org`, or a GHE.com tenant
+   such as `https://name.ghe.com`) and either:
+   - **Sign in with GitHub** (the device flow). The page shows a code and a link to GitHub; you type the code there, approve, and
+     the page moves on by itself. This needs the *client id* of an OAuth app or a GitHub App registered on that host (below),
+     given with `--client-id`.
+   - **Paste a token.** A fine-grained personal access token with read access to the repositories you want (Contents, Metadata, and
+     for the pull requests and issues pages Pull requests, Issues and Commit statuses), or a classic one with the scopes `repo` and
+     `read:org`. The input is not shown again.
+2. **Accounts.** Your own account and the organisations GitHub lists for you; untick the ones you do not want.
+3. **Products.** The repositories you can read (up to 500, the most recently pushed first; forks and archived ones are left out of
+   the suggestion), sorted into products by what their names share (`whydah-*` becomes *Whydah*; the rest by owner). Rename a
+   product, move a repository to another, hide the ones you do not want. A repository left in no product is still shown, in a group
+   called *Other*.
+4. **Start.** The portal starts on the same address and the page signs you in.
+
+SCP seals the token, writes `personal.yaml` (the products become groups with exact repository names) and starts. The page closes
+the setup for good: it works once, from the browser the link was opened in, and only while `scp personal` waits for it.
+
+`--no-browser` prints the link without opening a browser; `--terminal` asks the same questions in the terminal instead (the host,
+the sign-in, which accounts; one group, "My repositories", holding everything).
 
 ### Registering an app for the code sign-in
 
@@ -77,11 +89,11 @@ states cover what is yours. Review requests to a team are not expanded to its me
 
 ## Changing things
 
-- **The accounts, groups, features**: edit `personal.yaml` and start again. The key `github.sources[].credential: true` means "the
+- **The accounts, products, features**: edit `personal.yaml` and start again (the products are `catalog.groups`). The key `github.sources[].credential: true` means "the
   token is in the vault".
 - **Another port**: `--port` on the first run (or `--reset`), or edit `server.public_addr`, `server.admin_addr` and `server.public_url`.
   The portal serves loopback addresses only.
-- **Start over**: `scp personal --reset` asks everything again; the old file is kept as `personal.yaml.bak`.
+- **Start over**: `scp personal --reset` opens the page again; the old file is kept as `personal.yaml.bak`.
 - **A token that ends**: GitHub tells SCP when a fine-grained token or a code sign-in ends. SCP says so at the next start and signs
   you in again; it does not refresh tokens.
 - **Sign out of GitHub**: revoke the token or the app's authorisation on GitHub, delete `scp.db` and `vault.key`.

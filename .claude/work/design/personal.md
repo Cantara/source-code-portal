@@ -79,3 +79,31 @@ a session refused.
 - The filter panels of `/pulls` and `/issues` show a "Mine" group of switches (`MineToggles`) when `me.login` is known. Each sets the
   field to the login in the address, a plain GET form field, so it works without JavaScript and a page can be bookmarked.
 - Not done: "my work" for commits and a dashboard element; the agents' tools do not take the parameters yet.
+
+## The first run in the browser (PE3)
+
+The terminal wizard asked what a person cannot be expected to know (a host, a client id, account numbers), and gave one group. The
+default first run is a page (`internal/setup`, `cmd/scp/personal_setup.go`); `--terminal` keeps the wizard.
+
+- **Flow.** `scp personal` (no `personal.yaml`, or `--reset`) listens on `127.0.0.1:<port>` (the portal's own port, so the page and
+  the portal share an address), prints `http://127.0.0.1:<port>/setup/?code=<entry>` and opens it (`--no-browser`: only prints). Steps:
+  sign in (device flow with `--client-id`, else a pasted token; host forms as `ghlogin.ParseHost`), accounts (`Orgs`), products
+  (`Repos`, `Suggest`, edited on the page), start. `Finish` seals the credential, writes `personal.yaml`, shuts the setup server down
+  and the portal starts on the same address; the page waits for `/api/v1/me` to answer JSON and follows the launch link.
+- **Products.** `Suggest`: a first word shared by at least 3 repositories (`whydah-*`), then leftovers by owner when there is more
+  than one, at most 50 products of 64 repositories (the group matcher limits). Each product becomes a group of `exact` matchers
+  (`default_repo`: its first repository); hidden repositories go to the source's `exclude` (at most 64); repositories left in no
+  product go to an `unclaimed: true` group "Other". The list is the token's view, 500 repositories at most; a person with more edits
+  `personal.yaml`.
+- **Security** (the portal's model unchanged; `docs/security-model.md`). The page is served on loopback only. The entry code is
+  random, works once and turns into an `HttpOnly`, `SameSite=Strict` cookie. A `Host` other than `127.0.0.1:<port>` or
+  `localhost:<port>` is refused (DNS rebinding), every POST must be same-origin (`Sec-Fetch-Site`, else `Origin`), JSON only, bodies
+  at most 256 KiB. The CSP allows only the page's own script and style (no inline). The token lives in the setup server's memory and
+  is never sent to the page; a sign-in cancelled by another is dropped by a generation counter. Nothing the page shows is
+  repository-authored except names, which are drawn as text nodes.
+- **Client id.** `defaultClientID` in `personal_setup.go` is empty until a GitHub App with device flow and read-only permissions is
+  registered; until then github.com signs in by pasted token or `--client-id`.
+- **Not done.** A credential that has ended signs in again through the terminal wizard, not the page.
+- **Tests.** `internal/setup` (the entry, refusals, a token, a code, a code for another host, `Suggest`); `TestPersonalBrowserSetup`
+  drives the page's API against the fake host and checks `personal.yaml`, the sealed credential, file modes and the freed port; the
+  flow was also walked in a real browser against a fake GitHub.

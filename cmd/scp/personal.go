@@ -15,6 +15,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/auth"
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/ghlogin"
+	"github.com/cantara/source-code-portal/internal/setup"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/vault"
 )
@@ -44,6 +46,8 @@ type personalFlags struct {
 	dir, host, clientID, scope, webDir string
 	port                               int
 	reset                              bool
+	terminal                           bool // ask the questions in the terminal, not in the browser
+	noBrowser                          bool // print the setup link and do not open it
 }
 
 func newPersonalCmd(opts *options) *cobra.Command {
@@ -67,7 +71,9 @@ func newPersonalCmd(opts *options) *cobra.Command {
 	fl.StringVar(&f.scope, "scope", "repo read:org", "the OAuth scopes asked with the code (ignored for a GitHub App)")
 	fl.StringVar(&f.webDir, "web-dir", "", "the web UI bundle (default: web beside this program, or web/bundle here)")
 	fl.IntVar(&f.port, "port", 9090, "the port of the portal on this computer (the admin port is the next)")
-	fl.BoolVar(&f.reset, "reset", false, "ask everything again and write personal.yaml anew (the old one is kept as personal.yaml.bak)")
+	fl.BoolVar(&f.terminal, "terminal", false, "set up with questions in the terminal instead of the page in the browser")
+	fl.BoolVar(&f.noBrowser, "no-browser", false, "print the link of the setup page and do not open it")
+	fl.BoolVar(&f.reset, "reset", false, "set up again and write personal.yaml anew (the old one is kept as personal.yaml.bak)")
 	return cmd
 }
 
@@ -81,6 +87,7 @@ type personal struct {
 	http  *http.Client
 	sleep func(context.Context, time.Duration) error
 	now   func() time.Time
+	open  func(url string) // opens the setup page in the browser; nil: the system's
 }
 
 func (p *personal) say(format string, a ...any) { _, _ = fmt.Fprintf(p.out, format+"\n", a...) }
@@ -152,8 +159,13 @@ func (p *personal) run(cmd *cobra.Command, opts *options, d deps) error {
 	if err != nil {
 		return failure{err}
 	}
-	cfgPath, err := p.setup(ctx, dir)
-	if err != nil {
+	var launch *auth.Launch
+	cfgPath := filepath.Join(dir, "personal.yaml")
+	if _, statErr := os.Stat(cfgPath); !p.flags.terminal && (p.flags.reset || errors.Is(statErr, os.ErrNotExist)) {
+		if launch, err = p.browserSetup(ctx, dir, cfgPath); err != nil {
+			return failure{err}
+		}
+	} else if cfgPath, err = p.setup(ctx, dir); err != nil {
 		return failure{err}
 	}
 	opts.configPath = cfgPath
@@ -167,8 +179,10 @@ func (p *personal) run(cmd *cobra.Command, opts *options, d deps) error {
 	if err := p.resolve(ctx, dir, &cfg); err != nil {
 		return failure{err}
 	}
-	if d.launch, err = newLaunch(p.clock()); err != nil {
-		return failure{err}
+	if d.launch = launch; d.launch == nil {
+		if d.launch, err = newLaunch(p.clock()); err != nil {
+			return failure{err}
+		}
 	}
 	srv, err := newServer(ctx, cfg, d, newLogger(cfg.Log, cmd.ErrOrStderr()))
 	if err != nil {
@@ -350,7 +364,7 @@ func (p *personal) wizard(ctx context.Context, dir, cfgPath string, v *vault.Vau
 			return err
 		}
 	}
-	if err := os.WriteFile(cfgPath, []byte(personalYAML(dir, signed.host, signed.user, accounts, def, webDir, p.flags.port)), 0o600); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(personalYAML(dir, signed.host, signed.user, accounts, nil, nil, nil, def, webDir, p.flags.port)), 0o600); err != nil {
 		return err
 	}
 	p.say("\nSigned in as %s. Settings are in %s (edit them freely; there is no secret in the file).", signed.user, cfgPath)
@@ -476,8 +490,9 @@ func findWebBundle() string {
 
 func q(s string) string { b, _ := json.Marshal(s); return string(b) } // a YAML double-quoted string
 
-// personalYAML is personal.yaml: an ordinary configuration, no secret in it.
-func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, defaultRepo, webDir string, port int) string {
+// personalYAML is personal.yaml. products are the groups the person made (none: one group of everything), hidden the repositories left
+// out and unassigned the ones no product holds (they go in a group "Other" at the end).
+func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, products []setup.Product, hidden, unassigned []string, defaultRepo, webDir string, port int) string {
 	var b strings.Builder
 	w := func(format string, a ...any) { _, _ = fmt.Fprintf(&b, format+"\n", a...) }
 	w("# Written by scp personal. Edit it freely and restart; nothing secret is in it (the credential is sealed in the store).")
@@ -499,12 +514,31 @@ func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, d
 	w("      credential: true # the token in the store's vault")
 	w("      include_private: true")
 	w("      orgs: [%s] # accounts and organisations to show", strings.Join(mapq(accounts), ", "))
+	if len(hidden) > 0 {
+		w("      exclude: [%s] # kept out of the portal", strings.Join(exactMatchers(hidden), ", "))
+	}
 	w("catalog:")
 	w("  groups:")
-	w("    - id: mine")
-	w("      name: My repositories")
-	w("      default_repo: %s", q(defaultRepo))
-	w("      match: [{catch_all: true}] # see docs/operator-guide.md for groups of your own")
+	if len(products) == 0 {
+		w("    - id: mine")
+		w("      name: My repositories")
+		w("      default_repo: %s", q(defaultRepo))
+		w("      match: [{catch_all: true}] # see docs/operator-guide.md for groups of your own")
+	}
+	ids := map[string]bool{"other": true}
+	for i, p := range products {
+		id := groupID(p.Name, i, ids)
+		w("    - id: %s", id)
+		w("      name: %s", q(p.Name))
+		w("      default_repo: %s", q(p.Repos[0]))
+		w("      match: [%s]", strings.Join(exactMatchers(p.Repos), ", "))
+	}
+	if len(products) > 0 && len(unassigned) > 0 {
+		w("    - id: other")
+		w("      name: Other")
+		w("      default_repo: %s", q(unassigned[0]))
+		w("      match: [{unclaimed: true}] # the repositories no product holds")
+	}
 	w("# The portal is for you alone: no anonymous view, one owner who sees the private repositories.")
 	w("access: {require_auth: true, private_groups: [%s]}", personalOwner)
 	w("auth:")
@@ -512,6 +546,29 @@ func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, d
 	w("  # login is your GitHub login: the lists offer what is yours (opened by you, asking your review, assigned to you).")
 	w("  tokens: [{name: %s, secret_file: %s, groups: [%s], admin: true, login: %s}]", personalOwner, q(filepath.Join(dir, "owner.token")), personalOwner, q(login))
 	return b.String()
+}
+
+func exactMatchers(names []string) []string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = "{exact: " + q(n) + "}"
+	}
+	return out
+}
+
+var idUnsafe = regexp.MustCompile(`[^a-z0-9]+`)
+
+// groupID is a group id from a product's name: a-z, 0-9 and -, unique among ids (which it extends).
+func groupID(name string, i int, ids map[string]bool) string {
+	id := strings.Trim(idUnsafe.ReplaceAllString(strings.ToLower(name), "-"), "-")
+	if id == "" || len(id) > 63 {
+		id = "product-" + strconv.Itoa(i+1)
+	}
+	for base, n := id, 2; ids[id]; n++ {
+		id = base + "-" + strconv.Itoa(n)
+	}
+	ids[id] = true
+	return id
 }
 
 func mapq(ss []string) []string {
