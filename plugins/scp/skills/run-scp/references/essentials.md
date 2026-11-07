@@ -68,3 +68,10 @@ Each matcher has exactly one field and sees the repository name, except `topic`.
 | `unclaimed: true` | what no other group selects |
 
 A repository may be in several groups; repositories in none are counted on the dashboard.
+
+## For one person: `scp personal`
+
+Someone who wants a portal only for themselves on their own computer needs no `scp.yaml`: `scp personal` asks for the GitHub host
+(github.com, an Enterprise Server or a GHE.com tenant), signs them in (a code with their own app's client id, or a pasted token),
+seals the credential in the store and serves on loopback with a one-time sign-in link. Its settings are `personal.yaml` in the
+directory it prints; read `docs/personal-edition.md` of the release. Use `scp serve` for a portal several people use.

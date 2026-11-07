@@ -1,6 +1,6 @@
 # The personal edition (rung 0 of the ladder, PE1)
 
-Status: in progress (plan.md section 4, P-92). Binding order: ../plan.md > this note > `store-model.md`, `auth.md`, `access.md`.
+Status: the wizard, the vault and the loopback portal are built; "my work" is next (plan.md section 4, P-92). Binding order: ../plan.md > this note > `store-model.md`, `auth.md`, `access.md`.
 
 One person runs the portal for themselves, on a laptop or a server of their own, against one GitHub host (github.com or a GitHub
 Enterprise Server), and sees every repository that person can read. It is the first rung of the ladder in `store-model.md` (P-91): one
@@ -14,7 +14,7 @@ only.** A person who already runs `scp serve` with a token file is unaffected.
 
 - **The directory** holds `scp.db` (the store), `personal.yaml` (the configuration: no secret in it), `session.key` and `owner.token`
   (local secrets, mode 0600, the directory 0700). The portal reads no other file of the person's.
-- **The credential** is a row of `credential` (migration `0003`: `principal`, `credential`), sealed with AES-256-GCM under a key
+- **The credential** is a row of `credential` (migration `0003`: only `credential` at this rung; `principal` arrives with rung 1, when more than one person exists), sealed with AES-256-GCM under a key
   derived (HKDF) from a 32-byte vault key, with the row's id, source and kind as additional data, so a value moved to another row
   does not open. The vault key lives in the operating system's keychain (macOS Keychain, the Secret Service on Linux, the Credential
   Manager on Windows); where there is none (a server without a desktop) it is a file `vault.key` (0600) in the directory and the wizard
@@ -52,3 +52,18 @@ the keychain or the fallback file); the device flow against a fake host (pending
 the wizard end to end against the fake GitHub (a token, the organisations offered and chosen, the files written, the credential
 sealed); the command: start, launch link, session, the dashboard answering with the owner's private repository and a request without
 a session refused.
+
+## As built
+
+- `internal/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (migration 0003), `internal/ghlogin` (hosts, device flow,
+  `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`), `auth.Launch` (`GET /auth/launch`),
+  `cmd/scp/personal.go`.
+- A source says `credential: true`; `scp personal` opens the vault and puts the token in the source before `newServer`; `newServer`
+  refuses a source with `credential` and no token, so `scp serve` never starts with an unresolved one.
+- The wizard writes one catch-all group, "My repositories", whose default repository is the one the person pushed to last; the
+  person edits `personal.yaml` for groups of their own.
+- A credential that has ended (the device flow's `expires_in`, or the header a fine-grained token's `/user` answer carries) is signed
+  in again at the next start without touching `personal.yaml`; `--reset` asks everything and keeps the old file as `.bak`.
+- The portal refuses configurations whose listeners are not loopback (`requireLoopback`).
+- Not verified against a real GitHub Enterprise Server: the device flow's availability on a given version, and the REST base paths
+  (`/api/v3/`, `api.<name>.ghe.com`) are from GitHub's documentation. A pasted token needs only the REST calls.

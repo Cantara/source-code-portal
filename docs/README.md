@@ -1,6 +1,7 @@
 # Source Code Portal documentation
 
 - [Operator guide](operator-guide.md): install, configure, connect GitHub, run in a container or Kubernetes, monitor and upgrade.
+- [Personal edition](personal-edition.md): `scp personal`, a portal of your own on your computer for every repository you can read.
 - [Production setup](production.md): the steps from nothing to a public portal on one host, with sign-in and the assistant.
 - [Repository guide](repository-guide.md): what a repository shows in the portal and the optional `scp.yaml` descriptor.
 - [Security model](security-model.md): what the portal guarantees about private repositories, what the operator provides, and its limits.
