@@ -446,8 +446,8 @@ function Ageing({ data }: { data: Insights }) {
       </AsTable>
       <p className="mt-2 text-xs text-muted-foreground">
         Already retired ones are on{" "}
-        <Link href="/alumni" className="underline-offset-2 hover:underline">
-          Alumni
+        <Link href="/archive" className="underline-offset-2 hover:underline">
+          Archive
         </Link>
         .
       </p>

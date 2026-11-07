@@ -13,12 +13,12 @@ import (
 // API serves groups and repositories from the current snapshot. It implements the catalogue's methods of the strict server. What
 // other features show on these answers they add through the hooks, wired in cmd/scp.
 type API struct {
-	Current   func(context.Context) *snapshot.Snapshot // the viewer's view
-	Dashboard []func(*snapshot.Snapshot, *oapi.Dashboard)
-	Group     []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group)
-	Repo      []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo)
-	Detail    []func(*snapshot.RepoEntry, *oapi.RepoDetail)
-	Alumnus   []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Alumnus) // complete a retired repository's row (design/alumni.md)
+	Current      func(context.Context) *snapshot.Snapshot // the viewer's view
+	Dashboard    []func(*snapshot.Snapshot, *oapi.Dashboard)
+	Group        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group)
+	Repo         []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo)
+	Detail       []func(*snapshot.RepoEntry, *oapi.RepoDetail)
+	ArchiveEntry []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.ArchiveEntry) // complete a retired repository's row (design/archive.md)
 }
 
 func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {

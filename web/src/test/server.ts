@@ -390,9 +390,9 @@ export const defaults = [
       freshness: fresh,
     }),
   ),
-  http.get("/alumni", ({ response }) =>
+  http.get("/archive", ({ response }) =>
     response(200).json({
-      alumni: [
+      archive: [
         {
           repo: repo("old-lib", { archived: true, description: "Retired in 2025" }),
           reason: "archived",

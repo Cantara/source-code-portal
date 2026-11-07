@@ -47,7 +47,7 @@ Rejected:
 The tools (from A1): `search_repositories`, `list_groups`, `get_group`, `get_repository`, `get_document`, `recent_commits`
 (with `work`: hand, ai, automation, as `/commits?work=`), `repository_health` (with the packages), and `repository_packages`.
 Later features add theirs: `open_pull_requests`, `open_issues`, `recent_releases` (`variant`, `since`, `sort`, as `/releases`) and
-`retired_repositories` (`reason`, `used`, `sort`, as `/alumni`); each reads the feature's own API with the request's context.
+`retired_repositories` (`reason`, `used`, `sort`, as `/archive`); each reads the feature's own API with the request's context.
 
 The contract gains `GET /api/v1/tools` (name, title, description, input schema, annotations `readOnly` and `untrustedContent`) and
 `POST /api/v1/tools/{name}` (`{"input": {...}}` to `{"source", "text"}`, 400 for an input that fails its schema, 404 for an

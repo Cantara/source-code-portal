@@ -188,8 +188,8 @@ export function MainNav({ ask = false }: { ask?: boolean }) {
       <Link href="/releases" className={nav} aria-current={path === "/releases" ? "page" : undefined}>
         Releases
       </Link>
-      <Link href="/alumni" className={nav} aria-current={path === "/alumni" ? "page" : undefined}>
-        Alumni
+      <Link href="/archive" className={nav} aria-current={path === "/archive" ? "page" : undefined}>
+        Archive
       </Link>
       <Link href="/insights" className={nav} aria-current={path === "/insights" ? "page" : undefined}>
         Insights

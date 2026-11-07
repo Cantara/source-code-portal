@@ -492,19 +492,19 @@ func Repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	}
 }
 
-// alumniAuthors is how many of the newest default-branch commits an alumnus's authors are counted over.
-const alumniAuthors = 100
+// archiveAuthors is how many of the newest default-branch commits an archive entry's authors are counted over.
+const archiveAuthors = 100
 
-// Alumnus completes a retired repository's row: when it was last active (its newest commit, when one is held) and how many authors
-// its newest commits have, people's work only, counted and never named (design/alumni.md).
-func Alumnus(_ *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.Alumnus) {
+// ArchiveEntry completes a retired repository's row: when it was last active (its newest commit, when one is held) and how many authors
+// its newest commits have, people's work only, counted and never named (design/archive.md).
+func ArchiveEntry(_ *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.ArchiveEntry) {
 	cs, _ := Of(e)
 	if len(cs) == 0 {
 		return
 	}
 	a.LastActive = cs[0].CommittedAt.UTC()
 	authors := map[string]struct{}{}
-	for i := range cs[:min(len(cs), alumniAuthors)] {
+	for i := range cs[:min(len(cs), archiveAuthors)] {
 		if k, _ := Classify(&cs[i]); k == OriginAutomation {
 			continue
 		}
@@ -552,7 +552,7 @@ func statsOf(s *Stats) *oapi.CommitStats {
 func Authorship(s *snapshot.Snapshot, e *snapshot.RepoEntry) (people, top int) {
 	cs, _ := Of(e)
 	by := map[string]int{}
-	for i := range cs[:min(len(cs), alumniAuthors)] {
+	for i := range cs[:min(len(cs), archiveAuthors)] {
 		if k, _ := Classify(&cs[i]); k == OriginAutomation || Sweep(s, &cs[i]) {
 			continue
 		}

@@ -164,7 +164,7 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 				return "Reading the recent releases"
 			}, r.recentReleases),
 		tool("retired_repositories", "Retired repositories",
-			"Lists the retired repositories (Alumni): archived on GitHub, or marked deprecated in scp.yaml, last active first. Each has why it is "+
+			"Lists the retired repositories (Archive): archived on GitHub, or marked deprecated in scp.yaml, last active first. Each has why it is "+
 				"retired, when it was last active, how many authors its recent commits had (counted, never named) and how many repositories "+
 				"still depend on it; used limits the list to those another repository still depends on.",
 			schema(nil, map[string]any{"group": prop("string", "A group id"), "q": prop("string", "Part of the repository's name"),
@@ -347,10 +347,10 @@ func (r toolReads) recentReleases(ctx context.Context, in map[string]any) (tools
 	return tools.Result{Source: "/releases", Text: b.String()}, nil
 }
 
-// retired lists the retired repositories (design/alumni.md) with the counts by reason.
+// retired lists the retired repositories (design/archive.md) with the counts by reason.
 func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result, error) {
 	limit := intArg(in, "limit", 20, 50)
-	params := oapi.ListAlumniParams{Limit: &limit}
+	params := oapi.ListArchiveParams{Limit: &limit}
 	if g := arg(in, "group"); g != "" {
 		params.Group = &g
 	}
@@ -358,28 +358,28 @@ func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result
 		params.Q = &q
 	}
 	if v := arg(in, "reason"); v != "" {
-		x := oapi.AlumniReason(v)
+		x := oapi.ArchiveReason(v)
 		params.Reason = &x
 	}
 	if used, _ := in["used"].(bool); used {
 		params.Used = &used
 	}
 	if v := arg(in, "sort"); v != "" {
-		x := oapi.AlumniSort(v)
+		x := oapi.ArchiveSort(v)
 		params.Sort = &x
 	}
-	res, err := r.catalog.ListAlumni(ctx, oapi.ListAlumniRequestObject{Params: params})
+	res, err := r.catalog.ListArchive(ctx, oapi.ListArchiveRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
-	ok, isOK := res.(oapi.ListAlumni200JSONResponse)
+	ok, isOK := res.(oapi.ListArchive200JSONResponse)
 	if !isOK {
 		return tools.Result{}, fmt.Errorf("the group, the reason or the sort is not valid, or is %w", errNotFound)
 	}
 	c := ok.Body.Counts
 	var b strings.Builder
 	fmt.Fprintf(&b, "%d retired (%d archived, %d deprecated); %d still depended on.\n\n", c.Total, c.Archived, c.Deprecated, c.Used)
-	for _, a := range ok.Body.Alumni {
+	for _, a := range ok.Body.Archive {
 		fmt.Fprintf(&b, "- [%s](%s) %s, last active %s, %d authors", a.Repo.Address, snapshot.RepoPage(snapshot.RepoKey(a.Repo.Address)), a.Reason,
 			a.LastActive.UTC().Format("2006-01-02"), a.Authors)
 		if a.UsedBy > 0 {
@@ -387,10 +387,10 @@ func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result
 		}
 		b.WriteString("\n")
 	}
-	if len(ok.Body.Alumni) == 0 {
+	if len(ok.Body.Archive) == 0 {
 		b.WriteString("No retired repositories.\n")
 	}
-	return tools.Result{Source: "/alumni", Text: b.String()}, nil
+	return tools.Result{Source: "/archive", Text: b.String()}, nil
 }
 
 // fleetInsights tells the five insights (design/insights.md) in words and lists.

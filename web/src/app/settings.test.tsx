@@ -17,7 +17,7 @@ describe("settings", () => {
     const user = userEvent.setup()
     render(
       <SettingsView
-        initial={{ work: ["hand", "ai"], view: "cards", commits: 0, history: 0, pulls: 0, issues: 0, releases: 0, alumni: 0 }}
+        initial={{ work: ["hand", "ai"], view: "cards", commits: 0, history: 0, pulls: 0, issues: 0, releases: 0, archive: 0 }}
       />,
     )
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument()

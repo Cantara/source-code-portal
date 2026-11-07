@@ -51,7 +51,7 @@ type Facts struct {
 type API struct {
 	Current func(context.Context) *snapshot.Snapshot // the viewer's view
 	Facts   func(*snapshot.Snapshot, *snapshot.RepoEntry) Facts
-	Retired func(*snapshot.RepoEntry) oapi.AlumniReason
+	Retired func(*snapshot.RepoEntry) oapi.ArchiveReason
 	Fresh   func(*snapshot.RepoEntry) snapshot.Freshness // what the answer's freshness follows
 }
 
@@ -77,7 +77,7 @@ type row struct {
 
 func (a API) build(s *snapshot.Snapshot, scopeKeys []snapshot.RepoKey, now time.Time) oapi.Insights {
 	var live []row
-	retired := map[snapshot.RepoKey]oapi.AlumniReason{}
+	retired := map[snapshot.RepoKey]oapi.ArchiveReason{}
 	for _, k := range scopeKeys {
 		e := s.Repos[k]
 		if e == nil {
@@ -273,7 +273,7 @@ type library struct {
 	repo    snapshot.RepoKey
 	users   []string // sorted
 	release string
-	retired *oapi.AlumniReason
+	retired *oapi.ArchiveReason
 }
 
 // libraries are the repositories of the scope that the most live repositories depend on, a retired one still used marked: the

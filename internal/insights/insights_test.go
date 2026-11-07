@@ -46,9 +46,9 @@ func fleet(t *testing.T) (*snapshot.Snapshot, API) {
 	p.Flush()
 	api := API{
 		Facts: func(_ *snapshot.Snapshot, e *snapshot.RepoEntry) Facts { return facts[e.Repo.Key()] },
-		Retired: func(e *snapshot.RepoEntry) oapi.AlumniReason {
+		Retired: func(e *snapshot.RepoEntry) oapi.ArchiveReason {
 			if e.Repo.Name == "old" {
-				return oapi.AlumniReasonDeprecated
+				return oapi.ArchiveReasonDeprecated
 			}
 			return ""
 		},
@@ -123,7 +123,7 @@ func TestInsights(t *testing.T) {
 
 	// Libraries: core is used by web and api (old is retired, not counted); old is used by web and is retired and listed.
 	if len(in.Libraries) != 2 || in.Libraries[0].Repo != "acme/core" || in.Libraries[0].Dependants != 2 || in.Libraries[0].Release == nil ||
-		*in.Libraries[0].Release != "v6" || in.Libraries[1].Repo != "acme/old" || in.Libraries[1].Retired == nil || *in.Libraries[1].Retired != oapi.AlumniReasonDeprecated {
+		*in.Libraries[0].Release != "v6" || in.Libraries[1].Repo != "acme/old" || in.Libraries[1].Retired == nil || *in.Libraries[1].Retired != oapi.ArchiveReasonDeprecated {
 		t.Errorf("libraries = %+v", in.Libraries)
 	}
 

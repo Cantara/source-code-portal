@@ -1,6 +1,6 @@
-# Insights: what the held data says about the fleet (IN1, IN2)
+# Insights: what the held data says about the fleet (IN1 to IN3)
 
-Status: IN1 and IN2 built (plan.md section 4, P-83). Binding order: ../plan.md > this note > `health.md`, `layout.md`, `releases.md`.
+Status: IN1 to IN3 built (plan.md section 4, P-83). Binding order: ../plan.md > this note > `health.md`, `layout.md`, `releases.md`.
 
 The dashboard shows where things stand now. Insights shows what the portal already holds says over time and across products: how the
 fleet is built, what it leans on, how often it ships. **Every insight is derived from the snapshot; the feature adds no job, no
@@ -19,14 +19,14 @@ viewer's view: Cadence, Technology, Shared libraries, Single-author repositories
    runtime is visible. Counts only what manifests say; a repository without a manifest is `unknown`.
 3. **Shared libraries.** The internal dependencies with the most dependants (the manifests' dependency graph, `Graph()`): the
    blast radius of a change. Each row: the library, its dependants (count, then the list), its latest release if it has one. A
-   library that is archived or deprecated and still used is marked: the Alumni's *still used* (`alumni.md`).
+   library that is archived or deprecated and still used is marked: the Archive's *still used* (`archive.md`).
 4. **Single-author repositories.** The repositories where one author wrote at least 90% of the last 100 default-branch commits
    (people's commits only; automation and sweeps excluded as everywhere, P-40, P-42), with at least 20 commits held. **The page names
    the repositories, never the author:** the finding is "knowledge sits with one person", not who. Bus factor as a list of places
    to share, not of people to watch.
 5. **Ageing.** The repositories by months since their last change in the portal's own activity bands (`rules`: active, recent,
    quiet, dormant), with the dormant ones listed: the candidates for retirement. It is the fleet map's data as a list, linking to
-   the Alumni for what is already retired.
+   the Archive for what is already retired.
 
 ## API
 

@@ -44,48 +44,6 @@ func (e ActivityLevel) Valid() bool {
 	}
 }
 
-// Defines values for AlumniReason.
-const (
-	AlumniReasonArchived   AlumniReason = "archived"
-	AlumniReasonDeprecated AlumniReason = "deprecated"
-)
-
-// Valid indicates whether the value is a known member of the AlumniReason enum.
-func (e AlumniReason) Valid() bool {
-	switch e {
-	case AlumniReasonArchived:
-		return true
-	case AlumniReasonDeprecated:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for AlumniSort.
-const (
-	AlumniSortActive AlumniSort = "active"
-	AlumniSortGroup  AlumniSort = "group"
-	AlumniSortName   AlumniSort = "name"
-	AlumniSortUsed   AlumniSort = "used"
-)
-
-// Valid indicates whether the value is a known member of the AlumniSort enum.
-func (e AlumniSort) Valid() bool {
-	switch e {
-	case AlumniSortActive:
-		return true
-	case AlumniSortGroup:
-		return true
-	case AlumniSortName:
-		return true
-	case AlumniSortUsed:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for AnnouncementTone.
 const (
 	Event  AnnouncementTone = "event"
@@ -101,6 +59,48 @@ func (e AnnouncementTone) Valid() bool {
 	case Info:
 		return true
 	case Notice:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArchiveReason.
+const (
+	ArchiveReasonArchived   ArchiveReason = "archived"
+	ArchiveReasonDeprecated ArchiveReason = "deprecated"
+)
+
+// Valid indicates whether the value is a known member of the ArchiveReason enum.
+func (e ArchiveReason) Valid() bool {
+	switch e {
+	case ArchiveReasonArchived:
+		return true
+	case ArchiveReasonDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ArchiveSort.
+const (
+	ArchiveSortActive ArchiveSort = "active"
+	ArchiveSortGroup  ArchiveSort = "group"
+	ArchiveSortName   ArchiveSort = "name"
+	ArchiveSortUsed   ArchiveSort = "used"
+)
+
+// Valid indicates whether the value is a known member of the ArchiveSort enum.
+func (e ArchiveSort) Valid() bool {
+	switch e {
+	case ArchiveSortActive:
+		return true
+	case ArchiveSortGroup:
+		return true
+	case ArchiveSortName:
+		return true
+	case ArchiveSortUsed:
 		return true
 	default:
 		return false
@@ -1010,46 +1010,6 @@ type ActivityRule struct {
 	WithinDays *int `json:"withinDays"`
 }
 
-// AlumniCounts defines model for AlumniCounts.
-type AlumniCounts struct {
-	Archived   int `json:"archived"`
-	Deprecated int `json:"deprecated"`
-	Total      int `json:"total"`
-
-	// Used Those another repository still depends on
-	Used int `json:"used"`
-}
-
-// AlumniPage defines model for AlumniPage.
-type AlumniPage struct {
-	Alumni    []Alumnus    `json:"alumni"`
-	Counts    AlumniCounts `json:"counts"`
-	Freshness Freshness    `json:"freshness"`
-	Page      Page         `json:"page"`
-}
-
-// AlumniReason Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
-type AlumniReason string
-
-// AlumniSort active: last active first (default); name; group; used: most dependants first
-type AlumniSort string
-
-// Alumnus defines model for Alumnus.
-type Alumnus struct {
-	// Authors Authors of its newest default-branch commits, people's work only; counted, never named
-	Authors int `json:"authors"`
-
-	// LastActive The newest default-branch commit the portal holds, else the last push
-	LastActive time.Time `json:"lastActive"`
-
-	// Reason Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
-	Reason AlumniReason `json:"reason"`
-	Repo   Repo         `json:"repo"`
-
-	// UsedBy Other repositories whose manifests still depend on a package it provides; archived ones are not counted
-	UsedBy int `json:"usedBy"`
-}
-
 // Announcement A short notice from the portal's admins or its deployment (design/announcements.md): plain text, one https link, a tone. Times keep the offset they were written with and are shown as written.
 type Announcement struct {
 	EndsAt *time.Time `json:"endsAt,omitempty"`
@@ -1082,6 +1042,46 @@ type AnnouncementLink struct {
 	Label string `json:"label"`
 	Url   string `json:"url"`
 }
+
+// ArchiveCounts defines model for ArchiveCounts.
+type ArchiveCounts struct {
+	Archived   int `json:"archived"`
+	Deprecated int `json:"deprecated"`
+	Total      int `json:"total"`
+
+	// Used Those another repository still depends on
+	Used int `json:"used"`
+}
+
+// ArchiveEntry defines model for ArchiveEntry.
+type ArchiveEntry struct {
+	// Authors Authors of its newest default-branch commits, people's work only; counted, never named
+	Authors int `json:"authors"`
+
+	// LastActive The newest default-branch commit the portal holds, else the last push
+	LastActive time.Time `json:"lastActive"`
+
+	// Reason Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
+	Reason ArchiveReason `json:"reason"`
+	Repo   Repo          `json:"repo"`
+
+	// UsedBy Other repositories whose manifests still depend on a package it provides; archived ones are not counted
+	UsedBy int `json:"usedBy"`
+}
+
+// ArchivePage defines model for ArchivePage.
+type ArchivePage struct {
+	Archive   []ArchiveEntry `json:"archive"`
+	Counts    ArchiveCounts  `json:"counts"`
+	Freshness Freshness      `json:"freshness"`
+	Page      Page           `json:"page"`
+}
+
+// ArchiveReason Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
+type ArchiveReason string
+
+// ArchiveSort active: last active first (default); name; group; used: most dependants first
+type ArchiveSort string
 
 // AssistantStatus defines model for AssistantStatus.
 type AssistantStatus struct {
@@ -1615,7 +1615,7 @@ type InsightLibrary struct {
 	Repo string `json:"repo"`
 
 	// Retired Archived on GitHub, or `lifecycle: deprecated` in scp.yaml
-	Retired *AlumniReason `json:"retired,omitempty"`
+	Retired *ArchiveReason `json:"retired,omitempty"`
 }
 
 // InsightMatrix defines model for InsightMatrix.
@@ -2517,17 +2517,17 @@ type BadRequest = Problem
 // NotFound defines model for NotFound.
 type NotFound = Problem
 
-// ListAlumniParams defines parameters for ListAlumni.
-type ListAlumniParams struct {
+// ListArchiveParams defines parameters for ListArchive.
+type ListArchiveParams struct {
 	Group *string `form:"group,omitempty" json:"group,omitempty"`
 
 	// Q Part of the repository's name
-	Q      *string       `form:"q,omitempty" json:"q,omitempty"`
-	Reason *AlumniReason `form:"reason,omitempty" json:"reason,omitempty"`
+	Q      *string        `form:"q,omitempty" json:"q,omitempty"`
+	Reason *ArchiveReason `form:"reason,omitempty" json:"reason,omitempty"`
 
 	// Used Only those another repository still depends on
-	Used *bool       `form:"used,omitempty" json:"used,omitempty"`
-	Sort *AlumniSort `form:"sort,omitempty" json:"sort,omitempty"`
+	Used *bool        `form:"used,omitempty" json:"used,omitempty"`
+	Sort *ArchiveSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Page The page, from 1
 	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
@@ -2674,9 +2674,9 @@ type SuggestParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// ListAlumni The retired repositories, newest activity first, one page at a time
-	// (GET /alumni)
-	ListAlumni(w http.ResponseWriter, r *http.Request, params ListAlumniParams)
+	// ListArchive The retired repositories, newest activity first, one page at a time
+	// (GET /archive)
+	ListArchive(w http.ResponseWriter, r *http.Request, params ListArchiveParams)
 	// GetAssistant Whether the assistant is on and the viewer may ask it
 	// (GET /assistant)
 	GetAssistant(w http.ResponseWriter, r *http.Request)
@@ -2757,14 +2757,14 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// ListAlumni operation middleware
-func (siw *ServerInterfaceWrapper) ListAlumni(w http.ResponseWriter, r *http.Request) {
+// ListArchive operation middleware
+func (siw *ServerInterfaceWrapper) ListArchive(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params ListAlumniParams
+	var params ListArchiveParams
 
 	// ------------- Optional query parameter "group" -------------
 
@@ -2858,7 +2858,7 @@ func (siw *ServerInterfaceWrapper) ListAlumni(w http.ResponseWriter, r *http.Req
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAlumni(w, r, params)
+		siw.Handler.ListArchive(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4096,7 +4096,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/issues", wrapper.ListIssues)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/releases", wrapper.ListReleases)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/insights", wrapper.GetInsights)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/alumni", wrapper.ListAlumni)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/archive", wrapper.ListArchive)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prerequisites", wrapper.GetPrerequisites)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups", wrapper.ListGroups)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/groups/{group}", wrapper.GetGroup)
@@ -4132,24 +4132,24 @@ type NotFoundApplicationProblemPlusJSONResponse Problem
 type NotModifiedResponse struct {
 }
 
-type ListAlumniRequestObject struct {
-	Params ListAlumniParams
+type ListArchiveRequestObject struct {
+	Params ListArchiveParams
 }
 
-type ListAlumniResponseObject interface {
-	VisitListAlumniResponse(w http.ResponseWriter) error
+type ListArchiveResponseObject interface {
+	VisitListArchiveResponse(w http.ResponseWriter) error
 }
 
-type ListAlumni200ResponseHeaders struct {
+type ListArchive200ResponseHeaders struct {
 	ETag *string
 }
 
-type ListAlumni200JSONResponse struct {
-	Body    AlumniPage
-	Headers ListAlumni200ResponseHeaders
+type ListArchive200JSONResponse struct {
+	Body    ArchivePage
+	Headers ListArchive200ResponseHeaders
 }
 
-func (response ListAlumni200JSONResponse) VisitListAlumniResponse(w http.ResponseWriter) error {
+func (response ListArchive200JSONResponse) VisitListArchiveResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -4164,18 +4164,18 @@ func (response ListAlumni200JSONResponse) VisitListAlumniResponse(w http.Respons
 	return err
 }
 
-type ListAlumni304Response = NotModifiedResponse
+type ListArchive304Response = NotModifiedResponse
 
-func (response ListAlumni304Response) VisitListAlumniResponse(w http.ResponseWriter) error {
+func (response ListArchive304Response) VisitListArchiveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(304)
 	return nil
 }
 
-type ListAlumni400ApplicationProblemPlusJSONResponse struct {
+type ListArchive400ApplicationProblemPlusJSONResponse struct {
 	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListAlumni400ApplicationProblemPlusJSONResponse) VisitListAlumniResponse(w http.ResponseWriter) error {
+func (response ListArchive400ApplicationProblemPlusJSONResponse) VisitListArchiveResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -4187,11 +4187,11 @@ func (response ListAlumni400ApplicationProblemPlusJSONResponse) VisitListAlumniR
 	return err
 }
 
-type ListAlumni404ApplicationProblemPlusJSONResponse struct {
+type ListArchive404ApplicationProblemPlusJSONResponse struct {
 	NotFoundApplicationProblemPlusJSONResponse
 }
 
-func (response ListAlumni404ApplicationProblemPlusJSONResponse) VisitListAlumniResponse(w http.ResponseWriter) error {
+func (response ListArchive404ApplicationProblemPlusJSONResponse) VisitListArchiveResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5410,9 +5410,9 @@ func (response ListTools200JSONResponse) VisitListToolsResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// ListAlumni The retired repositories, newest activity first, one page at a time
-	// (GET /alumni)
-	ListAlumni(ctx context.Context, request ListAlumniRequestObject) (ListAlumniResponseObject, error)
+	// ListArchive The retired repositories, newest activity first, one page at a time
+	// (GET /archive)
+	ListArchive(ctx context.Context, request ListArchiveRequestObject) (ListArchiveResponseObject, error)
 	// GetAssistant Whether the assistant is on and the viewer may ask it
 	// (GET /assistant)
 	GetAssistant(ctx context.Context, request GetAssistantRequestObject) (GetAssistantResponseObject, error)
@@ -5523,25 +5523,25 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
-// ListAlumni operation middleware
-func (sh *strictHandler) ListAlumni(w http.ResponseWriter, r *http.Request, params ListAlumniParams) {
-	var request ListAlumniRequestObject
+// ListArchive operation middleware
+func (sh *strictHandler) ListArchive(w http.ResponseWriter, r *http.Request, params ListArchiveParams) {
+	var request ListArchiveRequestObject
 
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListAlumni(ctx, request.(ListAlumniRequestObject))
+		return sh.ssi.ListArchive(ctx, request.(ListArchiveRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListAlumni")
+		handler = middleware(handler, "ListArchive")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListAlumniResponseObject); ok {
-		if err := validResponse.VisitListAlumniResponse(w); err != nil {
+	} else if validResponse, ok := response.(ListArchiveResponseObject); ok {
+		if err := validResponse.VisitListArchiveResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

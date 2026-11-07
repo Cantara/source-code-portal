@@ -13,7 +13,7 @@ permission and the *Release* event are already required).
   stable release of each repository (the default), every release, the stable ones or the pre-releases, with a time window and four
   sorts. A repository's page and a product's page show their own. One read per repository now serves both the badges' latest release
   and this list.
-- **Alumni** (`/alumni`, `GET /api/v1/alumni`): the retired repositories, those GitHub archived and those whose `scp.yaml` says
+- **Archive** (`/archive`, `GET /api/v1/archive`): the retired repositories, those GitHub archived and those whose `scp.yaml` says
   `lifecycle: deprecated`, with why, when last active, how many repositories still depend on them and how many people wrote their
   recent commits (counted, never named). A product's page says `N retired`.
 - **Insights** (`/insights`, `GET /api/v1/insights`): how often the fleet ships, what it is built on, which internal libraries most
