@@ -1,6 +1,6 @@
 # Store model for a personal edition and shared instances (SM1)
 
-Status: design, verified by prototypes, not built (plan.md section 4, P-89). Binding order: ../plan.md > this note > `sync-snapshot-store.md`,
+Status: design, verified by prototypes, not built (plan.md section 4, P-89, P-90). Binding order: ../plan.md > this note > `sync-snapshot-store.md`,
 `access.md`, `hardening.md`, `auth.md`.
 
 The owner wants a personal edition (one person signs in to GitHub, the portal reads the repositories that person can read; several
@@ -167,9 +167,27 @@ On a copy of the live database (never the original), in a scratch worktree:
    repositories, a group whose default is hidden, a search term present only in hidden documents.
 3. The view cache's fallback to the public view tested under load and under a failed build.
 
+## Decisions (owner delegated them, 2026-11-07: best technical and safe solution)
+
+- **Addresses: first claim wins now; the qualified address (`owner@source/name`) waits** until a real collision needs both. It touches
+  about 90 files and the wire format, and one person's own login on two hosts is the only likely case.
+- **Several people: isolation, not shared views.** A business that wants a shared platform runs one personal instance per person,
+  each with its own database, credential and process: the security boundary is the instance (H1's rule), and none of the per-viewer
+  view machinery (the gates above) is needed. The `ViewOf` generalisation stays as SM-b's refactor, still with two views; a viewer
+  per entitlement set is built only if a deployment needs one instance to serve people with different access, and then behind the
+  gates. What a central instance may hold for everyone (public and `internal` repositories, read with a service credential) can later
+  be fed to each personal instance as one more source, so a person adds their private repositories to a shared base without any
+  private data being shared.
+- **The sealing key of the personal edition lives in the operating system's keychain**, not in a file beside the database; the
+  operator deployment keeps `store.key_file`.
+- **The personal edition's first value is "my work"**: the identity of the signed-in person puts the pull requests that wait on them,
+  their review requests and their repositories first, and their own groups and layouts are theirs. Its own design note.
+- **Sync scope is chosen in the wizard** (my repositories, selected organisations or teams): a cold start of 1,000 repositories is
+  about 3 hours of GitHub time under the budget, and a person's rate limit is their own. Repositories that are opened sync first.
+
 ## Order
 
-SM-a (the migration, `repo.visibility`, the conflict rule, the pre-migration copy; no behaviour change) → SM-b (`ViewOf`, `Public()`
-as its special case, the viewer seam, the gates' test generalisation, still with two views) → SM-c (the personal edition: one
-principal, sealed credential, the person's listing, the wizard; a design note of its own) → SM-d (several principals on one
-instance: only after the gates pass; it may never ship).
+SM-a (the migration, `repo.visibility`, the conflict rule, the pre-migration copy; no behaviour change) -> SM-b (`ViewOf`, `Public()`
+as its special case, the viewer seam, the gates' test generalisation, still with two views) -> SM-c (the personal edition: one
+principal, sealed credential, the person's listing, the wizard, "my work"; a design note of its own). Several principals on one
+instance is not planned (see the decisions).
