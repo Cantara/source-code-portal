@@ -185,7 +185,8 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		}
 		s.mu.Unlock()
 		if ok {
-			http.SetCookie(w, &http.Cookie{Name: "scp_setup", Value: s.cookie, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 3600})
+			// Not Secure: the page is plain http on loopback, where Safari would not send a Secure cookie back.
+			http.SetCookie(w, &http.Cookie{Name: "scp_setup", Value: s.cookie, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 3600}) //nolint:gosec // G124: see above
 			http.Redirect(w, r, "/setup/", http.StatusSeeOther)
 			return
 		}

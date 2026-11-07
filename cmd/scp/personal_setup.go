@@ -72,7 +72,7 @@ func (p *personal) browserSetup(ctx context.Context, dir, cfgPath string) (*auth
 	}
 	p.say("Open this page to set up your portal (it works once, from one browser):\n\n  %s\n", link)
 	if !p.flags.noBrowser {
-		p.openPage(link)
+		p.openPage(ctx, link)
 	}
 	select {
 	case <-s.Done():
@@ -92,7 +92,7 @@ func (p *personal) browserSetup(ctx context.Context, dir, cfgPath string) (*auth
 	return launch, nil
 }
 
-func (p *personal) openPage(link string) {
+func (p *personal) openPage(ctx context.Context, link string) {
 	if p.open != nil {
 		p.open(link)
 		return
@@ -100,11 +100,11 @@ func (p *personal) openPage(link string) {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", link) //nolint:gosec // G204: the link is our own, on loopback
+		cmd = exec.CommandContext(ctx, "open", link) //nolint:gosec // G204: the link is our own, on loopback
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", link) //nolint:gosec // G204: as above
+		cmd = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", link) //nolint:gosec // G204: as above
 	default:
-		cmd = exec.Command("xdg-open", link) //nolint:gosec // G204: as above
+		cmd = exec.CommandContext(ctx, "xdg-open", link) //nolint:gosec // G204: as above
 	}
 	if err := cmd.Start(); err != nil {
 		return // the link is printed; the person opens it
@@ -119,7 +119,7 @@ func (p *personal) finishSetup(ctx context.Context, dir, cfgPath string, key []b
 		return nil, err
 	}
 	defer st.Close()
-	if err := os.Chmod(filepath.Join(dir, "scp.db"), 0o600); err != nil { //nolint:gosec // G302: the sealed credential is in it
+	if err := os.Chmod(filepath.Join(dir, "scp.db"), 0o600); err != nil {
 		return nil, err
 	}
 	v, err := vault.New(key, st)

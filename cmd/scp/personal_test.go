@@ -458,7 +458,7 @@ func TestPersonalBrowserSetup(t *testing.T) {
 	}
 	jar, _ := cookiejar.New(nil)
 	c := &http.Client{Jar: jar, Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
-	base := link[:strings.Index(link, "/setup/")]
+	base, _, _ := strings.Cut(link, "/setup/")
 	call := func(method, path string, body string) (int, string) {
 		t.Helper()
 		req, _ := http.NewRequestWithContext(t.Context(), method, base+path, strings.NewReader(body))
