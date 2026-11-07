@@ -233,7 +233,7 @@ function productsStep() {
   return h("section", {},
     h("div", { class: "card" },
       h("h2", {}, "Sort your repositories into products"),
-      h("p", { class: "note" }, `${listing.repos.length} repositories${listing.more ? " (the most recently pushed 500; more exist)" : ""}. A product is a group on the dashboard. The suggestions come from the first word of the names; change anything. A repository without a product still shows, under Other.`),
+      h("p", { class: "note" }, `${listing.repos.length} repositories of the accounts you chose (forks left out, one entry for a name that two accounts share)${listing.more ? ", found among the 500 most recently pushed; older ones exist and are not listed" : ""}. A product is a group on the dashboard. The suggestions come from the first word of the names; change anything. A repository without a product still shows, under Other.`),
       h("div", { class: "products" }, products.map((p) => h("div", { class: "product" },
         h("label", { for: "n-" + p.key, class: "sr" }, "Product name"),
         h("input", { id: "n-" + p.key, type: "text", value: p.name, maxlength: "120", on: { input: (e) => { p.name = e.target.value; refreshOptions() } } }),

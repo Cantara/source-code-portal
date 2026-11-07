@@ -566,6 +566,7 @@ func (s *Server) listRepos(ctx context.Context, body []byte) (any, error) {
 			mine = append(mine, r)
 		}
 	}
+	mine = OnePerName(mine)
 	out := reposOut{More: more, Suggested: Suggest(mine)}
 	out.Limits.Products, out.Limits.PerProduct, out.Limits.Hidden = MaxProducts, MaxPerProduct, MaxHidden
 	for _, r := range mine {
