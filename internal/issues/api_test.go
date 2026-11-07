@@ -58,6 +58,16 @@ func TestListIssues(t *testing.T) {
 		return out
 	}
 	all := list(oapi.ListIssuesParams{})
+	// What is a person's, logins without regard to case; the counts cover them.
+	if got := numbers(list(oapi.ListIssuesParams{Assignee: new("CY")})); !slices.Equal(got, []int{4}) {
+		t.Errorf("assigned to cy: %v", got)
+	}
+	if mine := list(oapi.ListIssuesParams{Author: new("Ann")}); !slices.Equal(numbers(mine), []int{1}) || mine.Counts.Open != 1 {
+		t.Errorf("opened by ann: %v, %+v", numbers(mine), mine.Counts)
+	}
+	if got := numbers(list(oapi.ListIssuesParams{Author: new("cy"), Assignee: new("di")})); len(got) != 0 {
+		t.Errorf("opened by cy and assigned to di: %v", got)
+	}
 	if got := numbers(all); !slices.Equal(got, []int{2, 5, 1, 4, 3}) {
 		t.Errorf("what waits first: %v; want people's needing triage, unassigned, assigned, each the longest idle first, automation last", got)
 	}

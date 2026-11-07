@@ -68,6 +68,13 @@ The key that seals the credential lives in the operating system's keychain (macO
 Credential Manager). Without one (a server with no desktop) it is the file `vault.key`, readable by you only, and the first run
 says so; then anyone who can read your files can read the credential, so keep the directory private.
 
+## Your own work
+
+Because `personal.yaml` gives your GitHub login to your sign-in (`login:` of the owner token), the Pull requests and Issues pages
+show a **Mine** group in their filter panel: *Opened by me* and *Asking my review* for pull requests, *Opened by me* and *Assigned
+to me* for issues. They are plain address fields (`?reviewer=your-login`), so a filtered page can be bookmarked and the counts of the
+states cover what is yours. Review requests to a team are not expanded to its members.
+
 ## Changing things
 
 - **The accounts, groups, features**: edit `personal.yaml` and start again. The key `github.sources[].credential: true` means "the

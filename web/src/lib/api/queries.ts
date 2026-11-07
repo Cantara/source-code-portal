@@ -29,6 +29,8 @@ export const keys = {
       f.repo ?? "",
       f.state ?? "",
       f.by ?? "",
+      f.author ?? "",
+      f.reviewer ?? "",
       f.drafts ?? false,
       f.sort ?? "waiting",
       f.size ?? 50,
@@ -65,6 +67,8 @@ export const keys = {
       f.state ?? "",
       f.kind ?? "",
       f.by ?? "",
+      f.author ?? "",
+      f.assignee ?? "",
       f.sort ?? "waiting",
       f.size ?? 50,
       f.page ?? 1,
@@ -127,6 +131,10 @@ export interface PullFilter {
   repo?: string
   state?: Schemas["PullState"]
   by?: "people" | "automation"
+  /** a GitHub login: the pull requests that person opened */
+  author?: string
+  /** a GitHub login: the pull requests asking that person to review */
+  reviewer?: string
   drafts?: boolean
   sort?: Schemas["QueueSort"]
   page?: number
@@ -212,6 +220,10 @@ export interface IssueFilter {
   state?: Schemas["IssueState"]
   kind?: Schemas["IssueKind"]
   by?: "people" | "automation"
+  /** a GitHub login: the issues that person opened */
+  author?: string
+  /** a GitHub login: the issues assigned to that person */
+  assignee?: string
   sort?: Schemas["QueueSort"]
   page?: number
   size?: number
@@ -231,6 +243,8 @@ export const issuesQuery = (api: Api, f: IssueFilter) =>
               state: f.state,
               kind: f.kind,
               by: f.by,
+              author: f.author,
+              assignee: f.assignee,
               sort: f.sort,
               page: f.page,
               limit: f.size,
@@ -255,6 +269,8 @@ export const pullsQuery = (api: Api, f: PullFilter) =>
               repo: f.repo,
               state: f.state,
               by: f.by,
+              author: f.author,
+              reviewer: f.reviewer,
               drafts: f.drafts,
               sort: f.sort,
               page: f.page,

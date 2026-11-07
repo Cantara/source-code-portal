@@ -25,9 +25,9 @@ func pullSnapshot(t *testing.T) *snapshot.Snapshot {
 	p.Update(func(b *snapshot.Builder) {
 		b.ReplaceSource("gh", []*snapshot.RepoEntry{
 			entry(1, "x",
-				Pull{Number: 1, Author: "ann", Updated: at, Asked: asked, Approved: true, Checks: "SUCCESS"},         // ready
-				Pull{Number: 2, Author: "bo", Updated: at.Add(-72 * time.Hour), Asked: asked},                        // review, the oldest
-				Pull{Number: 3, Author: "renovate[bot]", Bot: true, Updated: at.Add(-96 * time.Hour), Asked: asked}), // automation
+				Pull{Number: 1, Author: "ann", Updated: at, Asked: asked, Approved: true, Checks: "SUCCESS"},                    // ready
+				Pull{Number: 2, Author: "bo", Updated: at.Add(-72 * time.Hour), Asked: asked, Reviewers: []string{"Ann", "cy"}}, // review, the oldest
+				Pull{Number: 3, Author: "renovate[bot]", Bot: true, Updated: at.Add(-96 * time.Hour), Asked: asked}),            // automation
 			entry(2, "y",
 				Pull{Number: 4, Author: "cy", Updated: at.Add(-time.Hour), Asked: asked, Changes: true}, // changes
 				Pull{Number: 5, Author: "di", Draft: true, Updated: at.Add(-200 * time.Hour)}),          // draft
@@ -74,6 +74,23 @@ func TestListPulls(t *testing.T) {
 	}
 	if got := numbers(list(oapi.ListPullsParams{State: new(oapi.PullStateDraft)})); !slices.Equal(got, []int{5}) {
 		t.Errorf("drafts: %v", got)
+	}
+	// What is a person's: the ones they opened, the ones asking them (logins without regard to case), and the counts cover them.
+	mine := list(oapi.ListPullsParams{Author: new("ANN")})
+	if got := numbers(mine); !slices.Equal(got, []int{1}) || mine.Counts.Open != 1 || mine.Counts.States.Ready != 1 {
+		t.Errorf("opened by ann: %v, %+v", got, mine.Counts)
+	}
+	if got := numbers(list(oapi.ListPullsParams{Reviewer: new("ann")})); !slices.Equal(got, []int{2}) {
+		t.Errorf("asking ann: %v", got)
+	}
+	if got := numbers(list(oapi.ListPullsParams{Reviewer: new("ann"), Author: new("bo")})); !slices.Equal(got, []int{2}) {
+		t.Errorf("asking ann, opened by bo: %v", got)
+	}
+	if got := numbers(list(oapi.ListPullsParams{Reviewer: new("ann"), Author: new("cy")})); len(got) != 0 {
+		t.Errorf("asking ann, opened by cy: %v", got)
+	}
+	if got := numbers(list(oapi.ListPullsParams{Author: new("nobody")})); len(got) != 0 {
+		t.Errorf("a stranger: %v", got)
 	}
 	g := list(oapi.ListPullsParams{Group: new("g")})
 	if got := numbers(g); !slices.Equal(got, []int{4}) || g.Counts.Open != 2 || g.Freshness.Status != "stale" {

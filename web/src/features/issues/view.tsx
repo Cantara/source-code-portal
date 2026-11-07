@@ -13,6 +13,7 @@ import {
   FilterForm,
   FilterGroup,
   FilterLayout,
+  MineToggles,
   ProductChoices,
   SizeChoices,
   TextFilter,
@@ -92,6 +93,14 @@ export function IssuesView({ defaultSize, filters }: { defaultSize: number; filt
             <FilterGroup title="Repository">
               <TextFilter name="repo" label="Repository (owner/name)" value={f.repo ?? ""} onPick={(repo) => pick({ repo })} />
             </FilterGroup>
+            <MineToggles
+              fields={[
+                { name: "author", label: "Opened by me" },
+                { name: "assignee", label: "Assigned to me" },
+              ]}
+              current={{ author: f.author, assignee: f.assignee }}
+              onPick={pick}
+            />
             <FilterGroup title="Opened by">
               <Choices
                 name="by"

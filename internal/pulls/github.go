@@ -27,6 +27,7 @@ type Listed struct {
 	Base, Head, HeadSHA    string
 	Labels                 []Label
 	Requested              int // reviewers and teams asked
+	Reviewers              []string
 	baseRepo, headRepoName string
 }
 
@@ -92,8 +93,9 @@ func (r rest) Open(ctx context.Context, owner, name string) ([]Listed, error) {
 
 // maxField is the bytes of a read field; titles and labels are cut again when they are cleaned.
 const (
-	maxField  = 1 << 10
-	maxLabels = 5
+	maxField     = 1 << 10
+	maxLabels    = 5
+	maxReviewers = 10 // people asked to review kept by login
 )
 
 // readPulls reads GitHub's list of pull requests, keeping only the fields a Listed holds; bodies and everything else are skipped.
@@ -190,8 +192,10 @@ func readPulls(body io.Reader) ([]Listed, error) {
 					}
 					return nil
 				})
-			case "requested_reviewers", "requested_teams":
+			case "requested_teams":
 				err = d.Array(func() error { p.Requested++; return d.Skip() })
+			case "requested_reviewers":
+				err = readReviewers(d, &p)
 			default:
 				err = d.Skip()
 			}
@@ -288,4 +292,21 @@ type detailJSON struct {
 			} `json:"commit"`
 		} `json:"nodes"`
 	} `json:"commits"`
+}
+
+// readReviewers reads the people asked to review: counted, and the first maxReviewers kept by login.
+func readReviewers(d *jsonstream.Reader, p *Listed) error {
+	return d.Array(func() error {
+		p.Requested++
+		return d.Object(func(k string) (err error) {
+			if k != "login" {
+				return d.Skip()
+			}
+			var login string
+			if login, err = d.String(maxField); err == nil && len(p.Reviewers) < maxReviewers && login != "" {
+				p.Reviewers = append(p.Reviewers, login)
+			}
+			return err
+		})
+	})
 }

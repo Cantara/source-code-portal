@@ -63,6 +63,7 @@ type Pull struct {
 	HeadSHA   string    `json:"sha"`
 	Labels    []Label   `json:"labels,omitempty"`
 	Requested int       `json:"requested,omitempty"`
+	Reviewers []string  `json:"reviewers,omitempty"` // the first maxReviewers people asked, by login (teams are only counted)
 	Review    string    `json:"review,omitempty"`
 	Approved  bool      `json:"approved,omitempty"`
 	Changes   bool      `json:"changes,omitempty"`
@@ -241,7 +242,8 @@ func merge(prev *Set, listed []Listed, now time.Time) (*Set, []int) {
 	for _, l := range listed {
 		p := Pull{Number: l.Number, Title: untrusted.Text(l.Title, maxTitle), URL: l.URL, Author: untrusted.Text(l.Author, 100),
 			Bot: l.AuthorBot || actor.Bot(l.Author) || actor.Branch(l.Head), Draft: l.Draft, Fork: l.Fork, Created: l.Created.UTC(), Updated: l.Updated.UTC(),
-			Base: untrusted.Text(l.Base, 100), Head: untrusted.Text(l.Head, 100), HeadSHA: l.HeadSHA, Requested: l.Requested}
+			Base: untrusted.Text(l.Base, 100), Head: untrusted.Text(l.Head, 100), HeadSHA: l.HeadSHA, Requested: l.Requested,
+			Reviewers: cleanLogins(l.Reviewers)}
 		for _, lb := range l.Labels {
 			p.Labels = append(p.Labels, untrusted.NewLabel(lb.Name, lb.Color))
 		}
@@ -318,4 +320,15 @@ func publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 		}
 	}
 	b.UpdateRepo(it.Repo, func(e *snapshot.RepoEntry) { facet.Set(e, r, fresh) })
+}
+
+// cleanLogins cleans the logins of the people asked to review, as an author's is.
+func cleanLogins(in []string) []string {
+	var out []string
+	for _, l := range in {
+		if l = untrusted.Text(l, 64); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
 }

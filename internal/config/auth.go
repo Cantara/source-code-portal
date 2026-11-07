@@ -29,6 +29,8 @@ type Token struct {
 	Secret     Secret   `mapstructure:"-"`
 	Groups     []string `mapstructure:"groups"`
 	Admin      bool     `mapstructure:"admin"`
+	// Login is the GitHub login of the person the token stands for: the lists offer "mine" with it (scp personal sets it).
+	Login string `mapstructure:"login"`
 }
 
 // OIDC configures sign-in through an OpenID Connect provider; an empty issuer turns it off.
@@ -77,6 +79,9 @@ func (a Auth) validate(publicURL string) []string {
 			p = append(p, at+".secret_file: required")
 		}
 		p = append(p, groupNames(at+".groups", t.Groups)...)
+		if t.Login != "" && !ownerPattern.MatchString(t.Login) {
+			p = append(p, fmt.Sprintf("%s.login: %q is not a GitHub login", at, t.Login))
+		}
 	}
 	o := a.OIDC
 	if o.Issuer == "" {

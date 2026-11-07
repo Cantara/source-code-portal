@@ -1066,9 +1066,10 @@ type Pull struct {
 	Created, Updated            time.Time
 	Base, Head, HeadSHA         string
 	Labels                      []string
-	Requested                   int
-	Review, Mergeable, Checks   string // GraphQL's reviewDecision, mergeable and the head's statusCheckRollup state
-	Approved, Changes           bool   // a reviewer's latest opinion
+	Requested                   int      // people asked to review, named reviewer0, reviewer1, ... after Reviewers
+	Reviewers                   []string // people asked to review, by login
+	Review, Mergeable, Checks   string   // GraphQL's reviewDecision, mergeable and the head's statusCheckRollup state
+	Approved, Changes           bool     // a reviewer's latest opinion
 	Additions, Deletions, Files int
 }
 
@@ -1116,9 +1117,12 @@ func (s *Server) listPulls(w http.ResponseWriter, req *http.Request) {
 		for _, l := range p.Labels {
 			labels = append(labels, map[string]string{"name": l, "color": "0e8a16"})
 		}
-		reviewers := make([]map[string]string, p.Requested)
-		for i := range reviewers {
-			reviewers[i] = map[string]string{"login": fmt.Sprintf("reviewer%d", i)}
+		reviewers := make([]map[string]string, 0, max(p.Requested, len(p.Reviewers)))
+		for _, l := range p.Reviewers {
+			reviewers = append(reviewers, map[string]string{"login": l})
+		}
+		for i := 0; len(reviewers) < p.Requested; i++ {
+			reviewers = append(reviewers, map[string]string{"login": fmt.Sprintf("reviewer%d", i)})
 		}
 		out = append(out, map[string]any{"number": p.Number, "title": p.Title, "draft": p.Draft,
 			"html_url":   fmt.Sprintf("https://github.com/%s/pull/%d", full, p.Number),

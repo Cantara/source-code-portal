@@ -320,7 +320,7 @@ func TestPersonalPortal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	yaml := personalYAML(dir, ghHost(gh.BaseURL()), []string{"acme"}, "open", "", n)
+	yaml := personalYAML(dir, ghHost(gh.BaseURL()), "ann", []string{"acme"}, "open", "", n)
 	cfgPath := filepath.Join(dir, "personal.yaml")
 	if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
@@ -393,9 +393,10 @@ func TestPersonalPortal(t *testing.T) {
 	}
 	var me struct {
 		SignedIn, Admin, Private bool
+		Login                    string
 	}
 	_, b := get(owner, "/api/v1/me")
-	if err := json.Unmarshal([]byte(b), &me); err != nil || !me.SignedIn || !me.Admin || !me.Private {
+	if err := json.Unmarshal([]byte(b), &me); err != nil || !me.SignedIn || !me.Admin || !me.Private || me.Login != "ann" {
 		t.Errorf("the owner: %s %v", b, err)
 	}
 	if code, _ := get(owner, "/api/v1/admin/status"); code != http.StatusOK {

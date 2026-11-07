@@ -1,4 +1,5 @@
 import type { PullFilter } from "@/lib/api/queries"
+import { login } from "@/lib/login"
 import { pageNumber, pageSize } from "@/lib/paging"
 import { pullStates, type PullState } from "@/entities/pull/pull"
 
@@ -21,6 +22,8 @@ export function pullsState(s: Record<string, unknown>, size: number): PullsState
   if (typeof s.repo === "string" && s.repo !== "") f.repo = s.repo.slice(0, 200).toLowerCase()
   if (typeof s.state === "string" && pullStates.some((x) => x.state === s.state)) f.state = s.state as PullState
   if (s.by === "people" || s.by === "automation") f.by = s.by
+  if (login(s.author)) f.author = login(s.author)
+  if (login(s.reviewer)) f.reviewer = login(s.reviewer)
   if (s.drafts === "true") f.drafts = true
   if (typeof s.sort === "string" && (sorts as readonly string[]).includes(s.sort) && s.sort !== "waiting")
     f.sort = s.sort as PullFilter["sort"]
@@ -35,6 +38,8 @@ export function pullsSearch(st: PullsState, defaultSize: number): string {
   if (f.repo) q.set("repo", f.repo)
   if (f.state) q.set("state", f.state)
   if (f.by) q.set("by", f.by)
+  if (f.author) q.set("author", f.author)
+  if (f.reviewer) q.set("reviewer", f.reviewer)
   if (f.drafts) q.set("drafts", "true")
   if (f.sort && f.sort !== "waiting") q.set("sort", f.sort)
   if (st.page > 1) q.set("page", String(st.page))

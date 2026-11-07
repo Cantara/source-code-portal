@@ -63,6 +63,8 @@ paths:
         - { name: state, in: query, required: false, schema: { $ref: "#/components/schemas/PullState" } }
         - { name: by, in: query, required: false, description: "people or automation; absent: both", schema: { type: string, enum: [people, automation] } }
         - { name: drafts, in: query, required: false, schema: { type: boolean, default: false } }
+        - { name: author, in: query, required: false, description: "A GitHub login: only the pull requests that person opened (the counts cover them)", schema: { type: string, maxLength: 39 } }
+        - { name: reviewer, in: query, required: false, description: "A GitHub login: only the pull requests that ask that person to review (teams are not expanded)", schema: { type: string, maxLength: 39 } }
         - { name: sort, in: query, required: false, schema: { $ref: "#/components/schemas/QueueSort" } }
         - { $ref: "#/components/parameters/PageNumber" }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
@@ -92,6 +94,8 @@ paths:
         - { name: state, in: query, required: false, schema: { $ref: "#/components/schemas/IssueState" } }
         - { name: kind, in: query, required: false, schema: { $ref: "#/components/schemas/IssueKind" } }
         - { name: by, in: query, required: false, description: "people or automation; absent: both", schema: { type: string, enum: [people, automation] } }
+        - { name: author, in: query, required: false, description: "A GitHub login: only the issues that person opened (the counts cover them)", schema: { type: string, maxLength: 39 } }
+        - { name: assignee, in: query, required: false, description: "A GitHub login: only the issues assigned to that person", schema: { type: string, maxLength: 39 } }
         - { name: sort, in: query, required: false, schema: { $ref: "#/components/schemas/QueueSort" } }
         - { $ref: "#/components/parameters/PageNumber" }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
@@ -1650,6 +1654,7 @@ components:
         via: { type: string, enum: [none, proxy, oidc, token], description: "How the viewer is identified; none when anonymous" }
         private: { type: boolean, description: Sees private and internal repositories }
         admin: { type: boolean, description: Sees the operator surfaces }
+        login: { type: string, description: "The viewer's GitHub login when the credential knows it (a token configured with `login`); absent otherwise. The lists use it for what is the viewer's own." }
         signIn:
           type: object
           required: [oidc, token]
