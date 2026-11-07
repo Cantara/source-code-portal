@@ -154,3 +154,15 @@ func TestCompileRefusesWhatThePortalRefuses(t *testing.T) {
 		}
 	}
 }
+
+func TestDeriveBigBucketsNeedThreeForARule(t *testing.T) {
+	names := []string{"alpha-1", "alpha-2", "beta-1", "beta-2", "gamma-x", "delta-y", "eps-z", "zeta-q", "omega-1", "omega-2", "omega-3"}
+	d := Derive(repoList(names...), []Product{{Name: "Bucket", Repos: names}}, nil)[0]
+	if !slices.Equal(ruleValues(d), []string{"prefix:omega-"}) || len(d.Pinned) != 8 {
+		t.Errorf("rules %v pinned %v: two that share a start are a coincidence in a big bucket, three are a pattern", ruleValues(d), d.Pinned)
+	}
+	small := Derive(repoList(names[:4]...), []Product{{Name: "Small", Repos: names[:4]}}, nil)[0]
+	if !slices.Equal(ruleValues(small), []string{"prefix:alpha-", "prefix:beta-"}) {
+		t.Errorf("a small product keeps pairs: %v", ruleValues(small))
+	}
+}

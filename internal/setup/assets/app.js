@@ -253,115 +253,360 @@ async function cancelRead() {
 async function openProducts() {
   await act(async () => {
     listing = await api("repos", { accounts: [...accounts] })
-    products = []
-    assign = {}
-    for (const r of listing.repos) assign[r.name] = ""
-    for (const p of listing.suggested) {
-      const key = "p" + nextKey++
-      products.push({ key, name: p.name })
-      for (const n of p.repos) assign[n] = key
-    }
+    applySuggestion()
+    selected = new Set()
+    query = ""
+    view = "all"
+    rowsShown = {}
+    drafts = {}
     go("products")
+    schedulePreview()
   })
 }
 
-// ---- 3. products
+// ---- 3. products: the repositories at the left, the products at the right. A repository is dragged (or moved with the menu) into a
+// product; the server works out the rules the product's repositories share (a name that starts the same, a topic), so repositories
+// created later fit by themselves. Nothing is written until Start.
 
-function counts() {
-  const per = {}
-  let hidden = 0
-  for (const v of Object.values(assign)) {
-    if (v === "hide") hidden++
-    else if (v) per[v] = (per[v] || 0) + 1
+let derived = {} // product key -> what the server worked out for it: rules, pinned repositories
+let derivedId = 0 // a late answer to an older question is dropped
+let previewTimer = null
+let previewError = ""
+let selected = new Set()
+let drag = [] // the names being dragged
+let query = ""
+let view = "all" // all | unassigned | hidden
+let rowsShown = {} // account -> rows drawn (the lists can be long)
+let lastPick = null // the repository last ticked, for shift-click ranges
+let drafts = {} // product key -> { kind, value, result } the rule being written
+let draftTimer = null
+
+const PAGE = 150
+const KINDS = [
+  ["prefix", "Name starts with"],
+  ["topic", "Has the topic"],
+  ["glob", "Name like (* and ?)"],
+  ["regexp", "Name matches (regular expression)"],
+]
+
+const membersOf = (key) => listing.repos.filter((r) => assign[r.name] === key).map((r) => r.name)
+const hiddenNames = () => listing.repos.filter((r) => assign[r.name] === "hide").map((r) => r.name)
+const withMembers = () => products.filter((p) => membersOf(p.key).length)
+const wire = (p) => ({ name: p.name.trim(), repos: membersOf(p.key).sort(), rules: p.rules, fixed: p.fixed || undefined })
+
+function say(rule) {
+  const v = rule.value
+  return { prefix: `name starts with “${v}”`, topic: `topic “${v}”`, glob: `name like “${v}”`, regexp: `name matches /${v}/`, exact: v }[rule.kind] || v
+}
+
+function addProduct(name) {
+  const key = "p" + nextKey++
+  products.push({ key, name, rules: [], fixed: false })
+  return key
+}
+
+function suggestName(names) {
+  const words = names.map((n) => n.split(/[-_.]/)[0].toLowerCase())
+  let base = "New product"
+  if (names.length > 1 && words[0].length >= 2 && words.every((w) => w === words[0])) base = words[0][0].toUpperCase() + words[0].slice(1)
+  let name = base
+  for (let i = 2; products.some((p) => p.name.trim().toLowerCase() === name.toLowerCase()); i++) name = `${base} ${i}`
+  return name
+}
+
+function moveTo(names, target) {
+  if (target === "new") target = addProduct(suggestName(names))
+  for (const n of names) assign[n] = target === "none" ? "" : target
+  selected = new Set([...selected].filter((n) => !names.includes(n)))
+  render()
+  schedulePreview()
+}
+
+function schedulePreview() {
+  clearTimeout(previewTimer)
+  previewTimer = setTimeout(runPreview, 250)
+}
+
+async function runPreview() {
+  const mine = withMembers()
+  const id = ++derivedId
+  try {
+    const out = await api("rules", { accounts: [...accounts], hidden: hiddenNames(), products: mine.map(wire) })
+    if (id !== derivedId) return
+    derived = {}
+    out.products.forEach((d, i) => { derived[mine[i].key] = d })
+    previewError = ""
+  } catch (e) {
+    if (id !== derivedId) return
+    previewError = e.message
   }
-  return { per, hidden }
+  if (step === "products") render()
 }
 
 function problem() {
-  const { per, hidden } = counts()
   const lim = listing.limits
+  if (previewError) return previewError
+  const hidden = hiddenNames().length
   if (hidden > lim.hidden) return `At most ${lim.hidden} repositories can be hidden one by one; leave an account out instead.`
-  for (const p of products) {
-    if ((per[p.key] || 0) > 0 && !p.name.trim()) return "Give every product that has repositories a name."
-    if ((per[p.key] || 0) > lim.perProduct) return `A product holds at most ${lim.perProduct} repositories.`
+  const mine = withMembers()
+  for (const p of mine) {
+    if (!p.name.trim()) return "Give every product a name."
+    if (derived[p.key] && derived[p.key].tooMany) return `“${p.name}” needs more than ${lim.matchers} entries. Add a rule that covers many of its repositories, or split it.`
   }
-  const names = products.filter((p) => per[p.key]).map((p) => p.name.trim().toLowerCase())
+  const names = mine.map((p) => p.name.trim().toLowerCase())
   if (new Set(names).size !== names.length) return "Two products have the same name."
   if (names.length > lim.products) return `At most ${lim.products} products.`
   return ""
 }
 
+function dropTarget(el, target) {
+  el.addEventListener("dragover", (e) => { if (drag.length) { e.preventDefault(); el.classList.add("over") } })
+  el.addEventListener("dragleave", () => el.classList.remove("over"))
+  el.addEventListener("drop", (e) => {
+    e.preventDefault()
+    el.classList.remove("over")
+    if (drag.length) moveTo(drag, target)
+    drag = []
+  })
+  return el
+}
+
+function draggable(el, name) {
+  el.setAttribute("draggable", "true")
+  el.addEventListener("dragstart", (e) => {
+    drag = selected.has(name) ? [...selected] : [name]
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", drag.join(", "))
+    el.classList.add("dragging")
+  })
+  el.addEventListener("dragend", () => { drag = []; el.classList.remove("dragging") })
+  return el
+}
+
+// -- the repositories
+
+function visibleRepos() {
+  const q = query.trim().toLowerCase()
+  return listing.repos.filter((r) => {
+    const a = assign[r.name] || ""
+    if (view === "unassigned" && a) return false
+    if (view === "hidden" && a !== "hide") return false
+    return !q || r.name.toLowerCase().includes(q) || (r.topics || []).some((t) => t.includes(q))
+  })
+}
+
+function pick(name, on, shift, visible) {
+  if (shift && lastPick && lastPick !== name) {
+    const a = visible.indexOf(lastPick)
+    const b = visible.indexOf(name)
+    if (a >= 0 && b >= 0) for (const n of visible.slice(Math.min(a, b), Math.max(a, b) + 1)) on ? selected.add(n) : selected.delete(n)
+  } else on ? selected.add(name) : selected.delete(name)
+  lastPick = name
+  render()
+}
+
+function repoRow(r, visible) {
+  const a = assign[r.name] || ""
+  const owner = a === "hide" ? "Hidden" : a ? (products.find((p) => p.key === a) || {}).name : ""
+  return draggable(h("li", { class: "repo" + (selected.has(r.name) ? " sel" : "") + (a ? " in" : "") },
+    h("input", { type: "checkbox", id: "pick-" + r.name, checked: selected.has(r.name), "aria-label": "Select " + r.name,
+      on: { click: (e) => pick(r.name, e.target.checked, e.shiftKey, visible) } }),
+    h("span", { class: "name" }, r.name),
+    r.private ? h("span", { class: "badge private" }, "private") : null,
+    r.archived ? h("span", { class: "badge" }, "archived") : null,
+    (r.topics || []).slice(0, 3).map((t) => h("span", { class: "chip" }, t)),
+    owner ? h("span", { class: "in-product" }, owner) : null), r.name)
+}
+
+function reposPanel() {
+  const visible = visibleRepos()
+  const names = visible.map((r) => r.name)
+  const sections = [...accounts].map((acct) => {
+    const all = listing.repos.filter((r) => r.owner.toLowerCase() === acct.toLowerCase())
+    const rows = visible.filter((r) => r.owner.toLowerCase() === acct.toLowerCase())
+    const free = all.filter((r) => !assign[r.name]).length
+    const n = rowsShown[acct] || PAGE
+    return h("details", { open: true, class: "account", "data-id": "acct-" + acct },
+      h("summary", {}, `${acct} · ${all.length} repositories${free ? `, ${free} without a product` : ""}`),
+      h("ul", { class: "plain repos" }, rows.slice(0, n).map((r) => repoRow(r, names))),
+      rows.length > n ? h("button", { type: "button", class: "link", on: { click: () => { rowsShown[acct] = n + PAGE; render() } } }, `Show ${Math.min(PAGE, rows.length - n)} more of ${rows.length - n}`) : null,
+      rows.length === 0 ? h("p", { class: "note" }, "Nothing here matches.") : null)
+  })
+  return h("div", { class: "panel" },
+    h("h3", {}, "Your repositories"),
+    h("div", { class: "toolbar" },
+      h("label", { for: "q", class: "sr" }, "Search repositories"),
+      h("input", { id: "q", type: "search", placeholder: "Search names and topics", value: query, autocomplete: "off", on: { input: (e) => { query = e.target.value; render() } } }),
+      h("label", { for: "view", class: "sr" }, "Show"),
+      h("select", { id: "view", on: { change: (e) => { view = e.target.value; render() } } },
+        [["all", "All"], ["unassigned", "Without a product"], ["hidden", "Hidden"]].map(([v, l]) => h("option", { value: v, selected: view === v }, l)))),
+    h("div", { class: "row tight" },
+      h("button", { type: "button", on: { click: () => { for (const n of names) selected.add(n); render() } } }, `Select the ${names.length} shown`),
+      selected.size ? h("button", { type: "button", class: "link", on: { click: () => { selected = new Set(); render() } } }, `Clear (${selected.size})`) : null),
+    moveBar(),
+    h("div", { class: "keep list", id: "repo-list" }, sections))
+}
+
+function moveBar() {
+  if (!selected.size) return h("p", { class: "note" }, "Drag repositories to a product, or tick them and move them with the menu. Shift-click ticks a range.")
+  return h("div", { class: "movebar" },
+    h("span", {}, `${selected.size} selected:`),
+    h("label", { for: "move", class: "sr" }, "Move the selected repositories to"),
+    h("select", { id: "move" },
+      h("option", { value: "new" }, "a new product"),
+      products.filter((p) => p.name.trim()).map((p) => h("option", { value: p.key }, p.name)),
+      h("option", { value: "none" }, "no product (Other)"),
+      h("option", { value: "hide" }, "hidden")),
+    h("button", { type: "button", class: "primary", on: { click: () => moveTo([...selected], document.getElementById("move").value) } }, "Move"))
+}
+
+// -- the products
+
+function zone(title, note, target, count) {
+  return dropTarget(h("div", { class: "zone", tabindex: "0", role: "group", "aria-label": title }, h("strong", {}, title), count != null ? h("span", { class: "count" }, count) : null, h("span", { class: "note" }, note)), target)
+}
+
+function ruleLine(p, rule) {
+  const extra = rule.extraN
+    ? h("p", { class: "warn" }, `Also catches ${rule.extraN} repositories no product holds: ${rule.extra.join(", ")}${rule.extraN > rule.extra.length ? ", …" : ""} `,
+        h("button", { type: "button", class: "link", on: { click: () => claim(p, rule) } }, "Add them to this product"))
+    : null
+  const spill = rule.spill && rule.spill.length
+    ? h("p", { class: "error" }, `Also catches ${rule.spill.join(", ")} of another product, which will then be in both.`)
+    : null
+  return h("li", { class: "rule" },
+    h("span", { class: "rule-text" }, say(rule)),
+    h("span", { class: "meta" }, `covers ${rule.own}`, rule.open ? " · new repositories fit" : ""),
+    rule.manual ? h("span", { class: "chip" }, "yours") : null,
+    rule.manual ? h("button", { type: "button", class: "link", "aria-label": "Remove the rule " + say(rule), on: { click: () => { p.rules = p.rules.filter((x) => !(x.kind === rule.kind && x.value === rule.value)); render(); schedulePreview() } } }, "Remove") : null,
+    extra, spill)
+}
+
+async function claim(p, rule) {
+  await act(async () => {
+    const out = await api("rule-test", { accounts: [...accounts], kind: rule.kind, value: rule.value })
+    for (const n of out.names || []) if (!assign[n]) assign[n] = p.key
+  })
+  schedulePreview()
+}
+
+function ruleForm(p) {
+  const d = drafts[p.key] || (drafts[p.key] = { kind: "prefix", value: "", result: null })
+  const r = d.result
+  const ok = r && !r.error && r.matches > 0
+  const idv = "rv-" + p.key
+  return h("details", { class: "add-rule", "data-id": "ar-" + p.key },
+    h("summary", {}, "Add a rule of your own"),
+    h("div", { class: "toolbar" },
+      h("label", { for: "rk-" + p.key, class: "sr" }, "Kind of rule"),
+      h("select", { id: "rk-" + p.key, on: { change: (e) => { d.kind = e.target.value; testDraft(p, d) } } }, KINDS.map(([v, l]) => h("option", { value: v, selected: d.kind === v }, l))),
+      h("label", { for: idv, class: "sr" }, "Value"),
+      h("input", { id: idv, type: "text", value: d.value, autocomplete: "off", spellcheck: "false", on: { input: (e) => { d.value = e.target.value; testDraft(p, d) } } })),
+    r ? h("p", { class: r.error ? "error" : "note", role: "status" }, r.error || `Selects ${r.matches} repositories${r.names.length ? ": " + r.names.slice(0, 6).join(", ") + (r.matches > 6 ? ", …" : "") : ""}`) : null,
+    h("button", { type: "button", disabled: !ok, on: { click: () => addRule(p, d) } }, ok ? `Add the rule and take the ${r.names.filter((n) => !assign[n]).length} without a product` : "Add the rule"))
+}
+
+function testDraft(p, d) {
+  clearTimeout(draftTimer)
+  d.result = null
+  draftTimer = setTimeout(async () => {
+    if (!d.value.trim()) return render()
+    try {
+      d.result = await api("rule-test", { accounts: [...accounts], kind: d.kind, value: d.value.trim() })
+    } catch (e) {
+      d.result = { error: e.message }
+    }
+    render()
+  }, 300)
+}
+
+function addRule(p, d) {
+  p.rules.push({ kind: d.kind, value: d.value.trim() })
+  for (const n of d.result.names) if (!assign[n]) assign[n] = p.key
+  drafts[p.key] = { kind: d.kind, value: "", result: null }
+  render()
+  schedulePreview()
+}
+
+function productCard(p) {
+  const names = membersOf(p.key)
+  const d = derived[p.key]
+  const open = d ? d.rules.filter((r) => r.open) : []
+  const card = h("div", { class: "pcard" },
+    h("div", { class: "product" },
+      h("label", { for: "n-" + p.key, class: "sr" }, "Product name"),
+      h("input", { id: "n-" + p.key, type: "text", value: p.name, maxlength: "120", on: { input: (e) => { p.name = e.target.value; schedulePreview() } } }),
+      h("span", { class: "count" }, `${names.length} repos`),
+      h("button", { type: "button", on: { click: () => { for (const n of names) assign[n] = ""; products = products.filter((x) => x !== p); render(); schedulePreview() } } }, "Remove")),
+    !d ? h("p", { class: "note" }, "Working out the rules…")
+      : h("div", {},
+          open.length ? h("p", { class: "fits" }, open.length > 3 ? `New repositories that fit any of its ${open.length} open rules join this product by themselves.` : `New repositories whose ${open.map(say).join(" or ")} join this product by themselves.`)
+                      : h("p", { class: "note" }, "A fixed list: a new repository goes to Other until you add it."),
+          h("ul", { class: "plain rules" }, d.rules.map((r) => ruleLine(p, r))),
+          d.pinned.length ? h("details", { "data-id": "pin-" + p.key }, h("summary", {}, `${d.pinned.length} pinned one by one`), h("p", { class: "note" }, d.pinned.join(", "))) : null),
+    h("div", { class: "row tight" },
+      h("input", { type: "checkbox", id: "fx-" + p.key, checked: !p.fixed, on: { change: (e) => { p.fixed = !e.target.checked; render(); schedulePreview() } } }),
+      h("label", { for: "fx-" + p.key, class: "inline" }, "Work out rules so new repositories fit")),
+    ruleForm(p),
+    h("details", { "data-id": "mem-" + p.key }, h("summary", {}, `Repositories (${names.length})`),
+      h("ul", { class: "plain members" }, names.map((n) => draggable(h("li", { class: "repo" }, h("span", { class: "name" }, n), h("button", { type: "button", class: "link", on: { click: () => moveTo([n], "none") } }, "Remove")), n)))))
+  return dropTarget(card, p.key)
+}
+
+function productsPanel() {
+  const { hidden } = counts()
+  const unassigned = listing.repos.filter((r) => !assign[r.name]).length
+  return h("div", { class: "panel" },
+    h("h3", {}, "Your products"),
+    h("div", { class: "zones" },
+      zone("New product", "Drop repositories here", "new"),
+      zone("Other", "No product", "none", unassigned),
+      zone("Hidden", "Left out of the portal", "hide", hidden)),
+    h("div", { class: "keep list", id: "product-list" }, products.map(productCard)),
+    h("div", { class: "row tight" },
+      h("button", { type: "button", on: { click: suggestAgain } }, "Suggest products again"),
+      h("button", { type: "button", class: "link", on: { click: clearAll } }, "Clear everything")))
+}
+
+function counts() {
+  let hidden = 0
+  for (const v of Object.values(assign)) if (v === "hide") hidden++
+  return { hidden }
+}
+
+function applySuggestion() {
+  products = []
+  assign = {}
+  derived = {}
+  for (const r of listing.repos) assign[r.name] = ""
+  for (const p of listing.suggested) {
+    const key = addProduct(p.name)
+    for (const n of p.repos) assign[n] = key
+  }
+}
+
+function suggestAgain() { applySuggestion(); selected = new Set(); render(); schedulePreview() }
+function clearAll() { products = []; assign = {}; derived = {}; for (const r of listing.repos) assign[r.name] = ""; selected = new Set(); render() }
+
 function productsStep() {
-  const { per, hidden } = counts()
   const issue = problem()
-  const rows = listing.repos.map((r) => h("tr", {},
-    h("td", {}, h("label", { for: "r-" + r.name, class: "sr" }, "Product of " + r.name), r.owner + "/" + r.name),
-    h("td", {}, h("span", { class: "badge" + (r.private ? " private" : "") }, r.private ? "private" : "public"), r.archived ? h("span", { class: "badge" }, "archived") : null),
-    h("td", {}, productSelect(r))))
+  const n = withMembers().length
   return h("section", {},
     h("div", { class: "card" },
       h("h2", {}, "Sort your repositories into products"),
-      h("p", { class: "note" }, `${listing.repos.length} repositories of the accounts you chose (forks left out, one entry for a name that two accounts share)${listing.more ? "; an account with more than 2000 is read up to its 2000 most recently pushed" : ""}. A product is a group on the dashboard. The suggestions come from the first word of the names; change anything. A repository without a product still shows, under Other.`),
-      h("div", { class: "products" }, products.map((p) => h("div", { class: "product" },
-        h("label", { for: "n-" + p.key, class: "sr" }, "Product name"),
-        h("input", { id: "n-" + p.key, type: "text", value: p.name, maxlength: "120", on: { input: (e) => { p.name = e.target.value; refreshOptions() } } }),
-        h("span", { class: "count" }, `${per[p.key] || 0} repos`),
-        h("button", { type: "button", "aria-label": "Remove " + p.name, on: { click: () => removeProduct(p.key) } }, "Remove")))),
-      h("div", { class: "row" }, h("button", { type: "button", on: { click: addProduct } }, "Add a product"))),
+      h("p", { class: "note" }, `${listing.repos.length} repositories of the accounts you chose (forks left out, one entry for a name that two accounts share)${listing.more ? "; an account with more than 2000 is read up to its 2000 most recently pushed" : ""}. A product is a group on the dashboard. Drag repositories into products; the portal works out what they share, so repositories you create later fit by themselves. Anything left over shows under Other.`)),
+    h("div", { class: "editor" }, reposPanel(), productsPanel()),
     h("div", { class: "card" },
-      h("div", { class: "scroll" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Repository"), h("th", {}, ""), h("th", {}, "Product"))), h("tbody", {}, rows))),
-      hidden ? h("p", { class: "note" }, `${hidden} hidden from the portal.`) : null),
-    issue ? h("p", { class: "error", role: "alert" }, issue) : null,
-    h("div", { class: "row" },
-      h("button", { type: "button", class: "primary", disabled: busy || !!issue, on: { click: finish } }, "Start my portal"),
-      h("button", { type: "button", on: { click: () => go("accounts") } }, "Back")))
-}
-
-function productSelect(r) {
-  const sel = h("select", { id: "r-" + r.name, "data-repo": r.name, on: { change: (e) => { assign[r.name] = e.target.value; render() } } })
-  fillOptions(sel, assign[r.name])
-  return sel
-}
-
-function fillOptions(sel, value) {
-  sel.replaceChildren(
-    h("option", { value: "" }, "Other (no product)"),
-    ...products.map((p) => h("option", { value: p.key, "data-product": p.key }, p.name || "(unnamed)")),
-    h("option", { value: "hide" }, "Hide from the portal"))
-  sel.value = value
-}
-
-// refreshOptions renames the options in place, so typing a product's name keeps the focus.
-function refreshOptions() {
-  for (const o of document.querySelectorAll("option[data-product]")) {
-    const p = products.find((x) => x.key === o.dataset.product)
-    if (p) o.textContent = p.name || "(unnamed)"
-  }
-}
-
-function addProduct() {
-  products.push({ key: "p" + nextKey++, name: "" })
-  render()
-  const inputs = document.querySelectorAll(".product input")
-  inputs[inputs.length - 1]?.focus()
-}
-
-function removeProduct(key) {
-  products = products.filter((p) => p.key !== key)
-  for (const n of Object.keys(assign)) if (assign[n] === key) assign[n] = ""
-  render()
+      issue ? h("p", { class: "error", role: "alert" }, issue) : h("p", { class: "note" }, n ? `${n} product${n === 1 ? "" : "s"} will be written to personal.yaml; you can edit them there later.` : "No products: everything shows in one group."),
+      h("div", { class: "row" },
+        h("button", { type: "button", class: "primary", disabled: busy || !!issue, on: { click: finish } }, "Start my portal"),
+        h("button", { type: "button", on: { click: () => go("accounts") } }, "Back"))))
 }
 
 async function finish() {
-  const lists = {}
-  const hide = []
-  for (const [n, v] of Object.entries(assign)) {
-    if (v === "hide") hide.push(n)
-    else if (v) (lists[v] ||= []).push(n)
-  }
-  const out = products.filter((p) => lists[p.key]).map((p) => ({ name: p.name.trim(), repos: lists[p.key].sort() }))
+  const out = withMembers().map(wire)
   await act(async () => {
-    st = await api("finish", { accounts: [...accounts], products: out, hidden: hide.sort() })
+    st = await api("finish", { accounts: [...accounts], products: out, hidden: hiddenNames().sort() })
     go("start")
     waitForPortal()
   })
@@ -396,7 +641,16 @@ async function waitForPortal() {
 
 function render() {
   if (!st) return
+  // The page is rebuilt on every change; keep what the person is in the middle of: the focused field and its caret, and the scroll of
+  // the two lists.
+  const active = document.activeElement
+  const focus = active && active.id ? { id: active.id, from: active.selectionStart, to: active.selectionEnd } : null
+  const scrolls = {}
+  for (const el of app.querySelectorAll(".keep[id]")) scrolls[el.id] = el.scrollTop
+  const before = new Set([...app.querySelectorAll("details[data-id]")].map((d) => d.dataset.id))
+  const open = new Set([...app.querySelectorAll("details[data-id][open]")].map((d) => d.dataset.id))
   const body = { signin: signIn, accounts: accountsStep, products: productsStep, start: startStep }[step]()
+  app.classList.toggle("wide", step === "products")
   app.replaceChildren(
     ...[
       h("h1", {}, "Set up your portal"),
@@ -406,6 +660,21 @@ function render() {
       body,
     ].filter(Boolean),
   )
+  for (const el of app.querySelectorAll(".keep[id]")) if (scrolls[el.id]) el.scrollTop = scrolls[el.id]
+  for (const d of app.querySelectorAll("details[data-id]")) if (before.has(d.dataset.id)) d.open = open.has(d.dataset.id)
+  if (focus) {
+    const el = document.getElementById(focus.id)
+    if (el) {
+      el.focus({ preventScroll: true })
+      if (focus.from != null && el.setSelectionRange) {
+        try {
+          el.setSelectionRange(focus.from, focus.to)
+        } catch {
+          // a field kind without a caret
+        }
+      }
+    }
+  }
 }
 
 try {

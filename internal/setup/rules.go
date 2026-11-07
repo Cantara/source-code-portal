@@ -124,6 +124,7 @@ func (r Rule) Describe() string {
 
 // Derive finds, for each product, the rules its members share: prefixes at the boundaries of their names (after a -, _ or ., or where
 // a lower case letter meets an upper case one) and topics. A rule is taken when it covers at least two members not covered yet
+// (three in a product of more than eight repositories)
 // (three in all for a prefix shorter than five characters, which is too loose to be a pattern) and catches no member of another
 // product; it may catch repositories no product holds, which is reported ("also catches"). What no rule covers stays pinned. The
 // person's own rules (Product.Rules) come first and are always kept. Hidden repositories are left out of everything.
@@ -234,6 +235,12 @@ func deriveOne(repos []ghlogin.Repo, index map[string]int, holder map[string]int
 			options = append(options, option{r, hit, own})
 		}
 	}
+	// A small product is one a person made on purpose: two repositories that share a start are a pattern. In a big catch-all bucket
+	// two are a coincidence, three are not.
+	minFresh := 2
+	if len(members) > 8 {
+		minFresh = 3
+	}
 	free := func(o option) (fresh, extra int) {
 		for _, n := range o.own {
 			if !covered[n] {
@@ -251,7 +258,7 @@ func deriveOne(repos []ghlogin.Repo, index map[string]int, holder map[string]int
 		best, bestFresh, bestExtra := -1, 0, 0
 		for k, o := range options {
 			fresh, extra := free(o)
-			if fresh < 2 {
+			if fresh < minFresh {
 				continue
 			}
 			// The better option covers more new members, then catches fewer strangers, then is the longer (more specific) value.
