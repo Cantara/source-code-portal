@@ -127,7 +127,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `server.trusted_proxies` | `[]` | CIDRs allowed to set `X-Forwarded-For` |
 | `log.level` | `info` | `debug`, `info`, `warn`, `error` (also `--log-level`) |
 | `log.format` | `json` | `json`, or `text` for local use |
-| `store.path` | `/data/scp.db` | the SQLite cache |
+| `store.path` | `/data/scp.db` | the SQLite cache; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version |
 | `sync.concurrency` | `4` | GitHub jobs running at once |
 | `github.sources[]` | required | one entry per GitHub host and credential |
 | `github.sources[].id` | required | short id, `[a-z0-9-]` |

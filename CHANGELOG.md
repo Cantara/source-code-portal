@@ -6,13 +6,20 @@ subjects.
 
 ## Unreleased
 
-Release notes on the Releases page, the repository's and the product's pages.
+Release notes on the Releases page, the repository's and the product's pages, and a store that migrates without losing data (the first
+step towards a personal edition: `design/store-model.md`). No configuration change is needed to upgrade.
 
 - **Release notes**: a release's notes show under its row as a disclosure ("Release notes"), on `/releases` and in the Releases panels of
   a repository and a product. They are the GitHub release's own text; a package release, and a GitHub release without a body, shows the
   section of the repository's `CHANGELOG.md` (or `CHANGES`, `HISTORY`, `NEWS`, `RELEASES`) for its version, marked "from the changelog".
   Long notes are cut with a link to the rest. `GET /api/v1/releases` rows carry `notes`, `notesCut` and `notesFrom`. The portal makes
   two more conditional requests per repository to read the changelog; no new permission.
+- **The database is kept across versions**: a store that holds data is copied to `<store.path>.pre-0002` (mode 0600, once) before its
+  schema changes, and the change only adds a column, `repo.visibility`, which each source's listing fills. Put the copy back to go back
+  to the previous version; without it an older version moves a newer database aside and resyncs from GitHub.
+- **Two sources that list one `owner/name` no longer take it from each other**: the source whose id sorts first owns it and the other's
+  repository is left out and named in the log (before, the address changed hands at every listing and its data was deleted each time).
+  Not reachable with today's configuration, which keeps an account in one source.
 
 ## 2.2.9
 

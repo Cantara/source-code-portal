@@ -806,14 +806,22 @@ func freshness(it store.Item, ttl time.Duration) snapshot.Freshness {
 }
 
 // setCatalogue replaces the repositories of source, dropping the entries of those that left or changed identity and adding entries
-// for new ones. It returns the keys of the dropped entries. Callers hold e.mu.
+// for new ones. It returns the keys of the dropped entries. An address another source owns (snapshot.Outranks) is not source's: it is
+// left out and told in the log, as the store does, and an address source owns takes over from a source that ranks lower. Callers hold
+// e.mu.
 func (e *Engine) setCatalogue(source string, repos []store.Repo, now time.Time) (removed []string) {
 	next := make(map[snapshot.RepoKey]store.Repo, len(repos))
+	kept := make([]store.Repo, 0, len(repos))
 	for _, r := range repos {
+		if h, held := e.repos[r.Key]; held && h.ID.Source != source && !snapshot.Outranks(source, h.ID.Source) {
+			e.log.Warn("catalogue: address held by another source; not tracked", "repo", r.Key, "source", source, "held_by", h.ID.Source)
+			continue
+		}
 		next[r.Key] = r
+		kept = append(kept, r)
 	}
 	for k, r := range e.repos {
-		if n, listed := next[k]; (r.ID.Source == source || listed) && n != r {
+		if n, listed := next[k]; (r.ID.Source == source || listed) && (n.Key != r.Key || n.ID != r.ID) { // a visibility change keeps the entries
 			delete(e.repos, k)
 			for key, en := range e.entries {
 				if en.repo == k {
@@ -823,7 +831,7 @@ func (e *Engine) setCatalogue(source string, repos []store.Repo, now time.Time) 
 			}
 		}
 	}
-	for _, r := range repos {
+	for _, r := range kept {
 		e.repos[r.Key] = r
 		e.addRepoEntries(r, nil, now)
 	}

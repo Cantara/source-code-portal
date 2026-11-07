@@ -28,10 +28,11 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
-// Repo is a catalogued repository: its address and identity.
+// Repo is a catalogued repository: its address and identity, and its visibility as its source last listed it ("" when not known).
 type Repo struct {
-	Key snapshot.RepoKey
-	ID  snapshot.RepoID
+	Key        snapshot.RepoKey
+	ID         snapshot.RepoID
+	Visibility string
 }
 
 // Item is the stored state of one sync job key.
@@ -66,7 +67,7 @@ type DB struct {
 
 // Open opens or creates the store at path. A file that cannot be used is quarantined next to path and a new one created.
 func Open(ctx context.Context, path string, log *slog.Logger) (*DB, error) {
-	db, err := open(ctx, path)
+	db, err := open(ctx, path, log)
 	if err == nil {
 		return &DB{db: db, log: log}, nil
 	}
@@ -79,7 +80,7 @@ func Open(ctx context.Context, path string, log *slog.Logger) (*DB, error) {
 		return nil, errors.Join(err, qerr)
 	}
 	log.Warn("store unusable; moved aside, starting empty", "err", err, "moved_to", moved)
-	db, err = open(ctx, path)
+	db, err = open(ctx, path, log)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ type unusableError struct{ err error }
 func (e unusableError) Error() string { return e.err.Error() }
 func (e unusableError) Unwrap() error { return e.err }
 
-func open(ctx context.Context, path string) (*sql.DB, error) {
+func open(ctx context.Context, path string, log *slog.Logger) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, err
 	}
@@ -105,14 +106,14 @@ func open(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // one writer; handlers never read the store
-	if err := check(ctx, db); err != nil {
+	if err := check(ctx, db, path, log); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
 	return db, nil
 }
 
-func check(ctx context.Context, db *sql.DB) error {
+func check(ctx context.Context, db *sql.DB, path string, log *slog.Logger) error {
 	var res string
 	if err := db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&res); err != nil {
 		return unusableError{fmt.Errorf("quick_check: %w", err)}
@@ -120,14 +121,16 @@ func check(ctx context.Context, db *sql.DB) error {
 	if res != "ok" {
 		return unusableError{fmt.Errorf("quick_check: %s", res)}
 	}
-	if err := migrate(ctx, db); err != nil {
+	if err := migrate(ctx, db, path, log); err != nil {
 		return unusableError{err}
 	}
 	return nil
 }
 
-// migrate applies the embedded migrations NNNN_name.sql after PRAGMA user_version, each in one transaction with its version bump.
-func migrate(ctx context.Context, db *sql.DB) error {
+// migrate applies the embedded migrations NNNN_name.sql after PRAGMA user_version, each in one transaction with its version bump. A
+// store that holds data is copied first (backup): a binary older than the schema quarantines the file and starts empty, so the copy is
+// the way back.
+func migrate(ctx context.Context, db *sql.DB, path string, log *slog.Logger) error {
 	names, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
 		return err
@@ -152,6 +155,9 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		if err != nil {
 			return err
 		}
+		if current > 0 {
+			backup(ctx, db, path, n, log)
+		}
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
@@ -169,6 +175,26 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// backup copies the store as it is before migration n to path.pre-NNNN (VACUUM INTO: a consistent copy of a store in use, about 50 ms
+// for 27 MB), once: a copy that exists is kept. A failure is logged and the migration goes on; the migrations are additive and run in
+// one transaction, and the store is a cache.
+func backup(ctx context.Context, db *sql.DB, path string, n int, log *slog.Logger) {
+	if path == "" {
+		return
+	}
+	dst := fmt.Sprintf("%s.pre-%04d", path, n)
+	if _, err := os.Stat(dst); err == nil {
+		return
+	}
+	if _, err := db.ExecContext(ctx, "VACUUM INTO ?", dst); err != nil {
+		log.Warn("store: no copy before the migration", "migration", n, "err", err)
+		_ = os.Remove(dst)
+		return
+	}
+	_ = os.Chmod(dst, 0o600)
+	log.Info("store: copied before the migration", "migration", n, "copy", dst)
 }
 
 // quarantine renames path and its -wal and -shm files to path.quarantine-<UTC>, keeping the newest two quarantined copies.
@@ -207,15 +233,18 @@ func (s *DB) Close() error {
 // Load returns every repository and item, for the warm start.
 func (s *DB) Load(ctx context.Context) ([]Repo, []Item, error) {
 	var repos []Repo
-	rows, err := s.db.QueryContext(ctx, "SELECT key, source, github_id FROM repo ORDER BY key")
+	rows, err := s.db.QueryContext(ctx, "SELECT key, source, github_id, visibility FROM repo ORDER BY key")
 	if err != nil {
 		return nil, nil, err
 	}
 	for rows.Next() {
 		var r Repo
-		if err := rows.Scan(&r.Key, &r.ID.Source, &r.ID.GitHubID); err != nil {
+		if err := rows.Scan(&r.Key, &r.ID.Source, &r.ID.GitHubID, &r.Visibility); err != nil {
 			_ = rows.Close()
 			return nil, nil, err
+		}
+		if r.Visibility == "unknown" {
+			r.Visibility = ""
 		}
 		repos = append(repos, r)
 	}
@@ -251,7 +280,7 @@ func (s *DB) Apply(ctx context.Context, c Change) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	if c.Catalogue != nil {
-		if err := replaceCatalogue(ctx, tx, c.Source, c.Catalogue); err != nil {
+		if err := replaceCatalogue(ctx, tx, s.log, c.Source, c.Catalogue); err != nil {
 			return err
 		}
 	}
@@ -280,7 +309,7 @@ func (s *DB) Apply(ctx context.Context, c Change) error {
 	return tx.Commit()
 }
 
-func replaceCatalogue(ctx context.Context, tx *sql.Tx, source string, repos []Repo) error {
+func replaceCatalogue(ctx context.Context, tx *sql.Tx, log *slog.Logger, source string, repos []Repo) error {
 	ids := map[int64]snapshot.RepoKey{}
 	for _, r := range repos {
 		ids[r.ID.GitHubID] = r.Key
@@ -310,16 +339,38 @@ func replaceCatalogue(ctx context.Context, tx *sql.Tx, source string, repos []Re
 		}
 	}
 	for _, r := range repos {
-		// An address taken by a repository with another identity (deleted and recreated, or a transfer between sources) moves over.
+		var holder string
+		switch err := tx.QueryRowContext(ctx, "SELECT source FROM repo WHERE key = ?", r.Key).Scan(&holder); {
+		case errors.Is(err, sql.ErrNoRows):
+		case err != nil:
+			return err
+		case holder != source && !snapshot.Outranks(source, holder):
+			// Another source owns the address: this one is not stored (and is told in the log), never swapped in. Two sources that
+			// list one address used to take it from each other at every listing and delete its items each time.
+			log.Warn("catalogue: address held by another source; not stored", "repo", r.Key, "source", source, "held_by", holder)
+			continue
+		}
+		// An address held by another identity (deleted and recreated, or a source that ranks lower) moves over, with its items.
 		if _, err := tx.ExecContext(ctx, "DELETE FROM repo WHERE key = ? AND NOT (source = ? AND github_id = ?)", r.Key, source, r.ID.GitHubID); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, "INSERT INTO repo (key, source, github_id) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
-			r.Key, source, r.ID.GitHubID); err != nil {
+		// A listing that does not say (a follower applying an older leader's outcome) keeps what is known.
+		if _, err := tx.ExecContext(ctx, `INSERT INTO repo (key, source, github_id, visibility) VALUES (?, ?, ?, ?)
+			ON CONFLICT (key) DO UPDATE SET visibility = CASE WHEN excluded.visibility = 'unknown' THEN repo.visibility ELSE excluded.visibility END`,
+			r.Key, source, r.ID.GitHubID, visibilityOf(r.Visibility)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// visibilityOf is v as the column holds it: one of the listed values, else unknown.
+func visibilityOf(v string) string {
+	switch v {
+	case "public", "private", "internal":
+		return v
+	}
+	return "unknown"
 }
 
 // Meta returns the value stored under key, "" when there is none.

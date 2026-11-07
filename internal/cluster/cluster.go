@@ -454,6 +454,8 @@ type repoJSON struct {
 	Key      snapshot.RepoKey `json:"key"`
 	Source   string           `json:"source"`
 	GitHubID int64            `json:"githubId"`
+	// Visibility is additive on the wire: an instance that does not send it is read as unknown.
+	Visibility string `json:"visibility,omitempty"`
 }
 
 func encode(r sync.Shared) []byte {
@@ -463,7 +465,7 @@ func encode(r sync.Shared) []byte {
 	if r.Catalogue != nil {
 		repos := make([]repoJSON, 0, len(r.Catalogue))
 		for _, c := range r.Catalogue {
-			repos = append(repos, repoJSON{Key: c.Key, Source: c.ID.Source, GitHubID: c.ID.GitHubID})
+			repos = append(repos, repoJSON{Key: c.Key, Source: c.ID.Source, GitHubID: c.ID.GitHubID, Visibility: c.Visibility})
 		}
 		rec.Catalogue = &repos
 	}
@@ -486,7 +488,7 @@ func decode(b []byte) (sync.Shared, error) {
 	if rec.Catalogue != nil {
 		r.Catalogue = make([]store.Repo, 0, len(*rec.Catalogue))
 		for _, c := range *rec.Catalogue {
-			r.Catalogue = append(r.Catalogue, store.Repo{Key: c.Key, ID: snapshot.RepoID{Source: c.Source, GitHubID: c.GitHubID}})
+			r.Catalogue = append(r.Catalogue, store.Repo{Key: c.Key, ID: snapshot.RepoID{Source: c.Source, GitHubID: c.GitHubID}, Visibility: c.Visibility})
 		}
 	}
 	return r, nil

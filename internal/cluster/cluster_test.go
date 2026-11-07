@@ -256,3 +256,18 @@ func keys(m map[string][]byte) []string {
 	slices.Sort(out)
 	return out
 }
+
+// TestWireCarriesVisibility: a listing's repositories keep their visibility across the wire, and an instance that does not send it is
+// read as not saying (the field is additive).
+func TestWireCarriesVisibility(t *testing.T) {
+	in := sync.Shared{Rev: 1, Source: "gh", Item: store.Item{Key: "catalog.reconcile/gh", Kind: "catalog.reconcile", State: snapshot.StateOK},
+		Catalogue: []store.Repo{{Key: "acme/a", ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Visibility: "private"}}}
+	out, err := cluster.Decode(cluster.Encode(in))
+	if err != nil || len(out.Catalogue) != 1 || out.Catalogue[0].Visibility != "private" {
+		t.Fatalf("decoded %+v, %v", out.Catalogue, err)
+	}
+	old := []byte(`{"rev":1,"source":"gh","item":{"key":"catalog.reconcile/gh","kind":"catalog.reconcile","state":"ok"},"catalogue":[{"key":"acme/a","source":"gh","githubId":1}]}`)
+	if out, err := cluster.Decode(old); err != nil || len(out.Catalogue) != 1 || out.Catalogue[0].Visibility != "" {
+		t.Errorf("an older instance's record: %+v, %v", out.Catalogue, err)
+	}
+}
