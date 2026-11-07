@@ -3,11 +3,13 @@ import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { addressPath } from "@/lib/paths"
 import { Badge } from "@/components/ui/badge"
+import { ChevronDownIcon } from "@/components/ui/icons"
 import { ecosystemLabel } from "@/entities/repo/packages"
 import { EmptyState } from "@/shared/empty-state"
 import { InitialsAvatar } from "@/shared/initials-avatar"
 import { ListRow } from "@/shared/list-row"
 import { RelativeTime } from "@/shared/relative-time"
+import { SafeHtml } from "@/shared/safe-html"
 
 export type Release = Schemas["ReleaseEntry"]
 
@@ -16,6 +18,31 @@ const sourceLabel = (source: string) => (source === "github" ? "GitHub" : ecosys
 
 /** sourceTitle says it in a hint: a package's name and its registry, else GitHub. */
 const sourceTitle = (r: Release) => (r.package ? `${r.package} on ${sourceLabel(r.source)}` : "A GitHub release")
+
+/**
+ * ReleaseNotes is a release's notes under a disclosure that works without JavaScript: the GitHub release's own, or the changelog's
+ * section of its version, and when they were cut the way to the rest. Nothing when the release has none.
+ */
+function ReleaseNotes({ r }: { r: Release }) {
+  if (!r.notes) return null
+  return (
+    <details className="group mt-1 text-sm">
+      <summary className="inline-flex min-h-7 cursor-pointer list-none items-center gap-1 rounded-md border border-border px-2 text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+        <ChevronDownIcon className="size-4 -rotate-90 transition-transform group-open:rotate-0" />
+        Release notes{r.notesFrom === "changelog" && " from the changelog"}
+      </summary>
+      <SafeHtml html={r.notes} className="doc mt-1 border-l-2 border-border pl-3" />
+      {r.notesCut && r.url && (
+        <p className="mt-1 pl-3 text-muted-foreground">
+          The notes are cut here.{" "}
+          <a href={r.url} rel="noreferrer" className="underline">
+            Read all of them
+          </a>
+        </p>
+      )}
+    </details>
+  )
+}
 
 /**
  * ReleaseList is releases as the server orders them (design/releases.md), each a row like a pull request's: the author's avatar, the
@@ -85,6 +112,7 @@ export function ReleaseList({
             }
           >
             {r.summary && <p className="text-sm text-muted-foreground">{r.summary}</p>}
+            <ReleaseNotes r={r} />
           </ListRow>
         ))}
       </ol>
@@ -113,6 +141,7 @@ export function ReleaseList({
             {r.author && <> by {r.author}</>}
             {r.bot && <> (automation)</>}
           </span>
+          <ReleaseNotes r={r} />
         </li>
       ))}
     </ol>

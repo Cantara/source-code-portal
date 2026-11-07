@@ -474,7 +474,10 @@ product, the repository, a window (the last 7, 30, 90 days or year) and the orde
 panel: every choice is in view, applied as it is made, and the panel hides and shows with its button (the choice is kept for every list
 page). Without JavaScript the panel is a form with an Apply button. A
 release shows its tag (a link to GitHub), its name, the first line of its notes, who published it and when; one published by a bot
-says so. The latest stable release is also what the release badges and a repository's summary show. It needs the App's *Contents*
+says so. Under it, *Release notes* opens the notes of that version (the same on a repository's and a product's page): the GitHub release's
+own text, cut at 6 KiB with a link to the rest, or, for a package release and a release without a body, the section of the repository's
+root `CHANGELOG.md` (also `CHANGES`, `HISTORY`, `NEWS`, `RELEASES`, `RELEASE_NOTES`) for that version, marked *from the changelog*. A
+section starts at a heading that names the version (`## 1.2.3`, `## [1.2.3] - 2026-01-01`, `## v1.2.3`); the ten newest are read. The latest stable release is also what the release badges and a repository's summary show. It needs the App's *Contents*
 permission and the *Release* event, which the portal already asks for.
 
 ### 2.4.5 Archive

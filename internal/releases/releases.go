@@ -51,11 +51,14 @@ type Release struct {
 	Author    string    `json:"author,omitempty"`
 	Bot       bool      `json:"bot,omitempty"`
 	Assets    int       `json:"assets,omitempty"`
+	Notes     string    `json:"notes,omitempty"` // the release's own notes (Markdown), cut at maxNotes
+	NotesCut  bool      `json:"notesCut,omitempty"`
 }
 
 // Set is a repository's recent releases, the newest first.
 type Set struct {
-	Releases []Release `json:"releases"`
+	Releases  []Release `json:"releases"`
+	Changelog []Section `json:"changelog,omitempty"` // the newest versions of the repository's changelog (design/releases.md, RL5)
 }
 
 // Latest is the newest stable release: nil when there is none.
@@ -94,20 +97,24 @@ func Repo(_ *snapshot.Snapshot, e *snapshot.RepoEntry, r *oapi.Repo) {
 	}
 }
 
-// Fetcher reads a repository's releases, the newest first; none is not an error.
+// Fetcher reads a repository's releases, the newest first, and its changelog; none is not an error.
 type Fetcher interface {
 	Releases(ctx context.Context, owner, name string) ([]Release, error)
+	// Changelog is the text of the changelog at the repository's root, nil when it has none.
+	Changelog(ctx context.Context, owner, name string) ([]byte, error)
 }
 
-// REST is a source's GitHub API client per owner; *github.Source implements it.
-type REST interface {
+// Client is a source's GitHub client; *github.Source implements it.
+type Client interface {
 	REST(ctx context.Context, owner string) (*gh.Client, error)
+	Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]github.TreeEntry, error)
+	Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
 }
 
 // FromGitHub reads releases through src.
-func FromGitHub(src REST) Fetcher { return rest{src} }
+func FromGitHub(src Client) Fetcher { return rest{src} }
 
-type rest struct{ src REST }
+type rest struct{ src Client }
 
 // Releases lists the Keep newest published releases; drafts and releases without a publication time are left out.
 func (r rest) Releases(ctx context.Context, owner, name string) ([]Release, error) {
@@ -127,11 +134,32 @@ func (r rest) Releases(ctx context.Context, owner, name string) ([]Release, erro
 		if x.GetDraft() || x.GetPublishedAt().IsZero() {
 			continue
 		}
-		out = append(out, Release{Tag: x.GetTagName(), Name: x.GetName(), Summary: firstLine(x.GetBody()), URL: x.GetHTMLURL(),
+		out = append(out, Release{Tag: x.GetTagName(), Name: x.GetName(), Summary: firstLine(x.GetBody()), Notes: x.GetBody(), URL: x.GetHTMLURL(),
 			Published: x.GetPublishedAt().UTC(), Pre: x.GetPrerelease(), Author: x.GetAuthor().GetLogin(),
 			Bot: x.GetAuthor().GetType() == "Bot", Assets: len(x.Assets)})
 	}
 	return out, nil
+}
+
+// Changelog reads the file at the root of the default branch that holds the changelog, the first of its name in tree order.
+func (r rest) Changelog(ctx context.Context, owner, name string) ([]byte, error) {
+	top, err := r.src.Tree(ctx, owner, name, "HEAD", false)
+	if err != nil {
+		if github.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	for _, e := range top {
+		if e.Type == "blob" && e.Size <= maxChangelog && changelogName.MatchString(e.Path) {
+			b, err := r.src.Blob(ctx, owner, name, e.SHA)
+			if github.IsNotFound(err) {
+				return nil, nil
+			}
+			return b, err
+		}
+	}
+	return nil, nil
 }
 
 // firstLine is the first line of a release's notes that says something, before it is cleaned.
@@ -167,7 +195,13 @@ func (f *Releases) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if err != nil {
 		return sync.Result{}, err
 	}
-	payload, err := json.Marshal(build(listed))
+	text, err := src.Changelog(ctx, owner, name)
+	if err != nil {
+		return sync.Result{}, err
+	}
+	set := build(listed)
+	set.Changelog = sections(string(text))
+	payload, err := json.Marshal(set)
 	if err != nil {
 		return sync.Result{}, err
 	}
@@ -184,6 +218,7 @@ func build(listed []Release) *Set {
 	for _, l := range listed {
 		l.Name, l.Summary = untrusted.Text(l.Name, maxName), untrusted.Text(l.Summary, maxName)
 		l.Tag, l.Author = untrusted.Text(l.Tag, maxName), untrusted.Text(l.Author, maxName)
+		l.Notes, l.NotesCut = cut(l.Notes, maxNotes)
 		l.Bot = l.Bot || actor.Bot(l.Author)
 		l.Published = l.Published.UTC()
 		s.Releases = append(s.Releases, l)

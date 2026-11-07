@@ -98,7 +98,10 @@ describe("pages", () => {
     expect(await which.findByRole("radio", { name: /Latest per repository 2/ })).toBeChecked()
     expect(which.getByRole("radio", { name: /Every release 3/ })).not.toBeChecked()
     expect(which.getByRole("radio", { name: /Pre-releases 1/ })).toBeEnabled()
-    const rows = within(await screen.findByRole("list", { name: "Releases" })).getAllByRole("listitem")
+    const list = await screen.findByRole("list", { name: "Releases" })
+    const rows = within(list)
+      .getAllByRole("listitem")
+      .filter((li) => li.parentElement === list) // the notes hold lists of their own
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveTextContent("acme/core")
     expect(rows[0]).toHaveTextContent("Pre-release")
@@ -109,6 +112,16 @@ describe("pages", () => {
     )
     expect(rows[1]).toHaveTextContent("(automation)")
     expect(rows[1]).not.toHaveTextContent("Pre-release")
+    // the notes of a release are a disclosure under its row: its own, or the changelog's section of its version
+    const [own, changelog] = rows.map((r) => within(r))
+    expect(own?.getByText("Release notes").closest("details")).not.toHaveAttribute("open")
+    expect(own?.getByText("Faster login", { selector: "li" })).toBeInTheDocument()
+    expect(own?.getByRole("link", { name: "Read all of them" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/core/releases/tag/v2.1.0-rc1",
+    )
+    expect(changelog?.getByText("Release notes from the changelog")).toBeInTheDocument()
+    expect(changelog?.queryByRole("link", { name: "Read all of them" })).not.toBeInTheDocument()
     expect(screen.getByRole("form", { name: "Filter the releases" })).toHaveAttribute("action", "/releases")
   })
 
@@ -134,6 +147,9 @@ describe("pages", () => {
               author: "",
               bot: false,
               assets: 0,
+              notes: "",
+              notesCut: false,
+              notesFrom: "",
             },
           ],
           counts: { latest: 1, all: 1, stable: 1, pre: 0, github: 2, packages: 1 },

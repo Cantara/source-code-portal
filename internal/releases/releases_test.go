@@ -34,6 +34,8 @@ func TestFromGitHub(t *testing.T) {
 		githubtest.Release{Tag: "v9.9.9", Draft: true, Published: day(21)},
 		githubtest.Release{Tag: "v2.0.0", Name: "Two", Body: "## What's new\n\n- faster\n", Published: day(10), Author: "ann"})
 	srv.SetReleases(many, rels...)
+	srv.SetCommits(many, githubtest.Commit{SHA: "c1", Message: "init", AuthorName: "Ann", Date: day(1)})
+	srv.SetFile(many, "CHANGELOG.md", "## 2.0.0\n\n- two\n")
 	srv.AddToken("ghp_test")
 	c, err := github.New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, TokenFile: "x",
 		Token: config.NewSecret([]byte("ghp_test"))}}}, nil, slog.New(slog.DiscardHandler))
@@ -60,6 +62,15 @@ func TestFromGitHub(t *testing.T) {
 	if got[1].Tag != "v2.0.0" || got[1].Summary != "What's new" || got[1].Assets != 1 || !got[1].Published.Equal(day(10)) {
 		t.Errorf("second = %+v", got[1])
 	}
+	if b, err := src.Changelog(t.Context(), "acme", "many"); err != nil || !strings.Contains(string(b), "- two") {
+		t.Errorf("changelog = %q, %v", b, err)
+	}
+	if b, err := src.Changelog(t.Context(), "acme", "none"); err != nil || b != nil {
+		t.Errorf("no changelog is none, not a failure: %q, %v", b, err)
+	}
+	if b, err := src.Changelog(t.Context(), "acme", "gone"); err != nil || b != nil {
+		t.Errorf("an unknown repository has none: %q, %v", b, err)
+	}
 	if r, err := src.Releases(t.Context(), "acme", "none"); err != nil || len(r) != 0 {
 		t.Errorf("no release = %+v, %v", r, err)
 	}
@@ -69,11 +80,15 @@ func TestFromGitHub(t *testing.T) {
 }
 
 type fetcher struct {
-	rels []Release
-	err  error
+	rels      []Release
+	changelog string
+	err       error
 }
 
 func (f fetcher) Releases(context.Context, string, string) ([]Release, error) { return f.rels, f.err }
+func (f fetcher) Changelog(context.Context, string, string) ([]byte, error) {
+	return []byte(f.changelog), f.err
+}
 
 func TestJob(t *testing.T) {
 	hostile := "Name \u202e with bidi\n"

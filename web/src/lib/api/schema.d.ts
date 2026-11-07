@@ -108,6 +108,7 @@ export interface paths {
      *     a repository's `packages` say) is a row of source `maven`, `npm` and so on beside the GitHub releases (source `github`), unless a
      *     GitHub release of the same version is listed. `source` limits the list to one kind; `latest` is then one row per repository, the
      *     newest of that kind (of both for `all`). The counts of the variants follow `source`, those of the sources follow `variant`.
+     *     A row carries the notes of its version (`notes`, HTML): the GitHub release's own, else the section of the repository's changelog.
      */
     get: operations["listReleases"]
     put?: never
@@ -1170,6 +1171,15 @@ export interface components {
       /** @description Published by automation */
       bot: boolean
       assets: number
+      /** @description The release's notes as sanitised HTML (headings as bold paragraphs, images as their alt text); empty when it has none */
+      notes: string
+      /** @description The notes were cut; the rest is on the release's page */
+      notesCut: boolean
+      /**
+       * @description release: the GitHub release's own notes; changelog: the section of the repository's changelog for the version; empty with no notes
+       * @enum {string}
+       */
+      notesFrom: "" | "release" | "changelog"
     }
     ReleaseCounts: {
       /** @description Repositories with a stable release of the chosen source */

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/safehtml"
 	"github.com/cantara/source-code-portal/internal/scope"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -30,17 +31,19 @@ type Published struct {
 
 // API serves the recent releases from the current snapshot. It implements the releases method of the strict server.
 type API struct {
-	Current  func(context.Context) *snapshot.Snapshot // the viewer's view
-	Packages func(*snapshot.RepoEntry) []Published    // what a repository publishes; nil: the GitHub releases only
+	Current  func(context.Context) *snapshot.Snapshot            // the viewer's view
+	Packages func(*snapshot.RepoEntry) []Published               // what a repository publishes; nil: the GitHub releases only
+	Render   func(*snapshot.RepoEntry, string) safehtml.SafeHTML // a release's notes (Markdown) as sanitised HTML; nil: no notes
 }
 
 // Ref is one release of a repository in the view, a GitHub release or a published package's newest: what a listing filters and sorts.
 type Ref struct {
-	Key     snapshot.RepoKey
-	Name    string
-	Groups  []string
-	Source  string // GitHub, else the package's ecosystem
-	Package string // the package's name; empty for a GitHub release
+	Key       snapshot.RepoKey
+	Name      string
+	Groups    []string
+	Source    string // GitHub, else the package's ecosystem
+	Package   string // the package's name; empty for a GitHub release
+	NotesFrom string // "release", "changelog", or "" with no notes
 	Release
 	latestAll     bool // the newest of the repository's stable GitHub release and its packages' releases
 	latestGitHub  bool // the repository's newest stable GitHub release
@@ -68,6 +71,7 @@ func (a API) refsOf(s *snapshot.Snapshot, keys []snapshot.RepoKey) []Ref {
 			for i := range set.Releases {
 				r := base
 				r.Release = set.Releases[i]
+				r.withNotes(set)
 				if &set.Releases[i] == newest {
 					gh = len(rows)
 				}
@@ -82,6 +86,7 @@ func (a API) refsOf(s *snapshot.Snapshot, keys []snapshot.RepoKey) []Ref {
 				}
 				r := base
 				r.Source, r.Package, r.Release = p.Ecosystem, p.Name, Release{Tag: p.Version, URL: p.URL, Published: p.Published}
+				r.withNotes(set)
 				if pk < 0 || r.Published.After(rows[pk].Published) {
 					pk = len(rows)
 				}
@@ -104,6 +109,16 @@ func (a API) refsOf(s *snapshot.Snapshot, keys []snapshot.RepoKey) []Ref {
 		out = append(out, rows...)
 	}
 	return out
+}
+
+// withNotes settles where r's notes come from: its own, else the changelog's section of its version.
+func (r *Ref) withNotes(set *Set) {
+	switch sec := sectionOf(set, r.Tag); {
+	case r.Notes != "":
+		r.NotesFrom = "release"
+	case sec != nil:
+		r.Notes, r.NotesCut, r.NotesFrom = sec.Notes, sec.Cut, "changelog"
+	}
 }
 
 func badRequest(detail string) oapi.ListReleases400ApplicationProblemPlusJSONResponse {
@@ -192,8 +207,13 @@ func (a API) ListReleases(ctx context.Context, req oapi.ListReleasesRequestObjec
 	page := oapi.ReleasePage{Releases: make([]oapi.ReleaseEntry, 0, end-start), Counts: counts, Page: pg,
 		Freshness: scope.Freshness(s, in, now, func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := Of(e); return f })}
 	for _, r := range kept[start:end] {
+		notes, from := "", ""
+		if r.Notes != "" && a.Render != nil {
+			notes, from = a.Render(s.Repos[r.Key], r.Notes).String(), r.NotesFrom
+		}
 		page.Releases = append(page.Releases, oapi.ReleaseEntry{Repo: string(r.Key), Name: r.Name, Groups: r.Groups, Source: r.Source, Package: r.Package, Tag: r.Tag, Title: r.Release.Name,
-			Summary: r.Summary, Url: r.URL, PublishedAt: r.Published.UTC(), Prerelease: r.Pre, Author: r.Author, Bot: r.Bot, Assets: r.Assets})
+			Summary: r.Summary, Url: r.URL, PublishedAt: r.Published.UTC(), Prerelease: r.Pre, Author: r.Author, Bot: r.Bot, Assets: r.Assets,
+			Notes: notes, NotesCut: r.NotesCut && notes != "", NotesFrom: oapi.ReleaseEntryNotesFrom(from)})
 	}
 	return oapi.ListReleases200JSONResponse{Body: page}, nil
 }

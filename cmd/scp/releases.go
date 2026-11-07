@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/cantara/source-code-portal/internal/docs"
 	"github.com/cantara/source-code-portal/internal/packages"
 	"github.com/cantara/source-code-portal/internal/releases"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -21,7 +22,8 @@ func publishedOf(e *snapshot.RepoEntry) []releases.Published {
 	return out
 }
 
-// newReleases is the releases API over a viewer's view: the GitHub releases and the published packages.
-func newReleases(view func(ctx context.Context) *snapshot.Snapshot) releases.API {
-	return releases.API{Current: view, Packages: publishedOf}
+// newReleases is the releases API over a viewer's view: the GitHub releases and the published packages, with their notes rendered by
+// the docs pipeline.
+func newReleases(view func(ctx context.Context) *snapshot.Snapshot, documents *docs.Docs) releases.API {
+	return releases.API{Current: view, Packages: publishedOf, Render: documents.Notes}
 }
