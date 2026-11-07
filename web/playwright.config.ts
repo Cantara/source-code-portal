@@ -43,13 +43,25 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
   ],
-  webServer: {
-    command: "go test -count=1 -timeout 0 -run '^TestServeForPlaywright$' ./cmd/scp",
-    cwd: "..",
-    env: { E2E_SCP_ADDR: addr, E2E_CONTROL_ADDR: "127.0.0.1:9191" },
-    url: `http://${addr}/api/v1/snapshot`,
-    timeout: 180_000,
-    reuseExistingServer: false,
-    stdout: "pipe",
-  },
+  webServer: [
+    {
+      command: "go test -count=1 -timeout 0 -run '^TestServeForPlaywright$' ./cmd/scp",
+      cwd: "..",
+      env: { E2E_SCP_ADDR: addr, E2E_CONTROL_ADDR: "127.0.0.1:9191" },
+      url: `http://${addr}/api/v1/snapshot`,
+      timeout: 180_000,
+      reuseExistingServer: false,
+      stdout: "pipe",
+    },
+    // The personal edition's setup page against a fake GitHub (e2e/setup.spec.ts).
+    {
+      command: "go test -count=1 -timeout 0 -run '^TestServeSetupForPlaywright$' ./cmd/scp",
+      cwd: "..",
+      env: { E2E_SETUP_ADDR: "127.0.0.1:9192" },
+      url: "http://127.0.0.1:9192/setup/app.css",
+      timeout: 180_000,
+      reuseExistingServer: false,
+      stdout: "pipe",
+    },
+  ],
 })

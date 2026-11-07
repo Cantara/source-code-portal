@@ -30,11 +30,25 @@ The page walks you through four steps:
    - **Paste a token.** A fine-grained personal access token with read access to the repositories you want (Contents, Metadata, and
      for the pull requests and issues pages Pull requests, Issues and Commit statuses), or a classic one with the scopes `repo` and
      `read:org`. The input is not shown again.
-2. **Accounts.** Your own account and the organisations GitHub lists for you; untick the ones you do not want.
-3. **Products.** The repositories you can read (up to 500, the most recently pushed first; forks and archived ones are left out of
-   the suggestion), sorted into products by what their names share (`whydah-*` becomes *Whydah*; the rest by owner). Rename a
-   product, move a repository to another, hide the ones you do not want. A repository left in no product is still shown, in a group
-   called *Other*.
+2. **Accounts.** Your own account and the organisations GitHub lists for you; untick the ones you do not want. The page then reads
+   their repositories as a background job with a progress bar (the account being read, how many of about how many, the time left)
+   and a Cancel button; nothing is asked of you while it runs. There is no cap on the list (an account is read up to its 2,000 most
+   recently pushed repositories).
+3. **Products.** Your repositories are listed per account at the left (search names and topics, show only those without a product)
+   and your products stand at the right. A first draft is suggested from the names (`whydah-*` becomes *Whydah*; the rest by
+   account). **Drag** repositories into a product (several at once if you ticked them; Shift-click ticks a range), or tick them and
+   use the "Move" menu, which also works with the keyboard and on a phone. Drop on *New product* to make one, on *Other* to take a
+   repository out of its product, on *Hidden* to leave it out of the portal.
+
+   **The portal works out the rules.** From the repositories in a product the page derives what they share: a name that starts the
+   same (`name starts with “whydah-”`) or a topic. Such a rule is *open*: a repository you create next week called `whydah-foo`
+   joins the product by itself, so you do not come back to maintain it. It tells what each rule catches, shows repositories no
+   product holds that start the same ("3 more repositories start with “kcp-” ... Add them with a rule") and never writes a rule that
+   would also catch a repository you gave to another product. A repository no rule fits is pinned by name. You can switch the rules
+   off for a product ("Work out rules so new repositories fit"), add your own (starts with, topic, a name pattern, or a regular
+   expression, each tested against your repositories before you add it) and remove them. A product's matchers are what
+   `personal.yaml` then holds, as `prefix`, `topic`, `glob`, `regexp` and `exact` ([the operator guide](operator-guide.md#2-configure)).
+   A rule looks at a repository's name and topics, not at the account, so a product spans the accounts you chose.
 4. **Start.** The portal starts on the same address and the page signs you in.
 
 SCP seals the token, writes `personal.yaml` (the products become groups with exact repository names) and starts. The page closes

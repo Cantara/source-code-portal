@@ -134,8 +134,16 @@ filters are *calculated* so a repository created later that belongs to a product
 - **Progress.** Listing is a job the server runs, not a request: per account, `GET /orgs/{o}/repos` (the person's own account:
   `/user/repos?affiliation=owner`) page by page, the account's total known beforehand (`GET /orgs/{o}` or `/user`: public and
   private repository counts), so the bar is determinate ("Cantara: 120 of 180"). The state carries `job {phase, account, done,
-  total, state}`; the page polls it, disables Next until it is done, offers Cancel, and keeps what a cancel or a failure already
-  listed. The 500-repository cap goes (2,000 per account is the ceiling, said when reached). After Start the page shows the
+  total, state}`; the page polls it, disables Next until it is done, offers Cancel, and ends the job on a cancel or a failure (nothing partial is kept). The 500-repository cap goes (2,000 per account is the ceiling, said when reached). After Start the page shows the
   portal's first load from the admin status (`queue`, `snapshot.repos`) until the dashboard has its catalogue.
 - **Stages.** PE4a (built): the listing job, topics and progress (a cancel or a failure ends the job; nothing partial is kept). PE4b: `Derive`, the rules in `personal.yaml`, the drag-and-drop editor.
   PE4c: progress after Start. Re-opening the editor on an existing `personal.yaml` is not built (`--reset` starts over).
+
+- **As built (PE4).** The page's two lists and its product cards are in `internal/setup/assets/app.js`; the server derives (`POST
+  /setup/api/rules` previews, `/setup/api/rule-test` counts one rule) and `finish` derives again, so what was shown is what is written.
+  A product in a catch-all bucket of more than eight repositories needs three that start alike for a rule (two is a coincidence
+  there). `Hint`s name unassigned repositories that start like a member's, as a one-click rule. Pinned entries past the group's 64
+  matchers become alternation regexps of up to 256 bytes. Not built: a dashboard progress bar for the portal's first catalogue load
+  (it needs new fields in the contract); scoping a rule to an account; re-opening the editor on an existing `personal.yaml`.
+- **Tests.** `Derive` on real-shaped lists, the hints, the job's progress and cancel, `TestSetupRulesSelectWhatThePortalSelects`, and the
+  whole page in a browser (`web/e2e/setup.spec.ts`: sign in, the read, drag and drop, a hint, the menu, hide, start, axe).

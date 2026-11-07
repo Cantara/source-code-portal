@@ -31,6 +31,11 @@ personal edition (`scp personal`). No configuration change is needed to upgrade.
   writes an editable `personal.yaml` and serves a portal on this computer only that refuses every request without a session; a link
   that works once signs the owner in. See [the personal edition](docs/personal-edition.md). New key `github.sources[].credential`
   (`scp serve` refuses it); new store table `credential` (migration 0003, a copy first); new dependencies `go-keyring` and `x/term`.
+- **Products by drag and drop, with rules that keep fitting**: the first run's product step lists your repositories per account and
+  lets you drag them into products; the rules a product's repositories share (a name that starts the same, a topic) are derived
+  and written to `personal.yaml`, so a repository you create later joins by itself, with a hint when unassigned repositories start
+  like a product's. The repositories are read as a background job with a progress bar and a Cancel button (no more 500-repository
+  cap), and the start has a staged bar.
 - **A first run in the browser**: `scp personal` opens a page on this computer that signs you in (a code on GitHub with `--client-id`,
   or a pasted token), lists your accounts and repositories and lets you sort them into products (suggested from the names), then
   starts the portal and signs you in (a button takes the token the GitHub CLI already holds). `--terminal` keeps the questions in the terminal, `--no-browser` only prints the link.

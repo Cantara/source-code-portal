@@ -426,7 +426,7 @@ function reposPanel() {
     const rows = visible.filter((r) => r.owner.toLowerCase() === acct.toLowerCase())
     const free = all.filter((r) => !assign[r.name]).length
     const n = rowsShown[acct] || PAGE
-    if (rows.length === 0 && (q || view !== "all")) return null // an account with nothing to show while searching is just noise
+    if (rows.length === 0 && (query.trim() || view !== "all")) return null // an account with nothing to show while searching is just noise
     return h("details", { open: true, class: "account", "data-id": "acct-" + acct },
       h("summary", {}, `${acct} · ${all.length} repositories${free ? `, ${free} without a product` : ""}`),
       h("ul", { class: "plain repos" }, rows.slice(0, n).map((r) => repoRow(r, names))),
