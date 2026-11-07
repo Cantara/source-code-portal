@@ -24,6 +24,20 @@ func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
 
 const token = "ghp_SETUPsecret0123456789"
 
+type fakeRepo struct {
+	name          string
+	private, fork bool
+	topics        string // the JSON list's items
+}
+
+// orgRepos are the repositories each account holds, the most recently pushed first.
+var orgRepos = map[string][]fakeRepo{ //nolint:gochecknoglobals // a test table, never written
+	"acme": {{"whydah-sso", true, false, `"iam"`}, {"whydah-admin", false, false, `"iam"`}, {"whydah-ui", false, false, `"iam"`},
+		{"tools", false, false, ""}, {"forked", false, true, ""}},
+	"octo": {{"notes", true, false, ""}},
+	"zeta": {{"other", false, false, ""}},
+}
+
 // host is a GitHub host for the page: the sign-in, who the token is, its organisations and its repositories.
 func host(t *testing.T, gate <-chan struct{}) *httptest.Server {
 	t.Helper()
@@ -43,7 +57,7 @@ func host(t *testing.T, gate <-chan struct{}) *httptest.Server {
 	})
 	mux.HandleFunc("GET /api/v3/user", func(w http.ResponseWriter, r *http.Request) {
 		if authed(w, r) {
-			fmt.Fprint(w, `{"login":"octo"}`)
+			fmt.Fprint(w, `{"login":"octo","public_repos":0,"owned_private_repos":1}`)
 		}
 	})
 	mux.HandleFunc("GET /api/v3/user/orgs", func(w http.ResponseWriter, r *http.Request) {
@@ -51,22 +65,36 @@ func host(t *testing.T, gate <-chan struct{}) *httptest.Server {
 			fmt.Fprint(w, `[{"login":"acme"},{"login":"zeta"}]`)
 		}
 	})
+	mux.HandleFunc("GET /api/v3/orgs/{org}", func(w http.ResponseWriter, r *http.Request) {
+		if authed(w, r) {
+			fmt.Fprintf(w, `{"login":%q,"public_repos":%d,"total_private_repos":%d}`, r.PathValue("org"), len(orgRepos[r.PathValue("org")])-1, 1)
+		}
+	})
+	list := func(w http.ResponseWriter, owner string) {
+		var parts []string
+		for _, rp := range orgRepos[owner] {
+			parts = append(parts, fmt.Sprintf(`{"name":%q,"private":%v,"fork":%v,"archived":false,"pushed_at":"2026-11-01T10:00:00Z","topics":[%s],"owner":{"login":%q}}`,
+				rp.name, rp.private, rp.fork, rp.topics, owner))
+		}
+		fmt.Fprint(w, "["+strings.Join(parts, ",")+"]")
+	}
 	mux.HandleFunc("GET /api/v3/user/repos", func(w http.ResponseWriter, r *http.Request) {
+		if authed(w, r) {
+			list(w, "octo")
+		}
+	})
+	mux.HandleFunc("GET /api/v3/orgs/{org}/repos", func(w http.ResponseWriter, r *http.Request) {
 		if !authed(w, r) {
 			return
 		}
-		var parts []string
-		for _, rp := range []struct {
-			owner, name   string
-			private, fork bool
-		}{
-			{"acme", "whydah-sso", true, false}, {"acme", "whydah-admin", false, false}, {"acme", "whydah-ui", false, false},
-			{"acme", "tools", false, false}, {"acme", "forked", false, true}, {"octo", "notes", true, false}, {"zeta", "other", false, false},
-		} {
-			parts = append(parts, fmt.Sprintf(`{"name":%q,"private":%v,"fork":%v,"archived":false,"pushed_at":"2026-11-01T10:00:00Z","owner":{"login":%q}}`,
-				rp.name, rp.private, rp.fork, rp.owner))
+		if gate != nil { // the test holds the read to look at its progress
+			select {
+			case <-gate:
+			case <-r.Context().Done():
+				return
+			}
 		}
-		fmt.Fprint(w, "["+strings.Join(parts, ",")+"]")
+		list(w, r.PathValue("org"))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -89,7 +117,13 @@ type rig struct {
 
 func newRig(t *testing.T, clientID string, sleep func(context.Context, time.Duration) error) *rig {
 	t.Helper()
-	gh := host(t, nil)
+	return newRigHeld(t, clientID, sleep, nil)
+}
+
+// newRigHeld is a rig whose organisation listings wait for hold to close.
+func newRigHeld(t *testing.T, clientID string, sleep func(context.Context, time.Duration) error, hold <-chan struct{}) *rig {
+	t.Helper()
+	gh := host(t, hold)
 	r := &rig{gh: gh, code: "entry-code-0123456789", finished: make(chan Result, 1), bodies: &bytes.Buffer{},
 		cli: func(string) (string, error) { return "", errors.New("no login") }}
 	ts := httptest.NewUnstartedServer(nil)
@@ -151,6 +185,25 @@ func (r *rig) call(t *testing.T, method, path string, body any, header ...string
 	out := map[string]any{}
 	_ = json.Unmarshal(b, &out)
 	return res.StatusCode, out
+}
+
+// list reads the repositories of the accounts the way the page does: starts the job and waits until it is over.
+func (r *rig) list(t *testing.T, accounts ...string) map[string]any {
+	t.Helper()
+	code, st := r.call(t, http.MethodPost, "/setup/api/list", map[string]any{"accounts": accounts})
+	if code != 200 {
+		t.Fatalf("list: %d %v", code, st)
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		job, _ := st["job"].(map[string]any)
+		if job != nil && job["state"] != "running" {
+			return job
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the listing did not end: %v", st)
+		}
+		_, st = r.call(t, http.MethodGet, "/setup/api/state", nil)
+	}
 }
 
 func TestEntry(t *testing.T) {
@@ -249,6 +302,12 @@ func TestWithAToken(t *testing.T) {
 	// A stranger's account is refused; the chosen ones list their repositories without forks and other accounts'.
 	if code, _ := r.call(t, http.MethodPost, "/setup/api/repos", map[string]any{"accounts": []string{"intruder"}}); code != http.StatusBadRequest {
 		t.Errorf("an account that is not the person's: %d", code)
+	}
+	if code, _ := r.call(t, http.MethodPost, "/setup/api/repos", map[string]any{"accounts": []string{"octo", "acme"}}); code != http.StatusBadRequest {
+		t.Errorf("repositories before they are read: %d", code)
+	}
+	if job := r.list(t, "octo", "acme"); job["state"] != "done" || job["done"] != 6.0 || job["total"] != 6.0 {
+		t.Fatalf("job: %v", job)
 	}
 	code, list := r.call(t, http.MethodPost, "/setup/api/repos", map[string]any{"accounts": []string{"octo", "acme"}})
 	if code != 200 {
@@ -469,5 +528,53 @@ func TestWithTheGitHubCLI(t *testing.T) {
 	r2.cli = func(string) (string, error) { return "not-a-token", nil }
 	if code, o := r2.call(t, http.MethodPost, "/setup/api/cli", map[string]string{}); code != http.StatusBadRequest || strings.Contains(fmt.Sprint(o), "not-a-token") {
 		t.Errorf("a token GitHub refuses: %d %v", code, o)
+	}
+}
+
+func TestListingProgressAndCancel(t *testing.T) {
+	hold := make(chan struct{})
+	r := newRigHeld(t, "", nil, hold)
+	r.enter(t)
+	if code, st := r.call(t, http.MethodPost, "/setup/api/token", map[string]string{"token": token}); code != 200 || st["user"] != "octo" {
+		t.Fatalf("token: %d %v", code, st)
+	}
+	_, st := r.call(t, http.MethodPost, "/setup/api/list", map[string]any{"accounts": []string{"acme", "octo"}})
+	var job map[string]any
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		job, _ = st["job"].(map[string]any)
+		// acme (sorted first) is held: the sizes are in (acme 5 in the host's table minus one public, plus one private; octo 1)
+		if job != nil && job["total"] != 0.0 && job["state"] == "running" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no progress: %v", st)
+		}
+		_, st = r.call(t, http.MethodGet, "/setup/api/state", nil)
+	}
+	if job["account"] != "acme" || job["step"] != 1.0 || job["steps"] != 2.0 || job["done"] != 0.0 {
+		t.Errorf("running: %v", job)
+	}
+	if code, _ := r.call(t, http.MethodPost, "/setup/api/repos", map[string]any{"accounts": []string{"acme", "octo"}}); code != http.StatusBadRequest {
+		t.Errorf("repositories while the job runs: %d", code)
+	}
+	// Finish is refused while the repositories are not read.
+	if code, _ := r.call(t, http.MethodPost, "/setup/api/finish", map[string]any{"accounts": []string{"acme", "octo"}, "products": []Product{}}); code != http.StatusBadRequest {
+		t.Errorf("finish before the read: %d", code)
+	}
+	_, st = r.call(t, http.MethodPost, "/setup/api/list/cancel", map[string]any{})
+	if job, _ = st["job"].(map[string]any); job["state"] != "cancelled" {
+		t.Errorf("cancel: %v", job)
+	}
+	close(hold)
+	time.Sleep(50 * time.Millisecond) // a late page must not bring the cancelled read back
+	if _, st = r.call(t, http.MethodGet, "/setup/api/state", nil); st["job"].(map[string]any)["state"] != "cancelled" {
+		t.Errorf("a cancelled read came back: %v", st["job"])
+	}
+	// Reading again works, and another choice of accounts reads again.
+	if job := r.list(t, "acme"); job["state"] != "done" || job["done"] != 5.0 {
+		t.Errorf("again: %v", job)
+	}
+	if job := r.list(t, "acme", "zeta"); job["state"] != "done" || job["done"] != 6.0 {
+		t.Errorf("other accounts: %v", job)
 	}
 }

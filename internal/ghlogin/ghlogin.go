@@ -315,26 +315,55 @@ type Repo struct {
 	Fork        bool
 	Archived    bool
 	Pushed      time.Time
+	Topics      []string
 }
 
-// MaxRepos is how many repositories Repos reads (5 pages of 100, the most recently pushed first).
-const MaxRepos = 500
+// MaxPerAccount is how many repositories AccountRepos reads of one account (20 pages of 100, the most recently pushed first).
+const MaxPerAccount = 2000
 
-// Repos lists the repositories the token can read, the most recently pushed first, up to MaxRepos (GET /user/repos with the owner,
-// collaborator and organisation member affiliations). more is true when there were more.
-func (c *Client) Repos(ctx context.Context, token string) (repos []Repo, more bool, err error) {
-	for page := 1; page <= MaxRepos/100; page++ {
+// AccountSize estimates how many repositories the token will see in an account, from the counts the account's own record carries
+// (the public ones and the private ones it owns or, for an organisation, holds); 0 when the host gives no count. self is the
+// token's own account (GET /user), else an organisation.
+func (c *Client) AccountSize(ctx context.Context, token, account string, self bool) (int, error) {
+	var r struct {
+		Public       int `json:"public_repos"`
+		OwnedPrivate int `json:"owned_private_repos"`
+		TotalPrivate int `json:"total_private_repos"`
+	}
+	path := "orgs/" + url.PathEscape(account)
+	if self {
+		path = "user"
+	}
+	if _, err := c.get(ctx, token, path, &r); err != nil {
+		return 0, err
+	}
+	private := r.TotalPrivate
+	if self {
+		private = r.OwnedPrivate
+	}
+	return r.Public + private, nil
+}
+
+// AccountRepos lists the repositories of one account that the token can read, the most recently pushed first, up to
+// MaxPerAccount, and tells progress how many it has after each page. self is the token's own account (the repositories it owns:
+// GET /user/repos), else an organisation (GET /orgs/{org}/repos). more is true when there were more than the ceiling.
+func (c *Client) AccountRepos(ctx context.Context, token, account string, self bool, progress func(n int)) (repos []Repo, more bool, err error) {
+	for page := 1; page <= MaxPerAccount/100; page++ {
 		var r []struct {
-			Name     string `json:"name"`
-			Private  bool   `json:"private"`
-			Fork     bool   `json:"fork"`
-			Archived bool   `json:"archived"`
-			Pushed   string `json:"pushed_at"`
+			Name     string   `json:"name"`
+			Private  bool     `json:"private"`
+			Fork     bool     `json:"fork"`
+			Archived bool     `json:"archived"`
+			Pushed   string   `json:"pushed_at"`
+			Topics   []string `json:"topics"`
 			Owner    struct {
 				Login string `json:"login"`
 			} `json:"owner"`
 		}
-		path := "user/repos?affiliation=owner,collaborator,organization_member&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+		path := "orgs/" + url.PathEscape(account) + "/repos?type=all&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+		if self {
+			path = "user/repos?affiliation=owner&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+		}
 		if _, err := c.get(ctx, token, path, &r); err != nil {
 			return nil, false, err
 		}
@@ -343,7 +372,10 @@ func (c *Client) Repos(ctx context.Context, token string) (repos []Repo, more bo
 				continue
 			}
 			pushed, _ := time.Parse(time.RFC3339, x.Pushed)
-			repos = append(repos, Repo{Owner: x.Owner.Login, Name: x.Name, Private: x.Private, Fork: x.Fork, Archived: x.Archived, Pushed: pushed})
+			repos = append(repos, Repo{Owner: x.Owner.Login, Name: x.Name, Private: x.Private, Fork: x.Fork, Archived: x.Archived, Pushed: pushed, Topics: x.Topics})
+		}
+		if progress != nil {
+			progress(len(repos))
 		}
 		if len(r) < 100 {
 			return repos, false, nil

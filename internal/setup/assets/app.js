@@ -169,20 +169,88 @@ async function toAccounts() {
 
 // ---- 2. accounts
 
+let readStarted = 0 // when this page saw the read begin, for the time left
+
 function accountsStep() {
   const all = [st.user, ...(st.orgs || [])]
+  const job = st.job
+  if (job && job.state === "running") return readingCard(job)
   return h("section", { class: "card" },
     h("h2", {}, `Signed in as ${st.user}`),
     h("p", { class: "note" }, st.ends ? `This sign-in ends ${new Date(st.ends).toLocaleString()}; run scp personal again then.` : "Which accounts should the portal show?"),
     h("ul", { class: "plain" }, all.map((a) => h("li", {},
       h("input", { type: "checkbox", id: "acct-" + a, checked: accounts.has(a), on: { change: (e) => { e.target.checked ? accounts.add(a) : accounts.delete(a); render() } } }),
       h("label", { for: "acct-" + a, class: "inline" }, a, a === st.user ? " (you)" : "")))),
+    job && job.state === "failed" ? h("p", { class: "error", role: "alert" }, job.error) : null,
     h("div", { class: "row" },
-      h("button", { type: "button", class: "primary", disabled: busy || accounts.size === 0, on: { click: loadRepos } }, "Continue"),
+      h("button", { type: "button", class: "primary", disabled: busy || accounts.size === 0, on: { click: loadRepos } }, job && job.state === "failed" ? "Try again" : "Continue"),
       h("button", { type: "button", class: "link", on: { click: () => act(async () => { st = await api("signout", {}); go("signin") }) } }, "Sign in as someone else")))
 }
 
+// readingCard shows the repository read: what is being read, how far it is and, once there is a rate, how long it will take.
+function readingCard(job) {
+  const known = job.total > 0
+  const left = known && job.done > 0 && readStarted ? Math.max(0, Math.round(((Date.now() - readStarted) / job.done) * (job.total - job.done) / 1000)) : null
+  return h("section", { class: "card", "aria-busy": "true" },
+    h("h2", {}, "Reading your repositories"),
+    h("p", {}, job.counting ? `Counting the repositories of your ${job.steps} account${job.steps === 1 ? "" : "s"}` : `${job.account} (account ${job.step} of ${job.steps})`),
+    h("progress", { class: "bar", max: known ? job.total : false, value: known ? job.done : false, "aria-label": "Repositories read" }),
+    h("p", { class: "note", role: "status" },
+      job.counting ? "This takes a few seconds." : known ? `${job.done} of about ${job.total} repositories` : `${job.done} repositories so far`,
+      left != null && left > 2 ? `, about ${left < 60 ? left + " seconds" : Math.ceil(left / 60) + " minutes"} left` : ""),
+    h("p", { class: "note" }, "GitHub hands them over a hundred at a time. Keep this page open; nothing is changed on GitHub."),
+    h("div", { class: "row" }, h("button", { type: "button", on: { click: cancelRead } }, "Cancel")))
+}
+
 async function loadRepos() {
+  error = ""
+  readStarted = Date.now()
+  try {
+    st = await api("list", { accounts: [...accounts] })
+  } catch (e) {
+    error = e.message
+  }
+  render()
+  watchRead()
+}
+
+// watchRead polls the read until it ends, then opens the products or shows what went wrong.
+function watchRead() {
+  clearInterval(timer)
+  if (!st.job || st.job.state !== "running") {
+    if (st.job && st.job.state === "done" && step === "accounts") void openProducts()
+    return
+  }
+  timer = setInterval(async () => {
+    try {
+      st = await api("state")
+    } catch (e) {
+      clearInterval(timer)
+      timer = null
+      error = e.message
+      render()
+      return
+    }
+    if (st.job && st.job.state === "running") return render()
+    clearInterval(timer)
+    timer = null
+    if (st.job && st.job.state === "done") await openProducts()
+    else render()
+  }, 500)
+}
+
+async function cancelRead() {
+  clearInterval(timer)
+  timer = null
+  try {
+    st = await api("list/cancel", {})
+  } catch (e) {
+    error = e.message
+  }
+  render()
+}
+
+async function openProducts() {
   await act(async () => {
     listing = await api("repos", { accounts: [...accounts] })
     products = []
@@ -233,7 +301,7 @@ function productsStep() {
   return h("section", {},
     h("div", { class: "card" },
       h("h2", {}, "Sort your repositories into products"),
-      h("p", { class: "note" }, `${listing.repos.length} repositories of the accounts you chose (forks left out, one entry for a name that two accounts share)${listing.more ? ", found among the 500 most recently pushed; older ones exist and are not listed" : ""}. A product is a group on the dashboard. The suggestions come from the first word of the names; change anything. A repository without a product still shows, under Other.`),
+      h("p", { class: "note" }, `${listing.repos.length} repositories of the accounts you chose (forks left out, one entry for a name that two accounts share)${listing.more ? "; an account with more than 2000 is read up to its 2000 most recently pushed" : ""}. A product is a group on the dashboard. The suggestions come from the first word of the names; change anything. A repository without a product still shows, under Other.`),
       h("div", { class: "products" }, products.map((p) => h("div", { class: "product" },
         h("label", { for: "n-" + p.key, class: "sr" }, "Product name"),
         h("input", { id: "n-" + p.key, type: "text", value: p.name, maxlength: "120", on: { input: (e) => { p.name = e.target.value; refreshOptions() } } }),
@@ -346,8 +414,10 @@ try {
   else if (st.user) {
     accounts = new Set([st.user, ...(st.orgs || [])])
     step = "accounts"
+    if (st.job && st.job.state === "running") readStarted = Date.now()
   }
   render()
+  if (step === "accounts" && st.job && st.job.state === "running") watchRead()
 } catch (e) {
   app.replaceChildren(h("p", { class: "error", role: "alert" }, e.message))
 }

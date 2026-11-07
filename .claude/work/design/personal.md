@@ -137,5 +137,5 @@ filters are *calculated* so a repository created later that belongs to a product
   total, state}`; the page polls it, disables Next until it is done, offers Cancel, and keeps what a cancel or a failure already
   listed. The 500-repository cap goes (2,000 per account is the ceiling, said when reached). After Start the page shows the
   portal's first load from the admin status (`queue`, `snapshot.repos`) until the dashboard has its catalogue.
-- **Stages.** PE4a: the listing job, topics and progress. PE4b: `Derive`, the rules in `personal.yaml`, the drag-and-drop editor.
+- **Stages.** PE4a (built): the listing job, topics and progress (a cancel or a failure ends the job; nothing partial is kept). PE4b: `Derive`, the rules in `personal.yaml`, the drag-and-drop editor.
   PE4c: progress after Start. Re-opening the editor on an existing `personal.yaml` is not built (`--reset` starts over).

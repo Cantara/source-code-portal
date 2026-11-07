@@ -84,22 +84,25 @@ type Server struct {
 	done   chan struct{}
 	cookie string
 
-	mu       sync.Mutex
-	entered  bool
-	hostText string
-	host     ghlogin.Host
-	hostSet  bool
-	clientID string
-	flow     flow
-	gen      int // bumped when the sign-in is reset: a late result of an older one is dropped
-	token    ghlogin.Token
-	user     string
-	orgs     []string
-	repos    []ghlogin.Repo
-	more     bool
-	listed   bool
-	launch   string
-	finished bool
+	mu        sync.Mutex
+	entered   bool
+	hostText  string
+	host      ghlogin.Host
+	hostSet   bool
+	clientID  string
+	flow      flow
+	gen       int // bumped when the sign-in is reset: a late result of an older one is dropped
+	token     ghlogin.Token
+	user      string
+	orgs      []string
+	repos     []ghlogin.Repo
+	more      bool
+	listed    bool
+	listedFor []string // the accounts s.repos was read for, sorted
+	job       *listing
+	jobs      int
+	launch    string
+	finished  bool
 }
 
 type flow struct {
@@ -144,6 +147,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /setup/api/token", s.api(s.pasteToken))
 	mux.Handle("POST /setup/api/cli", s.api(s.cliLogin))
 	mux.Handle("POST /setup/api/signout", s.api(s.signOut))
+	mux.Handle("POST /setup/api/list", s.api(s.startListing))
+	mux.Handle("POST /setup/api/list/cancel", s.api(s.cancelListing))
 	mux.Handle("POST /setup/api/repos", s.api(s.listRepos))
 	mux.Handle("POST /setup/api/finish", s.api(s.finish))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/setup/", http.StatusSeeOther) })
@@ -286,11 +291,12 @@ type stateOut struct {
 	Ends     string   `json:"ends,omitempty"` // when the token ends, if known
 	Done     bool     `json:"done,omitempty"`
 	Launch   string   `json:"launch,omitempty"`
+	Job      *jobOut  `json:"job,omitempty"` // the repositories being read
 }
 
 func (s *Server) snapshot() stateOut {
 	out := stateOut{Host: s.hostText, HostOK: s.hostSet, CanCLI: s.cfg.CLIToken != nil, CanCode: s.hostSet && s.clientID != "", ClientID: s.clientID, Flow: s.flow,
-		User: s.user, Orgs: s.orgs, Done: s.finished, Launch: s.launch}
+		User: s.user, Orgs: s.orgs, Done: s.finished, Launch: s.launch, Job: s.job.out()}
 	if s.hostSet {
 		out.Web = s.host.Web
 	}
@@ -327,6 +333,15 @@ func (s *Server) client() *ghlogin.Client {
 func (s *Server) reset() {
 	s.gen++
 	s.flow, s.token, s.user, s.orgs, s.repos, s.listed, s.more = flow{}, ghlogin.Token{}, "", nil, nil, false, false
+	s.dropListing()
+}
+
+// dropListing stops the repository read in progress and forgets it. Callers hold s.mu.
+func (s *Server) dropListing() {
+	if s.job != nil {
+		s.job.cancel()
+	}
+	s.job, s.listedFor = nil, nil
 }
 
 func (s *Server) setHost(_ context.Context, body []byte) (any, error) {
@@ -425,6 +440,7 @@ func (s *Server) signedInWith(ctx context.Context, c *ghlogin.Client, tok ghlogi
 		return nil // the person went back; this sign-in is no longer the one wanted
 	}
 	s.flow, s.repos, s.listed, s.more = flow{}, nil, false, false
+	s.dropListing()
 	s.token, s.user, s.orgs = tok, u.Login, orgs
 	return nil
 }
@@ -532,7 +548,8 @@ func (s *Server) chosen(accounts []string) ([]string, error) {
 	return out, nil
 }
 
-func (s *Server) listRepos(ctx context.Context, body []byte) (any, error) {
+// listRepos answers with the repositories the read (startListing) found, for the accounts asked for.
+func (s *Server) listRepos(_ context.Context, body []byte) (any, error) {
 	var in struct {
 		Accounts []string `json:"accounts"`
 	}
@@ -549,17 +566,13 @@ func (s *Server) listRepos(ctx context.Context, body []byte) (any, error) {
 		s.mu.Unlock()
 		return nil, err
 	}
-	c, tok, listed := s.client(), s.token.Value, s.listed
+	slices.Sort(accounts)
+	if !s.listed || !slices.Equal(s.listedFor, accounts) {
+		s.mu.Unlock()
+		return nil, bad("The repositories are not read yet.")
+	}
 	all, more := s.repos, s.more
 	s.mu.Unlock()
-	if !listed {
-		if all, more, err = c.Repos(ctx, tok); err != nil {
-			return nil, fmt.Errorf("listing your repositories: %w", err)
-		}
-		s.mu.Lock()
-		s.repos, s.more, s.listed = all, more, true
-		s.mu.Unlock()
-	}
 	var mine []ghlogin.Repo
 	for _, r := range all {
 		if !r.Fork && slices.ContainsFunc(accounts, func(a string) bool { return strings.EqualFold(a, r.Owner) }) && namePattern.MatchString(r.Name) {
@@ -595,6 +608,9 @@ func (s *Server) finish(ctx context.Context, body []byte) (any, error) {
 	accounts, err := s.chosen(in.Accounts)
 	if err != nil {
 		return nil, err
+	}
+	if sorted := slices.Sorted(slices.Values(accounts)); !slices.Equal(sorted, s.listedFor) {
+		return nil, bad("The repositories of these accounts are not read yet.")
 	}
 	known := map[string]bool{}
 	for _, r := range s.repos {
