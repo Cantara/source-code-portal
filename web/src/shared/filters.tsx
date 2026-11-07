@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDownIcon, PanelLeftIcon, SearchIcon } from "@/components/ui/icons"
 import { api } from "@/lib/api/client"
-import { groupsQuery } from "@/lib/api/queries"
+import { groupsQuery, meQuery } from "@/lib/api/queries"
 import { cn } from "@/lib/cn"
 import { count } from "@/lib/format"
 import { firstPageOf, pageSizes, rememberSize, type PagedList } from "@/lib/paging"
@@ -285,6 +285,37 @@ export function ProductChoices({ value, onPick }: { value: string; onPick: (grou
   return (
     <FilterGroup title="Product">
       <Choices name="group" label="Product" value={value} options={options} onPick={onPick} scroll />
+    </FilterGroup>
+  )
+}
+
+/**
+ * MineToggles are what is the reader's own, as switches: each sets one field of the address to the reader's GitHub login (known
+ * when the portal's credential for them says so, `/api/v1/me`). Nothing shows to a reader without a login.
+ */
+export function MineToggles({
+  fields,
+  current,
+  onPick,
+}: {
+  fields: { name: string; label: string }[]
+  current: Record<string, string | undefined>
+  onPick: (patch: Record<string, string>) => void
+}) {
+  const me = useQuery(meQuery(api)).data?.login
+  if (!me) return null
+  return (
+    <FilterGroup title="Mine">
+      {fields.map((f) => (
+        <Toggle
+          key={f.name}
+          name={f.name}
+          value={me}
+          label={f.label}
+          checked={current[f.name]?.toLowerCase() === me.toLowerCase()}
+          onPick={(on) => onPick({ [f.name]: on ? me : "" })}
+        />
+      ))}
     </FilterGroup>
   )
 }

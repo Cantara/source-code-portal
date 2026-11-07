@@ -13,6 +13,7 @@ import {
   FilterForm,
   FilterGroup,
   FilterLayout,
+  MineToggles,
   ProductChoices,
   SizeChoices,
   TextFilter,
@@ -84,6 +85,14 @@ export function PullsView({ defaultSize, filters }: { defaultSize: number; filte
             <FilterGroup title="Repository">
               <TextFilter name="repo" label="Repository (owner/name)" value={f.repo ?? ""} onPick={(repo) => pick({ repo })} />
             </FilterGroup>
+            <MineToggles
+              fields={[
+                { name: "author", label: "Opened by me" },
+                { name: "reviewer", label: "Asking my review" },
+              ]}
+              current={{ author: f.author, reviewer: f.reviewer }}
+              onPick={pick}
+            />
             <FilterGroup title="Opened by">
               <Choices
                 name="by"

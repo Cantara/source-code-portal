@@ -1732,6 +1732,8 @@ export interface components {
       private: boolean
       /** @description Sees the operator surfaces */
       admin: boolean
+      /** @description The viewer's GitHub login when the credential knows it (a token configured with `login`); absent otherwise. The lists use it for what is the viewer's own. */
+      login?: string
       signIn: {
         /** @description GET /auth/login signs in at the provider */
         oidc: boolean
@@ -1890,6 +1892,10 @@ export interface operations {
         /** @description people or automation; absent: both */
         by?: "people" | "automation"
         drafts?: boolean
+        /** @description A GitHub login: only the pull requests that person opened (the counts cover them) */
+        author?: string
+        /** @description A GitHub login: only the pull requests that ask that person to review (teams are not expanded) */
+        reviewer?: string
         sort?: components["schemas"]["QueueSort"]
         /** @description The page, from 1 */
         page?: components["parameters"]["PageNumber"]
@@ -1926,6 +1932,10 @@ export interface operations {
         kind?: components["schemas"]["IssueKind"]
         /** @description people or automation; absent: both */
         by?: "people" | "automation"
+        /** @description A GitHub login: only the issues that person opened (the counts cover them) */
+        author?: string
+        /** @description A GitHub login: only the issues assigned to that person */
+        assignee?: string
         sort?: components["schemas"]["QueueSort"]
         /** @description The page, from 1 */
         page?: components["parameters"]["PageNumber"]

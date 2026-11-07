@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -46,6 +47,7 @@ func (a API) ListIssues(ctx context.Context, req oapi.ListIssuesRequestObject) (
 	if missing != "" {
 		return notFound(missing), nil
 	}
+	refs = slices.DeleteFunc(slices.Clone(refs), func(r Ref) bool { return !ofPerson(r.Issue, p.Author, p.Assignee) })
 	by := ByAll
 	if p.By != nil {
 		switch *p.By {
@@ -89,4 +91,12 @@ func (a API) ListIssues(ctx context.Context, req oapi.ListIssuesRequestObject) (
 func freshOf(e *snapshot.RepoEntry) snapshot.Freshness {
 	_, f := Of(e)
 	return f
+}
+
+// ofPerson keeps an issue opened by author and assigned to assignee, where either is given (GitHub logins, case does not matter).
+func ofPerson(i *Issue, author, assignee *string) bool {
+	if author != nil && !strings.EqualFold(i.Author, *author) {
+		return false
+	}
+	return assignee == nil || slices.ContainsFunc(i.Assignees, func(l string) bool { return strings.EqualFold(l, *assignee) })
 }

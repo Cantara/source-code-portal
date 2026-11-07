@@ -127,7 +127,7 @@ and the badges.
   The REST listing gives every field but the reviews, checks, mergeability and stats, so a failed GraphQL query still lists them.
 - `internal/github`: `GraphQL(ctx, client, query, vars, out)` beside `REST`, the endpoint rule `graphQL(base)` moved from `commits`; D1's
   stats query uses it.
-- Contract: `GET /api/v1/pulls` (paged; `group`, `repo`, `state`, `by` (people, automation), `drafts`, `sort`), `PullRequest`;
+- Contract: `GET /api/v1/pulls` (paged; `group`, `repo`, `state`, `by` (people, automation), `author`, `reviewer` (GitHub logins: PE2), `drafts`, `sort`), `PullRequest`;
   `RepoSummary.openPulls` beside `openIssues` (issues only); `DashboardGroup.pulls` (counts by state); `PullSummary` on the
   dashboard's fleet.
 - The fake GitHub: `SetPull(owner, name, Pull)` serving the REST listing with ETags and the GraphQL fields.

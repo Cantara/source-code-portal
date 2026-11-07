@@ -21,6 +21,11 @@ personal edition (`scp personal`). No configuration change is needed to upgrade.
   repository is left out and named in the log (before, the address changed hands at every listing and its data was deleted each time).
   Not reachable with today's configuration, which keeps an account in one source.
 
+- **What is yours**: the Pull requests and Issues pages have a "Mine" group in their filter panel (opened by me, asking my review,
+  assigned to me) for a session whose credential knows its GitHub login: a token configured with the new `auth.tokens[].login`
+  (`scp personal` sets it). New query parameters `author`, `reviewer` (pull requests) and `author`, `assignee` (issues); `GET
+  /api/v1/me` carries `login`. The pull requests' people asked to review are now kept by login (up to 10), read from the same
+  listing as before; no new request or permission.
 - **A personal edition**: `scp personal` signs you in to GitHub (github.com, a GitHub Enterprise Server or a GHE.com tenant) with a code
   on GitHub or a pasted token, keeps the credential sealed in the store (the key in the operating system's keychain, else a 0600 file),
   writes an editable `personal.yaml` and serves a portal on this computer only that refuses every request without a session; a link

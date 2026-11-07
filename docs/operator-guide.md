@@ -158,7 +158,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `auth.session_ttl` | `12h` | how long a sign-in lasts, `5m` to `720h`; it is renewed while in use, for at most 7 days from the sign-in (then the provider is asked again), or `session_ttl` when that is longer |
 | `auth.admin_emails` | `[]` | verified email addresses of the administrators (case-insensitive) |
 | `auth.admin_groups` | `[]` | groups whose members are administrators |
-| `auth.tokens[]` | `[]` | access tokens: `name` (`[a-z0-9-]`), `secret_file` (at least 32 characters), `groups`, `admin` |
+| `auth.tokens[]` | `[]` | access tokens: `name` (`[a-z0-9-]`), `secret_file` (at least 32 characters), `groups`, `admin`, `login` (the GitHub login of the person the token stands for: Pull requests and Issues then offer "Mine" filters to that token's session; `scp personal` sets it) |
 | `auth.oidc.issuer` | empty | the OpenID Connect provider (https; http only on loopback); empty: no single sign-on |
 | `auth.oidc.client_id` | empty | the portal's client at the provider |
 | `auth.oidc.client_secret_file` | empty | the client's secret; empty for a public client (PKCE only) |

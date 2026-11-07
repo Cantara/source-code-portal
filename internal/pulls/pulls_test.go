@@ -116,7 +116,7 @@ func TestJob(t *testing.T) {
 	r := newRig(t)
 	at := r.now.Add(-48 * time.Hour)
 	ann := githubtest.Pull{Number: 7, Title: "Add the \u202ething", Author: "ann", Created: at, Updated: at, Base: "main", Head: "feature",
-		HeadSHA: strings.Repeat("a", 40), Labels: []string{"enhancement"}, Requested: 2, Review: "REVIEW_REQUIRED", Checks: "SUCCESS",
+		HeadSHA: strings.Repeat("a", 40), Labels: []string{"enhancement"}, Requested: 2, Reviewers: []string{"cy"}, Review: "REVIEW_REQUIRED", Checks: "SUCCESS",
 		Additions: 40, Deletions: 2, Files: 3}
 	bot := githubtest.Pull{Number: 9, Title: "Update lib to 2.1", Author: "renovate[bot]", Bot: true, Created: at.Add(-40 * 24 * time.Hour),
 		Updated: at.Add(time.Hour), Base: "main", Head: "renovate/lib-2.x", HeadSHA: strings.Repeat("b", 40), Checks: "SUCCESS"}
@@ -129,7 +129,7 @@ func TestJob(t *testing.T) {
 		t.Fatalf("first run: %+v, again %v", s, res.Again)
 	}
 	p := s.Pulls[1]
-	if p.Title != "Add the thing" || p.Bot || p.Requested != 2 || len(p.Labels) != 1 || p.Labels[0].Color != "0e8a16" ||
+	if p.Title != "Add the thing" || p.Bot || p.Requested != 2 || len(p.Reviewers) != 2 || p.Reviewers[0] != "cy" || p.Reviewers[1] != "reviewer0" || len(p.Labels) != 1 || p.Labels[0].Color != "0e8a16" ||
 		p.Stats == nil || p.Stats.Additions != 40 || p.Asked.IsZero() || StateOf(&p) != StateReview {
 		t.Errorf("a person's pull request: %+v, state %s", p, StateOf(&p))
 	}

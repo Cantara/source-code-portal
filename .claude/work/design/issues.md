@@ -72,7 +72,7 @@ API and the tool.
 - `internal/issues` (feature, facet `issues`, `Of`): `Issue`, `Set` (`Total`, `Exact`, `Issues`), `StateOf`, `KindOf`; the job
   `issues` (`github.go`: the listing streamed through `jsonstream`); `Feeds()` (fleet, group, repository, waiting first); `Counts`;
   `api.go`: `GET /api/v1/issues`.
-- Contract: `GET /api/v1/issues` (paged; `group`, `repo`, `state`, `kind`, `by`, `sort`), `Issue`, `IssueState`, `IssueKind`,
+- Contract: `GET /api/v1/issues` (paged; `group`, `repo`, `state`, `kind`, `by`, `author`, `assignee` (GitHub logins: PE2), `sort`), `Issue`, `IssueState`, `IssueKind`,
   `IssueCounts`, `IssuePage`; the labels of pull requests and issues are one schema, `IssueLabel` (GitHub's labels are issue labels);
   the order is one schema, `QueueSort`, for both lists.
 - The fake GitHub: `SetIssues(owner, name, ...Issue)`, served by the issues listing with the pull requests of `SetPulls` among them.

@@ -350,7 +350,7 @@ func (p *personal) wizard(ctx context.Context, dir, cfgPath string, v *vault.Vau
 			return err
 		}
 	}
-	if err := os.WriteFile(cfgPath, []byte(personalYAML(dir, signed.host, accounts, def, webDir, p.flags.port)), 0o600); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(personalYAML(dir, signed.host, signed.user, accounts, def, webDir, p.flags.port)), 0o600); err != nil {
 		return err
 	}
 	p.say("\nSigned in as %s. Settings are in %s (edit them freely; there is no secret in the file).", signed.user, cfgPath)
@@ -477,7 +477,7 @@ func findWebBundle() string {
 func q(s string) string { b, _ := json.Marshal(s); return string(b) } // a YAML double-quoted string
 
 // personalYAML is personal.yaml: an ordinary configuration, no secret in it.
-func personalYAML(dir string, h ghlogin.Host, accounts []string, defaultRepo, webDir string, port int) string {
+func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, defaultRepo, webDir string, port int) string {
 	var b strings.Builder
 	w := func(format string, a ...any) { _, _ = fmt.Fprintf(&b, format+"\n", a...) }
 	w("# Written by scp personal. Edit it freely and restart; nothing secret is in it (the credential is sealed in the store).")
@@ -509,7 +509,8 @@ func personalYAML(dir string, h ghlogin.Host, accounts []string, defaultRepo, we
 	w("access: {require_auth: true, private_groups: [%s]}", personalOwner)
 	w("auth:")
 	w("  session_key_file: %s", q(filepath.Join(dir, "session.key")))
-	w("  tokens: [{name: %s, secret_file: %s, groups: [%s], admin: true}]", personalOwner, q(filepath.Join(dir, "owner.token")), personalOwner)
+	w("  # login is your GitHub login: the lists offer what is yours (opened by you, asking your review, assigned to you).")
+	w("  tokens: [{name: %s, secret_file: %s, groups: [%s], admin: true, login: %s}]", personalOwner, q(filepath.Join(dir, "owner.token")), personalOwner, q(login))
 	return b.String()
 }
 

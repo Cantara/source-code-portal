@@ -138,6 +138,9 @@ type MeAPI struct {
 func (a MeAPI) GetMe(ctx context.Context, _ oapi.GetMeRequestObject) (oapi.GetMeResponseObject, error) {
 	v := ViewerOf(ctx)
 	out := oapi.Me{SignedIn: v.SignedIn(), Name: v.Name, Via: oapi.MeVia(v.Via), Private: v.Private, Admin: v.Admin}
+	if v.Login != "" {
+		out.Login = &v.Login
+	}
 	if !v.SignedIn() {
 		out.Via = oapi.MeViaNone
 	}

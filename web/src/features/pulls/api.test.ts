@@ -15,6 +15,13 @@ describe("pullsState", () => {
     expect(pullsSearch(st, 50)).toBe("?group=iam&repo=acme%2Fcore&state=review&by=people&drafts=true&sort=newest&page=2&per=25")
   })
 
+  it("keeps a login for what is a person's and drops one that is not a login", () => {
+    const st = pullsState({ author: "octo-cat", reviewer: "Ann" }, 50)
+    expect(st.filter).toEqual({ author: "octo-cat", reviewer: "Ann" })
+    expect(pullsSearch(st, 50)).toBe("?author=octo-cat&reviewer=Ann")
+    expect(pullsState({ author: "a b", reviewer: "x/../y" }, 50).filter).toEqual({})
+  })
+
   it("drops what it does not know and the defaults", () => {
     const st = pullsState({ state: "merged", by: "bots", sort: "waiting", page: "x" }, 50)
     expect(st).toEqual({ filter: {}, page: 1, size: 50 })

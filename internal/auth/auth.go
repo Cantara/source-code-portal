@@ -44,6 +44,7 @@ type Token struct {
 	Secret []byte
 	Groups []string
 	Admin  bool
+	Login  string // the GitHub login of the person the token stands for; may be empty
 }
 
 // OIDC is the provider.
@@ -204,7 +205,7 @@ func (a *Auth) named(name string) (token, bool) {
 }
 
 func (t token) identity() httpapi.Identity {
-	return httpapi.Identity{User: "token:" + t.Name, Name: t.Name, Groups: t.Groups, Admin: t.Admin, Via: "token"}
+	return httpapi.Identity{User: "token:" + t.Name, Name: t.Name, Groups: t.Groups, Admin: t.Admin, Via: "token", Login: t.Login}
 }
 
 func (s session) identity() httpapi.Identity {

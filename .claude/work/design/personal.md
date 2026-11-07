@@ -1,6 +1,6 @@
 # The personal edition (rung 0 of the ladder, PE1)
 
-Status: the wizard, the vault and the loopback portal are built; "my work" is next (plan.md section 4, P-92). Binding order: ../plan.md > this note > `store-model.md`, `auth.md`, `access.md`.
+Status: built, "my work" included (plan.md section 4, P-92). Binding order: ../plan.md > this note > `store-model.md`, `auth.md`, `access.md`.
 
 One person runs the portal for themselves, on a laptop or a server of their own, against one GitHub host (github.com or a GitHub
 Enterprise Server), and sees every repository that person can read. It is the first rung of the ladder in `store-model.md` (P-91): one
@@ -67,3 +67,15 @@ a session refused.
 - The portal refuses configurations whose listeners are not loopback (`requireLoopback`).
 - Not verified against a real GitHub Enterprise Server: the device flow's availability on a given version, and the REST base paths
   (`/api/v3/`, `api.<name>.ghe.com`) are from GitHub's documentation. A pasted token needs only the REST calls.
+
+## My work (PE2)
+
+- The viewer may carry a GitHub login (`Identity.Login`): `auth.tokens[].login`, validated as a login; `scp personal` writes the
+  person's own. It reaches the web UI server in `X-Scp-Login` and `GET /api/v1/me` as `login`. It only chooses what "mine" means in a
+  list; it grants nothing and no list shows more than the viewer's view held already.
+- Pull requests keep the logins of the people asked to review (`Pull.Reviewers`, up to 10, from `requested_reviewers` of the listing
+  already read); teams stay a count. `GET /api/v1/pulls` takes `author` and `reviewer`, `GET /api/v1/issues` `author` and `assignee`
+  (logins, case-insensitive); the counts cover the narrowed set, so the states' chips stay true.
+- The filter panels of `/pulls` and `/issues` show a "Mine" group of switches (`MineToggles`) when `me.login` is known. Each sets the
+  field to the login in the address, a plain GET form field, so it works without JavaScript and a page can be bookmarked.
+- Not done: "my work" for commits and a dashboard element; the agents' tools do not take the parameters yet.

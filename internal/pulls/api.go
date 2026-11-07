@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
@@ -44,6 +45,7 @@ func (a API) ListPulls(ctx context.Context, req oapi.ListPullsRequestObject) (oa
 	if missing != "" {
 		return notFound(missing), nil
 	}
+	refs = slices.DeleteFunc(slices.Clone(refs), func(r Ref) bool { return !ofPerson(r.Pull, p.Author, p.Reviewer) })
 	by := ByAll
 	if p.By != nil {
 		switch *p.By {
@@ -88,4 +90,12 @@ func (a API) ListPulls(ctx context.Context, req oapi.ListPullsRequestObject) (oa
 func freshOf(e *snapshot.RepoEntry) snapshot.Freshness {
 	_, f := Of(e)
 	return f
+}
+
+// ofPerson keeps a pull request opened by author and asking reviewer, where either is given (GitHub logins, case does not matter).
+func ofPerson(p *Pull, author, reviewer *string) bool {
+	if author != nil && !strings.EqualFold(p.Author, *author) {
+		return false
+	}
+	return reviewer == nil || slices.ContainsFunc(p.Reviewers, func(l string) bool { return strings.EqualFold(l, *reviewer) })
 }

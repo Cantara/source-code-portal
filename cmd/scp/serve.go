@@ -397,7 +397,7 @@ func newAuth(cfg config.Config, log *slog.Logger, launch *auth.Launch) (*auth.Au
 		o.SessionKey = a.SessionKey.Reveal()
 	}
 	for _, t := range a.Tokens {
-		o.Tokens = append(o.Tokens, auth.Token{Name: t.Name, Secret: t.Secret.Reveal(), Groups: t.Groups, Admin: t.Admin})
+		o.Tokens = append(o.Tokens, auth.Token{Name: t.Name, Secret: t.Secret.Reveal(), Groups: t.Groups, Admin: t.Admin, Login: t.Login})
 	}
 	if a.OIDC.Issuer != "" {
 		o.OIDC = &auth.OIDC{Issuer: a.OIDC.Issuer, ClientID: a.OIDC.ClientID, ClientSecret: string(a.OIDC.ClientSecret.Reveal()),

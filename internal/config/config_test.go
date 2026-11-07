@@ -155,6 +155,7 @@ func TestRefused(t *testing.T) {
 		"oidc without openid":     {file: "auth:\n  oidc: {issuer: 'https://id.example', scopes: [email]}\n", want: "must include openid"},
 		"bad admin email":         {file: "auth:\n  admin_emails: [root]\n", want: "auth.admin_emails"},
 		"bad token name":          {file: "auth:\n  tokens: [{name: 'CI bot', secret_file: /x}]\n", want: "auth.tokens[0].name"},
+		"token with a bad login":  {file: "auth:\n  tokens: [{name: ci, secret_file: /x, login: 'not a login'}]\n", want: "auth.tokens[0].login"},
 		"token without secret":    {file: "auth:\n  tokens: [{name: ci}]\n", want: "auth.tokens[0].secret_file: required"},
 		"short token secret":      {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  tokens: [{name: ci, secret_file: TOKEN}]\n", want: "at least 32 characters"},
 		"short session key":       {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN}\nauth:\n  session_key_file: TOKEN\n", want: "at least 32 bytes"},

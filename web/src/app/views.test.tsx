@@ -21,7 +21,7 @@ import { setLocation } from "@/test/navigation"
 import { MainNav } from "./shell"
 import { RulesProvider } from "@/lib/rules-context"
 import type { Filters } from "@/lib/preferences"
-import { activity, commit, fresh, http, noPulls, rules, server, snapshot } from "@/test/server"
+import { activity, commit, fresh, http, me, noPulls, rules, server, snapshot } from "@/test/server"
 
 function client() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10_000 } } })
@@ -52,6 +52,30 @@ describe("pages", () => {
     expect(turn.getByRole("radio", { name: /Failing checks 0/ })).toBeDisabled() // none: dimmed, still in view
     expect(screen.getByRole("link", { name: "Change 1" })).toHaveAttribute("href", "https://github.com/acme/core/pull/1")
     expect(screen.getByRole("form", { name: "Filter pull requests" })).toHaveAttribute("action", "/pulls")
+  })
+
+  it("offers what is the reader's own when the portal knows their GitHub login", async () => {
+    server.use(http.get("/me", ({ response }) => response(200).json(me({ signedIn: true, via: "token", login: "octo-cat" }))))
+    show(<PullsView defaultSize={50} filters={noFilters} />, "/pulls")
+    const mine = await screen.findByRole("switch", { name: "Opened by me" })
+    expect(mine).not.toBeChecked()
+    expect(mine).toHaveAttribute("name", "author")
+    expect(mine).toHaveAttribute("value", "octo-cat") // the form works without JavaScript too
+    expect(screen.getByRole("switch", { name: "Asking my review" })).toHaveAttribute("name", "reviewer")
+    await userEvent.click(mine)
+    expect(await screen.findByRole("switch", { name: "Opened by me" })).toBeChecked()
+  })
+
+  it("offers the issues that are the reader's own, and nothing to a reader without a login", async () => {
+    server.use(http.get("/me", ({ response }) => response(200).json(me({ signedIn: true, via: "token", login: "octo-cat" }))))
+    const { unmount } = show(<IssuesView defaultSize={50} filters={noFilters} />, "/issues")
+    expect(await screen.findByRole("switch", { name: "Assigned to me" })).toHaveAttribute("name", "assignee")
+    expect(screen.getByRole("switch", { name: "Opened by me" })).toHaveAttribute("name", "author")
+    unmount()
+    server.use(http.get("/me", ({ response }) => response(200).json(me())))
+    show(<IssuesView defaultSize={50} filters={noFilters} />, "/issues")
+    expect(await screen.findByRole("heading", { level: 1, name: "Issues" })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole("switch", { name: "Assigned to me" })).toBeNull())
   })
 
   it("answers five questions about the fleet, naming repositories and no one", async () => {

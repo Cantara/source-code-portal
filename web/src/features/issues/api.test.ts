@@ -15,6 +15,13 @@ describe("issuesState", () => {
     expect(issuesSearch(st, 50)).toBe("?group=iam&repo=acme%2Fcore&state=triage&kind=bug&by=people&sort=newest&page=2&per=25")
   })
 
+  it("keeps a login for what is a person's and drops one that is not a login", () => {
+    const st = issuesState({ author: "octo-cat", assignee: "Ann" }, 50)
+    expect(st.filter).toEqual({ author: "octo-cat", assignee: "Ann" })
+    expect(issuesSearch(st, 50)).toBe("?author=octo-cat&assignee=Ann")
+    expect(issuesState({ author: "a b", assignee: "x/../y" }, 50).filter).toEqual({})
+  })
+
   it("drops what it does not know and the defaults", () => {
     const st = issuesState({ state: "closed", kind: "chore", by: "bots", sort: "waiting", page: "x" }, 50)
     expect(st).toEqual({ filter: {}, page: 1, size: 50 })

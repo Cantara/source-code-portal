@@ -1,4 +1,5 @@
 import type { IssueFilter } from "@/lib/api/queries"
+import { login } from "@/lib/login"
 import { pageNumber, pageSize } from "@/lib/paging"
 import { issueKinds, issueStates, type IssueKind, type IssueState } from "@/entities/issue/issue"
 
@@ -22,6 +23,8 @@ export function issuesState(s: Record<string, unknown>, size: number): IssuesSta
   if (typeof s.state === "string" && issueStates.some((x) => x.state === s.state)) f.state = s.state as IssueState
   if (typeof s.kind === "string" && issueKinds.some((x) => x.kind === s.kind)) f.kind = s.kind as IssueKind
   if (s.by === "people" || s.by === "automation") f.by = s.by
+  if (login(s.author)) f.author = login(s.author)
+  if (login(s.assignee)) f.assignee = login(s.assignee)
   if (typeof s.sort === "string" && (sorts as readonly string[]).includes(s.sort) && s.sort !== "waiting")
     f.sort = s.sort as IssueFilter["sort"]
   return { filter: f, page: pageNumber(s.page), size: pageSize(s.per, size) }
@@ -36,6 +39,8 @@ export function issuesSearch(st: IssuesState, defaultSize: number): string {
   if (f.state) q.set("state", f.state)
   if (f.kind) q.set("kind", f.kind)
   if (f.by) q.set("by", f.by)
+  if (f.author) q.set("author", f.author)
+  if (f.assignee) q.set("assignee", f.assignee)
   if (f.sort && f.sort !== "waiting") q.set("sort", f.sort)
   if (st.page > 1) q.set("page", String(st.page))
   if (st.size !== defaultSize) q.set("per", String(st.size))

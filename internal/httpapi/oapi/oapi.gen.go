@@ -1957,6 +1957,9 @@ type Me struct {
 	// Admin Sees the operator surfaces
 	Admin bool `json:"admin"`
 
+	// Login The viewer's GitHub login when the credential knows it (a token configured with `login`); absent otherwise. The lists use it for what is the viewer's own.
+	Login *string `json:"login,omitempty"`
+
 	// Name The viewer's name; empty when anonymous
 	Name string `json:"name"`
 
@@ -2647,8 +2650,14 @@ type ListIssuesParams struct {
 	Kind  *IssueKind  `form:"kind,omitempty" json:"kind,omitempty"`
 
 	// By people or automation; absent: both
-	By   *ListIssuesParamsBy `form:"by,omitempty" json:"by,omitempty"`
-	Sort *QueueSort          `form:"sort,omitempty" json:"sort,omitempty"`
+	By *ListIssuesParamsBy `form:"by,omitempty" json:"by,omitempty"`
+
+	// Author A GitHub login: only the issues that person opened (the counts cover them)
+	Author *string `form:"author,omitempty" json:"author,omitempty"`
+
+	// Assignee A GitHub login: only the issues assigned to that person
+	Assignee *string    `form:"assignee,omitempty" json:"assignee,omitempty"`
+	Sort     *QueueSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Page The page, from 1
 	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
@@ -2672,7 +2681,13 @@ type ListPullsParams struct {
 	// By people or automation; absent: both
 	By     *ListPullsParamsBy `form:"by,omitempty" json:"by,omitempty"`
 	Drafts *bool              `form:"drafts,omitempty" json:"drafts,omitempty"`
-	Sort   *QueueSort         `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Author A GitHub login: only the pull requests that person opened (the counts cover them)
+	Author *string `form:"author,omitempty" json:"author,omitempty"`
+
+	// Reviewer A GitHub login: only the pull requests that ask that person to review (teams are not expanded)
+	Reviewer *string    `form:"reviewer,omitempty" json:"reviewer,omitempty"`
+	Sort     *QueueSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Page The page, from 1
 	Page  *PageNumber `form:"page,omitempty" json:"page,omitempty"`
@@ -3245,6 +3260,32 @@ func (siw *ServerInterfaceWrapper) ListIssues(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// ------------- Optional query parameter "author" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "author", r.URL.Query(), &params.Author, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "author"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "author", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "assignee" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "assignee", r.URL.Query(), &params.Assignee, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "assignee"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "assignee", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "sort" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -3419,6 +3460,32 @@ func (siw *ServerInterfaceWrapper) ListPulls(w http.ResponseWriter, r *http.Requ
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "drafts"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "drafts", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "author" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "author", r.URL.Query(), &params.Author, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "author"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "author", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "reviewer" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "reviewer", r.URL.Query(), &params.Reviewer, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "reviewer"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reviewer", Err: err})
 		}
 		return
 	}
