@@ -95,12 +95,12 @@ func compile(kind, value string) (matchFn, error) {
 			return nil, fmt.Errorf("a regular expression has 1 to %d bytes", maxRegexpBytes)
 		}
 		if _, err := syntax.Parse(value, syntax.Perl); err != nil {
-			return nil, fmt.Errorf("not a regular expression: %v", err)
+			return nil, fmt.Errorf("not a regular expression: %w", err)
 		}
 		anchored := `^(?:` + value + `)$`
 		parsed, err := syntax.Parse(anchored, syntax.Perl)
 		if err != nil {
-			return nil, fmt.Errorf("not a regular expression: %v", err)
+			return nil, fmt.Errorf("not a regular expression: %w", err)
 		}
 		if prog, err := syntax.Compile(parsed.Simplify()); err != nil || len(prog.Inst) > maxRegexpInsts {
 			return nil, fmt.Errorf("the regular expression is too complex")
