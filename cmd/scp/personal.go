@@ -79,15 +79,16 @@ func newPersonalCmd(opts *options) *cobra.Command {
 
 // personal is one run of the command. in, out and the hooks are replaced in tests.
 type personal struct {
-	flags personalFlags
-	in    *bufio.Reader
-	out   io.Writer
-	tty   io.Reader // the terminal, when stdin is one: hidden input
-	ring  vault.Ring
-	http  *http.Client
-	sleep func(context.Context, time.Duration) error
-	now   func() time.Time
-	open  func(url string) // opens the setup page in the browser; nil: the system's
+	flags    personalFlags
+	in       *bufio.Reader
+	out      io.Writer
+	tty      io.Reader // the terminal, when stdin is one: hidden input
+	ring     vault.Ring
+	http     *http.Client
+	sleep    func(context.Context, time.Duration) error
+	now      func() time.Time
+	open     func(url string)                                           // opens the setup page in the browser; nil: the system's
+	cliToken func(ctx context.Context, hostname string) (string, error) // the GitHub CLI's token; nil: ask `gh` if it is installed
 }
 
 func (p *personal) say(format string, a ...any) { _, _ = fmt.Fprintf(p.out, format+"\n", a...) }

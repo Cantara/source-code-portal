@@ -53,7 +53,7 @@ func (p *personal) browserSetup(ctx context.Context, dir, cfgPath string) (*auth
 		clientID = defaultClientID
 	}
 	s := setup.New(setup.Config{Addr: ln.Addr().String(), Code: entry, Host: p.flags.host, ClientID: clientID, Scope: p.flags.scope,
-		HTTP: p.http, Sleep: p.sleep, Now: p.now,
+		HTTP: p.http, Sleep: p.sleep, Now: p.now, CLIToken: p.cliTokenFunc(),
 		Finish: func(ctx context.Context, r setup.Result) (string, error) {
 			var err error
 			if launch, err = p.finishSetup(ctx, dir, cfgPath, key, r); err != nil {
@@ -90,6 +90,23 @@ func (p *personal) browserSetup(ctx context.Context, dir, cfgPath string) (*auth
 	}
 	p.say("Settings saved in %s. Starting your portal...", cfgPath)
 	return launch, nil
+}
+
+// cliTokenFunc offers the GitHub CLI's token when `gh` is installed (or a test supplies one): the setup page shows a button for it.
+func (p *personal) cliTokenFunc() func(context.Context, string) (string, error) {
+	if p.cliToken != nil {
+		return p.cliToken
+	}
+	gh, err := exec.LookPath("gh")
+	if err != nil {
+		return nil
+	}
+	return func(ctx context.Context, hostname string) (string, error) {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, gh, "auth", "token", "--hostname", hostname).Output() //nolint:gosec // G204: gh found on PATH, the host name is a parsed URL host
+		return string(out), err
+	}
 }
 
 func (p *personal) openPage(ctx context.Context, link string) {
