@@ -51,7 +51,7 @@ test("the navigator works by keyboard", async ({ page }) => {
   await page.keyboard.press("Escape")
   await expect(details).toHaveCount(0)
   await page.keyboard.press("/")
-  await expect(page.getByLabel("Search (press /)")).toBeFocused()
+  await expect(page.getByRole("searchbox", { name: "Search the commits" })).toBeFocused()
 })
 
 test("the navigator's filters work from the URL, and back restores them", async ({ page }) => {
@@ -71,8 +71,7 @@ test("the navigator's filters work from the URL, and back restores them", async 
   await expect(page.getByText("No commits match.")).toBeVisible()
 
   await page.goto("/repos/acme/whydah-core/commits")
-  await page.getByLabel("Author").fill("bo")
-  await page.getByRole("button", { name: "Apply" }).click()
+  await page.getByRole("searchbox", { name: "Author" }).fill("bo") // applied a moment after the last key
   await expect(page).toHaveURL(/author=bo/)
   await expect(rows).toHaveCount(2)
   await page.goBack()
@@ -121,7 +120,7 @@ test("the navigator pages by number, remembers the page size and moves by keyboa
 
   // The page size is a choice, kept for the next visit; the first commit shown stays in view.
   await page.goto("/repos/acme/tool/commits?page=3")
-  await page.getByLabel("Per page").selectOption("200")
+  await page.getByRole("radio", { name: "200", exact: true }).click()
   await expect(page).toHaveURL("/repos/acme/tool/commits?page=2&per=200")
   await expect(rows).toHaveCount(200)
   await expect(pager.getByText("201–400 of 500 commits")).toBeVisible()
@@ -143,7 +142,7 @@ test("a product's timeline lists its repositories and its commits by day", async
   await expect(repos.getByRole("link", { name: /Whydah-Core/ })).toHaveAttribute("href", "/repos/acme/whydah-core/commits")
   await expect(page.getByRole("heading", { level: 2 }).first()).toHaveText(/^\w+day, \w+ \d+, \d{4}$/)
   await expect(page.getByText("Change 30 of repository 2")).toHaveCount(0) // tool is not in the product
-  await expect(page.locator("main svg circle")).toHaveCount(0) // no graph across repositories
+  await expect(page.locator("main li svg circle")).toHaveCount(0) // no graph across repositories
   await repos.getByRole("link", { name: /whydah-sso/ }).click()
   await expect(page).toHaveURL("/repos/acme/whydah-sso/commits")
 })
@@ -158,7 +157,7 @@ test("200 rows of the navigator render without a long task", { tag: "@budget" },
       for (const e of l.getEntries()) w.longTasks.push(e.duration)
     }).observe({ type: "longtask", buffered: false })
   })
-  await page.getByLabel("Per page").selectOption("200")
+  await page.getByRole("radio", { name: "200", exact: true }).click()
   await expect(page.getByRole("listbox", { name: "Commits" }).getByRole("option")).toHaveCount(200)
   await expect(page.getByRole("navigation", { name: "Pages", exact: true }).getByText("201–400 of 500 commits")).toBeVisible()
   const longTasks = await page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)

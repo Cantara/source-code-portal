@@ -20,11 +20,12 @@ test("/archive lists the retired repositories with why, and passes axe in both t
     "aria-current",
     "page",
   )
-  await page
-    .getByRole("navigation", { name: "By reason" })
-    .getByRole("link", { name: /Deprecated 0/ })
-    .click()
-  await expect(page).toHaveURL(/\/archive\?reason=deprecated$/)
+  const reasons = page.getByRole("radiogroup", { name: "Reason" })
+  await expect(reasons.getByRole("radio", { name: /Deprecated 0/ })).toBeDisabled() // none: dimmed, still in view
+  await reasons.getByRole("radio", { name: /Archived 1/ }).click()
+  await expect(page).toHaveURL(/\/archive\?reason=archived$/)
+  await page.getByText("Still depended on").click()
+  await expect(page).toHaveURL(/reason=archived&used=true$/)
   await expect(page.getByText("No retired repository matches.")).toBeVisible()
 })
 

@@ -104,7 +104,10 @@ export interface paths {
      *     listed: `latest` (the default) is one row per repository, its newest stable release; `all` every kept release; `stable` the
      *     non-pre-releases; `pre` the pre-releases. `since` keeps the releases published at or after a time, an RFC 3339 time or a number
      *     of days such as `30d`. `group` and `repo` intersect. `counts` cover the scope and `since` whatever the variant, so the variants
-     *     can be offered as filters.
+     *     can be offered as filters. A repository's published packages are releases too: each package's newest release (the registry's, as
+     *     a repository's `packages` say) is a row of source `maven`, `npm` and so on beside the GitHub releases (source `github`), unless a
+     *     GitHub release of the same version is listed. `source` limits the list to one kind; `latest` is then one row per repository, the
+     *     newest of that kind (of both for `all`). The counts of the variants follow `source`, those of the sources follow `variant`.
      */
     get: operations["listReleases"]
     put?: never
@@ -1132,6 +1135,11 @@ export interface components {
      */
     ReleaseVariant: "latest" | "all" | "stable" | "pre"
     /**
+     * @description all: GitHub releases and published packages (default); github; packages (the newest release of each package a repository publishes)
+     * @enum {string}
+     */
+    ReleaseSource: "all" | "github" | "packages"
+    /**
      * @description newest first (default); oldest first; by repository; by product, then newest
      * @enum {string}
      */
@@ -1143,6 +1151,11 @@ export interface components {
       name: string
       /** @description Group ids in configuration order */
       groups: string[]
+      /** @description github for a GitHub release, else the package manager's ecosystem (maven, npm, pypi, cargo, go, swift, cocoapods, nuget, rubygems, packagist) */
+      source: string
+      /** @description The package's name; empty for a GitHub release */
+      package: string
+      /** @description The release's tag; a package's version */
       tag: string
       /** @description The release's name; empty when it has none */
       title: string
@@ -1159,11 +1172,15 @@ export interface components {
       assets: number
     }
     ReleaseCounts: {
-      /** @description Repositories with a stable release */
+      /** @description Repositories with a stable release of the chosen source */
       latest: number
       all: number
       stable: number
       pre: number
+      /** @description The rows the chosen variant lists that are GitHub releases */
+      github: number
+      /** @description The rows the chosen variant lists that are published packages */
+      packages: number
     }
     ReleasePage: {
       releases: components["schemas"]["ReleaseEntry"][]
@@ -1932,6 +1949,7 @@ export interface operations {
         /** @description owner/name */
         repo?: string
         variant?: components["schemas"]["ReleaseVariant"]
+        source?: components["schemas"]["ReleaseSource"]
         /** @description An RFC 3339 time or days such as 30d */
         since?: string
         sort?: components["schemas"]["ReleaseSort"]

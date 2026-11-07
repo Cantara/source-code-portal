@@ -77,22 +77,22 @@ func TestListReleases(t *testing.T) {
 	if c := all.Counts; c.Latest != 4 || c.All != 6 || c.Stable != 5 || c.Pre != 1 {
 		t.Errorf("counts = %+v", c)
 	}
-	if got := tags(list(oapi.ListReleasesParams{Variant: variant(oapi.All)})); len(got) != 6 || got[0] != "core v2.1.0-rc1" || got[1] != "secret v9.0.0" {
+	if got := tags(list(oapi.ListReleasesParams{Variant: variant(oapi.ReleaseVariantAll)})); len(got) != 6 || got[0] != "core v2.1.0-rc1" || got[1] != "secret v9.0.0" {
 		t.Errorf("all = %v", got)
 	}
-	if got := tags(list(oapi.ListReleasesParams{Variant: variant(oapi.Pre)})); !slices.Equal(got, []string{"core v2.1.0-rc1"}) {
+	if got := tags(list(oapi.ListReleasesParams{Variant: variant(oapi.ReleaseVariantPre)})); !slices.Equal(got, []string{"core v2.1.0-rc1"}) {
 		t.Errorf("pre = %v", got)
 	}
-	if got := tags(list(oapi.ListReleasesParams{Variant: variant(oapi.Stable), Group: str("tools")})); !slices.Equal(got, []string{"core v2.0.0", "core v1.0.0", "old v0.1.0"}) {
+	if got := tags(list(oapi.ListReleasesParams{Variant: variant(oapi.ReleaseVariantStable), Group: str("tools")})); !slices.Equal(got, []string{"core v2.0.0", "core v1.0.0", "old v0.1.0"}) {
 		t.Errorf("stable in the group = %v", got)
 	}
-	if got := tags(list(oapi.ListReleasesParams{Since: str("30d"), Variant: variant(oapi.All)})); len(got) != 4 {
+	if got := tags(list(oapi.ListReleasesParams{Since: str("30d"), Variant: variant(oapi.ReleaseVariantAll)})); len(got) != 4 {
 		t.Errorf("since 30d = %v, want the four published in the last 30 days", got)
 	}
 	if p := list(oapi.ListReleasesParams{Since: str("30d")}); p.Counts.All != 4 || p.Counts.Latest != 3 {
 		t.Errorf("counts follow since: %+v", p.Counts)
 	}
-	if got := tags(list(oapi.ListReleasesParams{Repo: str("acme/core"), Variant: variant(oapi.All)})); len(got) != 3 {
+	if got := tags(list(oapi.ListReleasesParams{Repo: str("acme/core"), Variant: variant(oapi.ReleaseVariantAll)})); len(got) != 3 {
 		t.Errorf("one repository = %v", got)
 	}
 	for sorted, want := range map[oapi.ReleaseSort][]string{
@@ -135,7 +135,7 @@ func TestListReleases(t *testing.T) {
 func TestReleasesPublicView(t *testing.T) {
 	pub := releaseSnapshot(t).Public()
 	a := API{Current: func(context.Context) *snapshot.Snapshot { return pub }}
-	res, _ := a.ListReleases(t.Context(), oapi.ListReleasesRequestObject{Params: oapi.ListReleasesParams{Variant: new(oapi.All)}})
+	res, _ := a.ListReleases(t.Context(), oapi.ListReleasesRequestObject{Params: oapi.ListReleasesParams{Variant: new(oapi.ReleaseVariantAll)}})
 	page := res.(oapi.ListReleases200JSONResponse).Body
 	if page.Counts.All != 5 {
 		t.Errorf("public releases = %d, want 5", page.Counts.All)
@@ -144,5 +144,81 @@ func TestReleasesPublicView(t *testing.T) {
 		if r.Name == "secret" {
 			t.Fatalf("a private repository's release for the public: %+v", r)
 		}
+	}
+}
+
+// TestReleasesOfPackages: a published package's newest release is a row beside the GitHub releases (design/releases.md, RL4): the
+// latest of a repository is the newest of both, a package of the version of a GitHub release is that release, one a registry does
+// not date is not listed, and the counts follow the source and the variant.
+func TestReleasesOfPackages(t *testing.T) {
+	s := releaseSnapshot(t)
+	now := time.Now().UTC()
+	ago := func(d int) time.Time { return now.AddDate(0, 0, -d) }
+	published := map[string][]Published{
+		"core":   {{Ecosystem: "maven", Name: "acme-core", Version: "2.0.0", Published: ago(9)}, {Ecosystem: "npm", Name: "core-js", Version: "2.2.0", URL: "https://registry/core-js", Published: ago(3)}},
+		"web":    {{Ecosystem: "pypi", Name: "web", Version: "0.4.0", Published: ago(20)}, {Ecosystem: "go", Name: "web-go", Version: "0.5.0"}},
+		"unread": {{Ecosystem: "cargo", Name: "unread", Version: "1.0.0", Published: ago(4)}},
+	}
+	a := API{Current: func(context.Context) *snapshot.Snapshot { return s }, Packages: func(e *snapshot.RepoEntry) []Published { return published[e.Repo.Name] }}
+	list := func(p oapi.ListReleasesParams) oapi.ReleasePage {
+		t.Helper()
+		res, err := a.ListReleases(t.Context(), oapi.ListReleasesRequestObject{Params: p})
+		page, ok := res.(oapi.ListReleases200JSONResponse)
+		if err != nil || !ok {
+			t.Fatalf("list %+v: %T %v", p, res, err)
+		}
+		return page.Body
+	}
+	rows := func(p oapi.ReleasePage) (out []string) {
+		for _, r := range p.Releases {
+			out = append(out, r.Source+" "+r.Repo[5:]+" "+r.Tag)
+		}
+		return out
+	}
+	source := func(v oapi.ReleaseSource) *oapi.ReleaseSource { return &v }
+	variant := func(v oapi.ReleaseVariant) *oapi.ReleaseVariant { return &v }
+
+	both := list(oapi.ListReleasesParams{})
+	want := []string{"github secret v9.0.0", "npm core 2.2.0", "cargo unread 1.0.0", "github web v0.3.0", "github old v0.1.0"}
+	if got := rows(both); !slices.Equal(got, want) {
+		t.Errorf("latest of both = %v, want %v: the newest of a repository's GitHub release and packages, a repository with only a package too", got, want)
+	}
+	if c := both.Counts; c.Latest != 5 || c.All != 9 || c.Stable != 8 || c.Pre != 1 || c.Github != 4 || c.Packages != 3 { // the sources count what choosing them lists
+		t.Errorf("counts = %+v", c)
+	}
+	if r := both.Releases[1]; r.Package != "core-js" || r.Url != "https://registry/core-js" || r.Prerelease || r.Author != "" || r.Title != "" {
+		t.Errorf("a package's row = %+v", r)
+	}
+	if got := rows(list(oapi.ListReleasesParams{Source: source(oapi.ReleaseSourceGithub)})); !slices.Equal(got, []string{"github secret v9.0.0", "github web v0.3.0", "github core v2.0.0", "github old v0.1.0"}) {
+		t.Errorf("github = %v", got)
+	}
+	pk := list(oapi.ListReleasesParams{Source: source(oapi.ReleaseSourcePackages)})
+	if got, want := rows(pk), []string{"npm core 2.2.0", "cargo unread 1.0.0", "pypi web 0.4.0"}; !slices.Equal(got, want) {
+		t.Errorf("packages = %v, want %v: the maven one is GitHub's v2.0.0, the go one has no date", got, want)
+	}
+	if c := pk.Counts; c.Latest != 3 || c.All != 3 || c.Stable != 3 || c.Pre != 0 || c.Github != 4 || c.Packages != 3 {
+		t.Errorf("counts of the packages = %+v: the variants follow the source, the sources the variant", c)
+	}
+	all := list(oapi.ListReleasesParams{Variant: variant(oapi.ReleaseVariantAll)})
+	if len(all.Releases) != 9 || all.Counts.Github != 6 || all.Counts.Packages != 3 {
+		t.Errorf("every release = %v %+v", rows(all), all.Counts)
+	}
+	if got := rows(list(oapi.ListReleasesParams{Variant: variant(oapi.ReleaseVariantPre), Source: source(oapi.ReleaseSourcePackages)})); len(got) != 0 {
+		t.Errorf("a package is never a pre-release: %v", got)
+	}
+	if got := rows(list(oapi.ListReleasesParams{Repo: new("acme/unread"), Variant: variant(oapi.ReleaseVariantAll)})); !slices.Equal(got, []string{"cargo unread 1.0.0"}) {
+		t.Errorf("a repository with only a package = %v", got)
+	}
+	if got := rows(list(oapi.ListReleasesParams{Since: new("30d"), Source: source(oapi.ReleaseSourcePackages), Variant: variant(oapi.ReleaseVariantAll)})); len(got) != 3 {
+		t.Errorf("since keeps the packages published in the window: %v", got)
+	}
+	res, _ := a.ListReleases(t.Context(), oapi.ListReleasesRequestObject{Params: oapi.ListReleasesParams{Source: source("registry")}})
+	if _, ok := res.(oapi.ListReleases400ApplicationProblemPlusJSONResponse); !ok {
+		t.Errorf("an unknown source: %T, want 400", res)
+	}
+	// Without a packages hook the list is GitHub's alone, as before.
+	plain := API{Current: a.Current}
+	if res, _ := plain.ListReleases(t.Context(), oapi.ListReleasesRequestObject{}); len(res.(oapi.ListReleases200JSONResponse).Body.Releases) != 4 {
+		t.Error("without the hook: GitHub's four")
 	}
 }

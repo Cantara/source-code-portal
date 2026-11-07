@@ -146,6 +146,7 @@ export interface ReleaseFilter {
   group?: string
   repo?: string
   variant?: Schemas["ReleaseVariant"]
+  source?: Schemas["ReleaseSource"]
   since?: string
   sort?: Schemas["ReleaseSort"]
   page?: number
@@ -164,6 +165,7 @@ export const releasesQuery = (api: Api, f: ReleaseFilter) =>
               group: f.group,
               repo: f.repo,
               variant: f.variant,
+              source: f.source,
               since: f.since,
               sort: f.sort,
               page: f.page,

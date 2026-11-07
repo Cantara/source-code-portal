@@ -4,6 +4,7 @@ import type { Commit, Schemas } from "@/lib/api/client"
 import { addressPath } from "@/lib/paths"
 import { DiffStat } from "@/shared/diffstat"
 import { InitialsAvatar } from "@/shared/initials-avatar"
+import { Dot, ListRow } from "@/shared/list-row"
 import { RelativeTime } from "@/shared/relative-time"
 import { EmptyState } from "@/shared/empty-state"
 import { AiMark } from "./ai-mark"
@@ -34,19 +35,60 @@ export function CommitList({
     <ol className={g ? undefined : "divide-y divide-border"}>
       {commits.map((c, i) => {
         const row = g?.rows[i] ?? undefined
+        if (!row)
+          return (
+            <ListRow
+              key={c.repo + c.sha}
+              rowRef={i === 0 ? firstRef : undefined}
+              tabIndex={i === 0 ? -1 : undefined}
+              lead={<InitialsAvatar name={c.authorName || c.authorLogin} />}
+              title={
+                <span className="min-w-0 break-words">
+                  {c.url ? (
+                    <a href={c.url} className="hover:underline" rel="noreferrer">
+                      {c.subject}
+                    </a>
+                  ) : (
+                    c.subject
+                  )}
+                </span>
+              }
+              aside={c.stats && <DiffStat stats={c.stats} />}
+              meta={
+                <>
+                  {showRepo && (
+                    <Link
+                      prefetch={false}
+                      href={repoHref(c.repo)}
+                      className="inline-flex min-h-6 items-center rounded border border-border px-1.5 text-xs font-medium text-foreground hover:bg-accent"
+                    >
+                      {c.repo}
+                    </Link>
+                  )}
+                  <span>
+                    <Author name={c.authorName} login={c.authorLogin} /> <AiMark commit={c} />
+                  </span>
+                  <Dot />
+                  <RelativeTime at={c.committedAt} />
+                  <Dot />
+                  <span className="font-mono">{c.sha.slice(0, 7)}</span>
+                </>
+              }
+            />
+          )
         return (
           <li
             key={c.repo + c.sha}
             ref={i === 0 ? firstRef : undefined}
             tabIndex={i === 0 ? -1 : undefined}
-            className={row ? "flex h-13 items-start gap-2 focus:outline-none" : "flex gap-3 py-2 focus:outline-none"}
+            className="flex h-13 items-start gap-2 focus:outline-none"
           >
-            {row && g && <GraphCell row={row} lanes={g.lanes} height={52} nodeY={16} className="h-13" />}
-            <span className={row ? "mt-0.5" : undefined}>
+            {g && <GraphCell row={row} lanes={g.lanes} height={52} nodeY={16} className="h-13" />}
+            <span className="mt-0.5">
               <InitialsAvatar name={c.authorName || c.authorLogin} />
             </span>
-            <div className={row ? "min-w-0 flex-1 py-1" : "min-w-0 flex-1"}>
-              <p className={row ? "truncate leading-6" : "break-words"} title={row ? c.subject : undefined}>
+            <div className="min-w-0 flex-1 py-1">
+              <p className="truncate leading-6" title={c.subject}>
                 {c.url ? (
                   <a href={c.url} className="hover:underline" rel="noreferrer">
                     {c.subject}
@@ -55,7 +97,7 @@ export function CommitList({
                   c.subject
                 )}
               </p>
-              <p className={row ? "truncate text-sm text-muted-foreground" : "text-sm text-muted-foreground"}>
+              <p className="truncate text-sm text-muted-foreground">
                 {showRepo && (
                   <>
                     <Link

@@ -29,8 +29,7 @@ test("/insights answers its five questions and passes axe in both themes", async
     "aria-current",
     "page",
   )
-  await page.getByRole("combobox", { name: "Product" }).selectOption("whydah")
-  await page.getByRole("button", { name: "Apply" }).click()
+  await page.getByRole("radiogroup", { name: "Product" }).getByRole("radio", { name: "Whydah" }).click()
   await expect(page).toHaveURL(/\/insights\?group=whydah$/)
   await expect(page.getByText("1 stable release in the last 12 months.")).toBeVisible()
 })
@@ -41,7 +40,7 @@ test.describe("without JavaScript", () => {
   test("/insights is on the page and the form picks a product", async ({ page }) => {
     await page.goto("/insights")
     for (const q of questions) await expect(page.getByRole("heading", { name: q })).toBeVisible()
-    await page.getByRole("combobox", { name: "Product" }).selectOption("other")
+    await page.getByRole("radiogroup", { name: "Product" }).getByRole("radio", { name: "Other" }).check()
     await page.getByRole("button", { name: "Apply" }).click()
     await expect(page).toHaveURL(/\/insights\?group=other$/)
     await expect(page.getByRole("heading", { name: questions[0] })).toBeVisible()

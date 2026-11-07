@@ -743,24 +743,45 @@ func (e ReleaseSort) Valid() bool {
 	}
 }
 
+// Defines values for ReleaseSource.
+const (
+	ReleaseSourceAll      ReleaseSource = "all"
+	ReleaseSourceGithub   ReleaseSource = "github"
+	ReleaseSourcePackages ReleaseSource = "packages"
+)
+
+// Valid indicates whether the value is a known member of the ReleaseSource enum.
+func (e ReleaseSource) Valid() bool {
+	switch e {
+	case ReleaseSourceAll:
+		return true
+	case ReleaseSourceGithub:
+		return true
+	case ReleaseSourcePackages:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReleaseVariant.
 const (
-	All    ReleaseVariant = "all"
-	Latest ReleaseVariant = "latest"
-	Pre    ReleaseVariant = "pre"
-	Stable ReleaseVariant = "stable"
+	ReleaseVariantAll    ReleaseVariant = "all"
+	ReleaseVariantLatest ReleaseVariant = "latest"
+	ReleaseVariantPre    ReleaseVariant = "pre"
+	ReleaseVariantStable ReleaseVariant = "stable"
 )
 
 // Valid indicates whether the value is a known member of the ReleaseVariant enum.
 func (e ReleaseVariant) Valid() bool {
 	switch e {
-	case All:
+	case ReleaseVariantAll:
 		return true
-	case Latest:
+	case ReleaseVariantLatest:
 		return true
-	case Pre:
+	case ReleaseVariantPre:
 		return true
-	case Stable:
+	case ReleaseVariantStable:
 		return true
 	default:
 		return false
@@ -2177,10 +2198,16 @@ type Release struct {
 type ReleaseCounts struct {
 	All int `json:"all"`
 
-	// Latest Repositories with a stable release
+	// Github The rows the chosen variant lists that are GitHub releases
+	Github int `json:"github"`
+
+	// Latest Repositories with a stable release of the chosen source
 	Latest int `json:"latest"`
-	Pre    int `json:"pre"`
-	Stable int `json:"stable"`
+
+	// Packages The rows the chosen variant lists that are published packages
+	Packages int `json:"packages"`
+	Pre      int `json:"pre"`
+	Stable   int `json:"stable"`
 }
 
 // ReleaseEntry defines model for ReleaseEntry.
@@ -2197,16 +2224,24 @@ type ReleaseEntry struct {
 	Groups []string `json:"groups"`
 
 	// Name The repository's name
-	Name        string    `json:"name"`
+	Name string `json:"name"`
+
+	// Package The package's name; empty for a GitHub release
+	Package     string    `json:"package"`
 	Prerelease  bool      `json:"prerelease"`
 	PublishedAt time.Time `json:"publishedAt"`
 
 	// Repo Lower-case owner/name, used in URLs
 	Repo string `json:"repo"`
 
+	// Source github for a GitHub release, else the package manager's ecosystem (maven, npm, pypi, cargo, go, swift, cocoapods, nuget, rubygems, packagist)
+	Source string `json:"source"`
+
 	// Summary The first line of its notes, cleaned; empty when it has none
 	Summary string `json:"summary"`
-	Tag     string `json:"tag"`
+
+	// Tag The release's tag; a package's version
+	Tag string `json:"tag"`
 
 	// Title The release's name; empty when it has none
 	Title string `json:"title"`
@@ -2223,6 +2258,9 @@ type ReleasePage struct {
 
 // ReleaseSort newest first (default); oldest first; by repository; by product, then newest
 type ReleaseSort string
+
+// ReleaseSource all: GitHub releases and published packages (default); github; packages (the newest release of each package a repository publishes)
+type ReleaseSource string
 
 // ReleaseVariant latest: one row per repository, its newest stable release (default); all; stable; pre
 type ReleaseVariant string
@@ -2618,6 +2656,7 @@ type ListReleasesParams struct {
 	// Repo owner/name
 	Repo    *string         `form:"repo,omitempty" json:"repo,omitempty"`
 	Variant *ReleaseVariant `form:"variant,omitempty" json:"variant,omitempty"`
+	Source  *ReleaseSource  `form:"source,omitempty" json:"source,omitempty"`
 
 	// Since An RFC 3339 time or days such as 30d
 	Since *string      `form:"since,omitempty" json:"since,omitempty"`
@@ -3445,6 +3484,19 @@ func (siw *ServerInterfaceWrapper) ListReleases(w http.ResponseWriter, r *http.R
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "variant"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "variant", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "source" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "source", r.URL.Query(), &params.Source, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "source"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source", Err: err})
 		}
 		return
 	}

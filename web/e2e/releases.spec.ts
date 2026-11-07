@@ -10,12 +10,16 @@ test("/releases lists the latest release of each repository, the variants filter
     await page.emulateMedia({ colorScheme: scheme })
     await page.goto("/releases")
     await expect(page.getByRole("heading", { level: 1, name: "Releases", exact: true })).toBeVisible()
-    const rows = page.getByRole("list", { name: "Release list" }).getByRole("listitem")
-    await expect(rows).toHaveCount(1)
+    const rows = page.getByRole("list", { name: "Releases" }).getByRole("listitem")
+    await expect(rows).toHaveCount(2) // whydah-sso has no GitHub release: its Maven package is its latest
     await expect(rows.first()).toContainText("acme/whydah-core")
     await expect(rows.first()).toContainText("v1.2.0")
     await expect(rows.first()).toContainText("Highlights")
     await expect(rows.first()).not.toContainText("Pre-release")
+    await expect(rows.first()).toContainText("GitHub")
+    await expect(rows.nth(1)).toContainText("acme/whydah-sso")
+    await expect(rows.nth(1)).toContainText("1.4.0")
+    await expect(rows.nth(1)).toContainText("Maven")
     const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze()
     expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([])
   }
@@ -23,16 +27,22 @@ test("/releases lists the latest release of each repository, the variants filter
     "aria-current",
     "page",
   )
-  const chips = page.getByRole("navigation", { name: "By variant" })
-  await expect(chips.getByRole("link", { name: /Every release 2/ })).toBeVisible()
-  await chips.getByRole("link", { name: /Pre-releases 1/ }).click()
+  const source = page.getByRole("radiogroup", { name: "Source" })
+  await source.getByRole("radio", { name: /Packages 2/ }).click() // each repository's newest package
+  await expect(page).toHaveURL(/\/releases\?source=packages$/)
+  await expect(page.getByRole("list", { name: "Releases" }).getByRole("listitem")).toHaveCount(2)
+  await expect(page.getByRole("list", { name: "Releases" })).not.toContainText("GitHub")
+  await source.getByRole("radio", { name: "GitHub and packages" }).click()
+  await expect(page).toHaveURL(/\/releases$/)
+  const which = page.getByRole("radiogroup", { name: "Which releases" })
+  await expect(which.getByRole("radio", { name: /Every release 4/ })).toBeVisible()
+  await which.getByRole("radio", { name: /Pre-releases 1/ }).click()
   await expect(page).toHaveURL(/\/releases\?variant=pre$/)
-  const rows = page.getByRole("list", { name: "Release list" }).getByRole("listitem")
+  const rows = page.getByRole("list", { name: "Releases" }).getByRole("listitem")
   await expect(rows).toHaveCount(1)
   await expect(rows.first()).toContainText("v1.3.0-rc1")
   await expect(rows.first()).toContainText("Pre-release")
-  await page.getByLabel("Published").selectOption("7d")
-  await page.getByRole("button", { name: "Apply" }).click()
+  await page.getByRole("radio", { name: "Last 7 days" }).click()
   await expect(page).toHaveURL(/variant=pre&since=7d/)
   await expect(rows).toHaveCount(1)
 })
@@ -42,11 +52,11 @@ test.describe("without JavaScript", () => {
 
   test("/releases shows every release and filters by the form", async ({ page }) => {
     await page.goto("/releases?variant=all")
-    await expect(page.getByRole("list", { name: "Release list" }).getByRole("listitem")).toHaveCount(2)
-    await page.getByLabel("Order").selectOption("oldest")
+    await expect(page.getByRole("list", { name: "Releases" }).getByRole("listitem")).toHaveCount(4) // two GitHub releases, two Maven packages
+    await page.getByRole("radio", { name: "Oldest first" }).check()
     await page.getByRole("button", { name: "Apply" }).click()
     await expect(page).toHaveURL(/variant=all.*sort=oldest/)
-    await expect(page.getByRole("list", { name: "Release list" }).getByRole("listitem").first()).toContainText("v1.2.0")
+    await expect(page.getByRole("list", { name: "Releases" }).getByRole("listitem").first()).toContainText("1.4.0") // the Maven packages are older
   })
 })
 
@@ -61,9 +71,9 @@ test("a group and a repository show their releases, and a group its retired repo
 
   await page.goto("/repos/acme/whydah-core")
   const repo = page.getByRole("region", { name: "Releases" })
-  await expect(repo.getByRole("listitem")).toHaveCount(2)
+  await expect(repo.getByRole("listitem")).toHaveCount(3) // its Maven package too
   await expect(repo).toContainText("Pre-release")
-  await expect(repo.getByRole("link", { name: "All 2 held" })).toHaveAttribute(
+  await expect(repo.getByRole("link", { name: "All 3 held" })).toHaveAttribute(
     "href",
     "/releases?repo=acme%2Fwhydah-core&variant=all",
   )

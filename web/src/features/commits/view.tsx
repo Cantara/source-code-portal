@@ -2,38 +2,82 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useRef, useState, type FormEvent } from "react"
+import { usePathname } from "next/navigation"
+import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { api, type Commit, type Repo } from "@/lib/api/client"
 import { useSnapshotVersion } from "@/lib/api/snapshot"
 import { dayUTC } from "@/lib/format"
-import { firstPageOf, rememberSize } from "@/lib/paging"
-import { repoAt, repoCommitsPath } from "@/lib/paths"
+import { groupCommitsPath, repoAt, repoCommitsPath } from "@/lib/paths"
 import { RelativeTime } from "@/shared/relative-time"
 import { CommitList } from "@/entities/commit/commit-list"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { crumbs } from "@/lib/crumbs"
 import { PageHeader } from "@/shared/page-header"
-import { Pager, PageSizeField } from "@/shared/pager"
+import { Pager } from "@/shared/pager"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { groupQuery } from "@/lib/api/queries"
-import { ProductField, RepoField } from "@/shared/filter-fields"
+import {
+  FilterForm,
+  FilterGroup,
+  FilterLayout,
+  ProductChoices,
+  SizeChoices,
+  TextFilter,
+  Toggle,
+  useListNav,
+} from "@/shared/filters"
+import type { Filters } from "@/lib/preferences"
 import { commitLogQuery, logSearch, logState, type LogState } from "./api"
 
 /**
- * AllCommitsView is the timeline of commits across repositories, or of one product (`?group=`) with its repositories, filtered by
- * repository and automation through the URL, in numbered pages of the reader's size (defaultSize until chosen).
+ * AllCommitsView is the timeline of commits across repositories, or of one product (`?group=`) with its repositories: the filters
+ * (the product, the repository, automation, the page size) are in the panel at the left, in numbered pages of the reader's size
+ * (defaultSize until chosen).
  */
-export function AllCommitsView({ defaultSize }: { defaultSize: number }) {
-  const st = logState(Object.fromEntries(useSearchParams()), defaultSize)
+export function AllCommitsView({ defaultSize, filters }: { defaultSize: number; filters: Filters }) {
+  const { st, pick, pickSize, clear } = useListNav({
+    list: "commits",
+    base: "/commits",
+    parse: logState,
+    serialize: logSearch,
+    defaultSize,
+  })
+  const f = st.filter
   return (
     <>
-      <PageHeader title="Commits" trail={crumbs.commits()}>
-        <FilterForm key={logSearch({ ...st, page: 1 }, defaultSize)} st={st} defaultSize={defaultSize} />
-      </PageHeader>
-      {st.filter.group && <ProductRepos group={st.filter.group} />}
-      <CommitLog st={st} defaultSize={defaultSize} />
+      <PageHeader title="Commits" trail={crumbs.commits()} />
+      <FilterLayout
+        initial={filters}
+        label="Filter commits"
+        clear={clear}
+        filters={
+          <FilterForm action="/commits" label="Filter commits">
+            <ProductChoices value={f.group ?? ""} onPick={(group) => pick({ group })} />
+            <FilterGroup title="Repository">
+              <TextFilter
+                name="repo"
+                label="Repository (owner/name)"
+                value={f.repo ?? ""}
+                onPick={(repo) => pick({ repo: repo.toLowerCase() })}
+              />
+            </FilterGroup>
+            <FilterGroup title="Show">
+              <Toggle
+                name="automation"
+                value="false"
+                label="Hide automation"
+                checked={f.automation === false}
+                onPick={(on) => pick({ automation: on ? "false" : "" })}
+              />
+            </FilterGroup>
+            <SizeChoices value={st.size} onPick={pickSize} />
+          </FilterForm>
+        }
+      >
+        {f.group && <ProductRepos group={f.group} />}
+        <CommitLog st={st} defaultSize={defaultSize} />
+      </FilterLayout>
     </>
   )
 }
@@ -65,73 +109,34 @@ function ProductRepos({ group }: { group: string }) {
   )
 }
 
-/** GroupCommitsView is the commit log of a group. */
-export function GroupCommitsView({ group, defaultSize }: { group: string; defaultSize: number }) {
+/** GroupCommitsView is the commit log of a group: its page size is the one filter, in the panel at the left like the others. */
+export function GroupCommitsView({ group, defaultSize, filters }: { group: string; defaultSize: number; filters: Filters }) {
   const { data } = useQuery(groupQuery(api, group))
-  const search = logState(Object.fromEntries(useSearchParams()), defaultSize)
-  const st: LogState = { filter: { group }, page: search.page, size: search.size }
+  const { st, pickSize } = useListNav({
+    list: "commits",
+    base: groupCommitsPath(group),
+    parse: (fields, size) => ({ ...logState(fields, size), filter: { group } }),
+    serialize: logSearch,
+    defaultSize,
+  })
   return (
     <>
       <PageHeader
         title={`Commits in ${data?.name ?? group}`}
         trail={crumbs.groupCommits(data?.id ?? group, data?.name ?? group)}
       />
-      <CommitLog st={st} defaultSize={defaultSize} sizeField />
+      <FilterLayout
+        initial={filters}
+        label="Filter commits"
+        filters={
+          <FilterForm action={groupCommitsPath(group)} label="Filter commits">
+            <SizeChoices value={st.size} onPick={pickSize} />
+          </FilterForm>
+        }
+      >
+        <CommitLog st={st} defaultSize={defaultSize} />
+      </FilterLayout>
     </>
-  )
-}
-
-function FilterForm({ st, defaultSize }: { st: LogState; defaultSize: number }) {
-  const router = useRouter()
-  const filter = st.filter
-  const [repoText, setRepoText] = useState(filter.repo ?? "")
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = new FormData(e.currentTarget)
-    const g = String(form.get("group") ?? "")
-    const repo = repoText.trim().toLowerCase()
-    const next: LogState = {
-      filter: {
-        ...(g ? { group: g } : {}),
-        ...(repo ? { repo } : {}),
-        ...(form.get("automation") === "false" ? { automation: false } : {}),
-      },
-      page: 1,
-      size: st.size,
-    }
-    router.push(`/commits${logSearch(next, defaultSize)}`)
-  }
-  return (
-    <form onSubmit={submit} action="/commits" className="flex flex-wrap items-end gap-3 text-sm" aria-label="Filter commits">
-      <ProductField value={filter.group} />
-      <RepoField value={repoText} onChange={setRepoText} />
-      <label className="flex min-h-9 items-center gap-2">
-        <input type="checkbox" name="automation" value="false" defaultChecked={filter.automation === false} />
-        Hide automation
-      </label>
-      <SizeField st={st} defaultSize={defaultSize} />
-      <Button type="submit" variant="outline">
-        Apply
-      </Button>
-    </form>
-  )
-}
-
-/** SizeField chooses the page size: remembered for the next visit, the first commit shown kept in view. */
-function SizeField({ st, defaultSize }: { st: LogState; defaultSize: number }) {
-  const path = usePathname()
-  return (
-    <PageSizeField
-      value={st.size}
-      onSize={(n) => {
-        rememberSize("commits", n)
-        window.history.pushState(
-          null,
-          "",
-          path + logSearch({ ...st, size: n, page: firstPageOf(st.page, st.size, n) }, defaultSize),
-        )
-      }}
-    />
   )
 }
 
@@ -151,17 +156,7 @@ function days(commits: Commit[]): [string, Commit[]][] {
  * CommitLog is one numbered page of the commits of st, grouped by day, with the pager above and below. The first page follows new
  * snapshots; a later page stays as it is and offers "New commits", which reloads it.
  */
-export function CommitLog({
-  st,
-  defaultSize,
-  showRepo = true,
-  sizeField = false,
-}: {
-  st: LogState
-  defaultSize: number
-  showRepo?: boolean
-  sizeField?: boolean
-}) {
+export function CommitLog({ st, defaultSize, showRepo = true }: { st: LogState; defaultSize: number; showRepo?: boolean }) {
   const qc = useQueryClient()
   const path = usePathname()
   const { data, error, isPlaceholderData, refetch } = useQuery(commitLogQuery(api, qc, st))
@@ -204,11 +199,6 @@ export function CommitLog({
             </Button>
           )}
         </div>
-        {sizeField && (
-          <form action={path} className="text-sm" aria-label="Page size" onSubmit={(e) => e.preventDefault()}>
-            <SizeField st={st} defaultSize={defaultSize} />
-          </form>
-        )}
       </div>
       <Pager page={data.page} href={href} onPage={goPage} />
       <div className={isPlaceholderData ? "opacity-60" : undefined}>
@@ -217,15 +207,21 @@ export function CommitLog({
             <h2 id={`day-${day}`} className="mb-1 text-sm font-semibold text-muted-foreground">
               <time dateTime={day}>{dayUTC(`${day}T00:00:00Z`)}</time>
             </h2>
-            <CommitList
-              commits={commits}
-              showRepo={showRepo}
-              firstRef={i === 0 ? first : undefined}
-              repoHref={(a) => repoCommitsPath(repoAt(a).owner, repoAt(a).name)}
-            />
+            <div className="panel px-3">
+              <CommitList
+                commits={commits}
+                showRepo={showRepo}
+                firstRef={i === 0 ? first : undefined}
+                repoHref={(a) => repoCommitsPath(repoAt(a).owner, repoAt(a).name)}
+              />
+            </div>
           </section>
         ))}
-        {data.page.total === 0 && <CommitList commits={[]} />}
+        {data.page.total === 0 && (
+          <div className="panel px-3">
+            <CommitList commits={[]} />
+          </div>
+        )}
         {past && (
           <p className="text-muted-foreground">
             Page {data.page.number} is past the last.{" "}

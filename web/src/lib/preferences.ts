@@ -217,6 +217,20 @@ export function sideValue(s: Side): string {
   return `${s.open ? "open" : "closed"}:${s.width}`
 }
 
+/** filtersCookie keeps the filter panel of the list pages (Commits, Pull requests, ...): "open" or "closed", for all of them. */
+export const filtersCookie = "scp-filters"
+
+/**
+ * Filters is the filter panel as the reader left it. A reader who never chose has it open on a wide screen and folded on a narrow
+ * one (chosen is false); once they hide or show it, it is as they said on every screen.
+ */
+export type Filters = { open: boolean; chosen: boolean }
+
+/** filtersOf reads the panel's cookie; anything else is the reader not having chosen. */
+export function filtersOf(v: unknown): Filters {
+  return v === "open" || v === "closed" ? { open: v === "open", chosen: true } : { open: true, chosen: false }
+}
+
 /** dismissedCookie keeps the announcements a reader dismissed on the dashboard, each for its revision: an edit shows it again. */
 export const dismissedCookie = "scp-announcements"
 const maxDismissed = 20

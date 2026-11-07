@@ -148,12 +148,14 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 				return "Reading the open issues"
 			}, r.openIssues),
 		tool("recent_releases", "Recent releases",
-			"Lists the recent releases (the 20 newest of each repository are held) of everything, a group or one repository, newest first: "+
-				"by default the latest stable release of each repository; variant all lists every release held, stable only the stable ones, "+
-				"pre only the pre-releases. Each has its tag, title, whether it is a pre-release, when it was published and by whom (a person "+
-				"or automation), and the counts by variant.",
+			"Lists the recent releases (the 20 newest GitHub releases of each repository are held, and the newest release of each package a "+
+				"repository publishes to a registry: Maven, npm, PyPI and so on) of everything, a group or one repository, newest first: "+
+				"by default the latest release of each repository; variant all lists every release held, stable only the stable ones, "+
+				"pre only the pre-releases; source limits it to GitHub's or to the packages'. Each has its source, tag or version, title, whether "+
+				"it is a pre-release, when it was published and by whom (a person or automation), and the counts by variant and by source.",
 			schema(nil, map[string]any{"group": prop("string", "A group id"), "repo": prop("string", "A repository as owner/name"),
 				"variant": map[string]any{"type": "string", "enum": []string{"latest", "all", "stable", "pre"}, "description": "Which releases; default latest"},
+				"source":  map[string]any{"type": "string", "enum": []string{"all", "github", "packages"}, "description": "GitHub releases, published packages or both; default both"},
 				"since":   prop("string", "Only releases published since this RFC 3339 time or number of days such as 30d"),
 				"sort":    map[string]any{"type": "string", "enum": []string{"newest", "oldest", "repo", "group"}, "description": "The order; default newest"},
 				"limit":   limit}),
@@ -306,6 +308,10 @@ func (r toolReads) recentReleases(ctx context.Context, in map[string]any) (tools
 		x := oapi.ReleaseVariant(v)
 		params.Variant = &x
 	}
+	if v := arg(in, "source"); v != "" {
+		x := oapi.ReleaseSource(v)
+		params.Source = &x
+	}
 	if v := arg(in, "since"); v != "" {
 		params.Since = &v
 	}
@@ -323,9 +329,13 @@ func (r toolReads) recentReleases(ctx context.Context, in map[string]any) (tools
 	}
 	c := ok.Body.Counts
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d releases held (%d stable, %d pre-releases); the latest of %d repositories.\n\n", c.All, c.Stable, c.Pre, c.Latest)
+	fmt.Fprintf(&b, "%d releases held (%d stable, %d pre-releases); the latest of %d repositories; %d of them GitHub's, %d packages'.\n\n",
+		c.All, c.Stable, c.Pre, c.Latest, c.Github, c.Packages)
 	for _, e := range ok.Body.Releases {
 		fmt.Fprintf(&b, "- [%s %s](%s)", e.Repo, e.Tag, e.Url)
+		if e.Package != "" {
+			fmt.Fprintf(&b, " package %s on %s", e.Package, e.Source)
+		}
 		if e.Prerelease {
 			b.WriteString(" pre-release")
 		}

@@ -1,5 +1,6 @@
 import { ProblemError } from "@/lib/api/client"
 import type { Route } from "@/lib/page"
+import { filtersCookie, filtersOf } from "@/lib/preferences"
 import { searchQuery, searchState } from "./api"
 import { SearchView } from "./view"
 
@@ -14,11 +15,12 @@ export const searchRoute: Route<Record<string, never>> = {
     return { title: q ? `Search: ${q}` : "Search", robots: { index: false, follow: false } }
   },
   // A query the server refused renders its problem, so the page says why without JavaScript too.
-  render: ({ api, qc, search }) => {
+  render: ({ api, qc, search, cookies }) => {
     const st = searchState(search)
     const e = st.q ? qc.getQueryState(searchQuery(api, st).queryKey)?.error : undefined
     return (
       <SearchView
+        filters={filtersOf(cookies[filtersCookie])}
         problem={
           e instanceof ProblemError ? { status: e.status, code: e.code, detail: e.message, requestId: e.requestId } : undefined
         }

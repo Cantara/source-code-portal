@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn"
 import { addressPath } from "@/lib/paths"
 import { EmptyState } from "@/shared/empty-state"
 import { InitialsAvatar } from "@/shared/initials-avatar"
+import { Dot, ListRow } from "@/shared/list-row"
 import { RelativeTime } from "@/shared/relative-time"
 import { StateChip } from "@/shared/state-chip"
 
@@ -68,20 +69,29 @@ export function IssueList({
   return (
     <ol aria-label="Issues" className={cn("divide-y divide-border", className)}>
       {issues.map((i) => (
-        <li key={`${i.repo}#${i.number}`} className={cn("flex gap-3", compact ? "py-1.5" : "py-2")}>
-          {!compact && <InitialsAvatar name={i.author} />}
-          <div className="min-w-0 flex-1">
-            <p className={cn("flex items-baseline gap-2", compact && "text-sm")}>
-              <a
-                href={i.url}
-                rel="noreferrer"
-                className={cn("min-w-0 hover:underline", compact ? "min-h-6 truncate leading-6" : "break-words")}
-                title={i.title}
-              >
-                {i.title}
-              </a>
-            </p>
-            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-muted-foreground">
+        <ListRow
+          key={`${i.repo}#${i.number}`}
+          compact={compact}
+          lead={<InitialsAvatar name={i.author} />}
+          title={
+            <a
+              href={i.url}
+              rel="noreferrer"
+              className={cn("min-w-0 hover:underline", compact ? "min-h-6 truncate leading-6" : "break-words")}
+              title={i.title}
+            >
+              {i.title}
+            </a>
+          }
+          aside={
+            i.comments > 0 && (
+              <span className="text-sm text-muted-foreground" title="Comments">
+                {i.comments === 1 ? "1 comment" : `${i.comments} comments`}
+              </span>
+            )
+          }
+          meta={
+            <>
               <IssueStateChip state={i.state} />
               {i.kind !== "other" && (
                 <span className="rounded-full border border-border px-1.5 text-xs">
@@ -105,29 +115,23 @@ export function IssueList({
               </span>
               {i.assigned > 0 && (
                 <>
-                  <span aria-hidden="true">·</span>
+                  <Dot />
                   <span>
                     for {i.assignees.join(", ")}
                     {i.assigned > i.assignees.length && ` +${i.assigned - i.assignees.length}`}
                   </span>
                 </>
               )}
-              <span aria-hidden="true">·</span>
+              <Dot />
               <span>
                 idle <RelativeTime at={i.updatedAt} />
               </span>
               {!compact && (
                 <>
-                  <span aria-hidden="true">·</span>
+                  <Dot />
                   <span>
                     opened <RelativeTime at={i.createdAt} />
                   </span>
-                  {i.comments > 0 && (
-                    <>
-                      <span aria-hidden="true">·</span>
-                      <span>{i.comments === 1 ? "1 comment" : `${i.comments} comments`}</span>
-                    </>
-                  )}
                   {i.milestone && (
                     <span className="rounded-full border border-dashed border-border px-1.5 text-xs" title="Milestone">
                       {i.milestone}
@@ -140,9 +144,9 @@ export function IssueList({
                   ))}
                 </>
               )}
-            </p>
-          </div>
-        </li>
+            </>
+          }
+        />
       ))}
     </ol>
   )

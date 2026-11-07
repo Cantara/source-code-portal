@@ -90,7 +90,7 @@ The rule of the landing page holds (layout.md "Signals, not attributes"): the da
 live on their own page.
 
 1. **`/pulls`, "Pull requests" in the header** beside Commits: every open pull request of the viewer's view, server-rendered with a
-   GET form (no JavaScript needed): the states as chips with their counts, which also filter; product, repository, opened by (people,
+   the filter panel at the left (`design/filters.md`; a GET form without JavaScript): the states with their counts, which filter; product, repository, opened by (people,
    automation), and drafts hidden by default. Each row: state and the party it waits for, title linking to GitHub, `repo #123`, the
    author, age and idle, `+a −d` with the five blocks (`DiffStat`), labels, the checks' mark. Numbered pages (`Pager`), the page size
    remembered (P-26).

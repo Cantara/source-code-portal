@@ -33,6 +33,11 @@ export function settled(page: Page): Page {
  * injecting <style> or inline script.
  */
 export const test = base.extend<{ guard: undefined }>({
+  // A reader who has not chosen has the filter panel folded on a phone; the tests that use a list's filters have it open.
+  context: async ({ context, baseURL }, provide) => {
+    if (baseURL) await context.addCookies([{ name: "scp-filters", value: "open", url: baseURL }])
+    await provide(context)
+  },
   page: async ({ page, javaScriptEnabled }, provide) => {
     await provide(javaScriptEnabled === false ? page : settled(page))
   },

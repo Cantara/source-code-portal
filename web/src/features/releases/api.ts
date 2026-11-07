@@ -18,6 +18,13 @@ export const releaseVariants = [
   { value: "pre", label: "Pre-releases" },
 ] as const
 
+/** releaseSources are what a release can come from: GitHub, or a registry a repository publishes a package to. */
+export const releaseSources = [
+  { value: "all", label: "GitHub and packages" },
+  { value: "github", label: "GitHub releases" },
+  { value: "packages", label: "Packages" },
+] as const
+
 export const releaseSorts = [
   { value: "newest", label: "Newest first" },
   { value: "oldest", label: "Oldest first" },
@@ -43,6 +50,8 @@ export function releasesState(s: Record<string, unknown>, size: number): Release
   if (typeof s.repo === "string" && s.repo !== "") f.repo = s.repo.slice(0, 200).toLowerCase()
   const variant = releaseVariants.find((x) => x.value === s.variant)
   if (variant && variant.value !== "latest") f.variant = variant.value
+  const source = releaseSources.find((x) => x.value === s.source)
+  if (source && source.value !== "all") f.source = source.value
   if (typeof s.since === "string" && since.test(s.since)) f.since = s.since
   const sort = releaseSorts.find((x) => x.value === s.sort)
   if (sort && sort.value !== "newest") f.sort = sort.value
@@ -56,6 +65,7 @@ export function releasesSearch(st: ReleasesState, defaultSize: number): string {
   if (f.group) q.set("group", f.group)
   if (f.repo) q.set("repo", f.repo)
   if (f.variant && f.variant !== "latest") q.set("variant", f.variant)
+  if (f.source && f.source !== "all") q.set("source", f.source)
   if (f.since) q.set("since", f.since)
   if (f.sort && f.sort !== "newest") q.set("sort", f.sort)
   if (st.page > 1) q.set("page", String(st.page))

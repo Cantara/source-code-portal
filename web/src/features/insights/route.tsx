@@ -2,6 +2,7 @@ import { groupsQuery, insightsQuery } from "@/lib/api/queries"
 import { crumbs } from "@/lib/crumbs"
 import { load, prefetch } from "@/lib/load"
 import type { Route } from "@/lib/page"
+import { filtersCookie, filtersOf } from "@/lib/preferences"
 import { ld } from "@/lib/seo"
 import { InsightsView } from "./view"
 
@@ -18,5 +19,5 @@ export const insightsRoute: Route<object> = {
     alternates: { canonical: "/insights" },
   }),
   structured: (_, base) => [ld.page(base, "/insights", "Insights"), ld.breadcrumbs(base, crumbs.insights())],
-  render: () => <InsightsView />,
+  render: (ctx) => <InsightsView filters={filtersOf(ctx.cookies[filtersCookie])} />,
 }

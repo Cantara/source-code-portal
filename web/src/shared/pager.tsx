@@ -2,7 +2,7 @@ import type { MouseEvent } from "react"
 import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { count } from "@/lib/format"
-import { pageItems, pageSizes } from "@/lib/paging"
+import { pageItems } from "@/lib/paging"
 
 type Page = Schemas["Page"]
 
@@ -80,26 +80,5 @@ export function Pager({
         </ul>
       )}
     </nav>
-  )
-}
-
-/** PageSizeField chooses how many items a page shows; a form's field `per`, applied at once with onSize. */
-export function PageSizeField({ value, onSize }: { value: number; onSize?: (n: number) => void }) {
-  return (
-    <label className="flex flex-col">
-      Per page
-      <select
-        name="per"
-        value={value}
-        onChange={(e) => onSize?.(Number(e.target.value))}
-        className="mt-1 min-h-9 rounded-md border border-input bg-background px-2"
-      >
-        {pageSizes.map((n) => (
-          <option key={n} value={n}>
-            {n}
-          </option>
-        ))}
-      </select>
-    </label>
   )
 }

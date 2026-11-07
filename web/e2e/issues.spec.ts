@@ -21,13 +21,14 @@ test("/issues lists what waits first, its states filter, and passes axe in both 
     "aria-current",
     "page",
   )
-  const chips = page.getByRole("navigation", { name: "By where they stand" })
-  await chips.getByRole("link", { name: /Unassigned 1/ }).click()
+  await page
+    .getByRole("radiogroup", { name: "Where it stands" })
+    .getByRole("radio", { name: /Unassigned 1/ })
+    .click()
   await expect(page).toHaveURL(/\/issues\?state=unassigned$/)
   await expect(page.getByRole("list", { name: "Issues" }).getByRole("listitem")).toHaveCount(1)
   await expect(page.getByRole("link", { name: "Tokens expire an hour early" })).toBeVisible()
-  await page.getByLabel("Kind").selectOption("feature")
-  await page.getByRole("button", { name: "Apply" }).click()
+  await page.getByRole("radiogroup", { name: "Kind" }).getByRole("radio", { name: "Feature" }).click()
   await expect(page).toHaveURL(/state=unassigned&kind=feature/)
   await expect(page.getByText("No open issue matches")).toBeVisible()
 })
@@ -39,7 +40,7 @@ test.describe("without JavaScript", () => {
     await page.goto("/issues?state=triage")
     const items = page.getByRole("list", { name: "Issues" }).getByRole("listitem")
     await expect(items).toHaveCount(2)
-    await page.getByLabel("Opened by").selectOption("people")
+    await page.getByRole("radio", { name: "People", exact: true }).check()
     await page.getByRole("button", { name: "Apply" }).click()
     await expect(page).toHaveURL(/by=people/)
     await expect(page.getByRole("list", { name: "Issues" }).getByRole("listitem")).toHaveCount(1)

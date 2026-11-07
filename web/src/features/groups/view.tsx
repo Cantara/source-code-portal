@@ -19,7 +19,7 @@ import { RelativeTime } from "@/shared/relative-time"
 import { ActivityLight } from "@/entities/repo/activity-light"
 import { lastChange } from "@/entities/repo/health"
 import { licence } from "@/entities/repo/licence"
-import { ecosystemLabel, newestPackage } from "@/entities/repo/packages"
+import { ecosystemLabel, shipped } from "@/entities/repo/packages"
 import { levels } from "@/entities/health/health"
 import { Hint } from "@/shared/hint"
 import { cn } from "@/lib/cn"
@@ -43,11 +43,10 @@ type Column = {
   value: (r: Repo) => string | number
 }
 
-/** from is where a repository's release is published: GitHub for a GitHub release, else its newest package's registry. */
-const from = (r: Repo) =>
-  r.release ? "GitHub" : newestPackage(r) ? ecosystemLabel(newestPackage(r)?.ecosystem ?? "") : undefined
+/** from is where a repository's latest release is published: GitHub, or the registry of its newest package, whichever is newer. */
+const from = (r: Repo) => shipped(r)?.from
 
-const released = (r: Repo) => r.release?.publishedAt ?? newestPackage(r)?.publishedAt ?? ""
+const released = (r: Repo) => shipped(r)?.at ?? ""
 
 /** columns are the table's columns, as the dashboard's product table draws its own: numbers right, every one sortable. */
 const columns: Column[] = [
@@ -87,30 +86,30 @@ function searchOf(s: GroupSearch): string {
 
 const none = <span className="text-muted-foreground">–</span>
 
-/** Release is a repository's latest GitHub release, else its newest published package, as a link. */
+/** Release is a repository's latest release, the newer of its GitHub release and its newest published package, as a link. */
 function Release({ r }: { r: Repo }) {
-  const pkg = newestPackage(r)
-  if (r.release)
+  const rel = shipped(r)
+  if (!rel) return <span className="text-muted-foreground">none</span>
+  if (!rel.name)
     return (
-      <a href={r.release.url} rel="noreferrer nofollow" className="block max-w-36 truncate hover:underline" title={r.release.tag}>
+      <a href={rel.url} rel="noreferrer nofollow" className="block max-w-36 truncate hover:underline" title={rel.version}>
         <span className="sr-only">Release </span>
-        {r.release.tag}
+        {rel.version}
       </a>
     )
-  if (!pkg) return <span className="text-muted-foreground">none</span>
-  return pkg.url ? (
+  return rel.url ? (
     <a
-      href={pkg.url}
+      href={rel.url}
       rel="noreferrer nofollow"
-      aria-label={`${pkg.version}, published package ${pkg.name} on ${ecosystemLabel(pkg.ecosystem)}`}
-      title={pkg.name}
+      aria-label={`${rel.version}, published package ${rel.name} on ${ecosystemLabel(rel.ecosystem ?? "")}`}
+      title={rel.name}
       className="block max-w-36 truncate hover:underline"
     >
-      {pkg.version}
+      {rel.version}
     </a>
   ) : (
-    <span className="block max-w-36 truncate" title={pkg.name}>
-      {pkg.version}
+    <span className="block max-w-36 truncate" title={rel.name}>
+      {rel.version}
     </span>
   )
 }
@@ -401,7 +400,7 @@ function GroupReleases({ group }: { group: string }) {
         {data && <FreshnessBadge freshness={data.freshness} />}
       </div>
       {error && !data && <ProblemAlert error={error} />}
-      {data && <ReleaseList releases={data.releases} empty="None published" />}
+      {data && <ReleaseList releases={data.releases} compact empty="None published" />}
       <div className="mt-2 flex flex-wrap gap-x-4 text-sm">
         <Link href={`/releases?group=${encodeURIComponent(group)}`} className="hover:underline">
           All releases
