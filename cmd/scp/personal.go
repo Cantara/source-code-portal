@@ -532,7 +532,7 @@ func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, p
 		w("    - id: %s", id)
 		w("      name: %s", q(p.Name))
 		w("      default_repo: %s", q(p.Repos[0]))
-		w("      match: [%s]", strings.Join(exactMatchers(p.Repos), ", "))
+		w("      match: [%s] # rules that new repositories fit, then the repositories pinned one by one", strings.Join(matchers(p), ", "))
 	}
 	if len(products) > 0 && len(unassigned) > 0 {
 		w("    - id: other")
@@ -547,6 +547,18 @@ func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, p
 	w("  # login is your GitHub login: the lists offer what is yours (opened by you, asking your review, assigned to you).")
 	w("  tokens: [{name: %s, secret_file: %s, groups: [%s], admin: true, login: %s}]", personalOwner, q(filepath.Join(dir, "owner.token")), personalOwner, q(login))
 	return b.String()
+}
+
+// matchers are a product's matchers in the configuration's words: the rules derived from its repositories, else each one by name.
+func matchers(p setup.Product) []string {
+	if len(p.Matchers) == 0 {
+		return exactMatchers(p.Repos)
+	}
+	out := make([]string, len(p.Matchers))
+	for i, m := range p.Matchers {
+		out[i] = "{" + m.Kind + ": " + q(m.Value) + "}"
+	}
+	return out
 }
 
 func exactMatchers(names []string) []string {

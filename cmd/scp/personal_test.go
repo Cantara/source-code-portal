@@ -55,13 +55,22 @@ func fakeHost(t *testing.T, header map[string]string) *httptest.Server {
 		}
 	})
 	mux.HandleFunc("GET /api/v3/user/repos", func(w http.ResponseWriter, r *http.Request) {
-		if authed(w, r) {
-			fmt.Fprint(w, `[{"name":"newest","private":true,"pushed_at":"2026-11-02T10:00:00Z","owner":{"login":"octo"}},`+
-				`{"name":"whydah-sso","pushed_at":"2026-11-01T10:00:00Z","owner":{"login":"acme"}},`+
+		if !authed(w, r) {
+			return
+		}
+		if r.URL.Query().Get("affiliation") == "" { // the newest one (the terminal wizard's default repository)
+			fmt.Fprint(w, `[{"name":"newest","private":true,"pushed_at":"2026-11-02T10:00:00Z","owner":{"login":"octo"}}]`)
+			return
+		}
+		fmt.Fprint(w, `[{"name":"newest","private":true,"pushed_at":"2026-11-02T10:00:00Z","owner":{"login":"octo"}},`+
+			`{"name":"scratch","pushed_at":"2026-10-27T10:00:00Z","owner":{"login":"octo"}}]`)
+	})
+	mux.HandleFunc("GET /api/v3/orgs/{org}/repos", func(w http.ResponseWriter, r *http.Request) {
+		if authed(w, r) && r.PathValue("org") == "acme" {
+			fmt.Fprint(w, `[{"name":"whydah-sso","pushed_at":"2026-11-01T10:00:00Z","owner":{"login":"acme"}},`+
 				`{"name":"whydah-admin","pushed_at":"2026-10-30T10:00:00Z","owner":{"login":"acme"}},`+
 				`{"name":"whydah-ui","pushed_at":"2026-10-29T10:00:00Z","owner":{"login":"acme"}},`+
-				`{"name":"tools","pushed_at":"2026-10-28T10:00:00Z","owner":{"login":"acme"}},`+
-				`{"name":"scratch","pushed_at":"2026-10-27T10:00:00Z","owner":{"login":"octo"}}]`)
+				`{"name":"tools","pushed_at":"2026-10-28T10:00:00Z","owner":{"login":"acme"}}]`)
 		}
 	})
 	mux.HandleFunc("POST /login/device/code", func(w http.ResponseWriter, _ *http.Request) {
@@ -483,6 +492,18 @@ func TestPersonalBrowserSetup(t *testing.T) {
 	if code, b := call(http.MethodPost, "/setup/api/token", `{"token":"ghp_personal"}`); code != 200 || !strings.Contains(b, `"user":"octo"`) {
 		t.Fatalf("token: %d %s", code, b)
 	}
+	if code, b := call(http.MethodPost, "/setup/api/list", `{"accounts":["octo","acme"]}`); code != 200 {
+		t.Fatalf("list: %d %s", code, b)
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		_, b := call(http.MethodGet, "/setup/api/state", "")
+		if strings.Contains(b, `"state":"done"`) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the listing did not end: %s", b)
+		}
+	}
 	if code, b := call(http.MethodPost, "/setup/api/repos", `{"accounts":["octo","acme"]}`); code != 200 || !strings.Contains(b, `"Whydah"`) {
 		t.Fatalf("repos: %d %s", code, b)
 	}
@@ -499,7 +520,7 @@ func TestPersonalBrowserSetup(t *testing.T) {
 		t.Fatalf("setup: %v %+v", got.err, got.launch)
 	}
 	yamlBytes, _ := os.ReadFile(filepath.Join(dir, "personal.yaml"))
-	for _, want := range []string{`id: whydah-iam`, `name: "Whydah (IAM)"`, `{exact: "whydah-sso"}`, `exclude: [{exact: "scratch"}]`,
+	for _, want := range []string{`id: whydah-iam`, `name: "Whydah (IAM)"`, `{prefix: "whydah-"}`, `exclude: [{exact: "scratch"}]`,
 		`id: other`, `unclaimed: true`, `orgs: ["octo", "acme"]`, `login: "octo"`} {
 		if !strings.Contains(string(yamlBytes), want) {
 			t.Errorf("personal.yaml lacks %q:\n%s", want, yamlBytes)

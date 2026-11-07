@@ -90,7 +90,7 @@ func newFake(t *testing.T) *fakeHost {
 		if f.expiry != "" {
 			w.Header().Set("github-authentication-token-expiration", f.expiry)
 		}
-		fmt.Fprint(w, `{"login":"octo"}`)
+		fmt.Fprint(w, `{"login":"octo","public_repos":2,"owned_private_repos":1,"total_private_repos":5}`)
 	})
 	mux.HandleFunc("GET /api/v3/user/repos", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -102,20 +102,26 @@ func newFake(t *testing.T) *fakeHost {
 			fmt.Fprint(w, `[{"name":"newest"}]`)
 			return
 		}
-		if q.Get("per_page") != "100" || !strings.Contains(q.Get("affiliation"), "organization_member") {
+		if q.Get("per_page") != "100" || q.Get("affiliation") != "owner" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if f.repoPages > 0 {
-			var parts []string
-			for i := range 100 {
-				parts = append(parts, fmt.Sprintf(`{"name":"r%s-%d","owner":{"login":"acme"}}`, q.Get("page"), i))
-			}
-			fmt.Fprint(w, "["+strings.Join(parts, ",")+"]")
+		f.listRepos(w, q.Get("page"), "octo")
+	})
+	mux.HandleFunc("GET /api/v3/orgs/{org}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer good" || r.PathValue("org") != "acme" {
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		fmt.Fprint(w, `[{"name":"api","private":true,"pushed_at":"2026-11-01T10:00:00Z","owner":{"login":"acme"}},`+
-			`{"name":"old","fork":true,"archived":true,"owner":{"login":"octo"}},{"name":"","owner":{"login":"x"}},{"name":"nobody"}]`)
+		fmt.Fprint(w, `{"login":"acme","public_repos":3,"total_private_repos":4}`)
+	})
+	mux.HandleFunc("GET /api/v3/orgs/{org}/repos", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if r.Header.Get("Authorization") != "Bearer good" || q.Get("type") != "all" || q.Get("sort") != "pushed" || q.Get("per_page") != "100" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		f.listRepos(w, q.Get("page"), r.PathValue("org"))
 	})
 	mux.HandleFunc("GET /api/v3/user/orgs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer good" {
@@ -139,6 +145,20 @@ func newFake(t *testing.T) *fakeHost {
 	f.Server = httptest.NewServer(mux)
 	t.Cleanup(f.Close)
 	return f
+}
+
+// listRepos answers a repository listing: three repositories on one page, or (repoPages > 0) a full page of 100 on every page.
+func (f *fakeHost) listRepos(w http.ResponseWriter, page, owner string) {
+	if f.repoPages > 0 {
+		var parts []string
+		for i := range 100 {
+			parts = append(parts, fmt.Sprintf(`{"name":"r%s-%d","owner":{"login":%q}}`, page, i, owner))
+		}
+		fmt.Fprint(w, "["+strings.Join(parts, ",")+"]")
+		return
+	}
+	fmt.Fprintf(w, `[{"name":"api","private":true,"pushed_at":"2026-11-01T10:00:00Z","topics":["kcp","go"],"owner":{"login":%q}},`+
+		`{"name":"old","fork":true,"archived":true,"owner":{"login":%q}},{"name":"","owner":{"login":"x"}},{"name":"nobody"}]`, owner, owner)
 }
 
 func (f *fakeHost) client(t *testing.T, slept *[]time.Duration) *Client {
@@ -271,26 +291,41 @@ func TestWhoamiAndOrgs(t *testing.T) {
 	}
 }
 
-func TestRepos(t *testing.T) {
+func TestAccountRepos(t *testing.T) {
 	ctx := context.Background()
 	f := newFake(t)
 	c := f.client(t, nil)
-	repos, more, err := c.Repos(ctx, "good")
-	if err != nil || more || len(repos) != 2 {
-		t.Fatalf("%+v %v %v", repos, more, err)
+	if n, err := c.AccountSize(ctx, "good", "octo", true); err != nil || n != 3 {
+		t.Errorf("the person's own size (public and owned private): %d %v", n, err)
 	}
-	if r := repos[0]; r.Owner != "acme" || r.Name != "api" || !r.Private || r.Fork || !r.Pushed.Equal(time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)) {
+	if n, err := c.AccountSize(ctx, "good", "acme", false); err != nil || n != 7 {
+		t.Errorf("an organisation's size: %d %v", n, err)
+	}
+	if _, err := c.AccountSize(ctx, "wrong", "acme", false); err == nil {
+		t.Error("a wrong token got a size")
+	}
+	var seen []int
+	repos, more, err := c.AccountRepos(ctx, "good", "acme", false, func(n int) { seen = append(seen, n) })
+	if err != nil || more || len(repos) != 2 || !slices.Equal(seen, []int{2}) {
+		t.Fatalf("%+v %v %v %v", repos, more, seen, err)
+	}
+	if r := repos[0]; r.Owner != "acme" || r.Name != "api" || !r.Private || r.Fork || !slices.Equal(r.Topics, []string{"kcp", "go"}) ||
+		!r.Pushed.Equal(time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)) {
 		t.Errorf("first: %+v", r)
 	}
-	if r := repos[1]; r.Owner != "octo" || !r.Fork || !r.Archived || !r.Pushed.IsZero() {
+	if r := repos[1]; !r.Fork || !r.Archived || !r.Pushed.IsZero() {
 		t.Errorf("second: %+v", r)
 	}
-	f.repoPages = 9
-	repos, more, err = c.Repos(ctx, "good")
-	if err != nil || !more || len(repos) != MaxRepos {
-		t.Errorf("capped: %d %v %v", len(repos), more, err)
+	if repos, _, err = c.AccountRepos(ctx, "good", "octo", true, nil); err != nil || len(repos) != 2 || repos[0].Owner != "octo" {
+		t.Errorf("the person's own: %+v %v", repos, err)
 	}
-	if _, _, err := c.Repos(ctx, "wrong"); err == nil {
+	f.repoPages = 99
+	seen = nil
+	repos, more, err = c.AccountRepos(ctx, "good", "acme", false, func(n int) { seen = append(seen, n) })
+	if err != nil || !more || len(repos) != MaxPerAccount || len(seen) != MaxPerAccount/100 || seen[0] != 100 {
+		t.Errorf("capped: %d %v %v %d", len(repos), more, err, len(seen))
+	}
+	if _, _, err := c.AccountRepos(ctx, "wrong", "acme", false, nil); err == nil {
 		t.Error("a wrong token listed repositories")
 	}
 }

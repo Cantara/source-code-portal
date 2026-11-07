@@ -27,7 +27,7 @@ func Suggest(repos []ghlogin.Repo) []Product {
 	var out []Product
 	for w, names := range words {
 		if len(names) >= minPrefix {
-			names = firstN(names)
+			names = sorted(names)
 			out = append(out, Product{Name: title(w), Repos: names})
 			for _, n := range names {
 				taken[n] = true
@@ -55,7 +55,7 @@ func Suggest(repos []ghlogin.Repo) []Product {
 				if used[strings.ToLower(name)] { // the account's name is also a first word: two products never share a name
 					name = o + " (other)"
 				}
-				out = append(out, Product{Name: name, Repos: firstN(names)})
+				out = append(out, Product{Name: name, Repos: sorted(names)})
 			}
 		}
 	}
@@ -82,9 +82,9 @@ func OnePerName(repos []ghlogin.Repo) []ghlogin.Repo {
 	return out
 }
 
-func firstN(names []string) []string {
+func sorted(names []string) []string {
 	slices.Sort(names)
-	return names[:min(len(names), MaxPerProduct)]
+	return names
 }
 
 // firstWord is the lower-case word a name starts with, up to its first -, _ or ., when it has two letters or more.

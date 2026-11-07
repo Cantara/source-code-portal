@@ -108,3 +108,42 @@ default first run is a page (`internal/setup`, `cmd/scp/personal_setup.go`); `--
 - **Tests.** `internal/setup` (the entry, refusals, a token, a code, a code for another host, `Suggest`); `TestPersonalBrowserSetup`
   drives the page's API against the fake host and checks `personal.yaml`, the sealed credential, file modes and the freed port; the
   flow was also walked in a real browser against a fake GitHub.
+
+## Products by drag and drop, with rules that keep fitting (PE4)
+
+Owner, 2026-11-08: after the accounts step the person sees every repository per account, drags them into product groups, and the
+filters are *calculated* so a repository created later that belongs to a product joins it; long work shows progress.
+
+- **What a group can say.** Matchers are `exact`, `prefix`, `glob`, `regexp`, `topic` (and the unclaimed group), by repository name
+  or topic only, at most 64 per group. A group cannot say "in account X" (the matchers do not see the owner); a product is a name
+  pattern across the chosen accounts. Accounts as separate sources would allow it; not built.
+- **Rules from members (`Derive`, `internal/setup/rules.go`).** The members a person drags in are the *intent*; the rules written to
+  `personal.yaml` are what makes it last. For a product with members M, among all listed repositories R, the page proposes the
+  smallest set of open rules that cover M without catching a repository another product holds: `prefix` candidates at each name
+  boundary (`-`, `_`, `.`, a lower-to-upper case change; at least 3 characters), and a `topic` every member shares. A rule is accepted
+  when it covers at least 2 members (3 for a prefix of fewer than 6 characters) and spills into no other product's member; it may
+  also catch unassigned repositories, which the page names ("also catches 2 more: x, y; add them / pin the rest"). What no rule
+  covers stays pinned as `exact` entries. Each rule is shown in words with its live count and its kind: **open** (a new
+  `whydah-foo` joins by itself) or **pinned** (this repository only). The advanced edit is a regexp checked as the portal checks it
+  (anchored, at most 256 bytes) with its match count. When the pinned entries pass the 64 matchers, a regexp alternation takes
+  them, else the page says so.
+- **The page.** Step 3 has the accounts' repositories at the left (grouped by account, search, "unassigned only", multi-select with
+  shift-click; each repository carries its topics), product cards at the right as drop targets plus one "new product" drop zone.
+  Native drag and drop (no library; the CSP allows no inline script), and for the keyboard and touch a "Move to..." menu on the
+  selection. "Suggest products" fills a first draft (`Suggest`). A repository can be hidden. Nothing is saved until Start.
+- **Progress.** Listing is a job the server runs, not a request: per account, `GET /orgs/{o}/repos` (the person's own account:
+  `/user/repos?affiliation=owner`) page by page, the account's total known beforehand (`GET /orgs/{o}` or `/user`: public and
+  private repository counts), so the bar is determinate ("Cantara: 120 of 180"). The state carries `job {phase, account, done,
+  total, state}`; the page polls it, disables Next until it is done, offers Cancel, and ends the job on a cancel or a failure (nothing partial is kept). The 500-repository cap goes (2,000 per account is the ceiling, said when reached). After Start the page shows the
+  portal's first load from the admin status (`queue`, `snapshot.repos`) until the dashboard has its catalogue.
+- **Stages.** PE4a (built): the listing job, topics and progress (a cancel or a failure ends the job; nothing partial is kept). PE4b: `Derive`, the rules in `personal.yaml`, the drag-and-drop editor.
+  PE4c: progress after Start. Re-opening the editor on an existing `personal.yaml` is not built (`--reset` starts over).
+
+- **As built (PE4).** The page's two lists and its product cards are in `internal/setup/assets/app.js`; the server derives (`POST
+  /setup/api/rules` previews, `/setup/api/rule-test` counts one rule) and `finish` derives again, so what was shown is what is written.
+  A product in a catch-all bucket of more than eight repositories needs three that start alike for a rule (two is a coincidence
+  there). `Hint`s name unassigned repositories that start like a member's, as a one-click rule. Pinned entries past the group's 64
+  matchers become alternation regexps of up to 256 bytes. Not built: a dashboard progress bar for the portal's first catalogue load
+  (it needs new fields in the contract); scoping a rule to an account; re-opening the editor on an existing `personal.yaml`.
+- **Tests.** `Derive` on real-shaped lists, the hints, the job's progress and cancel, `TestSetupRulesSelectWhatThePortalSelects`, and the
+  whole page in a browser (`web/e2e/setup.spec.ts`: sign in, the read, drag and drop, a hint, the menu, hide, start, axe).
