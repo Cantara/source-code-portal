@@ -1,6 +1,7 @@
 # Store model for a personal edition and shared instances (SM1)
 
-Status: design, verified by prototypes, not built (plan.md section 4, P-89, P-90, P-91). Binding order: ../plan.md > this note > `sync-snapshot-store.md`,
+Status: design, verified by prototypes; SM-a built (the migration `0002`, the copy before it, the address rule), the rest not built
+(plan.md section 4, P-89, P-90, P-91). Binding order: ../plan.md > this note > `sync-snapshot-store.md`,
 `access.md`, `hardening.md`, `auth.md`.
 
 The owner wants a personal edition (one person signs in to GitHub, the portal reads the repositories that person can read; several
@@ -55,7 +56,9 @@ Three flaws the design has to fix, each shown by running the code:
 
 ## The model
 
-Migration `0002`, additive only: no existing column, key or payload is rewritten.
+Migrations are additive only: no existing column, key or payload is rewritten. **Each table arrives with the code that uses it**, in
+the migration of the step that needs it: `0002` (SM-a) adds `repo.visibility` and nothing else; `source`, `principal`, `credential`,
+`visible` and `item.credential_id` below are the shape the later steps (rung 0 and on) add as `0003` and after.
 
 ```sql
 CREATE TABLE source (                 -- the hosts; 'config' ones mirror scp.yaml, 'wizard' ones are added at runtime
@@ -123,9 +126,13 @@ entitlement. Nothing else about the model of two views changes.
 `RepoKey` is `owner/name` and is the key of the store, the engine, the snapshot, the cluster's wire format, the search segments, the
 URLs and the API. Making it unique across hosts touches all of them, so it is staged:
 
-- **Now: first claim wins.** The address belongs to the source that listed it first; a second source's repository of the same
-  address is a *conflict*: not stored, named in the Admin status and the log, never silently swapped. The config rule that one account
-  belongs to one source stays for configured sources. Prototype: ownership stays with the first source, its items are kept.
+- **Now (SM-a, built): the source whose id sorts first owns an address two sources list** (`snapshot.Outranks`). The rule has no state
+  and does not depend on which listing came first, so the store (`replaceCatalogue`), the engine (`setCatalogue`) and the snapshot
+  (`Builder.ReplaceSource`) agree in any order; a second source's repository of the address is a *conflict*: not stored, not tracked,
+  told in the log, never swapped in. An address changes hands at most once, when a source that ranks higher lists it after a lower one
+  held it (that source's entries and items for it go once), never again. The config rule that one account belongs to one source stays
+  for configured sources, so the case is not reachable today. (A rule of "first claim wins" was designed first; it needs the claim
+  kept somewhere all three layers read at start, and the sorted rule needs nothing.)
 - **If a real collision needs both:** a secondary source's repositories are addressed `owner@source/name` (a GitHub login holds
   only letters, digits and hyphens, so `@` is unambiguous, and the address stays two path segments so the routes, the proxy rules and
   the API paths keep their shape). Every place that cuts a `RepoKey` at `/` to call GitHub then takes the owner from the job's source
@@ -134,11 +141,11 @@ URLs and the API. Making it unique across hosts touches all of them, so it is st
 
 ## Migration and rollout
 
-- **Cantara's database is kept.** `0002` adds tables and two columns and backfills `repo.visibility` from the catalogue items;
-  `source` gets one row per existing source id. `user_version` becomes 2.
-- **A copy before the migration** (`VACUUM INTO scp.db.pre-0002`, kept until the next start finds the migration done and the
-  operator removes it; the rollback is to put it back). Rolling the binary back without it quarantines the database (flaw 2) and
-  resyncs.
+- **Cantara's database is kept.** `0002` adds `repo.visibility` and backfills it from each source's catalogue item; `user_version`
+  becomes 2. The visibility is then written at every listing (a listing that does not say keeps what is known).
+- **A copy before every migration of a store that holds data** (`VACUUM INTO scp.db.pre-NNNN`, the store as it was; made once, a
+  copy that exists is kept; mode 0600; a failure is logged and the migration goes on). The operator removes it when the new version
+  has proved itself; the rollback is to put it back. Rolling the binary back without it quarantines the database (flaw 2) and resyncs.
 - **The warm start is unchanged**: `Load` reads the same three tables; the new ones are read only by the code that needs them.
 - The earlier rule "greenfield: no migrations" is withdrawn for the store from this point (P-89); config keys and the contract
   stay greenfield.
@@ -153,7 +160,7 @@ On a copy of the live database (never the original), in a scratch worktree:
 | Is the pre-migration copy cheap and exact? | `VACUUM INTO` 44 ms, 26 MB; the copy opens and hashes to the same digest |
 | Does a view of any subset equal a portal that only knew that subset? | A generalised `publicView` (`ViewOf(keep)`) against a snapshot fed only the subset: 200 random subsets over 14 repositories on 2 sources with aliases, 3 groups (one default hidden, one without a default) and an index; repositories, aliases, groups (members, default, `DefaultMissing`), source counts, `Version` and the index all equal. Three mutations of the view (version from the full set, default left set, counts left unfiltered) each fail it. The existing `TestPublicView` passes unchanged |
 | What does a view cost at the real scale? | 1,000 repositories with every real index (search, feeds, graph, groups): 1.9 ms for 100 repositories, 2.9 ms for 500, 3.7 ms for 900; 20 distinct views of 500 held: +31 MB (1.6 MB each). A view per distinct set is affordable; filtering at read time is unnecessary |
-| Do two sources with one address lose data? | Yes (flaw 1): the store alternates owners at every listing and no item survives. With "first claim wins" the owner stays and the item is kept |
+| Do two sources with one address lose data? | Yes (flaw 1): the store alternates owners at every listing and no item survives. With the deterministic rule the owner stays whichever listed first and its item is kept (built: `TestAddressHeldByTwoSources`, `TestAddressOwnedByOneSource` in the engine and the snapshot) |
 | Are credentials safe at rest? | A sealed value opens only under its own row id, source, kind and instance key; a flipped bit is refused; the token is not in the database file or its WAL in plaintext |
 | Does the reference-count rule keep I6? | Two people on one private repository, one on another: when the first leaves, only the repository nobody reads goes, with its items; when the second leaves, the other goes; public repositories are untouched |
 
