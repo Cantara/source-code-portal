@@ -5,6 +5,8 @@ release's `docs/production.md` and the operator guide's section 3 are the refere
 
 ## One host: Docker Compose and Caddy (the default)
 
+A themed portal also mounts its theme directory read-only (`- ./theme:/etc/scp/theme:ro`; [theme.md](theme.md)).
+
 Caddy gets and renews the certificate, passes `X-Forwarded-For` and streams the server-sent events without buffering.
 
 `compose.yaml`:
@@ -156,6 +158,12 @@ the pull requests and the issues, each hidden by its button, as on the dashboard
 with `/present?profile=wall`. Behind `access.require_auth` sign in
 once on the device, with single sign-on or a token of its own from `auth.tokens` (only the groups it shows): the page's hourly reload
 renews the session. An administrator arranges it like the dashboard; its layout is saved in the store beside the dashboard's.
+
+## A theme
+
+The owner's colours, logo and name come from `web.theme_dir` (`theme.css`, `logo.svg`, `favicon.svg`) and `web.product_name`, read at the
+start, without a build; their brand stays in the deployment's own repository, never in SCP's. Needs a release after v2.2.10 (the
+operator guide's section 2.7). [theme.md](theme.md) has what to ask, the layout, the tokens for light and dark, mounting and the checks.
 
 ## Announcements
 
