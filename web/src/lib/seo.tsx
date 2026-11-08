@@ -4,6 +4,7 @@ import { headers } from "next/headers"
 import type { Schemas } from "./api/client"
 import type { Crumb } from "./crumbs"
 import { repoPath } from "./paths"
+import { look } from "./look"
 
 /** Thing is one Schema.org node of a page's JSON-LD graph. */
 export type Thing = Record<string, unknown> & { "@type": string }
@@ -29,7 +30,7 @@ export const ld = {
     "@type": "WebSite",
     "@id": `${base}/#website`,
     url: `${base}/`,
-    name: "Source Code Portal",
+    name: look().name,
     description: "Repositories, documentation and commits of the organisation.",
     potentialAction: {
       "@type": "SearchAction",
@@ -102,7 +103,7 @@ export const ld = {
   }),
 }
 
-const site = "Source Code Portal"
+const site = look().name
 
 /** titleOf is a page's own title, without the site's suffix. */
 function titleOf(m: Metadata): string {

@@ -35,6 +35,7 @@ var errReplaced = errors.New("bundle replaced")
 type Server struct {
 	dir, node string
 	version   string // the portal's release, shown by the pages (SCP_VERSION)
+	theme     string // the deployment's theme as JSON (SCP_THEME); empty: the built-in look
 	log       *slog.Logger
 	addr      string // 127.0.0.1:port the child listens on
 	ready     atomic.Bool
@@ -44,15 +45,16 @@ type Server struct {
 	observe                            func(event string) // a test's view of each step: "exited", "replaced", "ready"
 }
 
-// New picks a free loopback port for the server in dir (server.js), run with node; version is the portal's release the pages show.
-func New(dir, node, version string, log *slog.Logger) (*Server, error) {
+// New picks a free loopback port for the server in dir (server.js), run with node; version is the portal's release the pages show and
+// theme the deployment's theme as JSON (empty: none).
+func New(dir, node, version, theme string, log *slog.Logger) (*Server, error) {
 	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("web UI port: %w", err)
 	}
 	addr := ln.Addr().String()
 	_ = ln.Close()
-	return &Server{dir: dir, node: node, version: version, log: log.With("component", "web"), addr: addr,
+	return &Server{dir: dir, node: node, version: version, theme: theme, log: log.With("component", "web"), addr: addr,
 		minBackoff: minBackoff, buildEvery: buildEvery, probeEvery: probeEvery}, nil
 }
 
@@ -122,6 +124,9 @@ func (s *Server) once(ctx context.Context, api string) error {
 	// Only what the server needs: the portal's own environment can hold its configuration.
 	cmd.Env = []string{"PORT=" + port, "HOSTNAME=127.0.0.1", "NODE_ENV=production", "NEXT_TELEMETRY_DISABLED=1", "SCP_API=" + api,
 		"SCP_VERSION=" + s.version, "PATH=" + os.Getenv("PATH")}
+	if s.theme != "" {
+		cmd.Env = append(cmd.Env, "SCP_THEME="+s.theme)
+	}
 	cmd.Stdout, cmd.Stderr = out, out
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = stopGrace

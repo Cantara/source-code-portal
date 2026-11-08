@@ -27,6 +27,7 @@ import { issuesFilter, pullsFilter } from "./api"
 import { PresentView } from "./present"
 import type { Search } from "@/lib/page"
 import { ld } from "@/lib/seo"
+import { look } from "@/lib/look"
 
 /** dashboardRoute is `/`: the dashboard and its layout, through the reader's lens on people's work and products view. */
 export const dashboardRoute: Route<object> = {
@@ -39,7 +40,7 @@ export const dashboardRoute: Route<object> = {
       prefetch(qc, issuesQuery(api, issuesFilter(work, 5))),
     ])
   },
-  metadata: () => ({ title: { absolute: "Dashboard · Source Code Portal" }, alternates: { canonical: "/" } }),
+  metadata: () => ({ title: { absolute: `Dashboard · ${look().name}` }, alternates: { canonical: "/" } }),
   structured: (_, base) => [ld.page(base, "/", "Dashboard", "CollectionPage", false)],
   render: (ctx) => {
     const view = ctx.cookies[viewCookie]

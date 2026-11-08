@@ -4,6 +4,10 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## Unreleased
+
+- **A theme for your deployment**: `web.theme_dir` (a `theme.css` that sets the colour tokens, a `logo.svg`, a `favicon.svg`, served under `/theme/`, also before sign-in) and `web.product_name` make a portal look like its owner's without rebuilding anything: the release binary, bundle and image stay the signed ones, and a deployment's repository holds only its configuration and theme. No font and no address on another host (the policy is unchanged); the files are read at the start. Operator guide, section 2.7.
+
 ## 2.2.10
 
 The store's schema is flat, forks can be shown on demand, events from GitHub report themselves, and the modes are kept apart. **The first

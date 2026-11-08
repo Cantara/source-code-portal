@@ -7,17 +7,19 @@ import { LiveIndicator, StatusBanners } from "@/features/status/banners"
 import { unwrap } from "@/lib/api/client"
 import { origin, privateViewer, renderedAt, serverApi } from "@/lib/api/server"
 import { Providers } from "./providers"
-import { Mark } from "@/components/ui/mark"
+import { Logo } from "@/components/ui/logo"
+import { look as deployment } from "@/lib/look"
 import { Chrome, FocusOnNavigation, MainNav, PortalNav, ViewerMenu } from "./shell"
 import "@/styles/index.css"
 import "@/styles/docs.css"
 
 export async function generateMetadata(): Promise<Metadata> {
+  const { name, favicon } = deployment()
   return {
     metadataBase: new URL(await origin()),
-    title: { template: "%s · Source Code Portal", default: "Source Code Portal" },
+    title: { template: `%s · ${name}`, default: name },
     description: "Repositories, documentation and commits of the organisation.",
-    icons: { icon: { url: "/favicon.svg", type: "image/svg+xml" } },
+    icons: { icon: { url: favicon ?? "/favicon.svg", type: "image/svg+xml" } },
     // A private viewer's pages show private repositories: no search engine may keep them.
     ...((await privateViewer()) ? { robots: { index: false, follow: false } } : {}),
   }
@@ -34,6 +36,7 @@ function release(): string {
 /** RootLayout is the shell: skip link, header with navigation, the viewer and theme, status banners and the page. */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Without the API the header leaves the viewer out; the page shows the problem.
+  const look = deployment()
   const server = await serverApi()
   const [me, assistant, rules] = await Promise.all([
     unwrap(server.GET("/me")).catch(() => undefined),
@@ -45,10 +48,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <head>
         {/* Sets the stored theme before the first paint. */}
         <script src="/theme-init.js" />
-        <link rel="search" type="application/opensearchdescription+xml" href="/opensearch.xml" title="Source Code Portal" />
+        <link rel="search" type="application/opensearchdescription+xml" href="/opensearch.xml" title={look.name} />
+        {/* The deployment's colours: after the portal's own stylesheet, so its tokens win in light and dark. */}
+        {look.css ? <link rel="stylesheet" href={look.css} precedence="theme" /> : null}
       </head>
       <body className="cosmos">
-        <Providers now={renderedAt()} rules={rules}>
+        <Providers now={renderedAt()} rules={rules} look={look}>
           <FocusOnNavigation />
           <WebMCP />
           <Chrome>
@@ -58,9 +63,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <header className="sticky top-0 z-40 border-b border-border bg-background/75 backdrop-blur-md">
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 lg:px-6">
                 <Link href="/" className="group flex items-center gap-2.5 font-semibold tracking-tight">
-                  <Mark />
+                  <Logo src={look.logo} />
                   <span>
-                    Source Code Portal
+                    {look.name}
                     <span className="ml-2 font-mono text-[0.6875rem] font-normal text-muted-foreground" title="Release">
                       {release()}
                     </span>

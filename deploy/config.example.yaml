@@ -115,6 +115,10 @@ cluster:
 web:
   dir: "" # web/bundle
   node: node
+  # A deployment's own look (operator guide 2.7): a directory with theme.css (colour tokens), logo.svg and favicon.svg, and the name the
+  # pages use instead of "Source Code Portal". Both are read at the start; empty: the built-in look.
+  theme_dir: ""
+  product_name: ""
 # The pages' layouts an administrator designs on the dashboard (Design this page), one JSON file per page, and the announcements
 # administrators write in /admin (announcements.json). Empty: the built-in layouts and the configured announcements, nothing saved.
 layout:

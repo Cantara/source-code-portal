@@ -25,7 +25,7 @@ const (
 const notFoundPath = "/_scp/not-found"
 
 // reserved prefixes answer a plain 404 instead of a page.
-var reserved = []string{"/auth/", "/badges/", "/images/", "/webhooks/", "/.well-known/"} //nolint:gochecknoglobals // lookup table
+var reserved = []string{"/auth/", "/badges/", "/images/", "/theme/", "/webhooks/", "/.well-known/"} //nolint:gochecknoglobals // lookup table
 
 type pageKey struct{}
 

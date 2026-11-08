@@ -8,6 +8,8 @@ import { NowProvider } from "@/lib/clock"
 import { createQueryClient } from "@/lib/query"
 import type { Rules } from "@/lib/rules"
 import { RulesProvider } from "@/lib/rules-context"
+import type { Look } from "@/lib/look"
+import { LookProvider } from "@/lib/look-context"
 
 // Every API answer names the server's build; a different one than this bundle's offers a reload.
 api.use({
@@ -17,10 +19,10 @@ api.use({
 })
 
 /**
- * Providers holds the browser's query cache, which the pages hydrate from the server, the server's render instant and the rules the
- * server judges by.
+ * Providers holds the browser's query cache, which the pages hydrate from the server, the server's render instant, the rules the
+ * server judges by and the deployment's look.
  */
-export function Providers({ now, rules, children }: { now: number; rules?: Rules; children: ReactNode }) {
+export function Providers({ now, rules, look, children }: { now: number; rules?: Rules; look?: Look; children: ReactNode }) {
   const [qc] = useState(createQueryClient)
   // The root's effects run after its children's: once this one has, the page answers to clicks. The end-to-end tests wait for it
   // instead of pressing again until something happens.
@@ -30,7 +32,9 @@ export function Providers({ now, rules, children }: { now: number; rules?: Rules
   return (
     <NowProvider at={now}>
       <RulesProvider rules={rules}>
-        <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+        <LookProvider look={look}>
+          <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+        </LookProvider>
       </RulesProvider>
     </NowProvider>
   )
