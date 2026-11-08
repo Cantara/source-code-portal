@@ -154,6 +154,16 @@ type deps struct {
 	mode store.Mode
 }
 
+// checkedMode is the process's mode (the shared site unless the command said otherwise), after the one check that ties a part of the
+// personal edition to it: a launch link signs in without a secret of the portal's, so only one person's portal may have one.
+func (d deps) checkedMode() (store.Mode, error) {
+	mode := cmp.Or(d.mode, store.Shared)
+	if d.launch != nil && mode != store.Personal {
+		return "", errors.New("a launch link belongs to scp personal")
+	}
+	return mode, nil
+}
+
 // vaultResolved refuses a source whose credential is in the vault of scp personal and was not resolved: serve reads files.
 func vaultResolved(cfg config.Config) error {
 	for i, src := range cfg.GitHub.Sources {
@@ -169,9 +179,9 @@ func vaultResolved(cfg config.Config) error {
 
 // newServer opens the store, wires the features and binds both listeners.
 func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger) (_ *server, err error) {
-	mode := cmp.Or(d.mode, store.Shared)
-	if d.launch != nil && mode != store.Personal { // a launch link signs in without a secret of the portal's: only one person's portal has it
-		return nil, errors.New("a launch link belongs to scp personal")
+	mode, err := d.checkedMode()
+	if err != nil {
+		return nil, err
 	}
 	if err := vaultResolved(cfg); err != nil {
 		return nil, err

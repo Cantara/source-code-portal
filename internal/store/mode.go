@@ -85,7 +85,7 @@ func inspect(ctx context.Context, db *sql.DB) (have Mode, credentials, catalogue
 			return false, err
 		}
 		var found bool
-		err := db.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+")").Scan(&found) //nolint:gosec // G202: a fixed table name
+		err := db.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+")").Scan(&found)
 		return found, err
 	}
 	if ok, err := has("meta"); err != nil {
