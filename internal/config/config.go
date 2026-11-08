@@ -117,6 +117,8 @@ func defaults() map[string]any {
 		"cluster.namespace":                "scp",
 		"web.dir":                          "",
 		"web.node":                         "node",
+		"web.theme_dir":                    "",
+		"web.product_name":                 "",
 		"layout.dir":                       "",
 		"packages.public":                  true,
 		"features.pulls":                   true,

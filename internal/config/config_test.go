@@ -147,6 +147,8 @@ func TestRefused(t *testing.T) {
 		"cluster namespace":       {env: map[string]string{"SCP_CLUSTER_NAMESPACE": "SCP_Prod"}, want: "cluster.namespace"},
 		"web dir without server":  {env: map[string]string{"SCP_WEB_DIR": "/nonexistent"}, want: "web.dir"},
 		"web node empty":          {env: map[string]string{"SCP_WEB_NODE": " "}, want: "web.node"},
+		"theme dir missing":       {env: map[string]string{"SCP_WEB_THEME_DIR": "/nonexistent"}, want: "web.theme_dir"},
+		"product name too long":   {env: map[string]string{"SCP_WEB_PRODUCT_NAME": strings.Repeat("x", 61)}, want: "web.product_name"},
 		"short session ttl":       {env: map[string]string{"SCP_AUTH_SESSION_TTL": "1m"}, want: "auth.session_ttl"},
 		"oidc without key":        {file: "auth:\n  oidc: {issuer: 'https://id.example', client_id: scp}\nserver:\n  public_url: https://scp.example\n", want: "auth.session_key_file: required"},
 		"oidc without client":     {env: map[string]string{"SCP_AUTH_OIDC_ISSUER": "https://id.example"}, want: "auth.oidc.client_id"},

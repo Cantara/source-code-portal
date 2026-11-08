@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Rehearses an upgrade and a rollback of the store between a released build and this one, offline (a fake GitHub). The released build
-# reads the fake GitHub into a store (1). Then, by the schema generation of that store (its SCP1 application mark):
-#   the same generation as this build:
+# reads the fake GitHub into a store (1). Then, by the schema generation of that store (its SCP1 application mark) and version:
+#   the same schema as this build: this build and the release serve the store as it is (nothing to migrate, no copy);
+#   the same generation, an older version (this tree has migrations the release lacks):
 #     2. this build opens the store with GitHub gone: it migrates, takes the scp.db.pre-NNNN copy, and serves the data from the store,
 #     3. the released build, older than the schema, quarantines the migrated store and starts empty (the documented rollback hazard),
 #     4. restoring the copy makes the released build serve the data again.
@@ -43,7 +44,27 @@ stop "$pid"
 # The application mark is four bytes at offset 68 of the file's header: "SCP1" in the generation this tree makes.
 mark=$(od -An -tx1 -j68 -N4 "$db" | tr -d ' \n')
 
-if [ "$mark" = "53435031" ]; then
+# The schema version is four bytes (big-endian) at offset 60; this tree's is the number of its migrations.
+have=$((16#$(od -An -tx1 -j60 -N4 "$db" | tr -d ' \n')))
+want=$(ls "$root"/internal/store/migrations/*.sql | wc -l | tr -d ' ')
+
+if [ "$mark" = "53435031" ] && [ "$have" -eq "$want" ]; then
+	stop_github # GitHub is gone from here on: only the store can answer
+
+	echo "2. the schema is unchanged since $prev: this build serves its store as it is (no migration, no copy)"
+	run "$work/scp-new" new
+	serves alpha || fail "this build lost the data of $prev's store"
+	serves beta || fail "this build lost beta"
+	stop "$pid"
+	ls "$work"/scp.db.pre-* >/dev/null 2>&1 && fail "a copy was taken though there was nothing to migrate"
+
+	echo "3. $prev serves what this build left"
+	run "$work/scp-old" old2
+	serves alpha || fail "$prev does not serve alpha from the store this build used"
+	stop "$pid"
+
+	echo "PASS: no schema change since $prev; the store is served both ways"
+elif [ "$mark" = "53435031" ]; then
 	stop_github # GitHub is gone from here on: only the store can answer
 
 	echo "2. this build opens the store: migrates, copies, serves"

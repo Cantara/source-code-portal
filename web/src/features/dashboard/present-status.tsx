@@ -7,7 +7,9 @@ import { useNow } from "@/lib/clock"
 import { cn } from "@/lib/cn"
 import { useConnectionFailing, useLive } from "@/lib/connection"
 import { ago } from "@/lib/format"
-import { Mark } from "@/components/ui/mark"
+import { Logo } from "@/components/ui/logo"
+import { productName } from "@/lib/look"
+import { useLook } from "@/lib/look-context"
 
 /** stale and offline are how long since the data was last known current before the page says so (design/present.md). */
 const stale = 2 * 60_000
@@ -34,17 +36,14 @@ export function freshness(live: boolean, failing: boolean, checked: number, now:
  * left column narrows. A whole page load to the dashboard, as the bar's link.
  */
 export function Brand() {
+  const { name, logo } = useLook()
   return (
-    <a
-      href="/"
-      title="Source Code Portal: the dashboard"
-      className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
-    >
-      <Mark />
+    <a href="/" title={`${name}: the dashboard`} className="flex shrink-0 items-center gap-2 font-semibold tracking-tight">
+      <Logo src={logo} />
       <span aria-hidden="true" className="font-mono tracking-widest @max-md:hidden">
-        SCP
+        {name === productName ? "SCP" : name}
       </span>
-      <span className="sr-only">Source Code Portal, the dashboard</span>
+      <span className="sr-only">{name}, the dashboard</span>
     </a>
   )
 }

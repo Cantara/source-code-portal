@@ -26,6 +26,7 @@ var notWalked = map[string]string{ //nolint:gochecknoglobals // test table
 	"GET /api/v1/admin/status":            "admin only, asked on the public listener by edgePaths as /api/v1/status",
 	"GET /auth/login":                     "the sign-in redirect: signin_test.go",
 	"GET /auth/callback":                  "the sign-in return: signin_test.go",
+	"GET /theme/{file...}":                "the operator's own files, nothing of the catalogue: theme_test.go",
 	"POST /auth/logout":                   "signin_test.go",
 }
 
@@ -36,7 +37,8 @@ func TestEveryRouteIsWalkedOrNamed(t *testing.T) {
 	cfg := modeConfigWith(t, filepath.Join(t.TempDir(), "routes.db"), func(file func(name, body string) string) string {
 		return "webhook: {secret_file: " + file("hook", strings.Repeat("w", 40)) + "}\n" +
 			"llm: {provider: anthropic, model: claude-test, base_url: \"http://127.0.0.1:1\", api_key_file: " + file("llm", "sk-test") + "}\n" +
-			"assistant: {access: signed-in}\n"
+			"assistant: {access: signed-in}\n" +
+			"web: {theme_dir: " + filepath.Dir(file("theme.css", ":root{}")) + "}\n"
 	})
 	s, err := standUp(t, cfg, deps{})
 	if err != nil {

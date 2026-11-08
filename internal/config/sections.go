@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/cantara/source-code-portal/internal/theme"
 )
 
 // Store configures the SQLite last-good cache.
@@ -113,6 +115,10 @@ type Cluster struct {
 type Web struct {
 	Dir  string `mapstructure:"dir"`  // holds server.js
 	Node string `mapstructure:"node"` // the Node.js executable, a path or a name on PATH
+	// ThemeDir holds a deployment's theme.css, logo.svg and favicon.svg (each optional), served under /theme/ and read at the start
+	// (design/theme.md); ProductName replaces "Source Code Portal" in the pages. Empty: the built-in look.
+	ThemeDir    string `mapstructure:"theme_dir"`
+	ProductName string `mapstructure:"product_name"`
 }
 
 func (w Web) validate() []string {
@@ -125,7 +131,7 @@ func (w Web) validate() []string {
 	if strings.TrimSpace(w.Node) == "" {
 		p = append(p, "web.node: required")
 	}
-	return p
+	return append(p, theme.Validate(w.ThemeDir, w.ProductName)...)
 }
 
 // Layout names the directory the layouts and the announcements an admin kept in files (before they lived in the store) are imported

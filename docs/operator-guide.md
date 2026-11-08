@@ -192,6 +192,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js executable that runs the bundle (26, the current LTS; 24 also runs it) |
+| `web.theme_dir` | empty | a directory with the deployment's `theme.css`, `logo.svg` and `favicon.svg` (each optional), served under `/theme/` and read at the start (section 2.7); empty: the built-in look |
+| `web.product_name` | empty | what the pages call the portal instead of "Source Code Portal": titles, the header, the presentation page, link previews and the app manifest (at most 60 characters); empty: the built-in name |
 | `layout.dir` | empty | only for an upgrade: a directory with the `dashboard.json`, `present.json` and `announcements.json` an administrator saved before they lived in the store. Each one the store does not hold yet is imported once at the start (the log says which); after that the store is the truth and the files are not read. Remove the key afterwards |
 | `announcements[]` | `[]` | the deployment's announcements (section 2.4.1): `id`, `title`, `text`, `tone`, `starts`, `ends`, `place`, `link` (`label`, `url`), `lang`, `pages`, `audience`, `from`, `until`, `published`; at most 20 |
 | `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy, `nuget` the feed whose `index.json` is the service index, `rubygems` a gem server, `packagist` a Composer repository |
@@ -608,6 +610,65 @@ page's tools and lets a Gemini model call them:
 The page adds three tools of its own to the catalogue's: `current_page` (what the reader looks at), `open_page` (go to a page of the
 portal) and `set_preferences` (the reader's Settings). None reaches an administrator's actions. When the badge shows 0, the flag is off
 or Chrome was not relaunched. The Guide (`/guide#webmcp`) shows the same steps with a picture of the inspector.
+
+### 2.7 A theme for your deployment
+
+A deployment can look like its owner's without rebuilding anything: the release binary, the web bundle and the image stay the signed
+ones, and the deployment's own repository holds only its configuration and its look.
+
+```yaml
+web:
+  theme_dir: /srv/scp/theme        # theme.css, logo.svg, favicon.svg: each optional
+  product_name: Acme Code          # instead of "Source Code Portal"
+```
+
+```
+acme-portal/               the deployment's repository (not a copy of this one)
+├── scp.yaml               github.sources, catalog.groups, web.theme_dir, web.product_name, ...
+├── theme/
+│   ├── theme.css          sets the colour tokens below
+│   ├── logo.svg           shown in the header instead of the portal's mark
+│   └── favicon.svg        the tab's icon (and the presentation page's app icon)
+└── compose.yaml           the release image, the files mounted read-only (production guide)
+```
+
+Mount the directory beside the configuration, as the production guide does for `scp.yaml` and the secrets, and upgrading is a new
+image tag. To ship one artifact instead, start from the release image and copy the files in:
+`FROM ghcr.io/cantara/source-code-portal:<version>`, then `COPY theme /theme` and `COPY scp.yaml /etc/scp/scp.yaml` and set
+`web.theme_dir: /theme`.
+
+- **What is served.** The portal serves the directory's stylesheets and pictures (`.css`, `.svg`, `.png`, `.jpg`, `.webp`, `.ico`)
+  under `/theme/`, also to a visitor who has not signed in (the sign-in page needs its theme); never a listing, a hidden file, a
+  script or anything outside the directory (a symbolic link out of it is refused). `theme.css` may be 128 KiB at most, other files
+  1 MiB. The content security policy is the portal's own: a stylesheet and pictures from the portal itself, no font and no address on
+  another host (a theme uses the system fonts).
+- **Read at the start.** Each address the pages use carries a hash of the file, so a changed file is a new address; the portal reads
+  the files when it starts, so restart it after a change. `scp config check` tells a directory that is missing, a stylesheet that is
+  too big or not UTF-8, and a name that is too long.
+- **The tokens.** `theme.css` sets the colour tokens, which every page draws with; it does not restyle components. Set each token in
+  `:root:not(.dark)` for the light theme and in `.dark` for the dark one: the theme comes after the portal's own stylesheet, so a token
+  set in plain `:root` would win in dark as well.
+
+  | Tokens | What they paint |
+  |---|---|
+  | `--background`, `--foreground`, `--card`, `--card-foreground`, `--popover`, `--popover-foreground` | the page, its text, cards and menus |
+  | `--primary`, `--primary-foreground`, `--ring` | the brand colour: the active navigation, links' accents, buttons and the focus ring |
+  | `--secondary`, `--muted`, `--accent` (each with `-foreground`; `--muted-foreground` is the quiet text), `--border`, `--input` | quiet surfaces, the active filter chip, lines and form fields |
+  | `--glow`, `--grid`, `--radius` | the glow behind the mark, the faint grid, the corner radius |
+  | `--active`, `--recent`, `--quiet`, `--dormant`, `--archived`, `--ai`, `--danger`, `--destructive` (and their `-fg`) | the signals of the guide: activity levels, the work with AI, danger. They carry meaning: change them only to colours that keep the same reading and a contrast of 4.5:1 on the card |
+  | `--announce-*`, `--diff-add`, `--diff-del`, `--lane-0` to `--lane-5` | the announcements' tones, a commit's added and removed lines, the commit graph's lanes |
+
+  ```css
+  /* theme/theme.css: a sample */
+  :root:not(.dark) { --primary: oklch(0.5 0.17 150); --primary-foreground: oklch(0.99 0 0); --ring: oklch(0.55 0.17 150); }
+  .dark            { --primary: oklch(0.8 0.16 150); --primary-foreground: oklch(0.15 0.03 150); --ring: oklch(0.8 0.16 150); }
+  :root            { --radius: 0.25rem; }
+  ```
+
+- **The name.** `web.product_name` is in the pages' titles, the header, the presentation page's brand, the link previews and the app
+  manifest. The guide, the assistant and the texts for agents keep the product's name, which they describe.
+- **Check it.** Look at the dashboard, a repository page and `/present` in both themes (the theme menu in the header), and run a
+  contrast check on what you changed; the health and activity colours are judged by eye on the fleet map.
 
 ## 3. Run
 

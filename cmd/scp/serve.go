@@ -49,6 +49,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/sync"
+	"github.com/cantara/source-code-portal/internal/theme"
 	"github.com/cantara/source-code-portal/internal/tools"
 	"github.com/cantara/source-code-portal/internal/webhook"
 	"github.com/cantara/source-code-portal/internal/webui"
@@ -275,9 +276,13 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	m := newMetrics(g)
 	gh.Observe(m.githubResponse)
 	s.engine.Observe(m.job)
+	look, themeRoutes, err := themed(cfg.Web)
+	if err != nil {
+		return nil, err
+	}
 	var upstream *url.URL
 	if cfg.Web.Dir != "" {
-		if s.web, err = webui.New(cfg.Web.Dir, cfg.Web.Node, readBuildInfo().Version, log); err != nil {
+		if s.web, err = webui.New(cfg.Web.Dir, cfg.Web.Node, readBuildInfo().Version, look.Env(), log); err != nil {
 			return nil, err
 		}
 		upstream = s.web.URL()
@@ -333,6 +338,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /repos/{owner}/{name}", Handler: md.Repo(), Markdown: true},
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
+	routes = append(routes, themeRoutes...)
 	routes = append(routes, catalog.Legacy(view)...)
 	routes = append(routes, s.eventRoutes(cfg, gh, m, st, feed, log)...)
 	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
@@ -750,4 +756,16 @@ func polledSources(cfg config.Config) []string {
 		}
 	}
 	return out
+}
+
+// themed loads the deployment's look (design/theme.md) and the route that serves its files, which exists only with web.theme_dir.
+func themed(w config.Web) (*theme.Theme, []httpapi.Route, error) {
+	look, err := theme.Load(w.ThemeDir, w.ProductName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("web: %w", err)
+	}
+	if w.ThemeDir == "" {
+		return look, nil, nil
+	}
+	return look, []httpapi.Route{{Pattern: "GET " + theme.Prefix + "{file...}", Handler: look.Handler()}}, nil
 }

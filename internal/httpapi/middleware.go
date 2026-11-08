@@ -343,7 +343,7 @@ func (w *gzipWriter) Flush() {
 
 // openPaths answer an anonymous request under access.require_auth: signing in, the sign-in page with its assets and the sign-in
 // methods it reads (/api/v1/me), GitHub's deliveries (signed) and robots.txt.
-var openPaths = []string{"/auth/", "/signin", "/_next/static/", "/favicon.svg", "/theme-init.js", "/api/v1/me", "/webhooks/", "/robots.txt"} //nolint:gochecknoglobals // lookup table
+var openPaths = []string{"/auth/", "/signin", "/_next/static/", "/favicon.svg", "/theme-init.js", "/theme/", "/api/v1/me", "/webhooks/", "/robots.txt"} //nolint:gochecknoglobals // lookup table
 
 func openPath(p string) bool {
 	return slices.ContainsFunc(openPaths, func(o string) bool {
