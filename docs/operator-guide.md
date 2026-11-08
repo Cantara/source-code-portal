@@ -466,7 +466,8 @@ finding. They need the App's *Issues* read permission (section 1); without it Gi
 
 **Releases** in the header (`/releases`) lists what the repositories published, newest first. The portal keeps each repository's 20
 newest published releases (drafts are never listed): it reads them when GitHub sends a *Release* event and every 6 hours as a safety
-net, as a conditional request that costs no rate limit when nothing changed. By default the page shows the latest release of
+net (every 30 minutes when no events reach the portal: no receiver and no `webhook.catch_up`; `/api/v1/status` lists each source's mode and
+how often each subject is refreshed), as a conditional request that costs no rate limit when nothing changed. By default the page shows the latest release of
 each repository, the newer of its latest stable GitHub release and the newest release of the packages it publishes to registries
 (Maven, npm, PyPI and the others the portal reads, section 2.5): a repository that publishes only to a registry is listed too, with the
 registry's name beside its version. The *Source* choice limits the page to GitHub's releases or to the packages'; the portal holds a

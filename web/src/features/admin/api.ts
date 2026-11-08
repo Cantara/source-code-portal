@@ -7,8 +7,24 @@ export interface AdminStatus {
   alive: boolean
   snapshot: { version: number; builtAt: string; ageSeconds: number; catalogued: boolean; repos: number }
   queue: { waiting: number; running: number }
-  sources: { id: string; repos: number; freshness: string; checkedAt: string | null; rateRemaining: number }[]
-  webhook: { enabled: boolean; deliveries: Record<string, number>; lastDelivery: string | null }
+  sources: {
+    id: string
+    repos: number
+    freshness: string
+    checkedAt: string | null
+    rateRemaining: number
+    /** events: GitHub tells the portal (the receiver or the App's delivery log); poll: the portal asks. */
+    mode: "events" | "poll"
+    /** each subject's refresh in seconds: the safety net under events, the cadence under poll. */
+    cadenceSeconds: Record<string, number>
+  }[]
+  webhook: {
+    enabled: boolean
+    receiver: boolean
+    catchUp: boolean
+    deliveries: Record<string, number>
+    lastDelivery: string | null
+  }
   cluster: { enabled: boolean; connected: boolean; leader: boolean }
   warnings: string[]
 }

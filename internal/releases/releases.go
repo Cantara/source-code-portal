@@ -32,6 +32,9 @@ const (
 	// delivery log read every two minutes for one that was missed. A shorter TTL makes a cold start read every repository again before it
 	// has read the last one.
 	ttl = 6 * time.Hour
+	// pollTTL is the cadence for a source nothing tells about a new release (no webhook, no delivery log): conditional requests, a 304
+	// costs nothing against GitHub's limits.
+	pollTTL = 30 * time.Minute
 	// ConfirmAfter is when a run caused by an event reads again: GitHub's listing can be a few seconds behind the event.
 	ConfirmAfter = 30 * time.Second
 	maxName      = 200
@@ -182,7 +185,7 @@ func New(sources map[string]Fetcher) *Releases { return &Releases{sources: sourc
 
 // Spec is the per-repository releases job.
 func (f *Releases) Spec() sync.Spec {
-	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: Events, Run: f.run, Publish: publish}
+	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, PollTTL: pollTTL, On: Events, Run: f.run, Publish: publish}
 }
 
 func (f *Releases) run(ctx context.Context, j sync.Job) (sync.Result, error) {

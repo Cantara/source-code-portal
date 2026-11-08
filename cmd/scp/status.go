@@ -22,10 +22,12 @@ type status struct {
 	current      func() *snapshot.Snapshot
 	depth        func() (waiting, running int)
 	rate         func() map[string]float64
-	webhook      bool            // events reach the portal (a receiver or the delivery log)
-	receiver     bool            // GitHub can post to the portal
-	catchUp      bool            // the Apps' delivery logs are read
-	layouts      func() []string // why stored layouts are not served
+	webhook      bool                                         // events reach the portal (a receiver or the delivery log)
+	receiver     bool                                         // GitHub can post to the portal
+	catchUp      bool                                         // the Apps' delivery logs are read
+	polled       map[string]bool                              // sources nothing tells about changes
+	cadence      func(source string) map[string]time.Duration // each subject's refresh for a source
+	layouts      func() []string                              // why stored layouts are not served
 	prereqs      func() []prereq.Unmet
 	cluster      interface {
 		Leader() bool
@@ -68,6 +70,10 @@ type statusSource struct {
 	Freshness     string     `json:"freshness"`
 	CheckedAt     *time.Time `json:"checkedAt"`
 	RateRemaining float64    `json:"rateRemaining"`
+	// Mode is how the source is kept fresh: events (GitHub tells the portal: the receiver, or the App's delivery log) or poll. Cadence
+	// is each subject's refresh in seconds: under events it is the safety net, under poll how often it is asked.
+	Mode    string             `json:"mode"`
+	Cadence map[string]float64 `json:"cadenceSeconds"`
 }
 
 type statusCluster struct {
@@ -105,7 +111,14 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	b.Queue.Waiting, b.Queue.Running = st.depth()
 	rates := st.rate()
 	for _, src := range s.Sources {
-		ss := statusSource{ID: src.ID, Repos: src.Repos, Freshness: src.Fresh.Derive(now).String(), RateRemaining: rates[src.ID]}
+		ss := statusSource{ID: src.ID, Repos: src.Repos, Freshness: src.Fresh.Derive(now).String(), RateRemaining: rates[src.ID], Mode: "events",
+			Cadence: map[string]float64{}}
+		if st.polled[src.ID] {
+			ss.Mode = "poll"
+		}
+		for kind, d := range st.cadence(src.ID) {
+			ss.Cadence[kind] = d.Seconds()
+		}
 		if !src.Fresh.CheckedAt.IsZero() {
 			at := src.Fresh.CheckedAt
 			ss.CheckedAt = &at

@@ -35,9 +35,14 @@ never modify it, push to it or open issues or pull requests on it.
   complete, open one PR for it (its commits pushed to a branch); CI runs once, on the PR. When the owner explicitly asks to commit and push
   directly, push `main` itself (no branch, no PR): his instruction wins, for that request. Between changes run only the tests of what
   changed; the full `make check` once, before the PR. Never rerun a flaky job: fix the test. CI runs quick checks only; the browser tests and the load and size checks run locally in `make check` (P-85).
-- **The agent drives the work.** It takes the milestones in order and starts the next one when the last is green, without waiting
-  for a go. The specs (`plan.md`, `design/`) cover what the owner wants; the owner accepts the agent's choices. Decide, record in
-  `decisions.md`, keep going; never ask the owner, and leave no open questions in documents or replies.
+- **The agent drives the work, goal first.** Getting it done is the north star. Every piece of work starts by writing its goal, its
+  acceptance criteria (observable, checkable) and its definition of done (code, tests, the full gate green, documents and the code map
+  current, PR open and CI green) in the design note or the `plan.md` row; then the agent carries it out alone, to the end, and starts the
+  next milestone when the last is done. The specs cover what the owner wants; the owner accepts the agent's choices. A missing detail is
+  decided (the most conventional, safest option), recorded in `decisions.md` and carried on with; the agent never asks the owner for
+  input, clarification or confirmation, leaves no open questions in documents or replies, and stops only for what it cannot do itself
+  (a release or tag, a secret, a real-world account) or what the rules forbid; those are named once in the final report with the exact
+  step left. Reports state what is done, how it was verified and what remains unverified, in a few lines.
 - **Version**: semantic versioning (P-16): `v2.0.0` first, then every release bumps the patch version unless the owner decides a minor
   or major bump; the agent does not tag releases. Published tags are never moved.
 - **Read-only towards GitHub** (P-71): read permissions, GET requests and GraphQL queries only, never a write or a mutation; the fake

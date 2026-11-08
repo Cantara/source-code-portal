@@ -95,6 +95,9 @@ export function Status({ s }: { s: AdminStatus }) {
                 Listing
               </th>
               <th scope="col" className="py-1 font-normal">
+                Kept fresh
+              </th>
+              <th scope="col" className="py-1 font-normal">
                 Rate limit left
               </th>
             </tr>
@@ -107,6 +110,10 @@ export function Status({ s }: { s: AdminStatus }) {
                 <td className="py-1">
                   {src.freshness}, <RelativeTime at={src.checkedAt} />
                 </td>
+                <td className="py-1">
+                  <span className="font-medium">{src.mode === "events" ? "Events" : "Polling"}</span>
+                  <span className="block text-xs text-muted-foreground">{cadence(src)}</span>
+                </td>
                 <td className="py-1">{Math.round(src.rateRemaining * 100)}%</td>
               </tr>
             ))}
@@ -117,7 +124,9 @@ export function Status({ s }: { s: AdminStatus }) {
         <CardTitle>Webhook</CardTitle>
         <Facts
           rows={[
-            ["Configured", yes(s.webhook.enabled)],
+            ["Events reach the portal", yes(s.webhook.enabled)],
+            ["Receiver", yes(s.webhook.receiver)],
+            ["Delivery log read", yes(s.webhook.catchUp)],
             ["Last delivery", <RelativeTime key="l" at={s.webhook.lastDelivery} />],
             ...Object.entries(s.webhook.deliveries)
               .sort(([a], [b]) => a.localeCompare(b))
@@ -127,6 +136,32 @@ export function Status({ s }: { s: AdminStatus }) {
       </Card>
     </div>
   )
+}
+
+const subjects: Record<string, string> = {
+  catalog: "Listing",
+  commits: "Commits",
+  pulls: "Pull requests",
+  issues: "Issues",
+  releases: "Releases",
+  docs: "Documents",
+  manifests: "Dependencies",
+  packages: "Packages",
+}
+
+/** every is a refresh interval in words. */
+function every(seconds: number): string {
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min`
+  const h = seconds / 3600
+  return `${Number.isInteger(h) ? h : h.toFixed(1)} h`
+}
+
+/** cadence tells how each subject of a source is refreshed: the net under events, the poll otherwise. */
+function cadence(src: AdminStatus["sources"][number]): string {
+  const parts = Object.entries(src.cadenceSeconds)
+    .filter(([kind]) => subjects[kind])
+    .map(([kind, s]) => `${subjects[kind]} ${every(s)}`)
+  return (src.mode === "events" ? "net " : "every ") + parts.join(", ")
 }
 
 const access: Record<string, string> = { "signed-in": "signed-in viewers", admin: "administrators", everyone: "everyone" }

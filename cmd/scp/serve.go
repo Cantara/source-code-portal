@@ -192,6 +192,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 	}()
 	s.engine = sync.New(s.store, s.pub, gh, ids, cfg.Sync.Concurrency, log)
+	s.engine.SetPolling(polledSources(cfg)...)
 	bi := readBuildInfo()
 	s.engine.Release(bi.Version + "+" + bi.Build) // a new build runs failed jobs again
 	if len(cfg.Cluster.Addresses) > 0 {
@@ -260,8 +261,12 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
-		webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
+		cadence: s.engine.Cadence, webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
 		deliveries: map[string]int{}}
+	st.polled = map[string]bool{}
+	for _, id := range polledSources(cfg) {
+		st.polled[id] = true
+	}
 	if s.member != nil {
 		st.cluster = s.member
 	}
@@ -674,4 +679,17 @@ func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, s
 	}
 	rc.Observe(observe)
 	return []httpapi.Route{{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc}}
+}
+
+// polledSources are the sources GitHub does not tell about changes: with a webhook receiver every source is told (the operator set the
+// webhooks), without one only an App whose delivery log is read (webhook.catch_up) is; the others are polled, and the jobs whose TTL is
+// only a net under events (sync.Spec.PollTTL) run at their poll cadence.
+func polledSources(cfg config.Config) []string {
+	var out []string
+	for _, src := range cfg.GitHub.Sources {
+		if !cfg.Webhook.Secret.IsSet() && (!cfg.Webhook.CatchUp || src.App == nil) {
+			out = append(out, src.ID)
+		}
+	}
+	return out
 }

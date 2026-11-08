@@ -3,7 +3,7 @@
 Instructions for coding agents working in this repository (Source Code Portal, Go module `github.com/cantara/source-code-portal`).
 
 - Plan and design: `.claude/work/plan.md` (binding), `.claude/work/design/*.md`, decisions in `.claude/work/decisions.md`.
-- The agent drives: milestones in order, the next one started when the last is green; the specs cover the requirements, the owner
+- The agent drives, goal first: write the goal, acceptance criteria and definition of done, then work alone to the end without asking the owner for input or confirmation (see `.claude/CLAUDE.md`). Milestones in order, the next one started when the last is green; the specs cover the requirements, the owner
   accepts the agent's choices. Decide, record in `decisions.md` and continue; never ask the owner.
 - Layout: `cmd/scp` (Cobra CLI and all wiring), `internal/<package>` (created with its first code), `api/openapi.yaml` (the `/api/v1`
   contract), `web/` (Next.js web UI; `pnpm build` makes `web/bundle`, which `scp serve` runs with Node via `web.dir`), `deploy/` (Dockerfile, example config), `docs/` (user documentation).
