@@ -17,7 +17,9 @@ so a group cannot even name one as its `default_repo`).
 - **Views.** A snapshot has four views, by private/public and by forks hidden/shown: `Snapshot.View(private, forks)`. The default
   has them hidden. Every handler already reads `view(ctx)`; the request's choice is `?forks=show` on any GET of the public listener
   (the web UI's cookie `scp-forks`, FK3, turns into it). Versions, ETags, search index, llms, sitemap and counts follow the view. A hidden
-  fork's own address answers 404 in the default view like an address that does not exist.
+  fork's own address answers 404 in the default view like an address that does not exist. Two routes are the exception: the
+  badges and the documents' images are fetched by the browser as pictures, with nothing to carry `?forks=show`, and are named by
+  the repository's own address, so they answer for hidden forks too (found by running the branch on a real organisation).
 - **FK2, the API.** `GET /api/v1/dashboard` and `GET /api/v1/groups` say how many forks are hidden (`hiddenForks`), so a page can offer
   to show them; `scp config groups` says why a fork is not in a group ("fork; pin it with default_repo or exact, or include_forks").
 - **FK3, the web UI.** A "Show forks (N)" switch on the dashboard and the group page and in Settings (cookie `scp-forks`), only where
@@ -32,7 +34,7 @@ so a group cannot even name one as its `default_repo`).
 
 ## Acceptance
 
-- A fork no group pins is absent from the default view's repositories, groups, counts, search, llms, sitemap and badges, present with
+- A fork no group pins is absent from the default view's repositories, groups, counts, search, llms and sitemap, present with
   `?forks=show`, and counted in `hiddenForks`.
 - A fork named by `default_repo` or an `exact` matcher is in every view; with `include_forks: true` every fork is.
 - The views are consistent: versions differ only when hidden forks exist; with none, the views are the same objects (no extra cost).

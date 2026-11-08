@@ -157,7 +157,8 @@ catalog:
 	if !strings.Contains(strings.ToLower(toJSON(found)), "upstream-copy") {
 		t.Errorf("search with forks=show does not find the fork: %+v", found)
 	}
-	if code := get("/badges/repos/acme/upstream-copy/license.svg", nil); code != http.StatusNotFound {
+	// A badge is a picture the browser fetches without saying what the reader asked: it answers for a hidden fork too.
+	if code := get("/badges/repos/acme/upstream-copy/license.svg", nil); code != http.StatusOK {
 		t.Errorf("a hidden fork's badge: %d", code)
 	}
 }

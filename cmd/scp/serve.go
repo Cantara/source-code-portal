@@ -319,9 +319,12 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if external == nil {
 		external = egress.Guarded(10 * time.Second)
 	}
-	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(view,
+	// A badge and a document's image are fetched by the browser as pictures, with nothing to say that the reader asked for forks, and they
+	// are named by the repository's own address: they answer for every repository of the viewer's view, hidden forks included.
+	assets := func(ctx context.Context) *snapshot.Snapshot { return s.pub.Current().View(httpapi.Private(ctx), true) }
+	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(assets,
 		badgeData(f))},
-		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(view, external)},
+		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(assets, external)},
 		{Pattern: "GET /llms.txt", Handler: md.Index()}, {Pattern: "GET /llms-full.txt", Handler: md.Full()},
 		{Pattern: "GET /knowledge.yaml", Handler: md.KCP()}, {Pattern: "GET /.well-known/kcp.json", Handler: md.WellKnown()},
 		{Pattern: "GET /sitemap.xml", Handler: md.Sitemap()}, {Pattern: "GET /sitemaps/{file}", Handler: md.Sitemap()},

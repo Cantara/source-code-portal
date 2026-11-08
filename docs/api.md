@@ -16,10 +16,11 @@ curl -s -H "Authorization: Bearer $(cat ~/.config/scp/token)" https://scp.exampl
 
 The contract is OpenAPI 3.1, served by the portal at `/api/v1/openapi.yaml` (and in the repository at `api/openapi.yaml`).
 
-**Forks.** Forks of other repositories are left out of every answer (the repositories, the groups and their counts, the search, the
-badges, `llms.txt` and the sitemap) unless the source shows them (`include_forks`) or a group names one as its default repository or
+**Forks.** Forks of other repositories are left out of every answer (the repositories, the groups and their counts, the search,
+`llms.txt` and the sitemap) unless the source shows them (`include_forks`) or a group names one as its default repository or
 with an `exact` matcher. Add `forks=show` to any `GET` to have them all; the dashboard and a group say how many are left out
-(`hiddenForks`). A repository says whether it is a fork (`fork`).
+(`hiddenForks`). A repository says whether it is a fork (`fork`). Badges and the images of documents are addressed by the
+repository and answer for a fork whatever the choice.
 
 | Request | Returns |
 |---|---|
