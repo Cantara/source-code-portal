@@ -6,6 +6,12 @@ subjects.
 
 ## Unreleased
 
+- **Everything in SQLite, and an instance that dies survives**: the layouts and announcements administrators save now live in the store
+  (the new `document` table, a copy `scp.db.pre-0004` is taken first) instead of files, and every acknowledged write (a saved
+  document, a sealed credential, a parked webhook event) is synced to disk before it returns. `layout.dir` is now only read once, at
+  the start, to import the files an earlier version kept; after that remove it. `make rehearse` kills a real instance with SIGKILL
+  after the saves and proves the restart serves everything.
+
 - **Upgrade and rollback rehearsal**: `make rehearse` (part of `make check`) runs the newest release and the current tree on one store against a fake GitHub and proves the migration keeps the data, takes the `.pre-NNNN` copy, that the older build quarantines a migrated store, and that the copy brings the data back.
 
 - **Personal edition: events with a GitHub App of your own**: a new "Events" step in the setup page makes a read-only GitHub App per

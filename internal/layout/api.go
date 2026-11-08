@@ -129,7 +129,7 @@ func (h admin) writable(w http.ResponseWriter, r *http.Request) bool {
 	case !httpapi.SameOrigin(r, h.publicURL):
 		httpapi.WriteProblem(w, http.StatusForbidden, "cross-origin", "Change the layout from the portal's own pages.")
 	case !h.store.Writable():
-		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "Set layout.dir to save layouts.")
+		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "This portal has no store to save layouts in.")
 	default:
 		return true
 	}
@@ -149,7 +149,7 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.finish(w, page, func() error {
-		_, err := h.store.Save(page, Layout{Elements: body.Elements}, body.Revision)
+		_, err := h.store.Save(r.Context(), page, Layout{Elements: body.Elements}, body.Revision)
 		return err
 	})
 }
@@ -159,7 +159,7 @@ func (h admin) reset(w http.ResponseWriter, r *http.Request) {
 	if !ok || !h.writable(w, r) {
 		return
 	}
-	h.finish(w, page, func() error { return h.store.Reset(page, r.URL.Query().Get("revision")) })
+	h.finish(w, page, func() error { return h.store.Reset(r.Context(), page, r.URL.Query().Get("revision")) })
 }
 
 // finish runs a write and answers the stored layout, or why the write was refused.
@@ -168,7 +168,7 @@ func (h admin) finish(w http.ResponseWriter, page string, write func() error) {
 	case errors.Is(err, ErrConflict):
 		httpapi.WriteProblem(w, http.StatusPreconditionFailed, "conflict", "Someone saved this layout since you opened it; reload to see theirs.")
 	case errors.Is(err, ErrReadOnly):
-		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "Set layout.dir to save layouts.")
+		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "This portal has no store to save layouts in.")
 	case errors.As(err, new(Invalid)):
 		httpapi.WriteProblem(w, http.StatusUnprocessableEntity, "validation-failed", err.Error())
 	case err != nil:

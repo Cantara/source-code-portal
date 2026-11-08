@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 
-	"github.com/cantara/source-code-portal/internal/filestore"
+	"github.com/cantara/source-code-portal/internal/docstore"
 )
 
 var (
 	// ErrConflict is a save or reset based on a revision that is no longer the stored one.
-	ErrConflict = filestore.ErrConflict
-	// ErrReadOnly is a save or reset without a layout directory.
-	ErrReadOnly = filestore.ErrReadOnly
+	ErrConflict = docstore.ErrConflict
+	// ErrReadOnly is a save or reset without a store.
+	ErrReadOnly = docstore.ErrReadOnly
 )
 
 // Invalid is a layout the element catalogue refuses.
@@ -29,25 +30,27 @@ type Page struct {
 	Problem  string // why the file is not served; empty when it is
 }
 
-// Store is the file-system layout store: `<dir>/<page>.json` per page (internal/filestore). It serves from memory and reloads a
-// file that changed.
+// Store is the layout store: one document per page in the store (internal/docstore), served from memory.
 type Store struct {
-	dir   string // empty: built-in layouts only
+	db    docstore.Backend // nil: built-in layouts only
 	log   *slog.Logger
-	files map[string]*filestore.File[Layout]
+	files map[string]*docstore.Doc[Layout]
 }
 
-// Open loads every page's layout from dir (empty: none, the store serves the built-in layouts and refuses writes).
-func Open(dir string, log *slog.Logger) *Store {
-	s := &Store{dir: dir, log: log, files: map[string]*filestore.File[Layout]{}}
+// Open loads every page's layout from db (nil: none, the store serves the built-in layouts and refuses writes).
+func Open(ctx context.Context, db docstore.Backend, log *slog.Logger) *Store {
+	s := &Store{db: db, log: log, files: map[string]*docstore.Doc[Layout]{}}
 	for _, p := range pages {
-		s.files[p] = filestore.Open(dir, p, Default(p), Parse, log.With("layout", p))
+		s.files[p] = docstore.Open(ctx, db, p, Default(p), Parse, log.With("layout", p))
 	}
 	return s
 }
 
+// Names are the documents' names: one per page, as the files layout.dir held were named.
+func Names() []string { return slices.Clone(pages) }
+
 // Writable reports whether layouts can be saved.
-func (s *Store) Writable() bool { return s.dir != "" }
+func (s *Store) Writable() bool { return s.db != nil }
 
 // Get returns what the store holds for page; the built-in layout of an unknown page.
 func (s *Store) Get(page string) Page {
@@ -59,7 +62,7 @@ func (s *Store) Get(page string) Page {
 	return Page{Layout: st.Value, Revision: st.Revision, Stored: st.Stored, Problem: st.Problem}
 }
 
-// Problems returns, per page, why its file is not served.
+// Problems returns, per page, why its document is not served.
 func (s *Store) Problems() []string {
 	var out []string
 	for _, p := range pages {
@@ -70,21 +73,9 @@ func (s *Store) Problems() []string {
 	return out
 }
 
-// Run reloads changed files until ctx ends.
-func (s *Store) Run(ctx context.Context) {
-	if s.dir == "" {
-		return
-	}
-	files := make([]filestore.Reloader, 0, len(pages))
-	for _, p := range pages {
-		files = append(files, s.files[p])
-	}
-	filestore.Watch(ctx, files...)
-}
-
-// Save stores l as page's layout when revision is the stored one (empty: no file yet) and returns the new revision.
-func (s *Store) Save(page string, l Layout, revision string) (string, error) {
-	if s.dir == "" {
+// Save stores l as page's layout when revision is the stored one (empty: none yet) and returns the new revision.
+func (s *Store) Save(ctx context.Context, page string, l Layout, revision string) (string, error) {
+	if s.db == nil {
 		return "", ErrReadOnly
 	}
 	if err := l.Validate(); err != nil {
@@ -94,11 +85,10 @@ func (s *Store) Save(page string, l Layout, revision string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return s.files[page].Save(append(b, '\n'), revision)
+	return s.files[page].Save(ctx, append(b, '\n'), revision)
 }
 
 // Reset removes page's layout when revision is the stored one, so the built-in layout renders again.
-func (s *Store) Reset(page, revision string) error { return s.files[page].Remove(revision) }
-
-// reload reads page's file again when it changed.
-func (s *Store) reload(page string) { s.files[page].Reload() }
+func (s *Store) Reset(ctx context.Context, page, revision string) error {
+	return s.files[page].Remove(ctx, revision)
+}

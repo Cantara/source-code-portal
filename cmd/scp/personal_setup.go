@@ -30,7 +30,7 @@ const defaultClientID = ""
 // code, where the person signs in to GitHub, chooses accounts and sorts repositories into products. When they finish it has written
 // personal.yaml, sealed the credential and made the sign-in link of the portal that starts next on the same port.
 func (p *personal) browserSetup(ctx context.Context, dir, cfgPath string) (*auth.Launch, error) {
-	if err := os.MkdirAll(filepath.Join(dir, "layout"), 0o700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
 	key, where, err := vault.OpenKey(dir, p.keyRing(dir))

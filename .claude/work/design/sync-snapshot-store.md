@@ -20,7 +20,7 @@ budget, retries and pauses.
   repository whose `pushed_at` changed; the 2 h commits TTL is the safety net.
 - Publish is debounced (200 ms quiet, 1 s max, constants in `cmd/scp`): one rebuild per batch keeps CPU flat on cold start and webhook
   latency under seconds. One build runs at a time, each from the snapshot the previous one stored.
-- `modernc.org/sqlite`, WAL, one connection: pure Go; the database is a cache, so `synchronous=NORMAL` and quarantine-on-doubt fit.
+- `modernc.org/sqlite`, WAL, one connection: pure Go; the jobs' writes are a cache of GitHub, so `synchronous=NORMAL` and quarantine-on-doubt fit; what has been acknowledged (documents, credentials, parked events) is synced (`synchronous=FULL`, P-97).
 - Own migration runner on `PRAGMA user_version`: forward-only, a rollback is deleting the cache file.
 - Content SHAs are the persisted validators; ETags stay in the GitHub client's memory (github.md): they are bound to a rotating token.
 - A permanent error is recorded on the item, which is next due after 24 h: the item row carries all retry state. A new release

@@ -20,13 +20,15 @@ type Credential struct {
 	CreatedAt time.Time
 }
 
-// PutCredential stores c, replacing the credential with the same id.
+// PutCredential stores c, replacing the credential with the same id; the write is synced to disk before it returns.
 func (s *DB) PutCredential(ctx context.Context, c Credential) error {
-	_, err := s.db.ExecContext(ctx, `INSERT INTO credential (id, source, kind, sealed, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT (id) DO UPDATE SET source = excluded.source, kind = excluded.kind, sealed = excluded.sealed,
-		expires_at = excluded.expires_at, created_at = excluded.created_at`,
-		c.ID, c.Source, c.Kind, c.Sealed, toUnix(c.ExpiresAt), c.CreatedAt.Unix())
-	return err
+	return s.durably(ctx, func(conn *sql.Conn) error {
+		_, err := conn.ExecContext(ctx, `INSERT INTO credential (id, source, kind, sealed, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT (id) DO UPDATE SET source = excluded.source, kind = excluded.kind, sealed = excluded.sealed,
+			expires_at = excluded.expires_at, created_at = excluded.created_at`,
+			c.ID, c.Source, c.Kind, c.Sealed, toUnix(c.ExpiresAt), c.CreatedAt.Unix())
+		return err
+	})
 }
 
 // Credential returns the credential with id, or ErrNoCredential.

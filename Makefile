@@ -46,8 +46,9 @@ test: ## Go tests with the race detector, web tests
 e2e: web ## Playwright against the server running the web bundle and a fake GitHub (needs `pnpm -C web exec playwright install chromium`)
 	$(PNPM) -C web e2e
 
-rehearse: ## upgrade and rollback of the store between the newest release and this tree, offline (scripts/upgrade-rehearsal.sh)
+rehearse: ## the store's upgrade and rollback between the newest release and this tree, and a killed instance coming back, offline (scripts/upgrade-rehearsal.sh, scripts/crash-rehearsal.sh)
 	scripts/upgrade-rehearsal.sh
+	scripts/crash-rehearsal.sh
 
 check: gen ## the gate: generated code current, modules tidy, lint, test
 	git diff --exit-code

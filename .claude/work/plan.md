@@ -49,7 +49,7 @@ Rules (checked as described in `design/principles.md`):
    all of them), its jobs and its feature-only GitHub calls; a consumer declares the small function it needs and `cmd/scp` wires it. `cmd/scp/boundary_test.go` enforces the imports. The web UI keeps the same rule for `web/src/features`.
 3. Failure is data: each item carries its freshness; the last good state is served.
 4. Untrusted input (README, descriptor, manifests, webhook bodies) goes through bounded parsers and one sanitiser producing `SafeHTML`.
-5. SQLite is a rebuildable cache: deleting it costs a resync, never data.
+5. SQLite is the one place data lives and memory only loads it (P-97): the catalogue part can be read again from GitHub, but the documents administrators save and the sealed credentials are data, so the file is backed up, and every acknowledged write is synced to disk (an instance that dies must survive).
 
 Packages, config keys and metrics arrive with the code that uses them.
 
@@ -127,6 +127,7 @@ the one exception to currency, kept behind the `SafeHTML` constructor.
 | EV1 | Events without a receiver (`design/sync-modes.md`, P-95): `webhook.catch_up` reads the Apps' delivery logs with no webhook secret | `TestCatchUpWithoutAReceiver`: no receiver route, a missed delivery's release is read at once, an unannounced one waits for its poll; the config refuses `catch_up` without an App | built |
 | EV2 | A mode per source (events or poll) and a cadence per subject (`design/sync-modes.md`): `Spec.PollTTL`, the Admin status's per-source cadence | engine test of a poll-mode source's faster release poll and an events-mode source's unchanged one; the status lists both | built |
 | EV3 | The wizard's Connect step (`design/sync-modes.md`, `design/personal.md`): a GitHub App by manifest, installs per account, sources per mode | `internal/setup` tests against a fake GitHub (manifest conversion, installations, the key sealed), `personal.yaml` with an App source and a token source, the page in a browser | built |
+| SQ1 | Everything persisted in SQLite, memory loads it; an instance that dies survives (`design/documents.md`, P-97): the `document` table (migration 0004), `internal/docstore` replaces `internal/filestore`, acknowledged writes synced to disk, `layout.dir` imported once | store, docstore, layout and announce tests; `scripts/crash-rehearsal.sh` kills a real instance with SIGKILL after the saves and the restart serves everything; `scripts/upgrade-rehearsal.sh` | built |
 | IN1 | Insights, the data and the page (`design/insights.md`, P-83): cadence, technology, shared libraries, single-author repositories and ageing from the snapshot; `GET /api/v1/insights`, `/insights` in the header | each insight matches a fixture fleet; no author is named; a private repository's numbers are absent for the public; Playwright and axe pass | done |
 | IN2 | Insights, the rest: the tool `fleet_insights`, llms; docs, the Guide, the plugin | as PR3 | done |
 | IN3 | Insights, the graphs (`design/insights.md`, owner 2026-11-06): the release rhythm heatmap, the version ladder, the dependency matrix, the concentration histogram, the ageing bars, all inline SVG | the API carries the numbers each graph draws; the graphs match a fixture; Playwright and axe pass in both themes | done |

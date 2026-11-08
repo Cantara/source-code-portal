@@ -7,7 +7,7 @@ the readers' words. A new part of a page gets its term here first.
 
 | Term | What it is | In code |
 |---|---|---|
-| **Layout** | A page's ordered list of elements: the built-in one, or the one an admin stored | `/api/v1/pages/{page}`, `<layout.dir>/<page>.json` |
+| **Layout** | A page's ordered list of elements: the built-in one, or the one an admin stored | `/api/v1/pages/{page}`, the store's document `<page>` |
 | **Element** | One block of a page, of a kind: `announcements`, `telemetry`, `fleet-map`, `products`, `pulls`, `issues`, `latest-commits`, `heading` | `LayoutElement`; `Elements` in `features/dashboard/elements.tsx` |
 | **Design mode** | Where an admin adds, moves, changes and removes elements and saves the layout | `features/dashboard/design.tsx` |
 | **Main column** | At the left on a wide screen: the `products` element. It grows with its content; the **page scrolls** | `main` of `SidePanel` |
@@ -41,8 +41,7 @@ on a portal of 134 repositories it is 11 screens long, a catch-all group repeats
 a default ("no release", the common licence, the main language). The few signals that matter are lost.
 
 L1 rebuilds the landing page from a small catalogue of page elements that carry signals, not attributes. L2 makes the page's
-composition data: an admin arranges the elements in a design mode and the portal keeps the result in a layout store, the file system
-first.
+composition data: an admin arranges the elements in a design mode and the portal keeps the result in a layout store: a document per page in the store (SQLite), `design/documents.md`.
 
 ## Signals, not attributes
 The rule every element keeps, and the test for any new one:
@@ -131,15 +130,12 @@ flat object per element whose kind reads only its own fields):
   kind with only its own options (`groups` 1..100 unique group ids for `fleet-map` and `products`, `view` for `products`, `count` 1..50
   for `latest-commits`, `text` (required) and `note` for `heading`, cleaned to one plain line with `untrusted.Text`). No HTML, no
   scripts, no URLs. The web UI renders only known kinds. Absent `groups` means every group.
-- **Store**: `layout.Store` over `layout.dir`, one `<page>.json` per page, written to a temporary file, synced and renamed. The revision
-  is the file's content digest (SHA-256, 128 bits), empty when there is no file; a save or reset on another revision is refused (412),
-  so two admins never overwrite each other. A broken file keeps the last good layout serving and reports why; its revision is the broken
-  content's, so an admin can save over it. Without `layout.dir` the built-in layout renders and saves answer 409.
-- **Not a cache, not a user store**: layouts are the site's, edited by admins; they never go into SQLite (rule 5) and nothing is kept
-  per person (P-27).
-- **Reload**: each instance stats the files every 5 s and reads a changed one, so a shared volume serves several instances and a file
-  written by hand or by configuration management is picked up. A file that fails validation is logged and shown on the status page
-  (`/api/v1/status` warnings) and in the design mode.
+- **Store**: `layout.Store` over `internal/docstore`: one document per page in the store (SQLite), loaded into memory and written
+  through (synced to disk) on a save. The revision is the content digest (SHA-256, 128 bits), empty when nothing is stored; a save or
+  reset on another revision is refused (412), so two admins never overwrite each other. A document that no longer parses is served as the
+  built-in layout and reports why; its revision is the stored content's, so an admin can save over it. Without a store (tests) the
+  built-in layout renders and saves answer 409. Files from `layout.dir` are imported once (`design/documents.md`).
+- **Persistence**: layouts are the site's, edited by admins, nothing is kept per person (P-27); like all data they are in SQLite (P-97).
 - **API**: `GET /api/v1/pages/{page}` (contract) answers the elements resolved against the viewer's view: a group with no repository the
   viewer sees is dropped, and an element whose chosen groups all are, so the leak test (which walks every contract GET) covers it.
   `GET`, `PUT` and `DELETE /api/v1/admin/layouts/{page}` (outside the contract, as the admin status is; admin role; writes from the

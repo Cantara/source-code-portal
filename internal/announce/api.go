@@ -9,7 +9,7 @@ import (
 	"slices"
 
 	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/filestore"
+	"github.com/cantara/source-code-portal/internal/docstore"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 )
 
@@ -67,7 +67,7 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, http.StatusForbidden, "cross-origin", "Change the announcements from the portal's own pages.")
 		return
 	case !h.n.file.Writable():
-		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "Set layout.dir to save announcements.")
+		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "This portal has no store to save announcements in.")
 		return
 	}
 	var body saveBody
@@ -79,8 +79,8 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, http.StatusUnprocessableEntity, "validation-failed", err.Error())
 		return
 	}
-	switch _, err := h.n.file.Save(b, body.Revision); {
-	case errors.Is(err, filestore.ErrConflict):
+	switch _, err := h.n.file.Save(r.Context(), b, body.Revision); {
+	case errors.Is(err, docstore.ErrConflict):
 		httpapi.WriteProblem(w, http.StatusPreconditionFailed, "conflict", "Someone saved the announcements since you opened them; reload to see theirs.")
 	case err != nil:
 		h.log.Error("announcements not written", "err", err)
