@@ -289,23 +289,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
 	routes = append(routes, catalog.Legacy(view)...)
-	if feed {
-		s.inbox = &inbox{park: s.store, deliver: s.deliver, handled: s.engine.Handled, log: log, now: time.Now}
-		observe := func(event, result string) { m.delivery(event, result); st.delivery(event, result) }
-		for _, src := range cfg.GitHub.Sources {
-			if g := gh.Source(src.ID); g.App() {
-				s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, webhookSink(s.inbox.take, cfg.GitHub.Sources), observe, log))
-			}
-		}
-		if cfg.Webhook.Secret.IsSet() { // the receiver: GitHub can reach the portal
-			rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.inbox.take, cfg.GitHub.Sources), log)
-			if s.member != nil {
-				rc.Dedupe(s.member.First)
-			}
-			rc.Observe(observe)
-			routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
-		}
-	}
+	routes = append(routes, s.eventRoutes(cfg, gh, m, st, feed, log)...)
 	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
 	me := httpapi.MeAPI{}
 	if cfg.Auth.SignIn() || len(cfg.Auth.Tokens) > 0 {
@@ -666,4 +650,28 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, 
 	}
 	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(public, private, registries), Registries: registries,
 		Public: cfg.Public, Repo: repo})
+}
+
+// eventRoutes wires what tells the portal about changes: the inbox that makes events survive a restart, the catch-up of each App's
+// delivery log, and with a webhook secret the receiver (the returned route).
+func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, st *status, feed bool, log *slog.Logger) []httpapi.Route {
+	if !feed {
+		return nil
+	}
+	s.inbox = &inbox{park: s.store, deliver: s.deliver, handled: s.engine.Handled, log: log, now: time.Now}
+	observe := func(event, result string) { m.delivery(event, result); st.delivery(event, result) }
+	for _, src := range cfg.GitHub.Sources {
+		if g := gh.Source(src.ID); g.App() {
+			s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, webhookSink(s.inbox.take, cfg.GitHub.Sources), observe, log))
+		}
+	}
+	if !cfg.Webhook.Secret.IsSet() { // GitHub cannot reach the portal: the delivery logs are the only way events arrive
+		return nil
+	}
+	rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.inbox.take, cfg.GitHub.Sources), log)
+	if s.member != nil {
+		rc.Dedupe(s.member.First)
+	}
+	rc.Observe(observe)
+	return []httpapi.Route{{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc}}
 }
