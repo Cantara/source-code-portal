@@ -41,9 +41,8 @@ only.** A person who already runs `scp serve` with a token file is unaffected.
 
 ## What is not in it
 
-No hosted multi-person mode (rung 1 and on), no refresh of expiring tokens, no web wizard (the terminal one is the first; a page of
-`/admin` can follow), no GitHub App registration flow (the person registers the app on their host; `docs/personal-edition.md` says
-how and with which permissions).
+No hosted multi-person mode (rung 1 and on) and no refresh of expiring tokens. (The first run later became a browser page, PE3 and PE4,
+and the Events step makes a GitHub App of the person's own, EV3: `design/sync-modes.md`. The terminal wizard stays as `--terminal`.)
 
 ## Tests
 
@@ -56,7 +55,7 @@ a session refused.
 ## As built
 
 - `internal/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (migration 0003), `internal/ghlogin` (hosts, device flow,
-  `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`), `auth.Launch` (`GET /auth/launch`),
+  `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`; every GitHub call but the device flow goes through go-github, and the App's calls through `ghinstallation`, GL1), `auth.Launch` (`GET /auth/launch`),
   `cmd/scp/personal.go`.
 - A source says `credential: true`; `scp personal` opens the vault and puts the token in the source before `newServer`; `newServer`
   refuses a source with `credential` and no token, so `scp serve` never starts with an unresolved one.

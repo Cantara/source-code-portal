@@ -30,7 +30,7 @@ events, the others by polling, decided per account and per subject. Deployed ins
     only after sign-in). GitHub returns to `/setup/app/callback?code&state`; the cookie (`SameSite=Strict`) does not travel on that
     cross-site redirect, so the one-use state is the proof, the code is exchanged (`ghlogin.ConvertManifest`, the one POST) and the
     callback page hands back to `/setup/` by script. `POST /setup/api/app/check` lists the App's installations with an App JWT
-    (`ghlogin.Installations`, RS256 signed in the package, no new dependency); `app/forget` drops an App.
+    (`ghlogin.Installations`; the App's JWT is signed by `ghinstallation`, the exchange and the listing are go-github's); `app/forget` drops an App.
   - Result: the installed Apps' keys (`Result.Apps`) are sealed in the vault (`app-<account>`, kind `app-key`); `personal.yaml` gets a
     source `app-<account>` per App (`app: {id, credential: true}`), the token source `github` for the other accounts, and
     `webhook: {catch_up: true}` when there is an App. `app.credential` is `personal`'s like `credential`: `scp serve` refuses it.
