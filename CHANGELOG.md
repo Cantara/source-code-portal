@@ -4,7 +4,10 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
-## Unreleased
+## 2.2.11
+
+A portal can wear its owner's colours, logo and name from files, without a build. Nothing changes for a portal that sets neither new key
+(`web.theme_dir`, `web.product_name`): the store, the sync and every other key are as in 2.2.10, and nothing new is asked of GitHub.
 
 - **The operators' plugin knows how to theme a portal**: its skill `run-scp` has a reference on theming (what to ask, the deployment repository, `theme.css` with the tokens for light and dark, mounting, proving it) for the release that has `web.theme_dir` (plugin 1.10.0).
 - **A theme for your deployment**: `web.theme_dir` (a `theme.css` that sets the colour tokens, a `logo.svg`, a `favicon.svg`, served under `/theme/`, also before sign-in) and `web.product_name` make a portal look like its owner's without rebuilding anything: the release binary, bundle and image stay the signed ones, and a deployment's repository holds only its configuration and theme. No font and no address on another host (the policy is unchanged); the files are read at the start. Operator guide, section 2.7.
