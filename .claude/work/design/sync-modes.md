@@ -38,9 +38,11 @@ events, the others by polling, decided per account and per subject. Deployed ins
     callback, conversion, installations signed by the App, key never in a page body, installed Apps only in the result); a `cmd/scp`
     test that the written file loads, `serve` refuses the vault key, `resolve` fills it and the portal reads the App's account with
     its delivery log; the Playwright walk makes the App in a real browser against a fake GitHub (CSP, the cross-site return).
-  - Not verified against the real GitHub: that it accepts a loopback webhook URL and a loopback redirect for a new App and logs
-    deliveries to an unreachable URL; GHE Server's manifest flow by version. If GitHub refuses, the account stays polled and the page
-    says what GitHub answered.
+  - Checked against GitHub's documentation (registering a GitHub App from a manifest): `url` and `hook_attributes.url` are required,
+    `redirect_url` gets the one-hour `code` and the `state` back, `hook_attributes.active` defaults to true, and the flow is
+    documented for Enterprise Server too (3.0 onward). Not verified against a real host: that it accepts a loopback webhook and
+    redirect URL for a new App and logs deliveries to an unreachable URL. If it refuses, the account stays polled and the page says
+    what GitHub answered.
 
 ## Rules
 
