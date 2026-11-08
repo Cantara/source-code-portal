@@ -31,7 +31,8 @@ type group struct {
 	cfg       config.Group
 	sources   map[string]bool // empty: all
 	match     []matcher
-	unclaimed bool // also selects what no other group selects
+	exact     []string // the names the exact matchers give
+	unclaimed bool     // also selects what no other group selects
 }
 
 // Groups are the compiled group definitions, in config order.
@@ -78,6 +79,9 @@ func Compile(cfg []config.Group) (*Groups, []Finding) {
 			}
 			if fn(&snapshot.Repo{}) && kind != "catch_all" {
 				add(false, "%s.match[%d]: %s %q matches the empty name", at, j, kind, value)
+			}
+			if kind == "exact" {
+				g.exact = append(g.exact, value)
 			}
 			hasTopic = hasTopic || kind == "topic"
 			if kind == "catch_all" {
@@ -170,6 +174,26 @@ func (g *group) inSources(r *snapshot.Repo) bool {
 
 func (g *group) matches(r *snapshot.Repo) bool {
 	return slices.ContainsFunc(g.match, func(m matcher) bool { return m(r) })
+}
+
+// Pinned reports whether a group names r on purpose: its default repository, by name, or an exact matcher, within the group's
+// sources. A fork a group pins is never hidden.
+func (gs *Groups) Pinned(r *snapshot.Repo) bool {
+	return slices.ContainsFunc(gs.groups, func(g group) bool {
+		return g.inSources(r) && (strings.EqualFold(r.Name, g.cfg.DefaultRepo) || slices.ContainsFunc(g.exact, func(n string) bool { return strings.EqualFold(r.Name, n) }))
+	})
+}
+
+// Hidden returns the forks among repos that the default views leave out: those of a source that does not show forks and that no
+// group pins.
+func (gs *Groups) Hidden(repos map[snapshot.RepoKey]*snapshot.RepoEntry, showForks map[string]bool) map[snapshot.RepoKey]bool {
+	hidden := map[snapshot.RepoKey]bool{}
+	for k, e := range repos {
+		if e.Repo.Fork && !showForks[e.Repo.ID.Source] && !gs.Pinned(&e.Repo) {
+			hidden[k] = true
+		}
+	}
+	return hidden
 }
 
 // Resolve returns the groups with their members among repos. A group with the unclaimed matcher also takes, within its sources, the

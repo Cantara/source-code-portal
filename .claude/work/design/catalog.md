@@ -13,8 +13,7 @@ aliases to the snapshot. It owns the removal rule; the listing every `catalog.re
 - Renames and transfers keep the old address as an alias (at most 8 per repository) answered with 308: links in chat and docs keep working.
 - Listing is per owner, an organisation or a user account (github.md); each item's `visibility` is checked
   fail closed: `public` is admitted, `private` and `internal` only with `include_private` (access.md); stored rows are checked again at publish.
-- Admission filters per source (`github.sources[].include_forks` false, `include_archived` true): forks are usually noise, archived systems
-  are still part of the map.
+- Admission filters per source (`github.sources[].include_private`, `include_archived` true, `exclude`): archived systems are still part of the map. Forks are always admitted and hidden by a view unless the source sets `include_forks` or a group pins one (`forks.md`).
 - Matchers are typed and always match the whole name: a pattern means what it reads.
 - Membership is many to many; group display order is config order: operators control the dashboard.
 - A `default_repo` not among the members degrades the group card (`defaultRepoState: missing`) and the group stays visible.

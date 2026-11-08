@@ -56,6 +56,7 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
               </span>
               <VisibilityBadge visibility={repo.visibility} />
               {repo.archived && <Badge variant="warn">Archived</Badge>}
+              {repo.fork && <Badge>Fork</Badge>}
             </p>
             <RepoBadges address={repo.address} />
           </>

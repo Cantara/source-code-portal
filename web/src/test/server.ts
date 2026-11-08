@@ -207,6 +207,7 @@ export const defaults = [
   http.get("/dashboard", ({ query, response }) =>
     response(200).json({
       work: workOf(query.get("work")),
+      hiddenForks: 0,
       groups: [
         {
           id: "iam",
@@ -429,6 +430,7 @@ export const defaults = [
           name: "IAM",
           description: "Identity and access",
           defaultRepo: null,
+          hiddenForks: 0,
           defaultRepoState: "missing",
           repoCount: 2,
           health: product,

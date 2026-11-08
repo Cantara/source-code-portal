@@ -512,6 +512,7 @@ describe("commit log", () => {
       http.get("/dashboard", ({ response }) =>
         response(200).json({
           work: ["hand", "ai"],
+          hiddenForks: 0,
           groups: [],
           health: null,
           repoCount: ++n,
@@ -557,6 +558,7 @@ describe("commit log", () => {
         http.get("/dashboard", ({ response }) =>
           response(200).json({
             work: ["hand", "ai"],
+            hiddenForks: 0,
             groups: [],
             health: null,
             repoCount: ++n,

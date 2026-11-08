@@ -1471,7 +1471,7 @@ components:
       description: "A kind of work: people's by hand, people's with an AI, or maintenance by automation (bots and sweeps)"
     Dashboard:
       type: object
-      required: [work, groups, repoCount, ungroupedCount, latest, health, freshness, activity, pulls]
+      required: [work, groups, repoCount, ungroupedCount, hiddenForks, latest, health, freshness, activity, pulls]
       properties:
         work: { $ref: "#/components/schemas/Work" }
         groups: { type: array, items: { $ref: "#/components/schemas/DashboardGroup" } }
@@ -1479,6 +1479,7 @@ components:
         health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: "Every repository weighed as one product; the first 5 findings" }
         repoCount: { type: integer }
         ungroupedCount: { type: integer, description: Repositories in no group }
+        hiddenForks: { type: integer, description: "Forks left out of this view unless asked for with forks=show: no source shows them and no group names one as its default repository or with an exact matcher" }
         latest: { type: array, items: { $ref: "#/components/schemas/Commit" }, description: "The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them" }
         freshness: { $ref: "#/components/schemas/FreshnessCounts" }
         pulls: { $ref: "#/components/schemas/PullCounts", description: "Every open pull request of the view; automation's only when the work that counts holds it" }
@@ -1603,7 +1604,7 @@ components:
         groups: { type: array, items: { $ref: "#/components/schemas/GroupSummary" } }
     Group:
       type: object
-      required: [id, name, description, defaultRepo, defaultRepoState, repoCount, health, repos]
+      required: [id, name, description, defaultRepo, defaultRepoState, repoCount, hiddenForks, health, repos]
       properties:
         id: { type: string }
         name: { type: string }
@@ -1611,6 +1612,7 @@ components:
         defaultRepo: { type: [string, "null"] }
         defaultRepoState: { type: string, enum: [ok, missing] }
         repoCount: { type: integer }
+        hiddenForks: { type: integer, description: "The group's forks left out of this view unless asked for with forks=show" }
         health: { oneOf: [{ $ref: "#/components/schemas/ProductHealth" }, { type: "null" }], description: Every finding }
         repos: { type: array, items: { $ref: "#/components/schemas/Repo" } }
     SourceInfo:

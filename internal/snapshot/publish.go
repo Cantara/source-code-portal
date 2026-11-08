@@ -27,6 +27,7 @@ func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
 		Aliases:    maps.Clone(cur.Aliases),
 		Groups:     slices.Clone(cur.Groups),
 		Sources:    slices.Clone(cur.Sources),
+		hidden:     cur.hidden,
 		indexers:   cur.indexers,
 	}}
 }
@@ -108,6 +109,15 @@ func (b *Builder) Mark(key string, repo RepoKey, digest, content uint64) {
 // SetGroups replaces the groups (config order).
 func (b *Builder) SetGroups(groups []Group) { b.s.Groups = groups }
 
+// SetHidden names the forks the default views leave out (no source shows them and no group pins them). The set is not modified
+// afterwards; an empty one means none.
+func (b *Builder) SetHidden(keys map[RepoKey]bool) {
+	b.s.hidden = nil
+	if len(keys) > 0 {
+		b.s.hidden = keys
+	}
+}
+
 // SetCatalogued marks the snapshot as holding a catalogue.
 func (b *Builder) SetCatalogued() { b.s.Catalogued = true }
 
@@ -122,8 +132,36 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 		}
 	}
 	s.index(b.prev.indexes, b.log)
-	s.public = s.publicView(b.prev, b.log)
+	s.views(b.prev, b.log)
 	return s
+}
+
+// views derives the other three views from the complete one A (s): B without the private repositories, C without the hidden forks,
+// D without both. A view that would hold what another holds is that view, so a portal without private repositories or hidden forks
+// builds nothing more. Every view knows its siblings: public (private left out, forks as it has them) and lean (forks left out).
+func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
+	var pb, pc, pd *Snapshot // the views of the snapshot before, whose indexes are kept when one cannot be built
+	if prev != nil {
+		pb, pc = prev.public, prev.lean
+		if pc != nil {
+			pd = pc.public
+		}
+	}
+	b := s.derive(func(e *RepoEntry) bool { return e.Repo.Public() }, pb, log)
+	c := s
+	if slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return s.hidden[e.Repo.Key()] }) {
+		c = s.derive(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, pc, log)
+	}
+	d := b
+	if c != s {
+		d = c.derive(func(e *RepoEntry) bool { return e.Repo.Public() }, pd, log)
+	}
+	s.public, s.lean = b, c
+	b.public, b.lean = b, d
+	c.public, c.lean = d, c
+	d.public, d.lean = d, d
+	s.fat, b.fat, c.fat, d.fat = s, b, s, b
+	b.hidden, c.hidden, d.hidden = s.hidden, s.hidden, s.hidden
 }
 
 // index builds the derived lookups: group membership, then every feature's index. An index whose builder panics keeps what the
@@ -161,16 +199,17 @@ func buildIndex(ix Indexer, s *Snapshot) (v any, err error) {
 	return ix.build(s), nil
 }
 
-// publicView is s without its private and internal repositories, or s itself when it has none.
-func (s *Snapshot) publicView(prev *Snapshot, log *slog.Logger) *Snapshot {
-	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !e.Repo.Public() }) {
+// derive is s with the repositories keep refuses taken out, or s itself when it refuses none. before is the sibling view of the
+// snapshot before, whose indexes are kept when one cannot be built.
+func (s *Snapshot) derive(keep func(*RepoEntry) bool, before *Snapshot, log *slog.Logger) *Snapshot {
+	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !keep(e) }) {
 		return s
 	}
 	p := &Snapshot{BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{},
 		indexers: s.indexers}
 	count := map[string]int{}
 	for k, e := range s.Repos {
-		if e.Repo.Public() {
+		if keep(e) {
 			p.Repos[k] = e
 			count[e.Repo.ID.Source]++
 		}
@@ -195,18 +234,17 @@ func (s *Snapshot) publicView(prev *Snapshot, log *slog.Logger) *Snapshot {
 	}
 	var sum uint64
 	for _, m := range s.marks {
-		if e, _ := s.Repo(m.repo); e == nil || e.Repo.Public() {
+		if e, _ := s.Repo(m.repo); e == nil || keep(e) {
 			sum += m.digest
 		}
 	}
 	p.Version = sum & (1<<53 - 1)
 	p.digests = s.digests
-	var before map[string]any
-	if prev.public != nil {
-		before = prev.public.indexes
+	var prior map[string]any
+	if before != nil {
+		prior = before.indexes
 	}
-	p.index(before, log)
-	p.public = p
+	p.index(prior, log)
 	return p
 }
 

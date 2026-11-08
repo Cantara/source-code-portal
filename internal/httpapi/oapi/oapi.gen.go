@@ -1210,6 +1210,9 @@ type Dashboard struct {
 	// Health Every repository weighed as one product; the first 5 findings
 	Health *ProductHealth `json:"health"`
 
+	// HiddenForks Forks left out of this view unless asked for with forks=show: no source shows them and no group names one as its default repository or with an exact matcher
+	HiddenForks int `json:"hiddenForks"`
+
 	// Latest The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them
 	Latest []Commit `json:"latest"`
 
@@ -1451,11 +1454,14 @@ type Group struct {
 	Description      string                `json:"description"`
 
 	// Health Every finding
-	Health    *ProductHealth `json:"health"`
-	Id        string         `json:"id"`
-	Name      string         `json:"name"`
-	RepoCount int            `json:"repoCount"`
-	Repos     []Repo         `json:"repos"`
+	Health *ProductHealth `json:"health"`
+
+	// HiddenForks The group's forks left out of this view unless asked for with forks=show
+	HiddenForks int    `json:"hiddenForks"`
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	RepoCount   int    `json:"repoCount"`
+	Repos       []Repo `json:"repos"`
 }
 
 // GroupDefaultRepoState defines model for Group.DefaultRepoState.

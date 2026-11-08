@@ -98,9 +98,12 @@ type Snapshot struct {
 	Groups     []Group             // config order
 	Sources    []SourceStatus      // sorted by id
 	groupsOf   map[RepoKey][]string
-	indexers   []Indexer      // what the features derive from every repository, run at publish
-	indexes    map[string]any // index name -> what its indexer built
-	public     *Snapshot      // the view without private and internal repositories; s itself when there are none
+	indexers   []Indexer        // what the features derive from every repository, run at publish
+	indexes    map[string]any   // index name -> what its indexer built
+	public     *Snapshot        // this view without its private and internal repositories; s itself when there are none
+	lean       *Snapshot        // this view without the hidden forks; s itself when there are none
+	fat        *Snapshot        // this view with the hidden forks; s itself when it has them or there are none
+	hidden     map[RepoKey]bool // the forks no source shows and no group pins (Builder.SetHidden)
 	marks      map[string]mark
 	sum        uint64
 	digests    map[RepoKey]uint64 // per repository: the sum of its items' content digests
@@ -113,12 +116,48 @@ type mark struct {
 	content uint64 // what the item holds, without when it was checked
 }
 
-// Public returns the view of s without its private and internal repositories: s itself when it has none.
+// Public returns the view of s without its private and internal repositories: s itself when it has none. It keeps s's choice of forks.
 func (s *Snapshot) Public() *Snapshot {
 	if s.public == nil {
 		return s
 	}
 	return s.public
+}
+
+// View returns the view a request reads: with or without the private and internal repositories (private), with or without the forks
+// no source shows and no group pins (forks). A snapshot without private repositories or hidden forks returns itself for the choice
+// that changes nothing.
+func (s *Snapshot) View(private, forks bool) *Snapshot {
+	v := s
+	if !forks && s.lean != nil {
+		v = s.lean
+	}
+	if !private {
+		v = v.Public()
+	}
+	return v
+}
+
+// Hidden reports whether key is a fork the default views leave out.
+func (s *Snapshot) Hidden(key RepoKey) bool { return s.hidden[key] }
+
+// HiddenForks is how many forks the default views leave out of this view's kind (private or public): the same in the view that
+// shows them and in the one that does not, so a page can offer "Show forks (N)" either way.
+func (s *Snapshot) HiddenForks() int {
+	if s.fat == nil || s.lean == nil {
+		return 0
+	}
+	return len(s.fat.Repos) - len(s.lean.Repos)
+}
+
+// GroupHiddenForks is HiddenForks within one group: the members the group has with the forks shown and has not without them.
+func (s *Snapshot) GroupHiddenForks(id string) int {
+	if s.fat == nil || s.lean == nil {
+		return 0
+	}
+	all, _ := s.fat.Group(id)
+	lean, _ := s.lean.Group(id)
+	return len(all.Members) - len(lean.Members)
 }
 
 // Digest returns the content digest of the repository at key: the sum of its items' content digests (Builder.Mark), which changes

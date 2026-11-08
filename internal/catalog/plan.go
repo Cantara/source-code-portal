@@ -27,15 +27,16 @@ type Tracked struct {
 	Misses  int                `json:"misses,omitempty"`
 }
 
-// Filter is a source's admission rule.
+// Filter is a source's admission rule. Forks are always admitted: whether they are shown is the snapshot's views' business
+// (ShowForks, Groups.Hidden).
 type Filter struct {
-	IncludeForks, IncludeArchived, IncludePrivate bool
-	exclude                                       []matcher
+	ShowForks, IncludeArchived, IncludePrivate bool
+	exclude                                    []matcher
 }
 
 // SourceFilter is the admission rule of a configured source.
 func SourceFilter(s config.Source) (Filter, error) {
-	f := Filter{IncludeForks: s.IncludeForks, IncludeArchived: s.IncludeArchived, IncludePrivate: s.IncludePrivate}
+	f := Filter{ShowForks: s.IncludeForks, IncludeArchived: s.IncludeArchived, IncludePrivate: s.IncludePrivate}
 	for i, m := range s.Exclude {
 		kind, value, _ := m.Kind() // one key: checked by config
 		fn, err := compileMatcher(kind, value)
@@ -121,7 +122,7 @@ func admit(r snapshot.Repo, f Filter) (snapshot.Repo, bool) {
 	switch {
 	case r.ID.GitHubID == 0, !namePattern.MatchString(r.Owner), !namePattern.MatchString(r.Name),
 		r.Name == "." || r.Name == "..", !f.Visible(r.Visibility),
-		r.Archived && !f.IncludeArchived, r.Fork && !f.IncludeForks,
+		r.Archived && !f.IncludeArchived,
 		slices.ContainsFunc(f.exclude, func(m matcher) bool { return m(&r) }):
 		return r, false
 	}

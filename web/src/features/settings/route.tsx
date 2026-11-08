@@ -1,6 +1,6 @@
 import type { Route } from "@/lib/page"
 import { pageSize, sizeCookie } from "@/lib/paging"
-import { productsView, viewCookie, workCookie, workOf } from "@/lib/preferences"
+import { forksCookie, productsView, viewCookie, workCookie, workOf } from "@/lib/preferences"
 import { SettingsView } from "./view"
 
 /** settingsRoute is `/settings`: the reader's preferences, read from their cookies so the page opens with them. */
@@ -12,6 +12,7 @@ export const settingsRoute: Route<Record<string, never>> = {
       initial={{
         work: workOf(cookies[workCookie]),
         view: productsView(cookies[viewCookie], "cards"),
+        forks: cookies[forksCookie] === "show",
         commits: pageSize(cookies[sizeCookie("commits")], 0),
         history: pageSize(cookies[sizeCookie("history")], 0),
         pulls: pageSize(cookies[sizeCookie("pulls")], 0),

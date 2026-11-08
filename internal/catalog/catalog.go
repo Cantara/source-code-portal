@@ -169,6 +169,15 @@ func decode(payload []byte) state {
 	return s
 }
 
+// showForks is the sources whose forks are shown by default (include_forks).
+func (c *Catalog) showForks() map[string]bool {
+	out := map[string]bool{}
+	for id, s := range c.sources {
+		out[id] = s.filter.ShowForks
+	}
+	return out
+}
+
 // publish puts a source's catalogue into the snapshot and resolves the groups over every source's repositories.
 func (c *Catalog) publish(b *snapshot.Builder, it store.Item, fresh snapshot.Freshness) {
 	id := strings.TrimPrefix(it.Key, Kind+"/")
@@ -190,6 +199,7 @@ func (c *Catalog) publish(b *snapshot.Builder, it store.Item, fresh snapshot.Fre
 	}
 	b.ReplaceSource(id, entries, aliases, snapshot.SourceStatus{ID: id, Fresh: fresh, Repos: len(entries)})
 	b.SetGroups(c.groups.Resolve(b.Repos()))
+	b.SetHidden(c.groups.Hidden(b.Repos(), c.showForks()))
 	listed := 0
 	for _, s := range b.Sources() {
 		if _, ok := c.sources[s.ID]; ok && !s.Fresh.CheckedAt.IsZero() {

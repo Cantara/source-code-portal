@@ -28,7 +28,7 @@ func notFound(detail string) oapi.NotFoundApplicationProblemPlusJSONResponse {
 func (a API) GetDashboard(ctx context.Context, req oapi.GetDashboardRequestObject) (oapi.GetDashboardResponseObject, error) {
 	s := a.Current(ctx)
 	work := oapi.WorkOrDefault(req.Params.Work, oapi.Work{oapi.WorkKindHand, oapi.WorkKindAi, oapi.WorkKindAutomation})
-	out := oapi.Dashboard{Work: work, Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos),
+	out := oapi.Dashboard{Work: work, Groups: make([]oapi.DashboardGroup, 0, len(s.Groups)), RepoCount: len(s.Repos), HiddenForks: s.HiddenForks(),
 		Latest: []oapi.Commit{}, Activity: noActivity()}
 	for _, g := range s.Groups {
 		def, _ := defaultRepo(g)
@@ -71,7 +71,7 @@ func (a API) GetGroup(ctx context.Context, req oapi.GetGroupRequestObject) (oapi
 	}
 	def, state := defaultRepo(g)
 	out := oapi.Group{Id: g.ID, Name: g.Name, Description: g.Description, DefaultRepo: def,
-		DefaultRepoState: oapi.GroupDefaultRepoState(state), RepoCount: len(g.Members), Repos: a.repos(s, g.Members, time.Now())}
+		DefaultRepoState: oapi.GroupDefaultRepoState(state), RepoCount: len(g.Members), HiddenForks: s.GroupHiddenForks(g.ID), Repos: a.repos(s, g.Members, time.Now())}
 	for _, fn := range a.Group {
 		fn(s, g, &out)
 	}

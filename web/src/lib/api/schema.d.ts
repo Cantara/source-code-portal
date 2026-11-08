@@ -1558,6 +1558,8 @@ export interface components {
       repoCount: number
       /** @description Repositories in no group */
       ungroupedCount: number
+      /** @description Forks left out of this view unless asked for with forks=show: no source shows them and no group names one as its default repository or with an exact matcher */
+      hiddenForks: number
       /** @description The 10 newest commits of the work that counts (Dashboard.work); /commits lists all of them */
       latest: components["schemas"]["Commit"][]
       freshness: components["schemas"]["FreshnessCounts"]
@@ -1688,6 +1690,8 @@ export interface components {
       /** @enum {string} */
       defaultRepoState: "ok" | "missing"
       repoCount: number
+      /** @description The group's forks left out of this view unless asked for with forks=show */
+      hiddenForks: number
       /** @description Every finding */
       health: components["schemas"]["ProductHealth"] | null
       repos: components["schemas"]["Repo"][]

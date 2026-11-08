@@ -12,6 +12,7 @@ import { FindingList, HealthScore } from "@/entities/health/findings"
 import { EmptyState } from "@/shared/empty-state"
 import { RelativeTime } from "@/shared/relative-time"
 import { Sparkline } from "@/shared/sparkline"
+import { ForksSwitch } from "@/shared/forks-switch"
 import { by, has, isEvery, qualifier, remember, viewCookie, type Work } from "@/lib/preferences"
 import { assistants, counted, maintenance, noun, series, share, weekly } from "./work"
 import type { ProductsView } from "./layout"
@@ -305,12 +306,14 @@ function ProductTable({ groups, work }: { groups: Group[]; work: Work }) {
 export function Products({
   groups,
   repoCount,
+  hiddenForks,
   view: initial,
   work,
   now,
 }: {
   groups: Group[]
   repoCount: number
+  hiddenForks: number
   view: ProductsView | "tiles"
   work: Work
   now: number
@@ -326,21 +329,24 @@ export function Products({
         <h2 id="products" className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
           Products
         </h2>
-        <div role="group" aria-label="Show products as" className="inline-flex rounded-md border border-border p-0.5 text-xs">
-          {(["cards", "table"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={view === v}
-              onClick={() => choose(v)}
-              className={cn(
-                "rounded px-2 py-1 capitalize",
-                view === v ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {v}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <ForksSwitch hidden={hiddenForks} />
+          <div role="group" aria-label="Show products as" className="inline-flex rounded-md border border-border p-0.5 text-xs">
+            {(["cards", "table"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => choose(v)}
+                className={cn(
+                  "rounded px-2 py-1 capitalize",
+                  view === v ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {groups.length === 0 ? (

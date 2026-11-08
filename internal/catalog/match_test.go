@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -144,4 +145,42 @@ func keys(ks []snapshot.RepoKey) []string {
 		out[i] = string(k)
 	}
 	return out
+}
+
+// A fork is hidden unless its source shows forks or a group names it: as its default repository or with an exact matcher.
+func TestHiddenForks(t *testing.T) {
+	gs, findings := Compile([]config.Group{
+		{ID: "libs", Name: "Libs", DefaultRepo: "LibSearch", Match: []config.Match{{Prefix: "Lib"}}},
+		{ID: "tools", Name: "Tools", DefaultRepo: "tool", Match: []config.Match{{Exact: "tool"}, {Exact: "Reporter"}}, Sources: []string{"gh"}},
+		{ID: "rest", Name: "Rest", DefaultRepo: "stray", Match: []config.Match{{CatchAll: true}}},
+	})
+	if gs == nil {
+		t.Fatal(findings)
+	}
+	repo := func(source, name string, fork bool) *snapshot.RepoEntry {
+		return &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: source, GitHubID: int64(len(name))}, Owner: "acme", Name: name, Fork: fork}}
+	}
+	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
+	elsewhere := repo("other", "Reporter", true)
+	elsewhere.Repo.Owner = "beta" // the same name in another account: another address
+	for _, e := range []*snapshot.RepoEntry{
+		repo("gh", "LibSearch", true),     // the default repository of its group: pinned
+		repo("gh", "LibIndex", true),      // matched by a prefix only: hidden
+		repo("gh", "reporter", true),      // an exact matcher names it, whatever the case: pinned
+		elsewhere,                         // the exact matcher is for source gh only: hidden
+		repo("gh", "upstream-copy", true), // hidden
+		repo("shown", "mirror", true),     // its source shows forks
+		repo("gh", "LibBase", false),      // not a fork
+	} {
+		repos[e.Repo.Key()] = e
+	}
+	got := gs.Hidden(repos, map[string]bool{"shown": true})
+	var names []string
+	for k := range got {
+		names = append(names, repos[k].Repo.Name)
+	}
+	slices.Sort(names)
+	if want := []string{"LibIndex", "Reporter", "upstream-copy"}; !slices.Equal(names, want) {
+		t.Errorf("hidden = %v, want %v", names, want)
+	}
 }
