@@ -46,7 +46,7 @@ func TestCatchUpPassesOnWhatTheReceiverMissed(t *testing.T) {
 		Now:     func() time.Time { return now },
 	}
 	n, err := c.Once(t.Context())
-	want := []got{{sync.EventPush, "acme", "two"}, {sync.EventTag, "acme", "two"}, {"issues", "acme", "one"}}
+	want := []got{{sync.EventPush, "acme", "two"}, {sync.EventBranch, "acme", "two"}, {sync.EventTag, "acme", "two"}, {"issues", "acme", "one"}}
 	if err != nil || n != 2 || !slices.Equal(passed, want) {
 		t.Fatalf("passed %d %v (err %v), want the failed push and the unanswered issue, oldest first: %v", n, passed, err, want)
 	}

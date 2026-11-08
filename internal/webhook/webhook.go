@@ -254,14 +254,17 @@ func Normalise(event string, body []byte) (_ Normalised, ok bool) {
 	var n Normalised
 	switch event {
 	case "push":
-		if p.Repository == nil || p.Deleted {
+		if p.Repository == nil {
 			return Normalised{}, false
 		}
+		isDefault := p.Repository.DefaultBranch != "" && p.Ref == "refs/heads/"+p.Repository.DefaultBranch
 		switch {
-		case p.Repository.DefaultBranch != "" && p.Ref == "refs/heads/"+p.Repository.DefaultBranch:
-			n.Event = sync.EventPush
-		case strings.HasPrefix(p.Ref, "refs/tags/"):
+		case strings.HasPrefix(p.Ref, "refs/tags/"): // pushed or deleted: the tags and the releases read again
 			n.Event = sync.EventTag
+		case isDefault && !p.Deleted:
+			n.Event = sync.EventPush
+		case strings.HasPrefix(p.Ref, "refs/heads/") && len(p.Ref) > len("refs/heads/") && !isDefault:
+			n.Event = sync.EventBranch // pushed or deleted: only the history, which reads the newest branches, listens
 		default:
 			return Normalised{}, false
 		}

@@ -87,11 +87,12 @@ func (c *CatchUp) note(f func(*CatchUpState)) {
 	f(&c.state)
 }
 
-// eventsOf is what a delivery asks the portal to read again. A push says nothing of its branch in the log, so it stands for both.
+// eventsOf is what a delivery asks the portal to read again. A push says nothing of its ref in the log, so it stands for the default
+// branch, another branch and a tag.
 func eventsOf(d Delivery) []sync.Event {
 	switch d.Event {
 	case "push":
-		return []sync.Event{sync.EventPush, sync.EventTag}
+		return []sync.Event{sync.EventPush, sync.EventBranch, sync.EventTag}
 	case "release":
 		return []sync.Event{sync.EventTag}
 	case "repository":

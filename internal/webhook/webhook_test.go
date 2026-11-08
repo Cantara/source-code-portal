@@ -134,8 +134,11 @@ func TestNormalise(t *testing.T) {
 		ok          bool
 	}{
 		{"push", `{"ref":"refs/heads/main",` + repo + `}`, Normalised{sync.EventPush, "acme", "core"}, true},
-		{"push", `{"ref":"refs/heads/main","deleted":true,` + repo + `}`, Normalised{}, false},
-		{"push", `{"ref":"refs/heads/feature",` + repo + `}`, Normalised{}, false},
+		{"push", `{"ref":"refs/heads/main","deleted":true,` + repo + `}`, Normalised{}, false}, // the default branch is never deleted
+		{"push", `{"ref":"refs/heads/feature",` + repo + `}`, Normalised{sync.EventBranch, "acme", "core"}, true},
+		{"push", `{"ref":"refs/heads/feature","deleted":true,` + repo + `}`, Normalised{sync.EventBranch, "acme", "core"}, true},
+		{"push", `{"ref":"refs/tags/v1","deleted":true,` + repo + `}`, Normalised{sync.EventTag, "acme", "core"}, true},
+		{"push", `{"ref":"refs/notes/commits",` + repo + `}`, Normalised{}, false},
 		{"push", `{"ref":"refs/tags/v1",` + repo + `}`, Normalised{sync.EventTag, "acme", "core"}, true},
 		{"release", `{"action":"published",` + repo + `}`, Normalised{sync.EventTag, "acme", "core"}, true},
 		{"repository", `{"action":"renamed",` + repo + `}`, Normalised{sync.EventSourceChanged, "acme", ""}, true},

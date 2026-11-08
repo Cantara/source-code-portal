@@ -65,7 +65,8 @@ const (
 	EventPush          Event = "push"   // new commits on a repository's default branch, or a changed pushed_at
 	EventSourceChanged Event = "source" // repositories were added, removed or renamed in a source
 	EventOpen          Event = "open"   // the count of open issues and pull requests in a listing changed (the safety net when no webhook came)
-	EventTag           Event = "tag"    // a tag was pushed or a release published
+	EventTag           Event = "tag"    // a tag was pushed or deleted, or a release published
+	EventBranch        Event = "branch" // a branch other than the default one was pushed or deleted: only the history listens
 )
 
 // Job is what a Spec's Run receives.
@@ -384,6 +385,18 @@ func (e *Engine) Handled(ev Event, repo snapshot.RepoKey, source string, at time
 		}
 	}
 	return true
+}
+
+// Listeners are the kinds of the jobs that run on ev, sorted. A webhook event nothing listens to is a delivery acted on by nobody.
+func (e *Engine) Listeners(ev Event) []string {
+	var kinds []string
+	for _, s := range e.specs {
+		if slices.Contains(s.On, ev) {
+			kinds = append(kinds, s.Kind)
+		}
+	}
+	slices.Sort(kinds)
+	return kinds
 }
 
 func (e *Engine) poke() {
