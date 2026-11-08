@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/store"
 )
 
 func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
@@ -56,7 +56,7 @@ func TestFor(t *testing.T) {
 		config.Announcement{ID: "desk", Title: "On the dashboard", Pages: []string{"dashboard"}, Until: "2026-12-01T00:00:00Z"},
 		config.Announcement{ID: "early", Title: "Sooner event", Tone: "event", Starts: "2026-11-21T09:00:00Z", Until: "2026-11-22T00:00:00Z"},
 	)
-	n := Open(configured, "", func() time.Time { return now }, quiet())
+	n := Open(context.Background(), configured, nil, func() time.Time { return now }, quiet())
 	public := context.Background()
 	private := httpapi.WithViewer(public, httpapi.Viewer{Private: true})
 	if got := ids(n.For(public, "present")); !slices.Equal(got, []string{"early", "juleol"}) {
@@ -82,9 +82,9 @@ func TestFor(t *testing.T) {
 }
 
 func TestAdminRoutes(t *testing.T) {
-	dir := t.TempDir()
+	d := db(t)
 	configured := checked(t, config.Announcement{ID: "configured", Title: "From the deployment", Until: "2026-12-01T00:00:00Z"})
-	n := Open(configured, dir, func() time.Time { return now }, quiet())
+	n := Open(context.Background(), configured, d, func() time.Time { return now }, quiet())
 	mux := http.NewServeMux()
 	for _, r := range n.Routes("https://scp.example", quiet()) {
 		mux.Handle(r.Pattern, r.Handler)
@@ -147,15 +147,16 @@ func TestAdminRoutes(t *testing.T) {
 	if w := do(admin, "PUT", `{"announcements":[],"colour":1}`); w.Code != http.StatusBadRequest {
 		t.Errorf("unknown field: %d", w.Code)
 	}
-	// A broken file written by hand keeps the last good announcements, with the problem for the status.
-	if err := os.WriteFile(filepath.Join(dir, "announcements.json"), []byte(`{"announcements":[{"id":"x"}]}`), 0o600); err != nil {
+	// A stored document that no longer parses (a later version tightened what it accepts) is not served after a restart: only the
+	// configured announcements show, and the status carries the problem until an admin saves over it.
+	if err := d.PutDocument(context.Background(), Name, []byte(`{"announcements":[{"id":"x"}]}`), "broken", n.file.Get().Revision); err != nil {
 		t.Fatal(err)
 	}
-	n.file.Reload()
-	if got := ids(n.For(context.Background(), "dashboard")); !slices.Equal(got, []string{"juleol", "configured"}) || len(n.Problems()) != 1 {
+	n = Open(context.Background(), configured, d, func() time.Time { return now }, quiet())
+	if got := ids(n.For(context.Background(), "dashboard")); !slices.Equal(got, []string{"configured"}) || len(n.Problems()) != 1 {
 		t.Errorf("broken: %v %v", got, n.Problems())
 	}
-	ro := Open(nil, "", time.Now, quiet())
+	ro := Open(context.Background(), nil, nil, time.Now, quiet())
 	romux := http.NewServeMux()
 	for _, r := range ro.Routes("", quiet()) {
 		romux.Handle(r.Pattern, r.Handler)
@@ -165,6 +166,17 @@ func TestAdminRoutes(t *testing.T) {
 	rw := httptest.NewRecorder()
 	romux.ServeHTTP(rw, r)
 	if rw.Code != http.StatusConflict {
-		t.Errorf("without layout.dir: %d", rw.Code)
+		t.Errorf("without a store: %d", rw.Code)
 	}
+}
+
+// db is a store in a temporary directory.
+func db(t *testing.T) *store.DB {
+	t.Helper()
+	d, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "scp.db"), quiet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = d.Close() })
+	return d
 }

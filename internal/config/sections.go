@@ -128,8 +128,9 @@ func (w Web) validate() []string {
 	return p
 }
 
-// Layout configures the layout store (design/layout.md): the directory where an admin's design of the pages is kept, one file per
-// page. Empty: the built-in layouts, and no design mode.
+// Layout names the directory the layouts and the announcements an admin kept in files (before they lived in the store) are imported
+// from, once, at the start: a document the store does not hold yet is taken from `<dir>/<name>.json`. After that the store is the
+// truth and the files are not read again. Empty: nothing is imported; the key can be removed once the portal has started.
 type Layout struct {
 	Dir string `mapstructure:"dir"`
 }
@@ -138,7 +139,9 @@ func (l Layout) validate() []string {
 	if l.Dir == "" {
 		return nil
 	}
-	if info, err := os.Stat(l.Dir); err != nil || !info.IsDir() {
+	// A directory that is not there holds nothing to import: the store has the documents, and a restart must not fail over a folder
+	// the operator removed. Something that is there but is not a directory is a mistake worth saying.
+	if info, err := os.Stat(l.Dir); err == nil && !info.IsDir() {
 		return []string{fmt.Sprintf("layout.dir: %q is not a directory", l.Dir)}
 	}
 	return nil

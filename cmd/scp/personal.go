@@ -224,10 +224,8 @@ func requireLoopback(cfg config.Config) error {
 // ended, and the local secrets. It returns the path of personal.yaml.
 func (p *personal) setup(ctx context.Context, dir string) (string, error) {
 	cfgPath := filepath.Join(dir, "personal.yaml")
-	for _, d := range []string{dir, filepath.Join(dir, "layout")} {
-		if err := os.MkdirAll(d, 0o700); err != nil {
-			return "", err
-		}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
 	}
 	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a private directory is 0700
 		return "", err
@@ -515,7 +513,6 @@ func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, a
 	w("  public_url: %s", q("http://127.0.0.1:"+strconv.Itoa(port)))
 	w("log: {level: info, format: text}")
 	w("store: {path: %s}", q(filepath.Join(dir, "scp.db")))
-	w("layout: {dir: %s}", q(filepath.Join(dir, "layout")))
 	if webDir != "" {
 		w("web: {dir: %s}", q(webDir))
 	}

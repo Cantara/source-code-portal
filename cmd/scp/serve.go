@@ -29,6 +29,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/commits"
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/docs"
+	"github.com/cantara/source-code-portal/internal/docstore"
 	"github.com/cantara/source-code-portal/internal/egress"
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
@@ -266,8 +267,15 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	ready := func() bool {
 		return !s.stopping.Load() && s.pub.Current().Catalogued && (s.web == nil || s.web.Ready())
 	}
-	s.layouts = layout.Open(cfg.Layout.Dir, log)
-	s.notices = announce.Open(cfg.Announcements, cfg.Layout.Dir, time.Now, log)
+	imported, err := docstore.Import(ctx, s.store, cfg.Layout.Dir, append(layout.Names(), announce.Name))
+	if err != nil {
+		return nil, fmt.Errorf("layout.dir: %w", err)
+	}
+	if len(imported) > 0 {
+		log.Info("layouts and announcements from layout.dir are now kept in the store; the files are no longer read", "imported", imported)
+	}
+	s.layouts = layout.Open(ctx, s.store, log)
+	s.notices = announce.Open(ctx, cfg.Announcements, s.store, time.Now, log)
 	feed := cfg.Webhook.Secret.IsSet() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
@@ -550,24 +558,18 @@ func (s *server) run(ctx context.Context) error {
 	engineCtx, stopEngine := context.WithCancel(context.WithoutCancel(ctx))
 	engineDone := make(chan error, 1)
 	go func() { engineDone <- s.engine.Run(engineCtx) }()
-	layoutsCtx, stopLayouts := context.WithCancel(ctx)
-	layoutsDone := make(chan struct{})
-	go func() { s.layouts.Run(layoutsCtx); close(layoutsDone) }()
-	noticesDone := make(chan struct{})
-	go func() { s.notices.Run(layoutsCtx); close(noticesDone) }()
-	defer func() { stopLayouts(); <-noticesDone }()
-	defer func() { stopLayouts(); <-layoutsDone }()
+	sideCtx, stopSide := context.WithCancel(ctx) // the background readers of the inbox and the prerequisites
 	inboxDone := make(chan struct{})
 	go func() {
 		if s.inbox != nil {
-			s.inbox.run(layoutsCtx, s.engine.Warm())
+			s.inbox.run(sideCtx, s.engine.Warm())
 		}
 		close(inboxDone)
 	}()
-	defer func() { stopLayouts(); <-inboxDone }()
+	defer func() { stopSide(); <-inboxDone }()
 	checksDone := make(chan struct{})
-	go func() { s.watchPrereqs(layoutsCtx); close(checksDone) }()
-	defer func() { stopLayouts(); <-checksDone }()
+	go func() { s.watchPrereqs(sideCtx); close(checksDone) }()
+	defer func() { stopSide(); <-checksDone }()
 	memberCtx, stopMember := context.WithCancel(context.WithoutCancel(ctx))
 	memberDone := make(chan error, 1)
 	if s.member != nil {

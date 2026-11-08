@@ -303,3 +303,16 @@ func TestCatchUpNeedsAnApp(t *testing.T) {
 		t.Errorf("catch_up is off by default: %v", err)
 	}
 }
+
+// layout.dir only names where files from before the store held documents are imported from: a folder that is gone is nothing to
+// import and must not stop a restart; a file where a folder should be is a mistake.
+func TestLayoutDirMayBeGone(t *testing.T) {
+	gone := filepath.Join(t.TempDir(), "removed")
+	if _, _, err := Load(file(t, "layout: {dir: "+gone+"}\n"), nil); err != nil {
+		t.Errorf("a removed directory: %v", err)
+	}
+	notDir := write(t, "layouts", "x")
+	if _, _, err := Load(file(t, "layout: {dir: "+notDir+"}\n"), nil); err == nil || !strings.Contains(err.Error(), "layout.dir") {
+		t.Errorf("a file as the directory: %v", err)
+	}
+}

@@ -1,5 +1,5 @@
 // Package announce keeps the portal's announcements (design/announcements.md): the deployment's from `announcements[]` in the
-// configuration, locked, and the admins' in `<layout.dir>/announcements.json`. For gives the ones a viewer may see on a page now;
+// configuration, locked, and the admins' in the store (the document `announcements`). For gives the ones a viewer may see on a page now;
 // the admin's routes read and save the stored ones.
 package announce
 
@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/filestore"
+	"github.com/cantara/source-code-portal/internal/docstore"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 )
@@ -58,29 +58,25 @@ func Parse(b []byte) (List, error) {
 // Notices are the configured and the stored announcements.
 type Notices struct {
 	configured []config.Announcement // checked by the configuration
-	file       *filestore.File[List]
+	file       *docstore.Doc[List]
 	now        func() time.Time
 	qr         *qrCache
 }
 
-// Open reads the stored announcements from dir (empty: the configured ones only, and no saving). now is the clock (time.Now).
-func Open(configured []config.Announcement, dir string, now func() time.Time, log *slog.Logger) *Notices {
+// Name is the stored announcements' document.
+const Name = "announcements"
+
+// Open reads the stored announcements from db (nil: the configured ones only, and no saving). now is the clock (time.Now).
+func Open(ctx context.Context, configured []config.Announcement, db docstore.Backend, now func() time.Time, log *slog.Logger) *Notices {
 	return &Notices{
 		configured: configured,
-		file:       filestore.Open(dir, "announcements", List{Announcements: []config.Announcement{}}, Parse, log.With("store", "announcements")),
+		file:       docstore.Open(ctx, db, Name, List{Announcements: []config.Announcement{}}, Parse, log.With("store", "announcements")),
 		now:        now,
 		qr:         &qrCache{codes: map[string]*oapi.QRCode{}},
 	}
 }
 
-// Run reloads the stored file when it changed, until ctx ends.
-func (n *Notices) Run(ctx context.Context) {
-	if n.file.Writable() {
-		filestore.Watch(ctx, n.file)
-	}
-}
-
-// Problems is why the stored file is not served, for the admin status.
+// Problems is why the stored document is not served, for the admin status.
 func (n *Notices) Problems() []string {
 	if p := n.file.Get().Problem; p != "" {
 		return []string{"announcements: " + p + "; serving the last good announcements"}
@@ -138,7 +134,7 @@ func soonest(a, b config.Announcement) int {
 // served is a's answer: its fields as the pages draw them, its revision, and its link's QR code.
 func (n *Notices) served(a config.Announcement) oapi.Announcement {
 	b, _ := json.Marshal(a) //nolint:errchkjson // plain strings and slices
-	out := oapi.Announcement{Id: a.ID, Revision: filestore.Digest(b)[:12], Title: a.Title, Tone: oapi.AnnouncementTone(a.Tone), Until: a.UntilAt}
+	out := oapi.Announcement{Id: a.ID, Revision: docstore.Digest(b)[:12], Title: a.Title, Tone: oapi.AnnouncementTone(a.Tone), Until: a.UntilAt}
 	text := func(s string) *string {
 		if s == "" {
 			return nil

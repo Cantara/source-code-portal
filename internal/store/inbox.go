@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 )
 
@@ -9,9 +10,19 @@ import (
 const inboxPrefix = "inbox/"
 
 // Park keeps a webhook event under id until Unpark removes it, so an event the process never acted on (a crash, a restart) is not lost.
-// The write is synced to disk before it returns (the store's own writes are not: a cache may lose its last seconds to a power cut, but
-// GitHub has been told the delivery arrived and will not send it again).
-func (s *DB) Park(ctx context.Context, id, value string) (err error) {
+// GitHub has been told the delivery arrived and will not send it again, so the write is synced to disk before it returns.
+func (s *DB) Park(ctx context.Context, id, value string) error {
+	return s.durably(ctx, func(conn *sql.Conn) error {
+		_, err := conn.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+			inboxPrefix+id, value)
+		return err
+	})
+}
+
+// durably runs fn on a connection whose commits are synced to disk before they return. The store's own writes are not (a cache may
+// lose its last seconds to a power cut), but what has been acknowledged to a person or to GitHub must survive the process dying and
+// the machine losing power: parked webhook events, sealed credentials, the documents administrators save.
+func (s *DB) durably(ctx context.Context, fn func(*sql.Conn) error) (err error) {
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
 		return err
@@ -25,9 +36,7 @@ func (s *DB) Park(ctx context.Context, id, value string) (err error) {
 			err = e
 		}
 	}()
-	_, err = conn.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-		inboxPrefix+id, value)
-	return err
+	return fn(conn)
 }
 
 // Parked returns the parked events, by id.

@@ -154,13 +154,12 @@ landscape* up to 1600 px, *Desk* beyond, the commit log at 60%), each with its o
 the pull requests and the issues, each hidden by its button, as on the dashboard); a TV is told it is on a wall once
 with `/present?profile=wall`. Behind `access.require_auth` sign in
 once on the device, with single sign-on or a token of its own from `auth.tokens` (only the groups it shows): the page's hourly reload
-renews the session. An administrator arranges it like the dashboard; with `layout.dir`
-the layout is `present.json` beside `dashboard.json`.
+renews the session. An administrator arranges it like the dashboard; its layout is saved in the store beside the dashboard's.
 
 ## Announcements
 
 The team's news (an event with a sign-up link, planned maintenance) shows at the top of the dashboard and of `/present` while its
-time lasts. Administrators write them on the Admin page's *Announcements* card, saved as `announcements.json` in `layout.dir`; the
+time lasts. Administrators write them on the Admin page's *Announcements* card, saved in the store; the
 deployment can set its own in `announcements[]` (`id`, `title`, `text`, `tone`: `event`, `info` or `notice`, `starts`/`ends` in RFC
 3339 with their offset, `place`, `link` with `label` and an https `url`, `lang`, `pages`: `dashboard` and/or `present`, `audience`:
 `everyone` or `signed-in`, `from`, `until` (required unless `ends`), `published`), which `scp config check` checks and Admin lists

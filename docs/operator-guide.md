@@ -127,7 +127,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `server.trusted_proxies` | `[]` | CIDRs allowed to set `X-Forwarded-For` |
 | `log.level` | `info` | `debug`, `info`, `warn`, `error` (also `--log-level`) |
 | `log.format` | `json` | `json`, or `text` for local use |
-| `store.path` | `/data/scp.db` | the SQLite cache; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version |
+| `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts and announcements administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version |
 | `sync.concurrency` | `4` | GitHub jobs running at once |
 | `github.sources[]` | required | one entry per GitHub host and credential |
 | `github.sources[].id` | required | short id, `[a-z0-9-]` |
@@ -185,7 +185,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
 | `web.dir` | empty | the web UI bundle (the directory holding `server.js`); empty: the pages answer 503, the API, badges and Markdown still work |
 | `web.node` | `node` | the Node.js executable that runs the bundle (26, the current LTS; 24 also runs it) |
-| `layout.dir` | empty | a writable directory for the pages' layouts an administrator designs (section 2.4) and the announcements written in Admin (`announcements.json`, section 2.4.1); empty: the built-in layouts and the configured announcements, no saving |
+| `layout.dir` | empty | only for an upgrade: a directory with the `dashboard.json`, `present.json` and `announcements.json` an administrator saved before they lived in the store. Each one the store does not hold yet is imported once at the start (the log says which); after that the store is the truth and the files are not read. Remove the key afterwards |
 | `announcements[]` | `[]` | the deployment's announcements (section 2.4.1): `id`, `title`, `text`, `tone`, `starts`, `ends`, `place`, `link` (`label`, `url`), `lang`, `pages`, `audience`, `from`, `until`, `published`; at most 20 |
 | `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy, `nuget` the feed whose `index.json` is the service index, `rubygems` a gem server, `packagist` a Composer repository |
 | `packages.registries[].network` | `public` | `public`: reached through the public-only guard; `private`: on your network (http allowed, without credentials) |
@@ -363,7 +363,7 @@ layout:
   dir: /var/lib/scp/layouts   # writable by the portal; one JSON file per page (dashboard.json)
 ```
 
-- Without `layout.dir` the built-in layout renders and the design mode can only try layouts, not save them.
+- Saved layouts live in the store (the SQLite file), so they survive a restart or a crash and are in the store's backup; nothing but the store needs to be writable. "Reset" brings the built-in layout back.
 - The files are the portal's own: keep them with your configuration's backup. They are not in the cache (`store.path`), so deleting the
   cache never loses a design; deleting `dashboard.json` brings back the built-in layout.
 - A save is written to a temporary file and renamed, so a reader never sees half a layout. Two administrators never overwrite each
@@ -378,7 +378,7 @@ health, the products as tiles and the newest commits on one screen that never sc
 tile with its findings; the good ones take a line each and fold into "N more good" when they do not fit. It says at all times how
 current it is (*Live*, *Polling*, *Stale* after 2 minutes without new data, *Offline* after 10 or while the portal cannot be reached),
 keeps the screen awake, follows the reader's theme (a screen told it is on a wall is dark unless the reader chose), reloads for a new release and once an hour, and shifts a pixel now and then
-against burn-in. A tap shows its controls; an administrator designs it as the dashboard (`present.json` in `layout.dir`).
+against burn-in. A tap shows its controls; an administrator designs it as the dashboard (its own saved layout in the store).
 
 - One screen per team: `/present?groups=payments,identity` keeps to those products, `?work=hand,ai` fixes the work that counts.
 - The page knows the kind of screen it is on, its *profile*: *Handheld portrait* (a tablet held upright), *Handheld landscape* (a
@@ -408,7 +408,7 @@ other) while its time lasts, and goes away by itself. It is plain text with one 
   and its words, the tone (*Event*, *Announcement* or *Notice*, each in a colour of its own, never a health colour), the language of
   its text, the pages it shows on (the dashboard, `/present` or both), who sees it (everyone, or signed-in viewers only), when it shows
   and until when. *Published* off keeps it as a draft. The preview beside the form is the card the pages draw. They are saved in
-  `layout.dir` (`announcements.json`), so without one the card cannot save.
+  the store (the document `announcements`).
 - **The deployment** sets them in `announcements[]`, checked by `scp config check`; the *Admin* card lists them, locked:
 
 ```yaml

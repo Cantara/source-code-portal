@@ -1,6 +1,8 @@
-// Package store keeps the last good state in SQLite so a restart serves data before the first GitHub call. It is a cache:
-// deleting the file costs a resync, never data. A file that is corrupt, fails to migrate or has a newer schema is moved aside and the
-// store starts empty. The sync engine is the only writer.
+// Package store keeps everything the portal holds on to in SQLite, so a restart (or a crash) serves it before the first GitHub call:
+// the catalogue, the documents administrators save, sealed credentials, parked webhook events. Memory only loads it. The catalogue part
+// is read again from GitHub when the file is lost; the rest is data (back the file up), and an acknowledged write of it is synced to
+// disk before it returns (durably). A file that is corrupt, fails to migrate or has a newer schema is moved aside (the way back is its
+// copy) and the store starts empty.
 package store
 
 import (
@@ -18,6 +20,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // database/sql driver "sqlite"
@@ -61,8 +64,9 @@ type Change struct {
 
 // DB is the store.
 type DB struct {
-	db  *sql.DB
-	log *slog.Logger
+	db    *sql.DB
+	log   *slog.Logger
+	docMu sync.Mutex // one document save at a time: the revision check and the write are one step
 }
 
 // Open opens or creates the store at path. A file that cannot be used is quarantined next to path and a new one created.

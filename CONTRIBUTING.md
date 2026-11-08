@@ -27,6 +27,7 @@ Every piece of work starts with three things, written down before the code, in t
 - One branch, one pull request per feature; commits are Conventional Commits; nothing is pushed to `main`; the owner's team tags
   releases.
 - Read-only towards GitHub; the security model is never weakened for convenience (`docs/security-model.md`).
+- Data lives in SQLite and memory only loads it; an instance that dies must come back with everything it had acknowledged (`make rehearse` kills a real one to prove it).
 - Deployed instances are not broken: configuration and the store change only in additive ways, and `make rehearse` proves it.
 - Tests never touch the network. Generated files come from `make gen`.
 - Keep it small: no package, key or dependency before the code that needs it.

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/store"
 )
 
 func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
@@ -81,87 +81,71 @@ func layoutOf(kinds ...oapi.LayoutElementKind) Layout {
 	return l
 }
 
+// db is a store in a temporary directory.
+func db(t *testing.T) *store.DB {
+	t.Helper()
+	d, err := store.Open(t.Context(), filepath.Join(t.TempDir(), "scp.db"), quiet())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = d.Close() })
+	return d
+}
+
 func TestStoreSaveConflictReset(t *testing.T) {
-	dir := t.TempDir()
-	s := Open(dir, quiet())
+	d := db(t)
+	ctx := t.Context()
+	s := Open(ctx, d, quiet())
 	if p := s.Get("dashboard"); p.Stored || p.Revision != "" || len(p.Layout.Elements) != 7 {
 		t.Fatalf("before a save: %+v", p)
 	}
-	rev, err := s.Save("dashboard", layoutOf(oapi.LayoutElementKindTelemetry), "")
+	rev, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), "")
 	if err != nil || rev == "" {
 		t.Fatal(rev, err)
 	}
 	if p := s.Get("dashboard"); !p.Stored || p.Revision != rev || len(p.Layout.Elements) != 1 {
 		t.Errorf("after a save: %+v", p)
 	}
-	if _, err := s.Save("dashboard", layoutOf(oapi.LayoutElementKindFleetMap), ""); !errors.Is(err, ErrConflict) {
+	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindFleetMap), ""); !errors.Is(err, ErrConflict) {
 		t.Errorf("a save on a stale revision: %v", err)
 	}
-	if _, err := s.Save("dashboard", Layout{}, rev); !errors.As(err, new(Invalid)) {
+	if _, err := s.Save(ctx, "dashboard", Layout{}, rev); !errors.As(err, new(Invalid)) {
 		t.Errorf("an empty layout: %v", err)
 	}
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 1 || entries[0].Name() != "dashboard.json" {
-		t.Errorf("files = %v, want only dashboard.json (no temporary file left)", entries)
-	}
-	if again := Open(dir, quiet()).Get("dashboard"); again.Revision != rev || !again.Stored {
+	if again := Open(ctx, d, quiet()).Get("dashboard"); again.Revision != rev || !again.Stored {
 		t.Errorf("reopened: %+v", again)
 	}
-	if err := s.Reset("dashboard", "stale"); !errors.Is(err, ErrConflict) {
+	if err := s.Reset(ctx, "dashboard", "stale"); !errors.Is(err, ErrConflict) {
 		t.Errorf("a reset on a stale revision: %v", err)
 	}
-	if err := s.Reset("dashboard", rev); err != nil {
+	if err := s.Reset(ctx, "dashboard", rev); err != nil {
 		t.Fatal(err)
 	}
 	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 7 {
 		t.Errorf("after a reset: %+v", p)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "dashboard.json")); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("the file is still there: %v", err)
-	}
-	if _, err := Open("", quiet()).Save("dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); !errors.Is(err, ErrReadOnly) {
-		t.Errorf("without a directory: %v", err)
+	if _, err := Open(ctx, nil, quiet()).Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("without a store: %v", err)
 	}
 }
 
-// TestStoreReload: a file written by hand is picked up, a broken one keeps the last good layout with a problem an admin can save
-// over, and a removed one brings back the built-in layout.
-func TestStoreReload(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "dashboard.json")
-	s := Open(dir, quiet())
-	write := func(body string, mod time.Time) {
-		t.Helper()
-		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chtimes(path, mod, mod); err != nil {
-			t.Fatal(err)
-		}
-		s.reload("dashboard")
+// TestStoreBrokenDocument: a stored layout that no longer parses keeps the built-in layout with a problem an admin can save over.
+func TestStoreBrokenDocument(t *testing.T) {
+	d := db(t)
+	ctx := t.Context()
+	if err := d.PutDocument(ctx, "dashboard", []byte(`{"elements":[{"kind":"chart"}]}`), "r0", ""); err != nil {
+		t.Fatal(err)
 	}
-	base := time.Now().Add(-time.Hour)
-	write(`{"elements":[{"kind":"telemetry"},{"kind":"fleet-map"}]}`, base)
-	if p := s.Get("dashboard"); !p.Stored || len(p.Layout.Elements) != 2 {
-		t.Fatalf("written by hand: %+v", p)
-	}
-	write(`{"elements":[{"kind":"chart"}]}`, base.Add(time.Minute))
+	s := Open(ctx, d, quiet())
 	p := s.Get("dashboard")
-	if !p.Stored || len(p.Layout.Elements) != 2 || !strings.Contains(p.Problem, "unknown kind") || len(s.Problems()) != 1 {
+	if p.Stored || len(p.Layout.Elements) != 7 || !strings.Contains(p.Problem, "unknown kind") || len(s.Problems()) != 1 {
 		t.Fatalf("broken: %+v %v", p, s.Problems())
 	}
-	if _, err := s.Save("dashboard", layoutOf(oapi.LayoutElementKindTelemetry), p.Revision); err != nil {
-		t.Errorf("saving over a broken file: %v", err)
+	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), p.Revision); err != nil {
+		t.Errorf("saving over a broken document: %v", err)
 	}
 	if s.Get("dashboard").Problem != "" {
 		t.Error("the problem stays after a good save")
-	}
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
-	s.reload("dashboard")
-	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 7 {
-		t.Errorf("removed: %+v", p)
 	}
 }
 
@@ -191,7 +175,7 @@ func TestResolve(t *testing.T) {
 }
 
 func TestAdminRoutes(t *testing.T) {
-	s := Open(t.TempDir(), quiet())
+	s := Open(t.Context(), db(t), quiet())
 	mux := http.NewServeMux()
 	for _, r := range s.Routes("https://scp.example") {
 		mux.Handle(r.Pattern, r.Handler)
@@ -257,7 +241,7 @@ func TestAdminRoutes(t *testing.T) {
 		t.Errorf("reset: %d", w.Code)
 	}
 	ro := http.NewServeMux()
-	for _, r := range Open("", quiet()).Routes("") {
+	for _, r := range Open(t.Context(), nil, quiet()).Routes("") {
 		ro.Handle(r.Pattern, r.Handler)
 	}
 	r := httptest.NewRequestWithContext(httpapi.WithViewer(context.Background(), admin), "PUT", at, strings.NewReader(save))
@@ -265,6 +249,6 @@ func TestAdminRoutes(t *testing.T) {
 	rw := httptest.NewRecorder()
 	ro.ServeHTTP(rw, r)
 	if rw.Code != http.StatusConflict {
-		t.Errorf("without layout.dir: %d", rw.Code)
+		t.Errorf("without a store: %d", rw.Code)
 	}
 }
