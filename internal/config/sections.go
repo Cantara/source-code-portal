@@ -81,8 +81,12 @@ type Catalog struct {
 type Webhook struct {
 	SecretFile         string `mapstructure:"secret_file"`
 	PreviousSecretFile string `mapstructure:"previous_secret_file"`
-	Secret             Secret `mapstructure:"-"`
-	PreviousSecret     Secret `mapstructure:"-"`
+	// CatchUp reads each GitHub App's webhook delivery log every two minutes and acts on what the portal did not answer with a
+	// success. It makes events work where GitHub cannot reach the portal (no receiver, no secret: a computer at home); with a
+	// receiver it is the net for what the portal missed, which runs anyway.
+	CatchUp        bool   `mapstructure:"catch_up"`
+	Secret         Secret `mapstructure:"-"`
+	PreviousSecret Secret `mapstructure:"-"`
 }
 
 // Access names the headers a trusted authenticating proxy sets and the groups whose members see private repositories.

@@ -63,8 +63,11 @@ catalog:
 # GitHub webhook (content type application/json; events push, release, repository, installation, installation_repositories) at
 # POST /webhooks/github. The receiver is registered only when secret_file is set; previous_secret_file keeps deliveries signed with
 # the old secret valid during a rotation.
+# catch_up: true reads the App's webhook delivery log every two minutes instead (or as well): events for a portal GitHub cannot
+# reach. It needs a source with an app, and needs no secret.
 webhook:
   secret_file: /run/secrets/webhook-secret
+  # catch_up: false
   # previous_secret_file: /run/secrets/webhook-secret-old
 # Who sees private repositories: the headers a trusted authenticating proxy sets and the permitted groups.
 access:

@@ -6,6 +6,11 @@ subjects.
 
 ## Unreleased
 
+- **Events without a receiver**: the new `webhook.catch_up` (default off) reads each GitHub App's webhook delivery log every two minutes and
+  acts on what was not answered with a success, as the receiver's net already did, without needing `webhook.secret_file`. For a portal
+  GitHub cannot reach. `GET /api/v1/admin/status` says whether the receiver and the catch-up run. Nothing changes for a configuration
+  without the key.
+
 Release notes on the Releases page, the repository's and the product's pages, and a store that migrates without losing data, plus a
 personal edition (`scp personal`). No configuration change is needed to upgrade.
 
