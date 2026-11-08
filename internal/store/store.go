@@ -107,17 +107,17 @@ func open(ctx context.Context, path string, mode Mode, log *slog.Logger) (*sql.D
 		return nil, err
 	}
 	// The mode is judged before anything is migrated or written, from a read-only look at the file (opening it for use would already
-	// switch its journal mode). A file that cannot be read here is left to check, which quarantines it.
-	var mark bool
+	// switch its journal mode). A file that cannot be read here is left to check, which quarantines it when it is corrupt; when it
+	// is not, the mode is judged on the open store below, so a failed look never lets a store of the other mode be taken.
+	var mark, judged bool
 	if mode != "" {
 		have, credentials, catalogue, perr := peek(ctx, path)
-		if perr != nil {
-			mark = true
-		} else {
+		if perr == nil {
 			var cerr error
 			if mark, cerr = claim(path, have, credentials, catalogue, mode); cerr != nil {
 				return nil, cerr
 			}
+			judged = true
 		}
 	}
 	q := url.Values{}
@@ -133,8 +133,18 @@ func open(ctx context.Context, path string, mode Mode, log *slog.Logger) (*sql.D
 		_ = db.Close()
 		return nil, err
 	}
+	if mode != "" && !judged {
+		have, credentials, catalogue, ierr := inspect(ctx, db)
+		if ierr == nil {
+			mark, ierr = claim(path, have, credentials, catalogue, mode)
+		}
+		if ierr != nil {
+			_ = db.Close()
+			return nil, ierr
+		}
+	}
 	if mark {
-		if _, err := db.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+		if _, err := db.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING",
 			modeKey, string(mode)); err != nil {
 			_ = db.Close()
 			return nil, err

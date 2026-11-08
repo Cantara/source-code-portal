@@ -53,8 +53,11 @@ func (s *DB) Credential(ctx context.Context, id string) (Credential, error) {
 	return c, nil
 }
 
-// DeleteCredential removes the credential with id; one that is not there is not an error.
+// DeleteCredential removes the credential with id; one that is not there is not an error. Like the write, the removal is synced to
+// disk before it returns: a revoked credential does not come back after a power loss.
 func (s *DB) DeleteCredential(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM credential WHERE id = ?", id)
-	return err
+	return s.durably(ctx, func(conn *sql.Conn) error {
+		_, err := conn.ExecContext(ctx, "DELETE FROM credential WHERE id = ?", id)
+		return err
+	})
 }

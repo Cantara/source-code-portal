@@ -160,6 +160,9 @@ func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
 	b.public, b.lean = b, d
 	c.public, c.lean = d, c
 	d.public, d.lean = d, d
+	// When d is c (every private repository is a hidden fork) the one view serves the private lean reader and the public lean one, and
+	// has one fat link: b, so the public reader never counts a private fork. The private reader then sees no hidden forks counted;
+	// the failure is towards less, never towards a leak.
 	s.fat, b.fat, c.fat, d.fat = s, b, s, b
 	b.hidden, c.hidden, d.hidden = s.hidden, s.hidden, s.hidden
 }

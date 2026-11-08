@@ -63,9 +63,9 @@ type payload struct {
 	Full   time.Time `json:"full"`   // the last read that reused nothing
 }
 
-// Spec is the per-repository refresh job.
+// Spec is the per-repository refresh job. A tag pushed or deleted refreshes it too: the history carries the tags as labels.
 func (c *Commits) Spec() sync.Spec {
-	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: []sync.Event{sync.EventPush, sync.EventBranch}, Run: c.run, Publish: publish}
+	return sync.Spec{Kind: Kind, Prio: sync.PrioScheduled, TTL: ttl, On: []sync.Event{sync.EventPush, sync.EventBranch, sync.EventTag}, Run: c.run, Publish: publish}
 }
 
 func (c *Commits) run(ctx context.Context, j sync.Job) (sync.Result, error) {

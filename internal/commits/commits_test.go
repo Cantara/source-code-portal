@@ -491,3 +491,14 @@ func TestRunMergesACutReadWithTheHeldHistory(t *testing.T) {
 		t.Errorf("main = %v, again %v; want a b c d and a read again soon", shas, res.Again)
 	}
 }
+
+// TestSpecListensToRefs: the history is read again when the default branch moves, when another branch does and when a tag is pushed or
+// deleted (the tags are labels in it).
+func TestSpecListensToRefs(t *testing.T) {
+	on := New(nil).Spec().On
+	for _, e := range []sync.Event{sync.EventPush, sync.EventBranch, sync.EventTag} {
+		if !slices.Contains(on, e) {
+			t.Errorf("the history does not listen to %s", e)
+		}
+	}
+}

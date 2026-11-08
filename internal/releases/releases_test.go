@@ -2,6 +2,7 @@ package releases
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -170,5 +171,36 @@ func TestLatest(t *testing.T) {
 	}
 	if rel, f := Latest(s.Repos["acme/unread"]); rel != nil || f.State == snapshot.StateNotFound {
 		t.Errorf("not read yet: %+v %v, want unknown", rel, f.State)
+	}
+}
+
+// changelogFails lists releases and cannot read the changelog.
+type changelogFails struct{ fetcher }
+
+func (changelogFails) Changelog(context.Context, string, string) ([]byte, error) {
+	return nil, errors.New("blob: 403")
+}
+
+// TestChangelogFailureKeepsTheReleases: the changelog is a nicety; when it cannot be read the releases are still published and the
+// sections known from the last read stay.
+func TestChangelogFailureKeepsTheReleases(t *testing.T) {
+	rels := []Release{{Tag: "v1.0.0", Published: day(1)}}
+	job := sync.Job{Key: Kind + "/acme/x", Source: "gh", Repo: "acme/x"}
+	good, err := New(map[string]Fetcher{"gh": fetcher{rels: rels, changelog: "## 1.0.0\n\n- first\n"}}).Spec().Run(t.Context(), job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job.Prev = store.Item{State: snapshot.StateOK, Payload: good.Payload}
+	res, err := New(map[string]Fetcher{"gh": changelogFails{fetcher{rels: rels}}}).Spec().Run(t.Context(), job)
+	if err != nil {
+		t.Fatalf("a changelog that cannot be read failed the job: %v", err)
+	}
+	var set Set
+	if json.Unmarshal(res.Payload, &set) != nil || len(set.Releases) != 1 || len(set.Changelog) != 1 || set.Changelog[0].Version != "1.0.0" {
+		t.Errorf("published = %s, want the release and the sections known", res.Payload)
+	}
+	job.Prev = store.Item{}
+	if res, err = New(map[string]Fetcher{"gh": changelogFails{fetcher{rels: rels}}}).Spec().Run(t.Context(), job); err != nil || !strings.Contains(string(res.Payload), "v1.0.0") {
+		t.Errorf("without a known changelog the releases are still published: %s %v", res.Payload, err)
 	}
 }

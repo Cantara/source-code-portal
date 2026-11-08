@@ -94,6 +94,21 @@ describe("the live stream keeps itself open", () => {
   }
   const live = () => FakeSource.all.filter((s) => !s.closed)
 
+  it("follows the view the pages read: the forks, when the reader chose them", async () => {
+    const hook = await mount()
+    expect(FakeSource.all[0]?.url).toBe("/api/v1/events")
+    hook.unmount()
+    FakeSource.all = []
+    document.cookie = "scp-forks=show; path=/"
+    try {
+      const shown = await mount()
+      expect(FakeSource.all[0]?.url).toBe("/api/v1/events?forks=show")
+      shown.unmount()
+    } finally {
+      document.cookie = "scp-forks=; path=/; max-age=0"
+    }
+  })
+
   it("opens it again after silence, and a ping is proof of life", async () => {
     const hook = await mount()
     expect(FakeSource.all).toHaveLength(1)
