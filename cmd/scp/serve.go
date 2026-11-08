@@ -256,10 +256,11 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 	s.layouts = layout.Open(cfg.Layout.Dir, log)
 	s.notices = announce.Open(cfg.Announcements, cfg.Layout.Dir, time.Now, log)
-	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: cfg.Webhook.Secret.IsSet(),
+	feed := cfg.Webhook.Secret.IsSet() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
+	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
-		webhook: cfg.Webhook.Secret.IsSet(), layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
+		webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
 		deliveries: map[string]int{}}
 	if s.member != nil {
 		st.cluster = s.member
@@ -288,21 +289,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		{Pattern: "GET /repos/{owner}/{name}/docs/{path...}", Handler: md.Doc(), Markdown: true},
 		{Pattern: "GET /groups/{group}", Handler: md.Group(), Markdown: true}, events.Route()}
 	routes = append(routes, catalog.Legacy(view)...)
-	if cfg.Webhook.Secret.IsSet() {
-		s.inbox = &inbox{park: s.store, deliver: s.deliver, handled: s.engine.Handled, log: log, now: time.Now}
-		rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.inbox.take, cfg.GitHub.Sources), log)
-		if s.member != nil {
-			rc.Dedupe(s.member.First)
-		}
-		observe := func(event, result string) { m.delivery(event, result); st.delivery(event, result) }
-		rc.Observe(observe)
-		for _, src := range cfg.GitHub.Sources {
-			if g := gh.Source(src.ID); g.App() {
-				s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, webhookSink(s.inbox.take, cfg.GitHub.Sources), observe, log))
-			}
-		}
-		routes = append(routes, httpapi.Route{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc})
-	}
+	routes = append(routes, s.eventRoutes(cfg, gh, m, st, feed, log)...)
 	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
 	me := httpapi.MeAPI{}
 	if cfg.Auth.SignIn() || len(cfg.Auth.Tokens) > 0 {
@@ -663,4 +650,28 @@ func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, 
 	}
 	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(public, private, registries), Registries: registries,
 		Public: cfg.Public, Repo: repo})
+}
+
+// eventRoutes wires what tells the portal about changes: the inbox that makes events survive a restart, the catch-up of each App's
+// delivery log, and with a webhook secret the receiver (the returned route).
+func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, st *status, feed bool, log *slog.Logger) []httpapi.Route {
+	if !feed {
+		return nil
+	}
+	s.inbox = &inbox{park: s.store, deliver: s.deliver, handled: s.engine.Handled, log: log, now: time.Now}
+	observe := func(event, result string) { m.delivery(event, result); st.delivery(event, result) }
+	for _, src := range cfg.GitHub.Sources {
+		if g := gh.Source(src.ID); g.App() {
+			s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, webhookSink(s.inbox.take, cfg.GitHub.Sources), observe, log))
+		}
+	}
+	if !cfg.Webhook.Secret.IsSet() { // GitHub cannot reach the portal: the delivery logs are the only way events arrive
+		return nil
+	}
+	rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.inbox.take, cfg.GitHub.Sources), log)
+	if s.member != nil {
+		rc.Dedupe(s.member.First)
+	}
+	rc.Observe(observe)
+	return []httpapi.Route{{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc}}
 }

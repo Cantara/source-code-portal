@@ -85,6 +85,7 @@ func defaults() map[string]any {
 		"catalog.reconcile_interval":   "5m",
 		"webhook.secret_file":          "",
 		"webhook.previous_secret_file": "",
+		"webhook.catch_up":             false,
 		"access.user_header":           "X-Forwarded-User",
 		"access.groups_header":         "X-Forwarded-Groups",
 		"access.private_groups":        []string{},
@@ -244,6 +245,9 @@ func (c Config) validate() []string {
 	}
 	p = append(p, c.GitHub.validate()...)
 	p = append(p, c.Catalog.validate(c.GitHub)...)
+	if c.Webhook.CatchUp && !slices.ContainsFunc(c.GitHub.Sources, func(s Source) bool { return s.App != nil }) {
+		p = append(p, "webhook.catch_up: needs a github.sources entry with an app (the delivery log is the App's)")
+	}
 	if c.Webhook.PreviousSecretFile != "" && c.Webhook.SecretFile == "" {
 		p = append(p, "webhook.previous_secret_file: needs webhook.secret_file")
 	}

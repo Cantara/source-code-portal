@@ -293,3 +293,13 @@ func TestPackageRegistries(t *testing.T) {
 		t.Error("a registry credential was printed")
 	}
 }
+
+func TestCatchUpNeedsAnApp(t *testing.T) {
+	// The base configuration reads with a token: the delivery log is an App's.
+	if _, _, err := Load(file(t, "webhook: {catch_up: true}\n"), nil); err == nil || !strings.Contains(err.Error(), "webhook.catch_up: needs a github.sources entry with an app") {
+		t.Errorf("catch_up with a token only: %v", err)
+	}
+	if cfg, _, err := Load(file(t, ""), nil); err != nil || cfg.Webhook.CatchUp {
+		t.Errorf("catch_up is off by default: %v", err)
+	}
+}

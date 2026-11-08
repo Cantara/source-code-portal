@@ -22,7 +22,9 @@ type status struct {
 	current      func() *snapshot.Snapshot
 	depth        func() (waiting, running int)
 	rate         func() map[string]float64
-	webhook      bool
+	webhook      bool            // events reach the portal (a receiver or the delivery log)
+	receiver     bool            // GitHub can post to the portal
+	catchUp      bool            // the Apps' delivery logs are read
 	layouts      func() []string // why stored layouts are not served
 	prereqs      func() []prereq.Unmet
 	cluster      interface {
@@ -76,6 +78,8 @@ type statusCluster struct {
 
 type statusWebhook struct {
 	Enabled      bool           `json:"enabled"`
+	Receiver     bool           `json:"receiver"`
+	CatchUp      bool           `json:"catchUp"`
 	Deliveries   map[string]int `json:"deliveries"`
 	LastDelivery *time.Time     `json:"lastDelivery"`
 }
@@ -124,7 +128,7 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	if !st.webhook {
-		b.Warnings = append(b.Warnings, "webhook: not configured; pushes show after the next scheduled listing")
+		b.Warnings = append(b.Warnings, "webhook: not configured; pushes show after the next scheduled listing (webhook.secret_file, or webhook.catch_up with a GitHub App)")
 	}
 	if st.layouts != nil {
 		b.Warnings = append(b.Warnings, st.layouts()...)
@@ -134,7 +138,7 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	}
 	slices.Sort(b.Warnings)
 	st.mu.Lock()
-	b.Webhook = statusWebhook{Enabled: st.webhook, Deliveries: map[string]int{}}
+	b.Webhook = statusWebhook{Enabled: st.webhook, Receiver: st.receiver, CatchUp: st.catchUp, Deliveries: map[string]int{}}
 	for k, v := range st.deliveries {
 		b.Webhook.Deliveries[k] = v
 	}

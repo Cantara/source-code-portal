@@ -178,6 +178,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `assistant.tool_result_chars` | `12000` | characters of one tool result given to the model (1,000 to 200,000) |
 | `webhook.secret_file` | empty | webhook secret; the receiver is served only when set |
 | `webhook.previous_secret_file` | empty | the old secret, accepted too while you rotate |
+| `webhook.catch_up` | `false` | read each GitHub App's webhook delivery log every two minutes and act on what the portal did not answer with a success: events without a receiver, for a portal GitHub cannot reach (a computer at home, behind a firewall). It needs a source with `app`; with a receiver it is the net that runs anyway. The App still has to subscribe to the events and have a webhook URL (it need not be reachable) |
 | `cluster.addresses` | `[]` | Hazelcast members `host:port`; set to run as one of several instances (section 3.1) |
 | `cluster.name` | `dev` | the Hazelcast cluster name |
 | `cluster.namespace` | `scp` | prefix of the Hazelcast objects, `[a-z0-9-]`, so several portals can share one Hazelcast cluster |
