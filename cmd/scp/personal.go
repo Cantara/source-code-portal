@@ -85,7 +85,6 @@ type personal struct {
 	tty      io.Reader // the terminal, when stdin is one: hidden input
 	ring     vault.Ring
 	http     *http.Client
-	sleep    func(context.Context, time.Duration) error
 	now      func() time.Time
 	open     func(url string)                                           // opens the setup page in the browser; nil: the system's
 	cliToken func(ctx context.Context, hostname string) (string, error) // the GitHub CLI's token; nil: ask `gh` if it is installed
@@ -150,7 +149,7 @@ func (p *personal) dir() (string, error) {
 }
 
 func (p *personal) client(h ghlogin.Host) *ghlogin.Client {
-	return &ghlogin.Client{Host: h, HTTP: p.http, Sleep: p.sleep, Now: p.now}
+	return &ghlogin.Client{Host: h, HTTP: p.http, Now: p.now}
 }
 
 // run sets the directory up (the wizard on the first run), loads personal.yaml, opens the credential and serves.

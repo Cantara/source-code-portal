@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"go.uber.org/goleak"
@@ -50,6 +52,9 @@ type fakeHost struct {
 	answers   []string // the access_token endpoint's JSON answers, in order
 	polls     int
 	scope     string
+	pollAuth  string // the Authorization header of the last poll
+	pollBody  url.Values
+	handler   http.Handler
 	expiry    string
 	orgPages  int
 	repoPages int // pages of 100 repositories the listing has; 0: three repositories on one page
@@ -58,8 +63,32 @@ type fakeHost struct {
 func newFake(t *testing.T) *fakeHost {
 	t.Helper()
 	f := &fakeHost{}
+	f.routes()
+	f.Server = httptest.NewServer(f.handler)
+	t.Cleanup(f.Close)
+	return f
+}
+
+// memory serves a handler without a socket, so a test of the device flow can run on fake time in a synctest bubble.
+type memory struct{ h http.Handler }
+
+func (m memory) RoundTrip(r *http.Request) (*http.Response, error) {
+	rec := httptest.NewRecorder()
+	m.h.ServeHTTP(rec, r)
+	res := rec.Result()
+	res.Request = r
+	return res, nil
+}
+
+func (f *fakeHost) memClient() *Client {
+	h, _ := ParseHost("http://127.0.0.1:1")
+	return &Client{Host: h, HTTP: &http.Client{Transport: memory{f.handler}}}
+}
+
+func (f *fakeHost) routes() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /login/device/code", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		_ = r.ParseForm()
 		f.mu.Lock()
 		f.scope = r.PostForm.Get("scope")
@@ -71,9 +100,11 @@ func newFake(t *testing.T) *fakeHost {
 		fmt.Fprint(w, `{"device_code":"dev123","user_code":"WDJB-MJHT","verification_uri":"https://example/login/device","expires_in":900,"interval":5}`)
 	})
 	mux.HandleFunc("POST /login/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		_ = r.ParseForm()
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		f.pollAuth, f.pollBody = r.Header.Get("Authorization"), r.PostForm
 		if r.PostForm.Get("device_code") != "dev123" || r.PostForm.Get("grant_type") != "urn:ietf:params:oauth:grant-type:device_code" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -142,9 +173,7 @@ func newFake(t *testing.T) *fakeHost {
 		}
 		fmt.Fprint(w, "["+strings.Join(parts, ",")+"]")
 	})
-	f.Server = httptest.NewServer(mux)
-	t.Cleanup(f.Close)
-	return f
+	f.handler = mux
 }
 
 // listRepos answers a repository listing: three repositories on one page, or (repoPages > 0) a full page of 100 on every page.
@@ -161,49 +190,50 @@ func (f *fakeHost) listRepos(w http.ResponseWriter, page, owner string) {
 		`{"name":"old","fork":true,"archived":true,"owner":{"login":%q}},{"name":"","owner":{"login":"x"}},{"name":"nobody"}]`, owner, owner)
 }
 
-func (f *fakeHost) client(t *testing.T, slept *[]time.Duration) *Client {
+func (f *fakeHost) client(t *testing.T) *Client {
 	h, err := ParseHost(f.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
-	return &Client{Host: h, Now: func() time.Time { return now },
-		Sleep: func(_ context.Context, d time.Duration) error {
-			if slept != nil {
-				*slept = append(*slept, d)
-			}
-			now = now.Add(d)
-			return nil
-		}}
+	return &Client{Host: h, Now: func() time.Time { return now }}
 }
 
+// The device flow runs on fake time: x/oauth2 waits with real timers, so each case is a synctest bubble over an in-memory host.
 func TestDeviceFlow(t *testing.T) {
 	ctx := context.Background()
-	t.Run("pending, slow down, then a token that expires", func(t *testing.T) {
-		f := newFake(t)
-		f.answers = []string{`{"error":"authorization_pending"}`, `{"error":"slow_down","interval":10}`, `{"error":"authorization_pending"}`,
-			`{"access_token":"good","scope":"repo,read:org","token_type":"bearer","expires_in":28800}`}
-		var slept []time.Duration
-		c := f.client(t, &slept)
-		code, err := c.StartDevice(ctx, "Iv1.abc", "repo read:org")
-		if err != nil || code.UserCode != "WDJB-MJHT" || code.Interval != 5*time.Second || f.scope != "repo read:org" {
-			t.Fatalf("%+v %v scope=%q", code, err, f.scope)
-		}
-		tok, err := c.WaitDevice(ctx, "Iv1.abc", code)
-		if err != nil || tok.Value != "good" || tok.Scopes != "repo,read:org" {
-			t.Fatalf("%+v %v", tok, err)
-		}
-		if want := c.Now().Add(28800 * time.Second); !tok.Expires.Equal(want) {
-			t.Errorf("expiry %v, want %v", tok.Expires, want)
-		}
-		if !slices.Equal(slept, []time.Duration{5 * time.Second, 5 * time.Second, 10 * time.Second, 10 * time.Second}) {
-			t.Errorf("waits %v", slept)
-		}
-	})
-	t.Run("a token that does not expire", func(t *testing.T) {
-		f := newFake(t)
-		f.answers = []string{`{"access_token":"good","scope":""}`}
-		c := f.client(t, nil)
+	run := func(name string, answers []string, fn func(t *testing.T, f *fakeHost, c *Client)) {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				f := &fakeHost{answers: answers}
+				f.routes()
+				fn(t, f, f.memClient())
+			})
+		})
+	}
+	run("pending, slow down, then a token that expires", []string{`{"error":"authorization_pending"}`, `{"error":"slow_down","interval":10}`,
+		`{"error":"authorization_pending"}`, `{"access_token":"good","scope":"repo,read:org","token_type":"bearer","expires_in":28800}`},
+		func(t *testing.T, f *fakeHost, c *Client) {
+			code, err := c.StartDevice(ctx, "Iv1.abc", "repo read:org")
+			if err != nil || code.UserCode != "WDJB-MJHT" || code.Interval != 5*time.Second || f.scope != "repo read:org" {
+				t.Fatalf("%+v %v scope=%q", code, err, f.scope)
+			}
+			start := time.Now()
+			tok, err := c.WaitDevice(ctx, "Iv1.abc", code)
+			if err != nil || tok.Value != "good" || tok.Scopes != "repo,read:org" {
+				t.Fatalf("%+v %v", tok, err)
+			}
+			if want := time.Now().Add(28800 * time.Second); !tok.Expires.Equal(want) {
+				t.Errorf("expiry %v, want %v", tok.Expires, want)
+			}
+			if got := time.Since(start); got != 30*time.Second { // 5, 5 (told to slow down: 10), 10, 10
+				t.Errorf("waited %v", got)
+			}
+			if f.pollAuth != "" || f.pollBody.Get("client_id") != "Iv1.abc" || f.pollBody.Get("scope") != "" || f.pollBody.Get("client_secret") != "" {
+				t.Errorf("the poll: authorization %q body %v", f.pollAuth, f.pollBody)
+			}
+		})
+	run("a token that does not expire", []string{`{"access_token":"good","scope":""}`}, func(t *testing.T, f *fakeHost, c *Client) {
 		code, _ := c.StartDevice(ctx, "id", "")
 		tok, err := c.WaitDevice(ctx, "id", code)
 		if err != nil || !tok.Expires.IsZero() {
@@ -213,48 +243,54 @@ func TestDeviceFlow(t *testing.T) {
 			t.Errorf("a scope was sent: %q", f.scope)
 		}
 	})
-	t.Run("denied", func(t *testing.T) {
-		f := newFake(t)
-		f.answers = []string{`{"error":"access_denied"}`}
-		c := f.client(t, nil)
+	run("denied", []string{`{"error":"access_denied"}`}, func(t *testing.T, _ *fakeHost, c *Client) {
 		code, _ := c.StartDevice(ctx, "id", "")
 		if _, err := c.WaitDevice(ctx, "id", code); !errors.Is(err, ErrDenied) {
 			t.Errorf("%v", err)
 		}
 	})
-	t.Run("expired by the host and by the clock", func(t *testing.T) {
-		f := newFake(t)
-		f.answers = []string{`{"error":"expired_token"}`}
-		c := f.client(t, nil)
+	run("expired by the host", []string{`{"error":"expired_token"}`}, func(t *testing.T, _ *fakeHost, c *Client) {
 		code, _ := c.StartDevice(ctx, "id", "")
 		if _, err := c.WaitDevice(ctx, "id", code); !errors.Is(err, ErrExpired) {
 			t.Errorf("host: %v", err)
 		}
-		f.answers, f.polls = []string{`{"error":"authorization_pending"}`}, 0
+	})
+	run("expired by the clock", []string{`{"error":"authorization_pending"}`}, func(t *testing.T, _ *fakeHost, c *Client) {
+		code, _ := c.StartDevice(ctx, "id", "")
+		code.Expires = time.Now().Add(7 * time.Second) // polls at 5 s, and the next would come at 10 s
 		if _, err := c.WaitDevice(ctx, "id", code); !errors.Is(err, ErrExpired) {
 			t.Errorf("clock: %v", err)
 		}
+		code.Expires = time.Now().Add(-time.Second)
+		if _, err := c.WaitDevice(ctx, "id", code); !errors.Is(err, ErrExpired) {
+			t.Errorf("a code that has ended: %v", err)
+		}
 	})
-	t.Run("a refused client id and an unknown error", func(t *testing.T) {
-		f := newFake(t)
-		c := f.client(t, nil)
-		if _, err := c.StartDevice(ctx, "bad", ""); err == nil || !strings.Contains(err.Error(), "incorrect_client_credentials") {
+	run("a refused client id and an unknown error", []string{`{"error":"unsupported_grant_type","error_description":"no"}`}, func(t *testing.T, _ *fakeHost, c *Client) {
+		// GitHub answers a refusal on the code endpoint with a success status; the reason must reach the person.
+		if _, err := c.StartDevice(ctx, "bad", ""); err == nil || !strings.Contains(err.Error(), "incorrect_client_credentials") || !strings.Contains(err.Error(), "not valid") {
 			t.Errorf("%v", err)
 		}
-		f.answers = []string{`{"error":"unsupported_grant_type","error_description":"no"}`}
 		code, _ := c.StartDevice(ctx, "id", "")
 		if _, err := c.WaitDevice(ctx, "id", code); err == nil || !strings.Contains(err.Error(), "unsupported_grant_type") {
 			t.Errorf("%v", err)
 		}
 	})
-	t.Run("a cancelled context stops the wait", func(t *testing.T) {
-		f := newFake(t)
-		f.answers = []string{`{"error":"authorization_pending"}`}
-		c := f.client(t, nil)
+	run("a cancelled context stops the wait", []string{`{"error":"authorization_pending"}`}, func(t *testing.T, _ *fakeHost, c *Client) {
 		code, _ := c.StartDevice(ctx, "id", "")
 		cctx, cancel := context.WithCancel(ctx)
-		c.Sleep = func(ctx context.Context, _ time.Duration) error { cancel(); return ctx.Err() }
+		time.AfterFunc(7*time.Second, cancel)
 		if _, err := c.WaitDevice(cctx, "id", code); !errors.Is(err, context.Canceled) {
+			t.Errorf("%v", err)
+		}
+	})
+	run("an answer that is not a code", nil, func(t *testing.T, f *fakeHost, c *Client) {
+		f.handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{}`)
+		})
+		c.HTTP = &http.Client{Transport: memory{f.handler}}
+		if _, err := c.StartDevice(ctx, "id", ""); err == nil || !strings.Contains(err.Error(), "no device code") {
 			t.Errorf("%v", err)
 		}
 	})
@@ -263,7 +299,7 @@ func TestDeviceFlow(t *testing.T) {
 func TestWhoamiAndOrgs(t *testing.T) {
 	ctx := context.Background()
 	f := newFake(t)
-	c := f.client(t, nil)
+	c := f.client(t)
 	if _, err := c.Whoami(ctx, "wrong"); !errors.Is(err, ErrBadToken) {
 		t.Errorf("a wrong token: %v", err)
 	}
@@ -294,7 +330,7 @@ func TestWhoamiAndOrgs(t *testing.T) {
 func TestAccountRepos(t *testing.T) {
 	ctx := context.Background()
 	f := newFake(t)
-	c := f.client(t, nil)
+	c := f.client(t)
 	if n, err := c.AccountSize(ctx, "good", "octo", true); err != nil || n != 3 {
 		t.Errorf("the person's own size (public and owned private): %d %v", n, err)
 	}

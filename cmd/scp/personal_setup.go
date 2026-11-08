@@ -53,7 +53,7 @@ func (p *personal) browserSetup(ctx context.Context, dir, cfgPath string) (*auth
 		clientID = defaultClientID
 	}
 	s := setup.New(setup.Config{Addr: ln.Addr().String(), Code: entry, Host: p.flags.host, ClientID: clientID, Scope: p.flags.scope,
-		HTTP: p.http, Sleep: p.sleep, Now: p.now, CLIToken: p.cliTokenFunc(),
+		HTTP: p.http, Now: p.now, CLIToken: p.cliTokenFunc(),
 		Finish: func(ctx context.Context, r setup.Result) (string, error) {
 			var err error
 			if launch, err = p.finishSetup(ctx, dir, cfgPath, key, r); err != nil {

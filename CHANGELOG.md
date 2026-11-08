@@ -6,7 +6,7 @@ subjects.
 
 ## Unreleased
 
-- **The personal edition's GitHub calls use the libraries the portal already has**: creating a GitHub App from a manifest, listing where it is installed and the sign-in's reads (who you are, your organisations and repositories) go through go-github, and the App's token is signed by `ghinstallation`, instead of code of our own. Nothing changes for `scp serve`.
+- **The personal edition's GitHub calls use the libraries the portal already has**: creating a GitHub App from a manifest, listing where it is installed and the sign-in's reads (who you are, your organisations and repositories) go through go-github, the App's token is signed by `ghinstallation` and the sign-in by device code uses `golang.org/x/oauth2`, instead of code of our own. Nothing changes for `scp serve`.
 
 - **Everything in SQLite, and an instance that dies survives**: the layouts and announcements administrators save now live in the store
   (the new `document` table, a copy `scp.db.pre-0004` is taken first) instead of files, and every acknowledged write (a saved

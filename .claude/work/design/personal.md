@@ -55,7 +55,7 @@ a session refused.
 ## As built
 
 - `internal/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (migration 0003), `internal/ghlogin` (hosts, device flow,
-  `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`; every GitHub call but the device flow goes through go-github, and the App's calls through `ghinstallation`, GL1), `auth.Launch` (`GET /auth/launch`),
+  `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`; the device flow is `x/oauth2`'s, every other GitHub call goes through go-github and the App's JWT through `ghinstallation`, GL1), `auth.Launch` (`GET /auth/launch`),
   `cmd/scp/personal.go`.
 - A source says `credential: true`; `scp personal` opens the vault and puts the token in the source before `newServer`; `newServer`
   refuses a source with `credential` and no token, so `scp serve` never starts with an unresolved one.

@@ -4,6 +4,7 @@
 package ghlogin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	gh "github.com/google/go-github/v93/github"
+	"golang.org/x/oauth2"
 )
 
 // Host is a GitHub host: where people sign in (Web) and where the REST API is (API, with a trailing slash, as github.sources[].base_url).
@@ -57,12 +59,11 @@ func loopback(host string) bool {
 	return err == nil && a.IsLoopback()
 }
 
-// Client talks to a host. HTTP and Sleep are replaced in tests.
+// Client talks to a host. HTTP and Now are replaced in tests.
 type Client struct {
-	Host  Host
-	HTTP  *http.Client
-	Sleep func(context.Context, time.Duration) error
-	Now   func() time.Time
+	Host Host
+	HTTP *http.Client
+	Now  func() time.Time
 }
 
 func (c *Client) http() *http.Client {
@@ -77,20 +78,6 @@ func (c *Client) now() time.Time {
 		return c.Now()
 	}
 	return time.Now()
-}
-
-func (c *Client) sleep(ctx context.Context, d time.Duration) error {
-	if c.Sleep != nil {
-		return c.Sleep(ctx, d)
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
-	}
 }
 
 // Code is what the device flow shows the person: open VerificationURI and enter UserCode.
@@ -115,113 +102,128 @@ var (
 	ErrExpired = errors.New("ghlogin: the code ran out before the sign-in was confirmed")
 )
 
-func (c *Client) form(ctx context.Context, path string, v url.Values, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Host.Web+path, strings.NewReader(v.Encode()))
-	if err != nil {
-		return err
+// The device flow is RFC 8628, which golang.org/x/oauth2 speaks (the polling, the slow-down, the deadline). GitHub is a public
+// client here: the client id goes in the body, never a secret and never a Basic header.
+func (c *Client) oauth(clientID string) *oauth2.Config {
+	return &oauth2.Config{ClientID: clientID, Endpoint: oauth2.Endpoint{
+		DeviceAuthURL: c.Host.Web + "/login/device/code", TokenURL: c.Host.Web + "/login/oauth/access_token", AuthStyle: oauth2.AuthStyleInParams}}
+}
+
+// tap keeps the error GitHub sends with a success status on the code endpoint ({"error":"incorrect_client_credentials",...}): x/oauth2
+// reads such an answer as a code with nothing in it, and the person needs the reason.
+type tap struct {
+	base         http.RoundTripper
+	code, reason string
+}
+
+func (t *tap) RoundTrip(r *http.Request) (*http.Response, error) {
+	res, err := t.base.RoundTrip(r)
+	if err != nil || res.StatusCode < 200 || res.StatusCode > 299 {
+		return res, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	res, err := c.http().Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<16))
+	_ = res.Body.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s answered %d", c.Host.Web+path, res.StatusCode)
+	var e struct {
+		Error       string `json:"error"`
+		Description string `json:"error_description"`
 	}
-	return json.Unmarshal(body, out)
+	if json.Unmarshal(body, &e) == nil {
+		t.code, t.reason = e.Error, e.Description
+	}
+	res.Body = io.NopCloser(bytes.NewReader(body))
+	return res, nil
+}
+
+// asJSON asks for JSON, which is what GitHub answers the poll in only when asked (x/oauth2 does not ask on the token endpoint).
+type asJSON struct{ base http.RoundTripper }
+
+func (a asJSON) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("Accept", "application/json")
+	return a.base.RoundTrip(r)
+}
+
+func refusal(code, reason string) error {
+	if reason == "" {
+		return errors.New(code)
+	}
+	return fmt.Errorf("%s: %s", code, reason)
 }
 
 // StartDevice asks the host for a device code for the OAuth app or GitHub App clientID with scope (space-separated; empty for a GitHub
 // App, whose permissions are its own).
 func (c *Client) StartDevice(ctx context.Context, clientID, scope string) (Code, error) {
-	var r struct {
-		DeviceCode      string `json:"device_code"`
-		UserCode        string `json:"user_code"`
-		VerificationURI string `json:"verification_uri"`
-		ExpiresIn       int    `json:"expires_in"`
-		Interval        int    `json:"interval"`
-		Error           string `json:"error"`
-		Description     string `json:"error_description"`
+	hc := *c.http()
+	t := &tap{base: c.base()}
+	hc.Transport = t
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, &hc)
+	var opts []oauth2.AuthCodeOption
+	if scope != "" { // on the request for the code only: the polls carry none
+		opts = append(opts, oauth2.SetAuthURLParam("scope", scope))
 	}
-	v := url.Values{"client_id": {clientID}}
-	if scope != "" {
-		v.Set("scope", scope)
-	}
-	if err := c.form(ctx, "/login/device/code", v, &r); err != nil {
+	da, err := c.oauth(clientID).DeviceAuth(ctx, opts...)
+	if re := new(oauth2.RetrieveError); errors.As(err, &re) && re.ErrorCode != "" {
+		return Code{}, refusal(re.ErrorCode, re.ErrorDescription)
+	} else if err != nil {
 		return Code{}, err
 	}
-	if r.Error != "" {
-		return Code{}, fmt.Errorf("%s: %s", r.Error, r.Description)
+	if t.code != "" {
+		return Code{}, refusal(t.code, t.reason)
 	}
-	if r.DeviceCode == "" || r.UserCode == "" || r.VerificationURI == "" {
+	if da.DeviceCode == "" || da.UserCode == "" || da.VerificationURI == "" {
 		return Code{}, errors.New("ghlogin: the host sent no device code")
 	}
-	if u, err := url.Parse(r.VerificationURI); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+	if u, err := url.Parse(da.VerificationURI); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 		return Code{}, errors.New("ghlogin: the host sent a verification address that is not a web address")
 	}
-	if r.Interval < 1 {
-		r.Interval = 5
+	interval, expires := time.Duration(da.Interval)*time.Second, time.Until(da.Expiry)
+	if interval < time.Second {
+		interval = 5 * time.Second
 	}
-	if r.ExpiresIn < 1 {
-		r.ExpiresIn = 900
+	if da.Expiry.IsZero() {
+		expires = 15 * time.Minute
 	}
-	return Code{DeviceCode: r.DeviceCode, UserCode: r.UserCode, VerificationURI: r.VerificationURI,
-		Interval: time.Duration(r.Interval) * time.Second, Expires: c.now().Add(time.Duration(r.ExpiresIn) * time.Second)}, nil
+	return Code{DeviceCode: da.DeviceCode, UserCode: da.UserCode, VerificationURI: da.VerificationURI, Interval: interval, Expires: c.now().Add(expires)}, nil
 }
 
-// WaitDevice polls until the person confirms, denies or the code ends. It waits the host's interval and slows down when told to.
+// WaitDevice polls until the person confirms, denies or the code ends. x/oauth2 waits the host's interval and slows down when told to.
 func (c *Client) WaitDevice(ctx context.Context, clientID string, code Code) (Token, error) {
-	interval := code.Interval
-	for {
-		if err := c.sleep(ctx, interval); err != nil {
-			return Token{}, err
-		}
-		if !c.now().Before(code.Expires) {
-			return Token{}, ErrExpired
-		}
-		var r struct {
-			AccessToken string `json:"access_token"`
-			Scope       string `json:"scope"`
-			ExpiresIn   int    `json:"expires_in"`
-			Error       string `json:"error"`
-			Description string `json:"error_description"`
-			Interval    int    `json:"interval"`
-		}
-		err := c.form(ctx, "/login/oauth/access_token", url.Values{"client_id": {clientID}, "device_code": {code.DeviceCode},
-			"grant_type": {"urn:ietf:params:oauth:grant-type:device_code"}}, &r)
-		if err != nil {
-			return Token{}, err
-		}
-		switch r.Error {
-		case "":
-			if r.AccessToken == "" {
-				return Token{}, errors.New("ghlogin: the host sent no token")
-			}
-			t := Token{Value: r.AccessToken, Scopes: r.Scope}
-			if r.ExpiresIn > 0 {
-				t.Expires = c.now().Add(time.Duration(r.ExpiresIn) * time.Second)
-			}
-			return t, nil
-		case "authorization_pending":
-		case "slow_down":
-			interval += 5 * time.Second
-			if r.Interval > 0 {
-				interval = time.Duration(r.Interval) * time.Second
-			}
-		case "access_denied":
-			return Token{}, ErrDenied
-		case "expired_token":
-			return Token{}, ErrExpired
-		default:
-			return Token{}, fmt.Errorf("%s: %s", r.Error, r.Description)
-		}
+	left := code.Expires.Sub(c.now())
+	if left <= 0 {
+		return Token{}, ErrExpired
 	}
+	hc := *c.http()
+	hc.Transport = asJSON{c.base()}
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, &hc)
+	da := &oauth2.DeviceAuthResponse{DeviceCode: code.DeviceCode, Interval: int64(code.Interval / time.Second), Expiry: time.Now().Add(left)}
+	tok, err := c.oauth(clientID).DeviceAccessToken(ctx, da)
+	if err != nil {
+		if re := new(oauth2.RetrieveError); errors.As(err, &re) {
+			switch re.ErrorCode {
+			case "access_denied":
+				return Token{}, ErrDenied
+			case "expired_token":
+				return Token{}, ErrExpired
+			}
+			return Token{}, refusal(re.ErrorCode, re.ErrorDescription)
+		}
+		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) { // the code's own deadline, not the caller's
+			return Token{}, ErrExpired
+		}
+		return Token{}, err
+	}
+	out := Token{Value: tok.AccessToken}
+	out.Scopes, _ = tok.Extra("scope").(string)
+	switch {
+	case tok.ExpiresIn > 0:
+		out.Expires = c.now().Add(time.Duration(tok.ExpiresIn) * time.Second)
+	case !tok.Expiry.IsZero(): // the host answered in the form encoding
+		out.Expires = c.now().Add(time.Until(tok.Expiry))
+	}
+	return out, nil
 }
 
 // User is who a token is.
