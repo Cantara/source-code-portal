@@ -106,10 +106,11 @@ func TestAStoreWithoutAModeIsJudgedByWhatItHolds(t *testing.T) {
 	}
 }
 
-// The refusal comes before the migration: a store of the other mode on an older schema is neither migrated nor copied nor moved aside.
+// The refusal comes before everything else: a store of the other mode, even of an earlier schema generation, is neither migrated nor
+// copied nor moved aside.
 func TestARefusedStoreIsNotMigrated(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "scp.db")
-	schemaOne(t, path) // the first release's store: a catalogue, no credential table, no mode
+	earlierStore(t, path) // a deployed release's store: a catalogue, no credential table, no mode
 	before, _ := os.ReadFile(path)
 	var me *ModeError
 	if _, err := OpenAs(t.Context(), path, Personal, quiet); !errors.As(err, &me) {
@@ -123,7 +124,7 @@ func TestARefusedStoreIsNotMigrated(t *testing.T) {
 	if len(entries) != 1 {
 		t.Errorf("the refusal left files behind: %d", len(entries))
 	}
-	// Taken by the mode it fits, it migrates, with the copy, and keeps its mode.
+	// Taken by the mode it fits, it is of an earlier generation: moved aside, and the new store has its mode.
 	db, err := OpenAs(t.Context(), path, Shared, quiet)
 	if err != nil {
 		t.Fatal(err)

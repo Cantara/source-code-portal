@@ -143,6 +143,26 @@ func open(ctx context.Context, path string, mode Mode, log *slog.Logger) (*sql.D
 	return db, nil
 }
 
+// applicationID marks a file made by the current generation of the schema (PRAGMA application_id, set by migration 0001): "SCP1".
+const applicationID = 0x53435031
+
+// A store that holds data (a schema version) and lacks the mark was made by an earlier generation of the schema, which was replaced by
+// one baseline (SC1, P-106): its tables are a subset and its history differs, so it is not migrated. It is moved aside (the way back
+// is renaming it) and the catalogue is read again from GitHub.
+func checkGeneration(ctx context.Context, db *sql.DB) error {
+	var version, mark int
+	if err := db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
+		return err
+	}
+	if err := db.QueryRowContext(ctx, "PRAGMA application_id").Scan(&mark); err != nil {
+		return err
+	}
+	if version > 0 && mark != applicationID {
+		return unusableError{fmt.Errorf("a store of an earlier schema generation (version %d without the SCP mark); the catalogue is read again from GitHub", version)}
+	}
+	return nil
+}
+
 func check(ctx context.Context, db *sql.DB, path string, log *slog.Logger) error {
 	var res string
 	if err := db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&res); err != nil {
@@ -151,7 +171,10 @@ func check(ctx context.Context, db *sql.DB, path string, log *slog.Logger) error
 	if res != "ok" {
 		return unusableError{fmt.Errorf("quick_check: %s", res)}
 	}
-	if err := migrate(ctx, db, path, log); err != nil {
+	if err := checkGeneration(ctx, db); err != nil {
+		return err
+	}
+	if err := migrate(ctx, db, path, log, migrations); err != nil {
 		return unusableError{err}
 	}
 	return nil
@@ -160,8 +183,8 @@ func check(ctx context.Context, db *sql.DB, path string, log *slog.Logger) error
 // migrate applies the embedded migrations NNNN_name.sql after PRAGMA user_version, each in one transaction with its version bump. A
 // store that holds data is copied first (backup): a binary older than the schema quarantines the file and starts empty, so the copy is
 // the way back.
-func migrate(ctx context.Context, db *sql.DB, path string, log *slog.Logger) error {
-	names, err := fs.Glob(migrations, "migrations/*.sql")
+func migrate(ctx context.Context, db *sql.DB, path string, log *slog.Logger, files fs.FS) error {
+	names, err := fs.Glob(files, "migrations/*.sql")
 	if err != nil {
 		return err
 	}
@@ -181,7 +204,7 @@ func migrate(ctx context.Context, db *sql.DB, path string, log *slog.Logger) err
 		if n <= current {
 			continue
 		}
-		body, err := migrations.ReadFile(name)
+		body, err := fs.ReadFile(files, name)
 		if err != nil {
 			return err
 		}

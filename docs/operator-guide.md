@@ -133,7 +133,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `server.trusted_proxies` | `[]` | CIDRs allowed to set `X-Forwarded-For` |
 | `log.level` | `info` | `debug`, `info`, `warn`, `error` (also `--log-level`) |
 | `log.format` | `json` | `json`, or `text` for local use |
-| `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts and announcements administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version |
+| `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts and announcements administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version. A store made by a release before 2.3 (an earlier schema generation, without the portal's mark) is not migrated: the first start moves it aside as `<store.path>.quarantine-<time>` and reads the catalogue again from GitHub, which takes a minute or two for a few hundred repositories; remove the moved-aside file when the new start has proved itself |
 | `sync.concurrency` | `4` | GitHub jobs running at once |
 | `github.sources[]` | required | one entry per GitHub host and credential |
 | `github.sources[].id` | required | short id, `[a-z0-9-]` |
