@@ -48,6 +48,7 @@ never modify it, push to it or open issues or pull requests on it.
 - **Read-only towards GitHub** (P-71): read permissions, GET requests and GraphQL queries only, never a write or a mutation; the fake
   GitHub fails a test on anything else. A feature that needs another permission or event adds its row to `internal/prereq.Needs`
   and to the documentation's table in the same commit (`TestPrerequisitesDocumented`).
+- **No Hazelcast, Redis or Postgres in any new work** (owner, repeated): no design, feature, test run, rehearsal or verification item rests on them, and they are never listed as unverified. The existing `internal/cluster` code stays as it is until the owner says otherwise; the Hazelcast container commands below are not run. Search stays in memory; the store is SQLite.
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
 - Dependencies are the latest releases of the best-in-class choice (owner P-17), pure Go on the server; `bluemonday` is the one exception
   (`plan.md` section 3). Web: TypeScript 7 is `tsc` (`@typescript/native`); the `typescript` name holds the 6.0 API for typescript-eslint and Next.js.
@@ -130,5 +131,5 @@ search and no external store (owner). E1 to E4 (`design/embed.md`) are dequeued:
 a release only on the owner's go. New work starts with its design note and a row in `plan.md` section 4.
 Local web commands: `npx -y pnpm@12.18.0 -C web <script>` when the global pnpm is older; `make e2e` needs
 `pnpm -C web exec playwright install chromium`; `rm -rf web/.next` after a `next dev` run before `pnpm build` (stale dev route types);
-the Hazelcast tests: `docker run -d -p 127.0.0.1:5701:5701 -e HZ_NETWORK_PUBLICADDRESS=127.0.0.1:5701 hazelcast/hazelcast:5.7` and
+the Hazelcast tests (not run by the agent, see the rule above): `docker run -d -p 127.0.0.1:5701:5701 -e HZ_NETWORK_PUBLICADDRESS=127.0.0.1:5701 hazelcast/hazelcast:5.7` and
 `TEST_HAZELCAST=127.0.0.1:5701`.
