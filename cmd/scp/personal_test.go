@@ -465,14 +465,15 @@ func TestPersonalBrowserSetup(t *testing.T) {
 			t.Fatalf("no link printed:\n%s", out)
 		}
 	}
-	jar, _ := cookiejar.New(nil)
-	c := &http.Client{Jar: jar, Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	c := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
 	base, _, _ := strings.Cut(link, "/setup/")
+	var setupToken string // the page gives it once, to the one who opens the link
 	call := func(method, path string, body string) (int, string) {
 		t.Helper()
 		req, _ := http.NewRequestWithContext(t.Context(), method, base+path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		req.Header.Set("X-Setup-Token", setupToken)
 		res, err := c.Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -485,9 +486,16 @@ func TestPersonalBrowserSetup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	page, _ := io.ReadAll(res.Body)
 	_ = res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("the page: %d", res.StatusCode)
+	}
+	if _, rest, ok := strings.Cut(string(page), `<meta name="setup-token" content="`); ok {
+		setupToken, _, _ = strings.Cut(rest, `"`)
+	}
+	if setupToken == "" {
+		t.Fatal("the page gave no session token")
 	}
 	if code, b := call(http.MethodPost, "/setup/api/token", `{"token":"ghp_personal"}`); code != 200 || !strings.Contains(b, `"user":"octo"`) {
 		t.Fatalf("token: %d %s", code, b)

@@ -1,0 +1,3 @@
+#!/bin/sh
+# A commit message must stay deployment-neutral too (scripts/check-neutral.sh). Switched on with `make hooks`.
+exec "$(git rev-parse --show-toplevel)/scripts/check-neutral.sh" msg "$1"

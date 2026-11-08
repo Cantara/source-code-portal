@@ -34,10 +34,29 @@ function h(tag, attrs = {}, ...kids) {
   return el
 }
 
+// The session token comes with the page only for the one who opened the link with the one-use code. It is kept in the tab's session
+// storage (it survives the visit to GitHub and back, and is not sent to any other server) and sent as a header with every call.
+let token = ""
+try {
+  token = sessionStorage.getItem("scp-setup-token") || ""
+} catch {
+  // no storage: the page must not be reloaded
+}
+const given = document.querySelector('meta[name="setup-token"]')?.content
+if (given) {
+  token = given
+  try {
+    sessionStorage.setItem("scp-setup-token", given)
+  } catch {
+    // as above
+  }
+  history.replaceState(null, "", "/setup/") // the one-use code leaves the address bar
+}
+
 async function api(path, body) {
   const res = await fetch("/setup/api/" + path, {
     method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    headers: body === undefined ? { "X-Setup-Token": token } : { "Content-Type": "application/json", "X-Setup-Token": token },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const data = await res.json().catch(() => ({}))

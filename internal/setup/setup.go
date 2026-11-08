@@ -86,12 +86,12 @@ type Config struct {
 
 // Server is the setup page's state and handler.
 type Server struct {
-	cfg    Config
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	done   chan struct{}
-	cookie string
+	cfg     Config
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	done    chan struct{}
+	session string // the token the page sends in X-Setup-Token
 
 	mu        sync.Mutex
 	entered   bool
@@ -131,7 +131,7 @@ func New(cfg Config) *Server {
 	if cfg.Scope == "" {
 		cfg.Scope = "repo read:org"
 	}
-	return &Server{cfg: cfg, ctx: ctx, cancel: cancel, done: make(chan struct{}), cookie: base64.RawURLEncoding.EncodeToString(b),
+	return &Server{cfg: cfg, ctx: ctx, cancel: cancel, done: make(chan struct{}), session: base64.RawURLEncoding.EncodeToString(b),
 		hostText: cfg.Host, clientID: cfg.ClientID, pending: map[string]pendingApp{}}
 }
 
@@ -209,8 +209,12 @@ func (s *Server) hostOK(host string) bool {
 	return ok && host == "localhost:"+port
 }
 
-// page opens the page: the code in the address sets the cookie, once; the cookie shows the page.
+// page serves the page. The page itself is the same for everyone and holds nothing secret; the session token in it is given once, to
+// whoever opens the link with the one-use code. The browser keeps the token in the tab's session storage (per origin, so not per host
+// only, as a cookie is: another server on this computer, on another port, never gets it) and sends it as a header with every call.
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
+	b, _ := assets.ReadFile("assets/index.html")
+	page := string(b)
 	if code := r.URL.Query().Get("code"); code != "" {
 		s.mu.Lock()
 		ok := !s.entered && subtle.ConstantTimeCompare([]byte(code), []byte(s.cfg.Code)) == 1
@@ -219,26 +223,16 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		}
 		s.mu.Unlock()
 		if ok {
-			// Not Secure: the page is plain http on loopback, where Safari would not send a Secure cookie back.
-			http.SetCookie(w, &http.Cookie{Name: "scp_setup", Value: s.cookie, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: 3600}) //nolint:gosec // G124: see above
-			http.Redirect(w, r, "/setup/", http.StatusSeeOther)
-			return
+			page = strings.Replace(page, `<meta name="setup-token" content="">`, `<meta name="setup-token" content="`+s.session+`">`, 1)
 		}
 	}
-	if !s.signedIn(r) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = io.WriteString(w, `<!doctype html><meta charset="utf-8"><title>Source Code Portal setup</title><body style="font-family:system-ui;max-width:36rem;margin:3rem auto;padding:0 1rem"><h1>Open the link from the terminal</h1><p>This page opens with the link <code>scp personal</code> printed: it works once, from one browser. Stop the command and run it again for a new link.</p>`)
-		return
-	}
-	b, _ := assets.ReadFile("assets/index.html")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write(b)
+	_, _ = io.WriteString(w, page)
 }
 
+// signedIn is whether the request carries the session token.
 func (s *Server) signedIn(r *http.Request) bool {
-	c, err := r.Cookie("scp_setup")
-	return err == nil && subtle.ConstantTimeCompare([]byte(c.Value), []byte(s.cookie)) == 1
+	return subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Token")), []byte(s.session)) == 1
 }
 
 type problem struct {
@@ -257,7 +251,7 @@ func (s *Server) api(h func(ctx context.Context, body []byte) (any, error)) http
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 		}
 		if !s.signedIn(r) {
-			fail(http.StatusForbidden, "Open the page with the link from the terminal.")
+			fail(http.StatusForbidden, "Open the page with the link from the terminal (it works once, in one tab).")
 			return
 		}
 		var body []byte

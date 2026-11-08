@@ -161,6 +161,9 @@ func (c *Client) StartDevice(ctx context.Context, clientID, scope string) (Code,
 	if r.DeviceCode == "" || r.UserCode == "" || r.VerificationURI == "" {
 		return Code{}, errors.New("ghlogin: the host sent no device code")
 	}
+	if u, err := url.Parse(r.VerificationURI); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return Code{}, errors.New("ghlogin: the host sent a verification address that is not a web address")
+	}
 	if r.Interval < 1 {
 		r.Interval = 5
 	}

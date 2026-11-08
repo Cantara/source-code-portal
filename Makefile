@@ -53,6 +53,7 @@ rehearse: ## the store's upgrade and rollback between the newest release and thi
 check: gen ## the gate: generated code current, modules tidy, lint, test
 	git diff --exit-code
 	go mod tidy -diff
+	scripts/check-neutral.sh tree
 	$(MAKE) lint test e2e rehearse
 
 hooks: ## switch on the pre-commit hook (gofmt and Prettier on what is staged) for this clone
