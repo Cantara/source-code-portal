@@ -139,13 +139,14 @@ func TestAnswer(t *testing.T) {
 			t.Errorf("system prompt lacks %q", want)
 		}
 	}
-	if strings.Contains(sys, "ada") {
+	_, nonce, _ := strings.Cut(sys, `id="`)
+	nonce, _, _ = strings.Cut(nonce, `"`)
+	// The nonce is random hex, which can spell "ada": it is taken out before the prompt is searched for the viewer.
+	if strings.Contains(strings.ReplaceAll(sys, nonce, ""), "ada") {
 		t.Error("the system prompt names the viewer")
 	}
 	// The tool result is framed with the nonce, and the text cannot close the frame.
 	res := f.reqs[1].Messages[2]
-	_, nonce, _ := strings.Cut(sys, `id="`)
-	nonce, _, _ = strings.Cut(nonce, `"`)
 	if res.Role != llm.ToolRole || res.ToolCallID != "c0" || res.IsError ||
 		!strings.HasPrefix(res.Content, `<untrusted-content id="`+nonce+`" source="/repos/acme/core">`) ||
 		!strings.HasSuffix(res.Content, `</untrusted-content id="`+nonce+`">`) || strings.Count(res.Content, "untrusted-content") != 2 {

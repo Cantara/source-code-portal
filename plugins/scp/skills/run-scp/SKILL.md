@@ -1,6 +1,6 @@
 ---
 name: run-scp
-description: Set up, configure, deploy, upgrade and troubleshoot a Source Code Portal (SCP) from its released binary or container image (ghcr.io/cantara/source-code-portal) - the scp.yaml (GitHub App or token, organisations, product groups with prefix, glob, regexp, exact and topic matchers, webhooks, private repositories, OpenID Connect sign-in, access tokens, the assistant, several instances), the secrets, Docker Compose with a reverse proxy, Kubernetes or a plain binary, and checking it works. Use when someone wants to run their own SCP, change its configuration or groups, upgrade it, or find out why it misbehaves.
+description: Set up, configure, deploy, upgrade and troubleshoot a Source Code Portal (SCP) from its released binary or container image (ghcr.io/cantara/source-code-portal) - the scp.yaml (GitHub App or token, organisations, product groups with prefix, glob, regexp, exact and topic matchers, webhooks, private repositories, OpenID Connect sign-in, access tokens, the assistant, a theme with the owner's colours, logo and name, several instances), the secrets, Docker Compose with a reverse proxy, Kubernetes or a plain binary, and checking it works. Use when someone wants to run their own SCP, change its configuration or groups, upgrade it, or find out why it misbehaves.
 ---
 
 # Run Source Code Portal
@@ -88,7 +88,8 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    [references/essentials.md](references/essentials.md). Set `server.public_url` (absolute links, HSTS on https) and
    `server.trusted_proxies` (only the reverse proxy's network). Add only the sections they asked for: `webhook`, `access` and
    `include_private`, `auth` (OIDC: redirect URI `<public_url>/auth/callback`, sign-out redirect `<public_url>/`), `llm` and
-   `assistant`, `announcements[]` (the deployment's own, locked in Admin), `cluster` (several instances through
+   `assistant`, `announcements[]` (the deployment's own, locked in Admin), `web.theme_dir` and `web.product_name` (their colours, logo and
+   name: [references/theme.md](references/theme.md), for a release after v2.2.10), `cluster` (several instances through
    Hazelcast). `config check` until it passes.
 6. **Deploy.** Write the files for their target from [references/deploy.md](references/deploy.md): Docker Compose with Caddy (the
    default), Kubernetes, or the binary under systemd. Pin the image to the version, never `latest`. Expose only `:9090` through the
