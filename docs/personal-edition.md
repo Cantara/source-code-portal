@@ -1,5 +1,11 @@
 # The personal edition
 
+> **Experimental.** `scp personal` is new and not yet part of the supported ways to run the portal; the portal's own Guide page does not
+> mention it yet. Its commands, flags, files and `personal.yaml` may change between releases without notice. It has been run against a
+> fake GitHub and github.com's refusal answers, not yet on a GitHub Enterprise Server or GHE.com tenant, and GitHub's reaction to the
+> App the Events step makes (see below) is unconfirmed. Shared portals (`scp serve`) are unaffected by it and do not contain it in the
+> server build.
+
 A portal of your own, on your own computer: you sign in to GitHub once, and the portal shows every repository **you** can read, the
 private ones too. It is for one person. Nothing is exposed beyond the computer, and there is no configuration to write first.
 

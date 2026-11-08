@@ -69,7 +69,7 @@ Each matcher has exactly one field and sees the repository name, except `topic`.
 
 A repository may be in several groups; repositories in none are counted on the dashboard.
 
-## For one person: `scp personal`
+## For one person: `scp personal` (experimental)
 
 Someone who wants a portal only for themselves on their own computer needs no `scp.yaml`: `scp personal` opens a page in the
 browser where they choose the GitHub host (github.com, an Enterprise Server or a GHE.com tenant), sign in (a code with their own

@@ -357,6 +357,7 @@ func TestPersonalPortal(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := testDeps(t)
+	d.mode = store.Personal                                // as scp personal runs it
 	if d.launch, err = newLaunch(time.Now()); err != nil { // the auth package reads the real clock
 		t.Fatal(err)
 	}

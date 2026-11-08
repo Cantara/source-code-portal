@@ -137,7 +137,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].app.private_key_file` | | the App's private key (PEM) |
 | `github.sources[].app.installations` | all | account logins whose installations are used |
 | `github.sources[].token_file` | | a token file, instead of `app` |
-| `github.sources[].credential` | `false` | `true`: the token is in the vault of [`scp personal`](personal-edition.md); `scp serve` refuses it |
+| `github.sources[].credential` | `false` | `true`: the token is in the vault of [`scp personal`](personal-edition.md) (experimental); `scp serve` refuses it |
 | `github.sources[].app.credential` | `false` | `true`: the App's private key is in the vault of `scp personal` (instead of `app.private_key_file`); `scp serve` refuses it |
 | `github.sources[].include_forks` | `false` | list forks |
 | `github.sources[].include_archived` | `true` | list archived repositories |
@@ -611,7 +611,7 @@ or Chrome was not relaunched. The Guide (`/guide#webmcp`) shows the same steps w
 
 ## 3. Run
 
-For yourself alone on your own computer, [`scp personal`](personal-edition.md) signs you in to GitHub and needs no configuration.
+For yourself alone on your own computer, [`scp personal`](personal-edition.md) (experimental) signs you in to GitHub and needs no configuration.
 
 **Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.0.0.tar.gz`, the same for every platform) from
 the GitHub release, check them and run them with Node.js 26 on the `PATH` (or `web.node`):
