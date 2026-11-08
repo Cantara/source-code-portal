@@ -4,7 +4,16 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
-## Unreleased
+## 2.2.10
+
+The store's schema is flat, forks can be shown on demand, events from GitHub report themselves, and the modes are kept apart. **The first
+start after the upgrade moves the old database aside (`<store.path>.quarantine-<time>`) and reads everything from GitHub again**: a few
+minutes for a few hundred repositories, with the pages saying the portal is loading until it has filled. Delete the moved-aside file when
+the new start has proved itself. No configuration change is needed; nothing new is asked of GitHub.
+
+- **Forks on demand**: the listing always reads forks, so showing them is instant. They stay hidden unless the source sets
+  `include_forks`, or a group names one (its `default_repo` or an `exact` match). The dashboard and the groups say how many are hidden,
+  and a switch (the dashboard, Settings) shows them for that reader, with `?forks=show` on the address and the cookie `scp-forks`.
 
 - **Review fixes before 2.2.10**: a store whose mode could not be read at the first look is judged on the open store and never takes another mode's mark; removing a sealed credential is synced to disk like writing one; a changelog that cannot be read no longer costs a repository its releases (the sections known stay); a tag pushed or deleted refreshes the history's tag labels; the live stream follows the forks the reader chose; the rendered release notes are kept (4 MiB) instead of rendered at every request; `https://github.com/` and `GitHub.com` are github.com in the personal wizard.
 
@@ -48,9 +57,9 @@ personal edition (`scp personal`). No configuration change is needed to upgrade.
   section of the repository's `CHANGELOG.md` (or `CHANGES`, `HISTORY`, `NEWS`, `RELEASES`) for its version, marked "from the changelog".
   Long notes are cut with a link to the rest. `GET /api/v1/releases` rows carry `notes`, `notesCut` and `notesFrom`. The portal makes
   two more conditional requests per repository to read the changelog; no new permission.
-- **The database is kept across versions**: a store that holds data is copied to `<store.path>.pre-0002` (mode 0600, once) before its
-  schema changes, and the change only adds a column, `repo.visibility`, which each source's listing fills. Put the copy back to go back
-  to the previous version; without it an older version moves a newer database aside and resyncs from GitHub.
+- **The database is copied before a migration**: a store that holds data is copied to `<store.path>.pre-NNNN` (mode 0600, once) before
+  a later release changes its schema, and a migration only adds. Put the copy back to go back to the previous version; without it an
+  older version moves a newer database aside and resyncs from GitHub.
 - **Two sources that list one `owner/name` no longer take it from each other**: the source whose id sorts first owns it and the other's
   repository is left out and named in the log (before, the address changed hands at every listing and its data was deleted each time).
   Not reachable with today's configuration, which keeps an account in one source.
