@@ -61,10 +61,12 @@ func (s Source) credentials() int {
 
 // App is a GitHub App credential.
 type App struct {
-	ID             int64    `mapstructure:"id"`
-	PrivateKeyFile string   `mapstructure:"private_key_file"`
-	Installations  []string `mapstructure:"installations"` // account logins to use; empty means all
-	PrivateKey     Secret   `mapstructure:"-"`             // read from PrivateKeyFile
+	ID             int64  `mapstructure:"id"`
+	PrivateKeyFile string `mapstructure:"private_key_file"`
+	// Credential takes the private key from the vault (scp personal), as a source's credential does; scp serve refuses it.
+	Credential    bool     `mapstructure:"credential"`
+	Installations []string `mapstructure:"installations"` // account logins to use; empty means all
+	PrivateKey    Secret   `mapstructure:"-"`             // read from PrivateKeyFile
 }
 
 // DefaultBaseURL is the REST base of github.com.
@@ -303,8 +305,11 @@ func (g GitHub) validate() []string {
 			if s.App.ID <= 0 {
 				p = append(p, at+".app.id: required")
 			}
-			if s.App.PrivateKeyFile == "" {
+			switch {
+			case s.App.PrivateKeyFile == "" && !s.App.Credential:
 				p = append(p, at+".app.private_key_file: required")
+			case s.App.PrivateKeyFile != "" && s.App.Credential:
+				p = append(p, at+".app.private_key_file: not with app.credential")
 			}
 		}
 	}

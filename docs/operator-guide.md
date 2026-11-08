@@ -138,6 +138,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].app.installations` | all | account logins whose installations are used |
 | `github.sources[].token_file` | | a token file, instead of `app` |
 | `github.sources[].credential` | `false` | `true`: the token is in the vault of [`scp personal`](personal-edition.md); `scp serve` refuses it |
+| `github.sources[].app.credential` | `false` | `true`: the App's private key is in the vault of `scp personal` (instead of `app.private_key_file`); `scp serve` refuses it |
 | `github.sources[].include_forks` | `false` | list forks |
 | `github.sources[].include_archived` | `true` | list archived repositories |
 | `github.sources[].exclude` | `[]` | repositories kept out of the catalogue even where the credential reads them: matchers as in the groups (`exact`, `prefix`, `glob`, `regexp`, `topic`) |

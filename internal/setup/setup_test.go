@@ -39,7 +39,7 @@ var orgRepos = map[string][]fakeRepo{ //nolint:gochecknoglobals // a test table,
 }
 
 // host is a GitHub host for the page: the sign-in, who the token is, its organisations and its repositories.
-func host(t *testing.T, gate <-chan struct{}) *httptest.Server {
+func host(t *testing.T, gate <-chan struct{}, app *fakeApp) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	authed := func(w http.ResponseWriter, r *http.Request) bool {
@@ -96,6 +96,7 @@ func host(t *testing.T, gate <-chan struct{}) *httptest.Server {
 		}
 		list(w, r.PathValue("org"))
 	})
+	app.routes(mux)
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
@@ -108,6 +109,7 @@ type rig struct {
 	*httptest.Server
 	s        *Server
 	gh       *httptest.Server
+	app      *fakeApp
 	client   *http.Client
 	code     string
 	finished chan Result
@@ -123,8 +125,9 @@ func newRig(t *testing.T, clientID string, sleep func(context.Context, time.Dura
 // newRigHeld is a rig whose organisation listings wait for hold to close.
 func newRigHeld(t *testing.T, clientID string, sleep func(context.Context, time.Duration) error, hold <-chan struct{}) *rig {
 	t.Helper()
-	gh := host(t, hold)
-	r := &rig{gh: gh, code: "entry-code-0123456789", finished: make(chan Result, 1), bodies: &bytes.Buffer{},
+	app := newFakeApp()
+	gh := host(t, hold, app)
+	r := &rig{gh: gh, app: app, code: "entry-code-0123456789", finished: make(chan Result, 1), bodies: &bytes.Buffer{},
 		cli: func(string) (string, error) { return "", errors.New("no login") }}
 	ts := httptest.NewUnstartedServer(nil)
 	r.s = New(Config{Addr: ts.Listener.Addr().String(), Code: r.code, Host: gh.URL, ClientID: clientID, Sleep: sleep, HTTP: &http.Client{Transport: noKeepAlive},

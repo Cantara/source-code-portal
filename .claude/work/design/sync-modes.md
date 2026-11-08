@@ -1,6 +1,6 @@
 # Events and polling per account: GitHub Apps from the wizard (EV1 to EV3)
 
-Status: in progress (plan.md section 4, P-95). Binding order: ../plan.md > this note > `github.md`, `sync-snapshot-store.md`, `personal.md`.
+Status: built (EV1 to EV3; plan.md section 4, P-95, P-96). Binding order: ../plan.md > this note > `github.md`, `sync-snapshot-store.md`, `personal.md`.
 
 Owner, 2026-11-08: the wizard tries to install a GitHub App per organisation; the accounts it gets installed on are kept fresh by
 events, the others by polling, decided per account and per subject. Deployed instances must not be affected.
@@ -23,9 +23,24 @@ events, the others by polling, decided per account and per subject. Deployed ins
   engine uses it for the repositories of a poll-mode source (releases 6 hours becomes 30 minutes; the others already poll fast
   enough: pull requests and issues 15 minutes, commits through the listing's push events). The Admin status lists per source its mode
   and each subject's cadence ("events, net 6 h" or "polling, 30 min"). A deployment with a receiver or catch-up is unchanged.
-- **EV3: the wizard's Connect step** (`design/personal.md`): creates a GitHub App through the manifest flow (GitHub's one click),
-  keeps its key in the vault, shows per account whether it is installed (events), waiting for an owner or not installed (polling),
-  and writes one source per mode.
+- **EV3: the wizard's Connect step** (built; `design/personal.md`): the "Events" step between the accounts and the products.
+  - Flow: `POST /setup/api/app/start` gives the manifest (`ghlogin.AppManifest`: private, read permissions and events from
+    `prereq.Needs`, webhook URL and redirect URL on the setup address) and the address on the host (`/settings/apps/new` for the
+    person's own account, `/organizations/<org>/settings/apps/new`); the page posts the form there (CSP `form-action` names the host
+    only after sign-in). GitHub returns to `/setup/app/callback?code&state`; the cookie (`SameSite=Strict`) does not travel on that
+    cross-site redirect, so the one-use state is the proof, the code is exchanged (`ghlogin.ConvertManifest`, the one POST) and the
+    callback page hands back to `/setup/` by script. `POST /setup/api/app/check` lists the App's installations with an App JWT
+    (`ghlogin.Installations`, RS256 signed in the package, no new dependency); `app/forget` drops an App.
+  - Result: the installed Apps' keys (`Result.Apps`) are sealed in the vault (`app-<account>`, kind `app-key`); `personal.yaml` gets a
+    source `app-<account>` per App (`app: {id, credential: true}`), the token source `github` for the other accounts, and
+    `webhook: {catch_up: true}` when there is an App. `app.credential` is `personal`'s like `credential`: `scp serve` refuses it.
+  - Acceptance: setup tests against a fake host (manifest: read only, host-only form target, state once, no cookie needed on the
+    callback, conversion, installations signed by the App, key never in a page body, installed Apps only in the result); a `cmd/scp`
+    test that the written file loads, `serve` refuses the vault key, `resolve` fills it and the portal reads the App's account with
+    its delivery log; the Playwright walk makes the App in a real browser against a fake GitHub (CSP, the cross-site return).
+  - Not verified against the real GitHub: that it accepts a loopback webhook URL and a loopback redirect for a new App and logs
+    deliveries to an unreachable URL; GHE Server's manifest flow by version. If GitHub refuses, the account stays polled and the page
+    says what GitHub answered.
 
 ## Rules
 

@@ -6,6 +6,12 @@ subjects.
 
 ## Unreleased
 
+- **Personal edition: events with a GitHub App of your own**: a new "Events" step in the setup page makes a read-only GitHub App per
+  account with GitHub's one-click manifest flow. Accounts with the App installed get events within a couple of minutes (the portal
+  reads the App's delivery log; nothing needs to reach your computer), the others are polled with your token. `personal.yaml` then
+  has a source per mode and `webhook.catch_up`; the App's key is sealed in the vault (`app.credential`). Nothing changes for
+  `scp serve`.
+
 - **A mode per source, a cadence per subject**: a source the portal hears nothing from (no webhook receiver, no `webhook.catch_up`) now
   asks GitHub for new releases every 30 minutes instead of every 6 hours (conditional requests: an unchanged answer is free); sources
   with events keep the 6-hour net. The Admin status lists each source's mode (events or polling) and how often each subject is
