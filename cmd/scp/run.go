@@ -79,7 +79,7 @@ func loadConfig(cmd *cobra.Command, opts *options) (config.Config, map[string]an
 		}
 		return cfg, settings, err
 	}
-	for _, w := range trustWarnings(cfg) {
+	for _, w := range slices.Concat(trustWarnings(cfg), emailWarnings(cfg)) {
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "scp: warning:", w)
 	}
 	_, findings := catalog.Compile(cfg.Catalog.Groups)
@@ -161,6 +161,18 @@ func newVersionCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print as JSON")
 	return cmd
+}
+
+// emailWarnings names the administrator emails that a provider's silence would grant: with sign-in through OIDC and private
+// repositories in view (or no public view at all), auth.admin_emails matches an address whose email_verified claim is absent, and an
+// administrator sees every private repository.
+func emailWarnings(cfg config.Config) []string {
+	private := cfg.Access.RequireAuth || slices.ContainsFunc(cfg.GitHub.Sources, func(s config.Source) bool { return s.IncludePrivate })
+	if !private || cfg.Auth.OIDC.Issuer == "" || len(cfg.Auth.AdminEmails) == 0 || cfg.Auth.OIDC.RequireVerifiedEmail {
+		return nil
+	}
+	return []string{"auth.admin_emails: a provider that does not send email_verified is trusted for these addresses while private " +
+		"repositories are served; set auth.oidc.require_verified_email: true if yours sends the claim, or use auth.admin_groups"}
 }
 
 // trustWarnings names the trusted proxy ranges wider than one proxy network (/24, /64) while private repositories are served on

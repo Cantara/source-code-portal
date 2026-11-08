@@ -46,6 +46,9 @@ type Options struct {
 	RequireAuth    bool          // access.require_auth: the public listener refuses anonymous requests (but the open paths)
 	// Observe, when set, receives every request: listener, matched pattern ("unmatched" when none), method, status, duration.
 	Observe func(listener, pattern, method string, status int, d time.Duration)
+	// ObservePrivate, when set, receives every request of the private view (the ones that leave an audit line): the matched pattern and
+	// the status. Never the path, the viewer or the repository.
+	ObservePrivate func(pattern string, status int)
 }
 
 // wrap is the middleware chain, outermost first: request id, recover, access log and metrics, security headers, request deadline,
@@ -112,6 +115,9 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 				// The audit trail of the private view: who asked for what, never what was answered.
 				o.Log.Info("audit", "user", viewer.User, "via", viewer.Via, "method", r.Method, "pattern", pattern, "path", r.URL.Path,
 					"status", status, "request_id", id)
+				if o.ObservePrivate != nil {
+					o.ObservePrivate(pattern, status)
+				}
 			}
 		}()
 		if verr != nil {

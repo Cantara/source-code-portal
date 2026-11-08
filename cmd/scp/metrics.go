@@ -17,6 +17,7 @@ import (
 type metrics struct {
 	reg        *prometheus.Registry
 	requests   *prometheus.CounterVec
+	private    *prometheus.CounterVec
 	durations  *prometheus.HistogramVec
 	deliveries *prometheus.CounterVec
 	jobs       *prometheus.CounterVec
@@ -41,6 +42,8 @@ func newMetrics(g gauges) *metrics {
 	m := &metrics{reg: prometheus.NewRegistry()}
 	m.requests = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_http_requests_total", Help: "HTTP requests served."},
 		[]string{"listener", "pattern", "method", "code"})
+	m.private = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_private_view_requests_total",
+		Help: "Requests answered from the private view (each leaves an audit log line), by route pattern and status."}, []string{"pattern", "code"})
 	m.durations = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "scp_http_request_duration_seconds",
 		Help: "Time to serve an HTTP request.", Buckets: prometheus.DefBuckets}, []string{"listener", "pattern"})
 	m.deliveries = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "scp_webhook_deliveries_total", Help: "GitHub webhook deliveries."},
@@ -62,7 +65,7 @@ func newMetrics(g gauges) *metrics {
 		[]string{"version", "commit", "goversion"})
 	info.WithLabelValues(version, build, runtime.Version()).Set(1)
 	m.reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		m.requests, m.durations, m.deliveries, m.jobs, m.jobTime, m.github, m.asks, m.askTokens, m.searches, m.searchTime, info, newLive(g))
+		m.requests, m.private, m.durations, m.deliveries, m.jobs, m.jobTime, m.github, m.asks, m.askTokens, m.searches, m.searchTime, info, newLive(g))
 	return m
 }
 
@@ -78,6 +81,12 @@ func (m *metrics) request(listener, pattern, method string, status int, d time.D
 	}
 	m.requests.WithLabelValues(listener, pattern, method, strconv.Itoa(status)).Inc()
 	m.durations.WithLabelValues(listener, pattern).Observe(d.Seconds())
+}
+
+// privateView counts a request of the private view by the route pattern and the status: the audit line's counter, with no viewer and no
+// repository in a label (a pattern holds {owner}/{name}, never a name).
+func (m *metrics) privateView(pattern string, status int) {
+	m.private.WithLabelValues(pattern, strconv.Itoa(status)).Inc()
 }
 
 func (m *metrics) search(op string, d time.Duration) {

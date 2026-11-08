@@ -47,7 +47,7 @@ none of the operator duties below except the network layout.
 - **Removal.** A repository turned private leaves the public view at the next listing (at once with the webhook). A deleted or
   transferred repository is removed after two complete listings miss it; the second runs 30 seconds after the first.
 - **Audit.** Every request from a viewer of the private view leaves a log line `audit` (user, how they signed in, method, route, path,
-  status, request id), never the answer. Metrics and `/api/v1/status` carry no repository names.
+  status, request id), never the answer, and the counter `scp_private_view_requests_total` (route pattern and status, never a path, viewer or repository) counts them. Metrics and `/api/v1/status` carry no repository names.
 - **Repository text is untrusted.** Rendered documents pass one sanitiser. Markdown answers, `/llms*.txt`, `/knowledge.yaml` and the
   assistant's tool results have control and invisible characters removed, and are marked as data, never instructions.
 - **Read-only towards GitHub.** The portal asks for read permissions only and sends only reads: GET requests and GraphQL queries,
@@ -77,6 +77,11 @@ none of the operator duties below except the network layout.
   installation is the boundary GitHub enforces; `exclude` is a second fence. Whoever holds the App's private key can read everything
   those permissions cover in every installed repository, issue and pull request discussions included, though the portal itself keeps
   only their titles, labels and logins.
+- **Who is an administrator.** An administrator sees every private repository. Prefer `auth.admin_groups`: the provider's groups are
+  its own statement. `auth.admin_emails` matches an address only when the provider verified it; a provider that sends no
+  `email_verified` claim is taken as verified unless `auth.oidc.require_verified_email` is on, so with such a provider anyone who can
+  register an address they do not own at it could match the list. Turn the key on where the provider sends the claim; `serve` and
+  `config check` warn while private repositories are served, OIDC is on, `admin_emails` is set and the key is off.
 - **Secrets from files.** The App key, webhook secret, session key, token secrets, registry credentials and LLM key are read from files (a secrets manager's
   mount). Rotate the webhook secret with `webhook.previous_secret_file`. Rotate the App key, session key and tokens by replacing the
   file and restarting; a new session key signs everyone out.

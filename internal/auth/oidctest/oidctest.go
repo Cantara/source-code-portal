@@ -21,6 +21,7 @@ import (
 type User struct {
 	Subject, Email, Name string
 	Unverified           bool     // email_verified false
+	NoVerifiedClaim      bool     // email_verified left out, as Microsoft Entra does
 	Groups               []string // in the ID token, or with GroupsInUserinfo only from userinfo
 	GroupsInUserinfo     bool
 }
@@ -133,6 +134,9 @@ func (p *Provider) token(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	claims := map[string]any{"iss": p.URL, "sub": g.user.Subject, "aud": p.ClientID, "iat": now.Unix(), "exp": now.Add(time.Hour).Unix(),
 		"nonce": g.nonce, "name": g.user.Name, "email": g.user.Email, "email_verified": !g.user.Unverified}
+	if g.user.NoVerifiedClaim {
+		delete(claims, "email_verified")
+	}
 	if wrongNonce {
 		claims["nonce"] = "another"
 	}

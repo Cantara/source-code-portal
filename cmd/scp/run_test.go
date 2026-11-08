@@ -483,3 +483,29 @@ func TestTrustWarnings(t *testing.T) {
 		}
 	}
 }
+
+func TestEmailWarnings(t *testing.T) {
+	cfg := func(private, requireAuth bool, issuer string, emails []string, strict bool) config.Config {
+		var c config.Config
+		c.GitHub.Sources = []config.Source{{ID: "gh", IncludePrivate: private}}
+		c.Access.RequireAuth = requireAuth
+		c.Auth.OIDC.Issuer, c.Auth.AdminEmails, c.Auth.OIDC.RequireVerifiedEmail = issuer, emails, strict
+		return c
+	}
+	ada := []string{"ada@example.org"}
+	for name, tc := range map[string]struct {
+		cfg  config.Config
+		want int
+	}{
+		"private, OIDC, emails, silence trusted": {cfg(true, false, "https://idp", ada, false), 1},
+		"no public view at all":                  {cfg(false, true, "https://idp", ada, false), 1},
+		"the claim is required":                  {cfg(true, false, "https://idp", ada, true), 0},
+		"public repositories only":               {cfg(false, false, "https://idp", ada, false), 0},
+		"no OIDC":                                {cfg(true, false, "", ada, false), 0},
+		"no admin emails":                        {cfg(true, false, "https://idp", nil, false), 0},
+	} {
+		if got := emailWarnings(tc.cfg); len(got) != tc.want {
+			t.Errorf("%s: %q", name, got)
+		}
+	}
+}

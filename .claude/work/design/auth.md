@@ -76,6 +76,7 @@ are exempt.
 | `auth.oidc.client_id`, `auth.oidc.client_secret_file` | `""` | no secret: a public client with PKCE |
 | `auth.oidc.scopes` | `[openid, email, profile]` | `groups` added by the operator when the provider needs it |
 | `auth.oidc.groups_claim` | `groups` | |
+| `auth.oidc.require_verified_email` | `false` | an `email_verified` the provider does not send counts as not verified (issue 26; P-101); a startup warning while private repositories are served, OIDC is on, `admin_emails` is set and this is off |
 
 ## Tests
 - Sealing: round trip, tampering, a cookie of another name, expiry, key rotation.

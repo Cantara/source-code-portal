@@ -316,7 +316,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
 		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
 			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
-		Observe: m.request, RequireAuth: cfg.Access.RequireAuth}
+		Observe: m.request, ObservePrivate: m.privateView, RequireAuth: cfg.Access.RequireAuth}
 	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin, f))
 	external := d.images
 	if external == nil {
@@ -437,7 +437,7 @@ func newAuth(cfg config.Config, log *slog.Logger, launch *auth.Launch) (*auth.Au
 	}
 	if a.OIDC.Issuer != "" {
 		o.OIDC = &auth.OIDC{Issuer: a.OIDC.Issuer, ClientID: a.OIDC.ClientID, ClientSecret: string(a.OIDC.ClientSecret.Reveal()),
-			Scopes: a.OIDC.Scopes, GroupsClaim: a.OIDC.GroupsClaim}
+			Scopes: a.OIDC.Scopes, GroupsClaim: a.OIDC.GroupsClaim, RequireVerifiedEmail: a.OIDC.RequireVerifiedEmail}
 	}
 	return auth.New(o)
 }

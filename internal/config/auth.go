@@ -41,6 +41,9 @@ type OIDC struct {
 	ClientSecret     Secret   `mapstructure:"-"`
 	Scopes           []string `mapstructure:"scopes"`
 	GroupsClaim      string   `mapstructure:"groups_claim"`
+	// RequireVerifiedEmail treats an email_verified claim the provider does not send as not verified, so the email does not match
+	// auth.admin_emails. Off by default: some providers (Microsoft Entra) never send it.
+	RequireVerifiedEmail bool `mapstructure:"require_verified_email"`
 }
 
 // SignIn reports whether people can sign in: a session key is configured.

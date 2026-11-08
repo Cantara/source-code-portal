@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -411,7 +412,11 @@ func TestAudit(t *testing.T) {
 	o.Log = slog.New(slog.NewJSONHandler(&buf, nil))
 	o.WebToken = "t0ken"
 	o.Access = Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{"staff"}}
-	h := o.wrap("public", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	var counted []string
+	o.ObservePrivate = func(pattern string, status int) { counted = append(counted, fmt.Sprintf("%s %d", pattern, status)) }
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /repos/{owner}/{name}", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	h := o.wrap("public", mux)
 	for _, hdr := range [][]string{
 		{"X-Forwarded-User", "ann", "X-Forwarded-Groups", "staff"},
 		{},
@@ -433,5 +438,9 @@ func TestAudit(t *testing.T) {
 	}
 	if len(audits) != 1 || audits[0]["user"] != "ann" || audits[0]["via"] != "proxy" || audits[0]["path"] != "/repos/acme/vault" {
 		t.Errorf("audit lines = %v", audits)
+	}
+	// The counter takes the route's pattern, never the path: a label with a repository's name would put it in front of whoever reads the metrics.
+	if len(counted) != 1 || counted[0] != "GET /repos/{owner}/{name} 200" {
+		t.Errorf("counted = %q", counted)
 	}
 }

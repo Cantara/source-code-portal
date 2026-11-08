@@ -52,6 +52,7 @@ type OIDC struct {
 	Issuer, ClientID, ClientSecret string
 	Scopes                         []string
 	GroupsClaim                    string
+	RequireVerifiedEmail           bool // an email_verified claim the provider does not send counts as not verified
 }
 
 // Auth identifies requests by their bearer token or session cookie, and serves the sign-in routes.
