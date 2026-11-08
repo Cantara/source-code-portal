@@ -100,3 +100,63 @@ func TestCatchUpKeepsWhatItCouldNotDo(t *testing.T) {
 		t.Errorf("a failed read moved the cursor: %v then %v", before, last)
 	}
 }
+
+// A log longer than a read is passed on as far as it was read, the cursor moves on (the older deliveries cannot be reached any other
+// way), and the state and the observer say it was cut.
+func TestCatchUpSaysWhenTheLogWasLongerThanARead(t *testing.T) {
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	var last time.Time
+	var observed []string
+	var passed int
+	c := &CatchUp{
+		Source: "gh",
+		Read: func(context.Context, time.Time) ([]Delivery, error) {
+			return []Delivery{{GUID: "g1", Event: "issues", RepositoryID: 1, At: now.Add(-time.Minute)}}, ErrTruncated
+		},
+		Resolve: func(int64) (string, string, bool) { return "acme", "one", true },
+		Sink:    func(sync.Event, string, string) error { passed++; return nil },
+		Last:    func(context.Context) time.Time { return last }, SetLast: func(_ context.Context, at time.Time) { last = at },
+		Observe: func(e, r string) { observed = append(observed, e+":"+r) },
+		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)), Now: func() time.Time { return now },
+	}
+	n, err := c.Once(t.Context())
+	st := c.State()
+	if err != nil || n != 1 || passed != 1 || !last.Equal(now) || !st.Truncated.Equal(now) || !st.LastRead.Equal(now) || st.Source != "gh" {
+		t.Errorf("passed %d (err %v), last %v, state %+v", n, err, last, st)
+	}
+	if !slices.Contains(observed, "log:truncated") {
+		t.Errorf("observed %v", observed)
+	}
+}
+
+// The state tells a log that cannot be read, and recovers when it can.
+func TestCatchUpStateFollowsTheReads(t *testing.T) {
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	fail := true
+	c := &CatchUp{
+		Source: "gh",
+		Read: func(context.Context, time.Time) ([]Delivery, error) {
+			if fail {
+				return nil, errors.New("502 bad gateway")
+			}
+			return nil, nil
+		},
+		Resolve: func(int64) (string, string, bool) { return "", "", false },
+		Sink:    func(sync.Event, string, string) error { return nil },
+		Last:    func(context.Context) time.Time { return time.Time{} }, SetLast: func(context.Context, time.Time) {},
+		Observe: func(string, string) {}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: func() time.Time { return now },
+	}
+	if _, err := c.Once(t.Context()); err == nil {
+		t.Fatal("a failing read succeeded")
+	}
+	if st := c.State(); !st.LastRead.IsZero() || st.Error != "502 bad gateway" {
+		t.Errorf("after a failure: %+v", st)
+	}
+	fail = false
+	if _, err := c.Once(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if st := c.State(); !st.LastRead.Equal(now) || st.Error != "" {
+		t.Errorf("after a success: %+v", st)
+	}
+}

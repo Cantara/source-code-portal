@@ -708,6 +708,13 @@ func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, s
 			s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, webhookSink(s.inbox.take, cfg.GitHub.Sources), observe, log))
 		}
 	}
+	st.catchUps = func() []webhook.CatchUpState {
+		out := make([]webhook.CatchUpState, 0, len(s.inbox.catchUps))
+		for _, c := range s.inbox.catchUps {
+			out = append(out, c.State())
+		}
+		return out
+	}
 	if !cfg.Webhook.Secret.IsSet() { // GitHub cannot reach the portal: the delivery logs are the only way events arrive
 		return nil
 	}

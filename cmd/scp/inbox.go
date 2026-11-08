@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -147,11 +148,15 @@ func catchUp(src *github.Source, id string, st interface {
 }, current func() *snapshot.Snapshot, take webhook.Sink, observe func(event, result string), log *slog.Logger) *webhook.CatchUp {
 	key := "webhook/caught-up/" + id
 	return &webhook.CatchUp{
+		Source: id,
 		Read: func(ctx context.Context, since time.Time) ([]webhook.Delivery, error) {
 			got, err := src.Deliveries(ctx, since)
 			out := make([]webhook.Delivery, 0, len(got))
 			for _, d := range got {
 				out = append(out, webhook.Delivery{GUID: d.GUID, Event: d.Event, Action: d.Action, RepositoryID: d.RepositoryID, At: d.At, OK: d.OK()})
+			}
+			if errors.Is(err, github.ErrLogTruncated) {
+				err = webhook.ErrTruncated
 			}
 			return out, err
 		},

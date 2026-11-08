@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/prereq"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/webhook"
 )
 
 // lowRate is the rate-limit fraction below which the status warns.
@@ -28,6 +30,7 @@ type status struct {
 	catchUp      bool                                         // the Apps' delivery logs are read
 	polled       map[string]bool                              // sources nothing tells about changes
 	cadence      func(source string) map[string]time.Duration // each subject's refresh for a source
+	catchUps     func() []webhook.CatchUpState                // what each App's delivery log has been doing; nil without catch-up
 	layouts      func() []string                              // why stored layouts are not served
 	prereqs      func() []prereq.Unmet
 	cluster      interface {
@@ -90,6 +93,46 @@ type statusWebhook struct {
 	CatchUp      bool           `json:"catchUp"`
 	Deliveries   map[string]int `json:"deliveries"`
 	LastDelivery *time.Time     `json:"lastDelivery"`
+	// CatchUps is one entry per App whose delivery log is read: when it last was, in full, and why not if it is failing.
+	CatchUps []statusCatchUp `json:"catchUps"`
+}
+
+type statusCatchUp struct {
+	Source    string     `json:"source"`
+	LastRead  *time.Time `json:"lastRead"`
+	Error     string     `json:"error,omitempty"`
+	Truncated *time.Time `json:"truncated,omitempty"` // the log was longer than a read: its oldest deliveries were left to the polls
+}
+
+// staleLog is how long a delivery log may go unread (it is read every 2 minutes) before the status warns.
+const staleLog = 10 * time.Minute
+
+// catchUpStatus lists the logs and the warnings a log that is not being read calls for.
+func catchUpStatus(states []webhook.CatchUpState, now time.Time) (out []statusCatchUp, warnings []string) {
+	for _, c := range states {
+		e := statusCatchUp{Source: c.Source, Error: c.Error}
+		if !c.LastRead.IsZero() {
+			at := c.LastRead
+			e.LastRead = &at
+		}
+		if !c.Truncated.IsZero() {
+			at := c.Truncated
+			e.Truncated = &at
+		}
+		out = append(out, e)
+		switch {
+		case !c.LastRead.IsZero() && now.Sub(c.LastRead) > staleLog:
+			warnings = append(warnings, fmt.Sprintf("webhook: source %s: the delivery log was last read %s ago (%s); events wait for the polls",
+				c.Source, now.Sub(c.LastRead).Round(time.Minute), cmp.Or(c.Error, "no reason known")))
+		case c.LastRead.IsZero() && c.Error != "":
+			warnings = append(warnings, fmt.Sprintf("webhook: source %s: the delivery log is not being read (%s); events wait for the polls", c.Source, c.Error))
+		}
+		if !c.Truncated.IsZero() && now.Sub(c.Truncated) < 24*time.Hour {
+			warnings = append(warnings, fmt.Sprintf("webhook: source %s: the delivery log was longer than a read (at %s); its oldest deliveries were left to the polls",
+				c.Source, c.Truncated.UTC().Format(time.RFC3339)))
+		}
+	}
+	return out, warnings
 }
 
 // delivery counts a webhook delivery by result.
@@ -145,6 +188,12 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	if !st.webhook {
 		b.Warnings = append(b.Warnings, "webhook: not configured; pushes show after the next scheduled listing (webhook.secret_file, or webhook.catch_up with a GitHub App)")
 	}
+	var catchUps []statusCatchUp
+	if st.catchUps != nil {
+		var w []string
+		catchUps, w = catchUpStatus(st.catchUps(), now)
+		b.Warnings = append(b.Warnings, w...)
+	}
 	if st.layouts != nil {
 		b.Warnings = append(b.Warnings, st.layouts()...)
 	}
@@ -153,7 +202,7 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	}
 	slices.Sort(b.Warnings)
 	st.mu.Lock()
-	b.Webhook = statusWebhook{Enabled: st.webhook, Receiver: st.receiver, CatchUp: st.catchUp, Deliveries: map[string]int{}}
+	b.Webhook = statusWebhook{Enabled: st.webhook, Receiver: st.receiver, CatchUp: st.catchUp, Deliveries: map[string]int{}, CatchUps: catchUps}
 	for k, v := range st.deliveries {
 		b.Webhook.Deliveries[k] = v
 	}
