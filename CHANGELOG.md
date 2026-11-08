@@ -6,6 +6,10 @@ subjects.
 
 ## Unreleased
 
+- **A mode per source, a cadence per subject**: a source the portal hears nothing from (no webhook receiver, no `webhook.catch_up`) now
+  asks GitHub for new releases every 30 minutes instead of every 6 hours (conditional requests: an unchanged answer is free); sources
+  with events keep the 6-hour net. The Admin status lists each source's mode (events or polling) and how often each subject is
+  refreshed.
 - **Events without a receiver**: the new `webhook.catch_up` (default off) reads each GitHub App's webhook delivery log every two minutes and
   acts on what was not answered with a success, as the receiver's net already did, without needing `webhook.secret_file`. For a portal
   GitHub cannot reach. `GET /api/v1/admin/status` says whether the receiver and the catch-up run. Nothing changes for a configuration

@@ -21,8 +21,18 @@ const status: AdminStatus = {
   alive: true,
   snapshot: { version: 42, builtAt: "2026-10-13T10:00:00Z", ageSeconds: 3, catalogued: true, repos: 7 },
   queue: { waiting: 2, running: 1 },
-  sources: [{ id: "gh", repos: 7, freshness: "fresh", checkedAt: "2026-10-13T10:00:00Z", rateRemaining: 0.93 }],
-  webhook: { enabled: false, deliveries: {}, lastDelivery: null },
+  sources: [
+    {
+      id: "gh",
+      repos: 7,
+      freshness: "fresh",
+      checkedAt: "2026-10-13T10:00:00Z",
+      rateRemaining: 0.93,
+      mode: "poll",
+      cadenceSeconds: { releases: 1800, pulls: 900, commits: 7200 },
+    },
+  ],
+  webhook: { enabled: false, receiver: false, catchUp: false, deliveries: {}, lastDelivery: null },
   cluster: { enabled: false, connected: false, leader: true },
   warnings: ["webhook: not configured; pushes show after the next scheduled listing"],
 }

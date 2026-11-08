@@ -658,3 +658,53 @@ func TestSettleBoundsEventRuns(t *testing.T) {
 		r.stop()
 	})
 }
+
+// TestPollTTLOnlyForPolledSources: a kind with a PollTTL is read at that cadence for a source nothing tells about changes, and at its
+// TTL (a net under events) for any other; a spec without a PollTTL is the same for both.
+func TestPollTTLOnlyForPolledSources(t *testing.T) {
+	for name, tc := range map[string]struct {
+		polling  bool
+		wantRuns int32 // of the net-and-poll kind after 2 hours (the first run included)
+	}{
+		"polled source":      {polling: true, wantRuns: 5},  // 0, 30m, 60m, 90m, 120m (jitter up to a tenth)
+		"events-mode source": {polling: false, wantRuns: 1}, // the 6-hour net has not run out
+	} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var net, plain atomic.Int32
+				list := &counter{result: Result{Catalogue: []store.Repo{{Key: "acme/a", ID: snapshot.RepoID{Source: "gh", GitHubID: 1}}}}}
+				r := newRig(t, t.TempDir(), nil, 4, sourceSpec(list, 24*time.Hour),
+					Spec{Kind: "releases", Prio: PrioScheduled, TTL: 6 * time.Hour, PollTTL: 30 * time.Minute, Run: func(context.Context, Job) (Result, error) {
+						net.Add(1)
+						return Result{Payload: []byte("r")}, nil
+					}},
+					Spec{Kind: "issues", Prio: PrioScheduled, TTL: time.Hour, Run: func(context.Context, Job) (Result, error) {
+						plain.Add(1)
+						return Result{Payload: []byte("i")}, nil
+					}})
+				if tc.polling {
+					r.eng.SetPolling("gh")
+				}
+				r.run()
+				time.Sleep(2 * time.Hour)
+				got := net.Load()
+				if tc.polling && (got < tc.wantRuns-1 || got > tc.wantRuns+1) || !tc.polling && got != tc.wantRuns {
+					t.Errorf("runs of the net-and-poll kind in 2 hours: %d, want about %d", got, tc.wantRuns)
+				}
+				if p := plain.Load(); p < 2 || p > 3 {
+					t.Errorf("a kind without a PollTTL runs at its TTL for either: %d runs in 2 hours", p)
+				}
+				if c := r.eng.Cadence("gh")["releases"]; tc.polling && c != 30*time.Minute || !tc.polling && c != 6*time.Hour {
+					t.Errorf("cadence: %v", c)
+				}
+				if c := r.eng.Cadence("gh")["issues"]; c != time.Hour {
+					t.Errorf("cadence of a kind without PollTTL: %v", c)
+				}
+				if c := r.eng.Cadence("other")["releases"]; c != 6*time.Hour {
+					t.Errorf("another source is not polled: %v", c)
+				}
+				r.stop()
+			})
+		})
+	}
+}

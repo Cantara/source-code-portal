@@ -433,11 +433,22 @@ catalog:
 	}
 	var st struct {
 		Ready   bool
-		Sources []struct{ ID string }
-		Webhook struct{ Deliveries map[string]int }
+		Sources []struct {
+			ID             string
+			Mode           string
+			CadenceSeconds map[string]float64
+		}
+		Webhook struct {
+			Receiver   bool
+			Deliveries map[string]int
+		}
 	}
 	if code := fetch(admin+"/api/v1/status", &st); code != 200 || !st.Ready || len(st.Sources) != 1 || st.Webhook.Deliveries["accepted"] != 4 {
 		t.Errorf("status: %d %+v", code, st)
+	}
+	// a receiver is configured: the source is kept fresh by events, and releases keep their six-hour net
+	if len(st.Sources) == 1 && (st.Sources[0].Mode != "events" || st.Sources[0].CadenceSeconds["releases"] != 6*3600 || !st.Webhook.Receiver) {
+		t.Errorf("status mode and cadence: %+v", st)
 	}
 	if code := fetch(admin+"/debug/pprof/", nil); code != http.StatusNotFound {
 		t.Errorf("pprof without ops.pprof: %d", code)

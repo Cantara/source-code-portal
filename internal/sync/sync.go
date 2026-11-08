@@ -99,8 +99,11 @@ type Spec struct {
 	Lists     bool // per-source: results carry the source's catalogue
 	Prio      Priority
 	TTL       time.Duration
-	Timeout   time.Duration // default 2m
-	On        []Event
+	// PollTTL, when set, replaces TTL for the repositories of a source nothing tells about changes (Engine.SetPolling): TTL is then
+	// only a net under events, and a source without events needs the shorter poll. Zero: the same TTL everywhere.
+	PollTTL time.Duration
+	Timeout time.Duration // default 2m
+	On      []Event
 	// Settle is the least time from one run's start to the next that an event may cause; 0: none. A job whose events anyone can
 	// send (a comment on a public repository's issue) settles, so a stream of them costs one run a Settle, not one each.
 	Settle time.Duration
@@ -142,9 +145,10 @@ type Engine struct {
 	release string // the running release, for the warm start
 	log     *slog.Logger
 
-	specs []*Spec
-	wake  chan struct{}
-	done  chan outcome
+	specs   []*Spec
+	polling map[string]bool // sources that get no events (SetPolling); read-only once running
+	wake    chan struct{}
+	done    chan outcome
 
 	observe func(kind, result string, d time.Duration)
 	beat    atomic.Int64 // unix nanoseconds of the dispatcher's last loop
@@ -196,6 +200,32 @@ func New(st *store.DB, pub *snapshot.Publisher, budget Budget, sources []string,
 		observe: func(string, string, time.Duration) {}}
 	e.leader.Store(true)
 	return e
+}
+
+// SetPolling names the sources that get no events (no receiver, no delivery log): their jobs run at their spec's PollTTL where it has
+// one. Call it before Run; the engine only reads it.
+func (e *Engine) SetPolling(sources ...string) {
+	e.polling = make(map[string]bool, len(sources))
+	for _, s := range sources {
+		e.polling[s] = true
+	}
+}
+
+// TTLOf is how long a result of spec's kind for source is fresh: the spec's TTL, or its PollTTL for a source that is polled.
+func (e *Engine) TTLOf(s *Spec, source string) time.Duration {
+	if s.PollTTL > 0 && e.polling[source] {
+		return s.PollTTL
+	}
+	return s.TTL
+}
+
+// Cadence is each registered kind's TTL for a source, by kind name.
+func (e *Engine) Cadence(source string) map[string]time.Duration {
+	out := make(map[string]time.Duration, len(e.specs))
+	for _, s := range e.specs {
+		out[s.Kind] = e.TTLOf(s, source)
+	}
+	return out
 }
 
 // Share makes the engine one of several instances: fn receives every recorded outcome, and the engine runs no jobs until Lead. Call
@@ -535,7 +565,7 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 	if err := e.store.Apply(ctx, ch); err != nil {
 		e.log.Error("store write failed; serving from memory", "key", en.key, "err", err)
 	}
-	fresh := freshness(it, spec.TTL)
+	fresh := freshness(it, e.TTLOf(spec, en.source))
 	e.pub.Update(func(b *snapshot.Builder) { publish(b, spec, it, fresh, removed) })
 	if e.share != nil {
 		e.share(shared)
@@ -637,7 +667,7 @@ func (e *Engine) Receive(ctx context.Context, r Shared) {
 	if err := e.store.Apply(ctx, ch); err != nil {
 		e.log.Error("store write failed; serving from memory", "key", it.Key, "err", err)
 	}
-	fresh := freshness(it, spec.TTL)
+	fresh := freshness(it, e.TTLOf(spec, en.source))
 	e.pub.Update(func(b *snapshot.Builder) { publish(b, spec, it, fresh, removed) })
 	slices.SortFunc(adopted, func(a, b Shared) int { return strings.Compare(a.Item.Key, b.Item.Key) })
 	for _, o := range adopted {
@@ -734,8 +764,9 @@ func (e *Engine) succeeded(en *entry, r Result, now time.Time) {
 	}
 	it.CheckedAt, it.Attempts, it.ErrCode = now, 0, ""
 	en.item = it
-	en.due, en.prio, en.backoff = now.Add(withJitter(en.spec.TTL)), en.spec.Prio, false
-	if r.Again > 0 && r.Again < en.spec.TTL {
+	ttl := e.TTLOf(en.spec, en.source)
+	en.due, en.prio, en.backoff = now.Add(withJitter(ttl)), en.spec.Prio, false
+	if r.Again > 0 && r.Again < ttl {
 		en.due = now.Add(r.Again)
 	}
 	if p := e.pauses[en.source]; p != nil {
@@ -798,6 +829,17 @@ func withJitter(ttl time.Duration) time.Duration {
 		return ttl
 	}
 	return ttl - d + rand.N(2*d) //nolint:gosec // G404: jitter, not security
+}
+
+// sourceOf is the source an item belongs to: a per-source item's key ends in it, a repository's item follows its repository.
+func (e *Engine) sourceOf(it store.Item) string {
+	if r, ok := e.repos[it.Repo]; ok {
+		return r.ID.Source
+	}
+	if _, src, ok := strings.Cut(it.Key, "/"); ok && !strings.Contains(src, "/") {
+		return src
+	}
+	return ""
 }
 
 func freshness(it store.Item, ttl time.Duration) snapshot.Freshness {
@@ -863,7 +905,7 @@ func (e *Engine) newEntry(s *Spec, key, source string, repo snapshot.RepoKey, it
 	if !it.NextDue.IsZero() && it.NextDue.After(now) {
 		en.due = it.NextDue
 		en.backoff = it.Attempts > 0
-		if limit := now.Add(s.TTL); !en.backoff && en.due.After(limit) {
+		if limit := now.Add(e.TTLOf(s, source)); !en.backoff && en.due.After(limit) {
 			en.due = limit // the TTL was shortened since the schedule was stored
 		}
 	}
@@ -918,6 +960,10 @@ func (e *Engine) warmStart(ctx context.Context) error {
 			}
 		}
 	}
+	itemSource := make(map[string]string, len(items)) // the source of each stored item, for its TTL
+	for _, it := range items {
+		itemSource[it.Key] = e.sourceOf(it)
+	}
 	e.mu.Unlock()
 	if e.release != "" {
 		if err := e.store.SetMeta(ctx, metaRelease, e.release); err != nil {
@@ -932,7 +978,7 @@ func (e *Engine) warmStart(ctx context.Context) error {
 		for _, s := range e.specs { // registration order: the catalogue before what hangs off it
 			for _, it := range items {
 				if it.Kind == s.Kind {
-					publish(b, s, it, freshness(it, s.TTL), nil)
+					publish(b, s, it, freshness(it, e.TTLOf(s, itemSource[it.Key])), nil)
 				}
 			}
 		}
