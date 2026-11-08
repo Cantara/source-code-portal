@@ -269,7 +269,9 @@ func publicPaths(t *testing.T) []string {
 		// The search, by the private repository's name, its README's and commit's words, a filter and a prefix.
 		"/api/v1/search?q=zq-hidden", "/api/v1/search?q=zq-hidden+in:commit", "/api/v1/search?q=vault+in:pull", "/api/v1/search?q=vault+in:issue", "/api/v1/search?q=repo:zq-hidden",
 		"/api/v1/search?q=in:doc+zq-hidden+guide", "/api/v1/search?q=zq-hidden&in=repo", "/api/v1/search/suggest?q=zq-hidden",
-		"/api/v1/search/suggest?q=zq-hid", "/opensearch.xml")
+		"/api/v1/search/suggest?q=zq-hid", "/opensearch.xml",
+		// The Java portal's addresses and the routes of the pages and the crawlers.
+		"/dashboard", "/group/zq-hidden", "/index", "/wiki", "/wiki/zq-hidden", "/repos/acme/zq-hidden", "/robots.txt")
 }
 
 // TestNoLeak fetches every public path as the public, in HTML and Markdown: no answer carries a trace of the private repository,
@@ -373,7 +375,7 @@ auth: {tokens: [{name: bot, secret_file: $DIR/bot, groups: [staff]}]}
 		t.Errorf("a token's MCP: %v %+v", err, r)
 	}
 	for _, p := range append(publicPaths(t), "/", "/repos/acme/open", "/groups/all") {
-		if p == "/api/v1/me" { // the sign-in page reads the methods
+		if p == "/api/v1/me" || p == "/robots.txt" { // the sign-in page reads the methods; robots.txt keeps crawlers out, asked below
 			continue
 		}
 		if code, b, _ := get(p); code != http.StatusUnauthorized || strings.Contains(b, "open") {

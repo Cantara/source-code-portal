@@ -21,6 +21,11 @@ import (
 
 // modeConfig is a configuration with sign-in by a token named owner, the store at storePath and loopback listeners.
 func modeConfig(t *testing.T, storePath string) config.Config {
+	return modeConfigWith(t, storePath, nil)
+}
+
+// modeConfigWith adds to that configuration the YAML lines extra makes of the directory of its files (file writes one there).
+func modeConfigWith(t *testing.T, storePath string, extra func(file func(name, body string) string) string) config.Config {
 	t.Helper()
 	gh := githubtest.New(t)
 	gh.AddToken("ghp_test")
@@ -33,12 +38,17 @@ func modeConfig(t *testing.T, storePath string) config.Config {
 		}
 		return p
 	}
-	cfg, _, err := config.Load(file("scp.yaml", `store: {path: `+storePath+`}
+	more := ""
+	if extra != nil {
+		more = extra(file)
+	}
+	cfg, _, err := config.Load(file("scp.yaml", more+`store: {path: `+storePath+`}
 server: {public_url: "http://127.0.0.1:1"}
 access: {private_groups: [staff]}
 auth:
   session_key_file: `+file("key", strings.Repeat("k", 32))+`
   tokens: [{name: owner, secret_file: `+file("owner", strings.Repeat("o", 40))+`, groups: [staff], admin: true}]
+  oidc: {issuer: "https://idp.example.test", client_id: scp, scopes: [openid, email]}
 github:
   sources:
     - {id: gh, base_url: "`+gh.BaseURL()+`", orgs: [acme], token_file: `+file("token", "ghp_test")+`, include_private: true}

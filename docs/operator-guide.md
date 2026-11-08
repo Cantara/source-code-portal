@@ -157,7 +157,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `access.require_auth` | `false` | no public view: an anonymous request gets 401 (a browser's page request goes to `/signin`), except sign-in, `/api/v1/me`, `/webhooks/` and `robots.txt` (which then disallows everything) |
 | `auth.session_key_file` | empty | at least 32 random bytes that seal the sign-in cookies; the same file on every instance; needed for sign-in (section 2.2) |
 | `auth.session_ttl` | `12h` | how long a sign-in lasts, `5m` to `720h`; it is renewed while in use, for at most 7 days from the sign-in (then the provider is asked again), or `session_ttl` when that is longer |
-| `auth.admin_emails` | `[]` | verified email addresses of the administrators (case-insensitive) |
+| `auth.admin_emails` | `[]` | verified email addresses of the administrators (case-insensitive). An address counts as verified when the provider says so, or says nothing unless `auth.oidc.require_verified_email` is on: choose a provider that checks addresses, or prefer `auth.admin_groups` |
 | `auth.admin_groups` | `[]` | groups whose members are administrators |
 | `auth.tokens[]` | `[]` | access tokens: `name` (`[a-z0-9-]`), `secret_file` (at least 32 characters), `groups`, `admin`, `login` (the GitHub login of the person the token stands for: Pull requests and Issues then offer "Mine" filters to that token's session; `scp personal` sets it) |
 | `auth.oidc.issuer` | empty | the OpenID Connect provider (https; http only on loopback); empty: no single sign-on |
@@ -165,6 +165,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `auth.oidc.client_secret_file` | empty | the client's secret; empty for a public client (PKCE only) |
 | `auth.oidc.scopes` | `[openid, email, profile]` | the scopes asked for; `openid` is required |
 | `auth.oidc.groups_claim` | `groups` | the claim, in the ID token or from userinfo, that lists the user's groups |
+| `auth.oidc.require_verified_email` | `false` | `true`: an `email_verified` claim the provider does not send counts as not verified, so the address does not match `auth.admin_emails`. Off by default because some providers (Microsoft Entra) never send it; turn it on where yours does, or use `auth.admin_groups`. `serve` and `config check` warn while private repositories are served, OIDC is on, `auth.admin_emails` is set and the key is off |
 | `llm.provider` | empty | the assistant's language model provider: `anthropic`, `openai`, `gemini`, `openrouter` or `ollama`; empty: no assistant (section 2.3) |
 | `llm.model` | the provider's | the model, for example `claude-haiku-5-5` (anthropic), `gpt-4o` (openai) |
 | `llm.base_url` | the provider's | the provider's API base (https; http only on loopback or without a key), for a proxy or a local Ollama |

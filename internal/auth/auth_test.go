@@ -164,6 +164,24 @@ func TestSignInUserinfoAndUnverified(t *testing.T) {
 	}
 }
 
+// A provider that does not send email_verified: its email counts (the default, as Entra needs) unless the operator asks for the claim.
+func TestSignInWithoutTheVerifiedClaim(t *testing.T) {
+	for name, tc := range map[string]struct {
+		strict bool
+		want   string
+	}{"by default the silence counts": {false, "/ oidc Ada ada@example.org staff"}, "asked for the claim, it does not": {true, "/ oidc Ada  staff"}} {
+		t.Run(name, func(t *testing.T) {
+			idp, o := withProvider(t)
+			idp.SetUser(oidctest.User{Subject: "u-3", Email: "ada@example.org", Name: "Ada", NoVerifiedClaim: true, Groups: []string{"staff"}})
+			o.OIDC.RequireVerifiedEmail = tc.strict
+			p := newPortal(t, o)
+			if _, body := p.get(t, "/auth/login"); body != tc.want {
+				t.Errorf("signed in: %q, want %q", body, tc.want)
+			}
+		})
+	}
+}
+
 func TestSignInRefused(t *testing.T) {
 	for name, tc := range map[string]struct {
 		set  func(*oidctest.Provider)

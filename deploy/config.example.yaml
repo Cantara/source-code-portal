@@ -89,6 +89,7 @@ auth:
     client_secret_file: ""
     scopes: [openid, email, profile]
     groups_claim: groups
+    require_verified_email: false # true: an email_verified claim the provider does not send counts as not verified (Entra sends none)
 # The assistant on /ask: a language model answers questions about the catalogue through read-only tools; an empty provider turns it off.
 llm:
   provider: "" # anthropic, openai, gemini, openrouter, ollama
