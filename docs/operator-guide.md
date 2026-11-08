@@ -71,12 +71,17 @@ The open issues are read per repository every 15 minutes, and at once on an issu
 the most recently updated first, as conditional requests (an unchanged page is free), up to 3 pages and 100 issues per repository; the
 pull requests in that listing are left out. No GraphQL.
 
-**A webhook is never lost.** GitHub sends a delivery once and does not send it again. The portal writes every event to its store before
+**What happens to a webhook.** GitHub sends a delivery once and does not send it again. The portal writes every event to its store before
 it answers GitHub (an event it cannot keep is answered 503, so GitHub's delivery log shows it failed), passes it on, and after a
 restart passes on what was still parked (an update restarts the portal). With an App it also reads the App's webhook delivery log
 every two minutes (a read, with the App's own token; no permission needed) and acts on every delivery from the last days that it did
-not answer with a success: one that arrived while the portal was down, full or restarting is found within minutes of its return. A
-webhook on an organisation or a repository has no such log: there the listing below is the net. Issues and pull
+not answer with a success: one that arrived while the portal was down, full or restarting is found within minutes of its return. The log is read in
+pages of 100, back to the last complete read, up to 10,000 deliveries (about GitHub's three days of a busy organisation); if it is
+longer, the newest are passed on, the oldest are left to the polls below, and the status and the log say so. `/api/v1/status` lists
+under `webhook.catchUps` each App's log with when it was last read and why not, and warns when one has not been read for 10 minutes.
+A webhook on an organisation or a repository has no such log: there a delivery sent while the portal is down is lost, and the
+listing below is the net. Pushes to branches other than the default branch, deleted tags and branches, and a new repository's own
+event are not acted on by themselves; the polls pick them up. Issues and pull
 requests are also read every 15 minutes whatever arrives (a 304 costs no rate limit), and the listing every five minutes asks for a
 read when a repository's count of open issues and pull requests moved.
 

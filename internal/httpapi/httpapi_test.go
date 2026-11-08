@@ -436,7 +436,7 @@ func TestAudit(t *testing.T) {
 			audits = append(audits, m)
 		}
 	}
-	if len(audits) != 1 || audits[0]["user"] != "ann" || audits[0]["via"] != "proxy" || audits[0]["path"] != "/repos/acme/vault" {
+	if len(audits) != 1 || audits[0]["component"] != "audit" || audits[0]["user"] != "ann" || audits[0]["via"] != "proxy" || audits[0]["path"] != "/repos/acme/vault" {
 		t.Errorf("audit lines = %v", audits)
 	}
 	// The counter takes the route's pattern, never the path: a label with a repository's name would put it in front of whoever reads the metrics.

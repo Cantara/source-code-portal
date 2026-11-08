@@ -121,4 +121,32 @@ catalog:
 	if _, ok := releases()["acme/quiet"]; ok {
 		t.Errorf("a release nobody announced was read before its poll: %v", releases())
 	}
+
+	// The status says the log is being read, and when.
+	resp, err = client.Get("http://" + srv.adminLn.Addr().String() + "/api/v1/status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var st struct {
+		Webhook struct {
+			CatchUps []struct {
+				Source   string
+				LastRead *time.Time
+				Error    string
+			}
+		}
+		Warnings []string
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&st); err != nil {
+		t.Fatal(err)
+	}
+	if cu := st.Webhook.CatchUps; len(cu) != 1 || cu[0].Source != "gh" || cu[0].LastRead == nil || time.Since(*cu[0].LastRead) > time.Minute || cu[0].Error != "" {
+		t.Errorf("the status of the delivery log: %+v", st.Webhook.CatchUps)
+	}
+	for _, w := range st.Warnings {
+		if strings.Contains(w, "delivery log") {
+			t.Errorf("a healthy log warns: %s", w)
+		}
+	}
 }

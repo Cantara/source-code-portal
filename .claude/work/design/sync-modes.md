@@ -51,3 +51,29 @@ events, the others by polling, decided per account and per subject. Deployed ins
 - The App is read-only: its permissions and events come from `internal/prereq.Needs`.
 - Not verified against a real GitHub (needs an App to be created): whether GitHub accepts a loopback webhook URL on a new App and
   keeps logging deliveries to it; GitHub Enterprise Server's manifest flow and `/app/hook/deliveries` by version.
+
+## Durability (EV4, P-103)
+
+What the portal guarantees of events, as built and as limited. The goal is that no change GitHub tells the portal about is missed
+for good: an event is either acted on, or the poll that backs its subject repairs it, and an operator can see which.
+
+- **Received.** The receiver writes each verified event to the store, synced to disk, before it answers 202; a write that fails is
+  answered 503 and the delivery id is forgotten, so GitHub's resend is not a duplicate. A parked event is passed on again at every
+  start until `Engine.Handled` says every job that listens for it has run since, or 72 hours have passed.
+- **Sent while the portal could not take it.** An App's delivery log (`GET /app/hook/deliveries`) is read every 2 minutes from five
+  minutes before the last complete read; every delivery without a 2xx answer is passed on. A read of 100 pages (10,000 deliveries)
+  that still does not reach the last complete read is `ErrLogTruncated`: the newest deliveries are passed on, the cursor moves on
+  (older ones cannot be reached, GitHub lists newest first), and the status (`webhook.catchUps[].truncated`, a warning for a day), the
+  log (a warning) and `scp_webhook_deliveries_total{event="log",result="truncated"}` say so. A log that cannot be read at all keeps
+  the cursor, is a warning in the log at every try (the wait grows to an hour) and a status warning once it has gone 10 minutes
+  without a complete read.
+- **Removal.** A `repository` event (`deleted`, `transferred`, `renamed`, `privatized`...) starts a listing of the account at once; a
+  repository is removed after two complete listings in a row miss it, the second 30 seconds after the first. The count is kept with
+  the listing's state, so a restart never resets it, and a partial listing never counts. A verified `deleted` delivery does not
+  remove at once: one wrong or partial answer must not drop data.
+- **Limits, by design.** A source with a token and an organisation or repository webhook has no delivery log: a delivery sent while
+  the portal is down is lost, and the polls repair it (pull requests and issues 15 minutes, the listing 5 minutes, releases 6 hours,
+  commits 2 hours). Pushes to branches other than the default, deleted tags and branches, and the event of a repository the portal
+  does not yet know are not acted on by themselves; the commits poll and the listing pick them up. Not verified against a real
+  GitHub: that deliveries to an unreachable URL are logged with no success status and returned by the log, on github.com and on
+  Enterprise Server.

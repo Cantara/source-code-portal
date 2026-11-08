@@ -25,10 +25,17 @@ func (d Delivery) OK() bool { return d.Status >= 200 && d.Status < 300 }
 // ErrNoDeliveryLog is returned in token mode: only an App has a delivery log.
 var ErrNoDeliveryLog = errors.New("github: no webhook delivery log without an App")
 
-const maxDeliveryPages = 5 // 500 deliveries: more than a few minutes of a busy organisation
+// ErrLogTruncated says the log reaches further back than Deliveries read: the deliveries returned with it are the newest ones, and
+// older ones, down to since, were not read.
+var ErrLogTruncated = errors.New("github: the webhook delivery log is longer than was read")
+
+// maxDeliveryPages bounds a read at 10,000 deliveries, about the three days GitHub keeps for a busy organisation. A round of the
+// catch-up reads one page; only a long outage reads more.
+const maxDeliveryPages = 100
 
 // Deliveries reads the App's webhook delivery log, newest first, back to since (GET /app/hook/deliveries with the App's JWT; a read).
-// It is how the portal learns of a delivery it never received, or answered with a failure, while it was down or restarting.
+// It is how the portal learns of a delivery it never received, or answered with a failure, while it was down or restarting. When the
+// log is longer than maxDeliveryPages it returns the newest deliveries with ErrLogTruncated.
 func (s *Source) Deliveries(ctx context.Context, since time.Time) ([]Delivery, error) {
 	if s.app == nil {
 		return nil, ErrNoDeliveryLog
@@ -53,5 +60,5 @@ func (s *Source) Deliveries(ctx context.Context, since time.Time) ([]Delivery, e
 		}
 		opts.Cursor = resp.Cursor
 	}
-	return out, nil
+	return out, ErrLogTruncated
 }
