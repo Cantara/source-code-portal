@@ -109,3 +109,10 @@ session sees nothing; the public view never knew the private repositories), and 
   (DNS rebinding) or from another origin is refused, bodies are JSON and capped, and its script and style come from the page's own
   address under a strict content security policy. The token a person pastes, receives from GitHub or takes from the GitHub CLI (`gh auth token`, run by the portal on that person's click) stays in the process: the page
   is never sent it back, and it is sealed, not logged, when the setup ends.
+- The optional GitHub App of an account is made by GitHub's manifest flow in the person's own browser: the manifest asks for read
+  permissions only (taken from the one table of what each feature needs), the page may post it only to the host the person signed
+  in to (`form-action`), and GitHub's return carries a random state that works once (the cookie does not travel on a redirect from
+  another site, so the state is the proof). The one-hour code is exchanged by a single call that creates nothing and writes to no
+  repository; it hands over the App's id and private key, which stay in the process, are never sent to the page, and are sealed in
+  the vault like the token (kind `app-key`, with `scp serve` refusing `app.credential`, as it refuses a vault token). The App can
+  only read; it is private to the account that made it and can be deleted on GitHub at any time.

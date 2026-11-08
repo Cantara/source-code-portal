@@ -16,7 +16,7 @@ elsewhere) and Node.js on the `PATH`.
 
 ## The first run
 
-The page walks you through four steps:
+The page walks you through five steps:
 
 1. **Sign in.** Choose the host (`github.com`, a GitHub Enterprise Server such as `https://github.example.org`, or a GHE.com tenant
    such as `https://name.ghe.com`) and either:
@@ -34,7 +34,15 @@ The page walks you through four steps:
    their repositories as a background job with a progress bar (the account being read, how many of about how many, the time left)
    and a Cancel button; nothing is asked of you while it runs. There is no cap on the list (an account is read up to its 2,000 most
    recently pushed repositories).
-3. **Products.** Your repositories are listed per account at the left (search names and topics, show only those without a product)
+3. **Events (optional).** For each account you can make a **GitHub App** of your own with one click: the page sends you to GitHub
+   with a ready manifest (a private App that can only *read* what the portal needs: contents, metadata, pull requests, issues,
+   checks and commit statuses, and the push, release, repository, pull request and issue events), you confirm there, GitHub brings
+   you back, and you install the App on the account (for an organisation you must be an owner). "I installed it" checks with GitHub.
+   An account with the App installed is kept fresh by GitHub's events within a couple of minutes: the portal reads the App's
+   delivery log, so nothing has to reach your computer. Every other account (you skipped it, could not install, or have no
+   permission) is polled with your token, as before. The App's private key is sealed in the same vault as the token and never shown.
+   The App is yours: delete it on GitHub (Settings, Developer settings) whenever you like.
+4. **Products.** Your repositories are listed per account at the left (search names and topics, show only those without a product)
    and your products stand at the right. A first draft is suggested from the names (`whydah-*` becomes *Whydah*; the rest by
    account). **Drag** repositories into a product (several at once if you ticked them; Shift-click ticks a range), or tick them and
    use the "Move" menu, which also works with the keyboard and on a phone. Drop on *New product* to make one, on *Other* to take a
@@ -49,9 +57,11 @@ The page walks you through four steps:
    expression, each tested against your repositories before you add it) and remove them. A product's matchers are what
    `personal.yaml` then holds, as `prefix`, `topic`, `glob`, `regexp` and `exact` ([the operator guide](operator-guide.md#2-configure)).
    A rule looks at a repository's name and topics, not at the account, so a product spans the accounts you chose.
-4. **Start.** The portal starts on the same address and the page signs you in.
+5. **Start.** The portal starts on the same address and the page signs you in.
 
-SCP seals the token, writes `personal.yaml` (the products become groups with exact repository names) and starts. The page closes
+SCP seals the token (and the Apps' keys), writes `personal.yaml` (one source per way an account is read: a source `app-<account>` for
+each account with its App, `webhook.catch_up: true` then, and the source `github` with the token for the others; the products become
+groups) and starts. The page closes
 the setup for good: it works once, from the browser the link was opened in, and only while `scp personal` waits for it.
 
 `--no-browser` prints the link without opening a browser; `--terminal` asks the same questions in the terminal instead (the host,

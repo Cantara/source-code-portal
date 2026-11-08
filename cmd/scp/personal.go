@@ -319,6 +319,14 @@ func (p *personal) resolve(ctx context.Context, dir string, cfg *config.Config) 
 	}
 	for i := range cfg.GitHub.Sources {
 		s := &cfg.GitHub.Sources[i]
+		if s.App != nil && s.App.Credential { // an App's private key
+			sec, err := v.Get(ctx, s.ID)
+			if err != nil {
+				return fmt.Errorf("github.sources[%d]: the App key %q: %w; run scp personal --reset", i, s.ID, err)
+			}
+			s.App.PrivateKey = config.NewSecret([]byte(sec.Value))
+			continue
+		}
 		if !s.Credential {
 			continue
 		}
@@ -365,7 +373,7 @@ func (p *personal) wizard(ctx context.Context, dir, cfgPath string, v *vault.Vau
 			return err
 		}
 	}
-	if err := os.WriteFile(cfgPath, []byte(personalYAML(dir, signed.host, signed.user, accounts, nil, nil, nil, def, webDir, p.flags.port)), 0o600); err != nil {
+	if err := os.WriteFile(cfgPath, []byte(personalYAML(dir, signed.host, signed.user, accounts, nil, nil, nil, nil, def, webDir, p.flags.port)), 0o600); err != nil {
 		return err
 	}
 	p.say("\nSigned in as %s. Settings are in %s (edit them freely; there is no secret in the file).", signed.user, cfgPath)
@@ -489,11 +497,14 @@ func findWebBundle() string {
 	return ""
 }
 
+// appSourceID is the id of the source an account's App makes, and of its key in the vault.
+func appSourceID(account string) string { return "app-" + strings.ToLower(account) }
+
 func q(s string) string { b, _ := json.Marshal(s); return string(b) } // a YAML double-quoted string
 
 // personalYAML is personal.yaml. products are the groups the person made (none: one group of everything), hidden the repositories left
 // out and unassigned the ones no product holds (they go in a group "Other" at the end).
-func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, products []setup.Product, hidden, unassigned []string, defaultRepo, webDir string, port int) string {
+func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, apps []setup.AppKey, products []setup.Product, hidden, unassigned []string, defaultRepo, webDir string, port int) string {
 	var b strings.Builder
 	w := func(format string, a ...any) { _, _ = fmt.Fprintf(&b, format+"\n", a...) }
 	w("# Written by scp personal. Edit it freely and restart; nothing secret is in it (the credential is sealed in the store).")
@@ -510,13 +521,35 @@ func personalYAML(dir string, h ghlogin.Host, login string, accounts []string, p
 	}
 	w("github:")
 	w("  sources:")
-	w("    - id: %s", personalSource)
-	w("      base_url: %s", q(h.API))
-	w("      credential: true # the token in the store's vault")
-	w("      include_private: true")
-	w("      orgs: [%s] # accounts and organisations to show", strings.Join(mapq(accounts), ", "))
-	if len(hidden) > 0 {
-		w("      exclude: [%s] # kept out of the portal", strings.Join(exactMatchers(hidden), ", "))
+	var polled []string // the accounts no App of the person's is installed on: read with the token, by polling
+	for _, a := range accounts {
+		if !slices.ContainsFunc(apps, func(k setup.AppKey) bool { return k.Account == a }) {
+			polled = append(polled, a)
+		}
+	}
+	excluded := func() {
+		if len(hidden) > 0 {
+			w("      exclude: [%s] # kept out of the portal", strings.Join(exactMatchers(hidden), ", "))
+		}
+	}
+	for _, k := range apps {
+		w("    - id: %s", appSourceID(k.Account))
+		w("      base_url: %s", q(h.API))
+		w("      app: {id: %d, credential: true} # the App's key in the store's vault; GitHub's events reach the portal through its delivery log", k.ID)
+		w("      include_private: true")
+		w("      orgs: [%s]", q(k.Account))
+		excluded()
+	}
+	if len(polled) > 0 {
+		w("    - id: %s", personalSource)
+		w("      base_url: %s", q(h.API))
+		w("      credential: true # the token in the store's vault")
+		w("      include_private: true")
+		w("      orgs: [%s] # accounts and organisations to show, kept fresh by polling", strings.Join(mapq(polled), ", "))
+		excluded()
+	}
+	if len(apps) > 0 {
+		w("webhook: {catch_up: true} # read the Apps' delivery logs: events without anything reaching this computer")
 	}
 	w("catalog:")
 	w("  groups:")

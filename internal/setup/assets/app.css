@@ -114,3 +114,7 @@ ul.rules li.rule { display: block; padding: .3rem 0; border-top: 1px solid var(-
 details.add-rule { margin-top: .5rem; }
 @media (max-width: 40rem) { .zones { grid-template-columns: minmax(0, 1fr); } }
 .hint { font-size: .9rem; margin: .3rem 0; padding: .3rem .5rem; border-radius: .4rem; background: color-mix(in oklab, var(--primary) 10%, transparent); }
+.ok { color: var(--ok); font-weight: 600; }
+.app-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; padding: .5rem 0; border-bottom: 1px solid var(--border); }
+a.button { display: inline-block; padding: .35rem .8rem; border: 1px solid var(--border); border-radius: var(--radius); color: var(--foreground); text-decoration: none; background: var(--card); }
+a.button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }

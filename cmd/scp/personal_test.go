@@ -336,7 +336,7 @@ func TestPersonalPortal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	yaml := personalYAML(dir, ghHost(gh.BaseURL()), "ann", []string{"acme"}, nil, nil, nil, "open", "", n)
+	yaml := personalYAML(dir, ghHost(gh.BaseURL()), "ann", []string{"acme"}, nil, nil, nil, nil, "open", "", n)
 	cfgPath := filepath.Join(dir, "personal.yaml")
 	if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)

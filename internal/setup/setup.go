@@ -64,6 +64,8 @@ type Result struct {
 	Hidden     []string // repository names kept out of the portal
 	Unassigned []string // the listed repositories of the chosen accounts that no product holds and that are not hidden
 	Default    string   // the repository pushed to last, for groups that need a default
+	// Apps are the GitHub Apps the person made and installed, for chosen accounts: events instead of polling.
+	Apps []AppKey
 }
 
 // Config configures the setup server.
@@ -107,6 +109,8 @@ type Server struct {
 	listed    bool
 	listedFor []string // the accounts s.repos was read for, sorted
 	job       *listing
+	apps      map[string]*appRec    // by lower-case account
+	pending   map[string]pendingApp // manifests posted to GitHub, by state
 	jobs      int
 	launch    string
 	finished  bool
@@ -128,7 +132,7 @@ func New(cfg Config) *Server {
 		cfg.Scope = "repo read:org"
 	}
 	return &Server{cfg: cfg, ctx: ctx, cancel: cancel, done: make(chan struct{}), cookie: base64.RawURLEncoding.EncodeToString(b),
-		hostText: cfg.Host, clientID: cfg.ClientID}
+		hostText: cfg.Host, clientID: cfg.ClientID, pending: map[string]pendingApp{}}
 }
 
 // Done is closed once the person has finished and Config.Finish succeeded.
@@ -148,6 +152,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /setup/{$}", s.page)
 	mux.Handle("GET /setup/app.js", http.StripPrefix("/setup/", files))
 	mux.Handle("GET /setup/app.css", http.StripPrefix("/setup/", files))
+	mux.Handle("GET /setup/callback.js", http.StripPrefix("/setup/", files))
+	mux.HandleFunc("GET "+callbackPath, s.appCallback)
+	mux.Handle("POST /setup/api/app/start", s.api(s.startApp))
+	mux.Handle("POST /setup/api/app/check", s.api(s.checkApp))
+	mux.Handle("POST /setup/api/app/forget", s.api(s.forgetApp))
 	mux.Handle("GET /setup/api/state", s.api(s.state))
 	mux.Handle("POST /setup/api/host", s.api(s.setHost))
 	mux.Handle("POST /setup/api/device", s.api(s.startDevice))
@@ -172,8 +181,15 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
+		s.mu.Lock()
+		s.ensureHost()
+		forms := "'self'"
+		if s.hostSet { // the manifest is posted to the host the person signed in to
+			forms += " " + s.host.Web
+		}
+		s.mu.Unlock()
 		h.Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; "+
-			"base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+			"base-uri 'none'; form-action "+forms+"; frame-ancestors 'none'")
 		if !s.hostOK(r.Host) {
 			http.Error(w, "This address is not the setup page's.", http.StatusMisdirectedRequest)
 			return
@@ -300,12 +316,13 @@ type stateOut struct {
 	Ends     string   `json:"ends,omitempty"` // when the token ends, if known
 	Done     bool     `json:"done,omitempty"`
 	Launch   string   `json:"launch,omitempty"`
-	Job      *jobOut  `json:"job,omitempty"` // the repositories being read
+	Job      *jobOut  `json:"job,omitempty"`  // the repositories being read
+	Apps     []appOut `json:"apps,omitempty"` // the GitHub Apps made for accounts
 }
 
 func (s *Server) snapshot() stateOut {
 	out := stateOut{Host: s.hostText, HostOK: s.hostSet, CanCLI: s.cfg.CLIToken != nil, CanCode: s.hostSet && s.clientID != "", ClientID: s.clientID, Flow: s.flow,
-		User: s.user, Orgs: s.orgs, Done: s.finished, Launch: s.launch, Job: s.job.out()}
+		User: s.user, Orgs: s.orgs, Done: s.finished, Launch: s.launch, Job: s.job.out(), Apps: s.appsOut()}
 	if s.hostSet {
 		out.Web = s.host.Web
 	}
@@ -342,6 +359,7 @@ func (s *Server) client() *ghlogin.Client {
 func (s *Server) reset() {
 	s.gen++
 	s.flow, s.token, s.user, s.orgs, s.repos, s.listed, s.more = flow{}, ghlogin.Token{}, "", nil, nil, false, false
+	s.apps, s.pending = nil, map[string]pendingApp{}
 	s.dropListing()
 }
 
@@ -657,7 +675,7 @@ func (s *Server) finish(ctx context.Context, body []byte) (any, error) {
 		}
 	}
 	launch, err := s.cfg.Finish(ctx, Result{Host: s.host, Token: s.token, User: s.user, Accounts: accounts, Products: in.Products,
-		Hidden: in.Hidden, Unassigned: rest, Default: def})
+		Hidden: in.Hidden, Unassigned: rest, Default: def, Apps: s.installedApps(accounts)})
 	if err != nil {
 		return nil, fmt.Errorf("writing your settings: %w", err)
 	}

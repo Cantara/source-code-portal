@@ -2,10 +2,16 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -70,6 +76,35 @@ func TestServeSetupForPlaywright(t *testing.T) {
 			time.Sleep(300 * time.Millisecond) // long enough for the progress bar to be seen
 			list(w, r.PathValue("org"))
 		}
+	})
+	// The manifest flow: GitHub shows a page to confirm (the form's target), which links back with the code; the code is exchanged for
+	// the App, which is installed on acme.
+	appKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appPEM := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(appKey)}))
+	mux.HandleFunc("POST /organizations/{org}/settings/apps/new", func(w http.ResponseWriter, r *http.Request) {
+		var m struct {
+			Redirect string `json:"redirect_url"`
+		}
+		if json.Unmarshal([]byte(r.PostFormValue("manifest")), &m) != nil || m.Redirect == "" {
+			http.Error(w, "no manifest", http.StatusBadRequest)
+			return
+		}
+		next := m.Redirect + "?code=e2e-code&state=" + url.QueryEscape(r.URL.Query().Get("state"))
+		fmt.Fprintf(w, `<!doctype html><title>Register new GitHub App</title><h1>Register GitHub App</h1><a href=%q>Create GitHub App</a>`, next)
+	})
+	mux.HandleFunc("POST /api/v3/app-manifests/{code}/conversions", func(w http.ResponseWriter, r *http.Request) {
+		if r.PathValue("code") != "e2e-code" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": 7, "slug": "scp-acme-e2e", "name": "scp-acme-e2e", "pem": appPEM, "owner": map[string]string{"login": "acme"}})
+	})
+	mux.HandleFunc("GET /api/v3/app/installations", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `[{"account":{"login":"acme"}}]`)
 	})
 	gh := httptest.NewServer(mux)
 	defer gh.Close()

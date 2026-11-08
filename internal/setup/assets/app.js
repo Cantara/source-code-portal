@@ -5,6 +5,7 @@ const app = document.getElementById("app")
 const STEPS = [
   ["signin", "Sign in to GitHub"],
   ["accounts", "Accounts"],
+  ["connect", "Events"],
   ["products", "Products"],
   ["start", "Start"],
 ]
@@ -183,8 +184,65 @@ function accountsStep() {
       h("label", { for: "acct-" + a, class: "inline" }, a, a === st.user ? " (you)" : "")))),
     job && job.state === "failed" ? h("p", { class: "error", role: "alert" }, job.error) : null,
     h("div", { class: "row" },
-      h("button", { type: "button", class: "primary", disabled: busy || accounts.size === 0, on: { click: loadRepos } }, job && job.state === "failed" ? "Try again" : "Continue"),
+      h("button", { type: "button", class: "primary", disabled: busy || accounts.size === 0, on: { click: () => { rememberAccounts(); go("connect") } } }, "Continue"),
       h("button", { type: "button", class: "link", on: { click: () => act(async () => { st = await api("signout", {}); go("signin") }) } }, "Sign in as someone else")))
+}
+
+// ---- 3. events: a GitHub App of the person's own per account gives the portal GitHub's events; the accounts without one are polled.
+// Creating it takes the person to GitHub (the manifest flow) and back, so the chosen accounts wait in sessionStorage.
+
+function rememberAccounts() {
+  try {
+    sessionStorage.setItem("scp-setup-accounts", JSON.stringify([...accounts]))
+  } catch {
+    // the choice is then all accounts after the visit to GitHub
+  }
+}
+
+function connectStep() {
+  const job = st.job
+  if (job && job.state === "running") return readingCard(job)
+  const apps = Object.fromEntries((st.apps || []).map((a) => [a.account.toLowerCase(), a]))
+  const row = (a) => {
+    const app = apps[a.toLowerCase()]
+    if (!app) {
+      return h("li", { class: "app-row" }, h("strong", {}, a), " ", h("span", { class: "note" }, "polled every few minutes"), " ",
+        h("button", { type: "button", disabled: busy, on: { click: () => makeApp(a) } }, "Connect a GitHub App"))
+    }
+    if (app.status === "installed") {
+      return h("li", { class: "app-row" }, h("strong", {}, a), " ", h("span", { class: "ok" }, "✓ events: GitHub tells the portal within minutes"))
+    }
+    return h("li", { class: "app-row" }, h("strong", {}, a), " ", h("span", { class: "note" }, `the App ${app.slug} is made; install it on ${a}`), " ",
+      h("a", { href: app.installUrl, target: "_blank", rel: "noopener noreferrer", class: "button" }, "Install on GitHub"), " ",
+      h("button", { type: "button", disabled: busy, on: { click: () => checkApp(a) } }, "I installed it"), " ",
+      h("button", { type: "button", class: "link", disabled: busy, on: { click: () => act(async () => { st = await api("app/forget", { account: a }) }) } }, "Remove"))
+  }
+  return h("section", { class: "card" },
+    h("h2", {}, "Keep it fresh with events (optional)"),
+    h("p", {}, "With a GitHub App of your own, GitHub tells the portal about pushes, releases and pull requests within minutes. Without one the portal asks GitHub every few minutes instead. The App can only read, and nothing has to reach this computer: the portal reads the App's delivery log."),
+    h("p", { class: "note" }, "You make the App on GitHub with one click and install it on the account; for an organisation you need to be an owner. Accounts you skip, or cannot install on, are polled."),
+    h("ul", { class: "plain" }, [...accounts].map(row)),
+    job && job.state === "failed" ? h("p", { class: "error", role: "alert" }, job.error) : null,
+    h("div", { class: "row" },
+      h("button", { type: "button", class: "primary", disabled: busy, on: { click: loadRepos } }, job && job.state === "failed" ? "Try again" : "Continue"),
+      h("button", { type: "button", class: "link", on: { click: () => go("accounts") } }, "Back")))
+}
+
+// makeApp takes the person to GitHub to create the App: the server prepares the manifest, and the browser posts it there.
+async function makeApp(account) {
+  await act(async () => {
+    const r = await api("app/start", { account })
+    rememberAccounts()
+    const form = h("form", { method: "post", action: r.action }, h("input", { type: "hidden", name: "manifest", value: r.manifest }))
+    document.body.append(form)
+    form.submit()
+  })
+}
+
+async function checkApp(account) {
+  await act(async () => {
+    st = await api("app/check", { account })
+  })
 }
 
 // readingCard shows the repository read: what is being read, how far it is and, once there is a rate, how long it will take.
@@ -218,7 +276,7 @@ async function loadRepos() {
 function watchRead() {
   clearInterval(timer)
   if (!st.job || st.job.state !== "running") {
-    if (st.job && st.job.state === "done" && step === "accounts") void openProducts()
+    if (st.job && st.job.state === "done" && (step === "accounts" || step === "connect")) void openProducts()
     return
   }
   timer = setInterval(async () => {
@@ -676,7 +734,7 @@ function render() {
   for (const el of app.querySelectorAll(".keep[id]")) scrolls[el.id] = el.scrollTop
   const before = new Set([...app.querySelectorAll("details[data-id]")].map((d) => d.dataset.id))
   const open = new Set([...app.querySelectorAll("details[data-id][open]")].map((d) => d.dataset.id))
-  const body = { signin: signIn, accounts: accountsStep, products: productsStep, start: startStep }[step]()
+  const body = { signin: signIn, accounts: accountsStep, connect: connectStep, products: productsStep, start: startStep }[step]()
   app.classList.toggle("wide", step === "products")
   app.replaceChildren(
     ...[
@@ -710,10 +768,20 @@ try {
   else if (st.user) {
     accounts = new Set([st.user, ...(st.orgs || [])])
     step = "accounts"
+    if (st.apps && st.apps.length) {
+      // back from GitHub with an App: the accounts chosen before are in sessionStorage
+      try {
+        const kept = JSON.parse(sessionStorage.getItem("scp-setup-accounts") || "[]").filter((a) => accounts.has(a))
+        if (kept.length) accounts = new Set(kept)
+      } catch {
+        // all accounts
+      }
+      step = "connect"
+    }
     if (st.job && st.job.state === "running") readStarted = Date.now()
   }
   render()
-  if (step === "accounts" && st.job && st.job.state === "running") watchRead()
+  if ((step === "accounts" || step === "connect") && st.job && st.job.state === "running") watchRead()
 } catch (e) {
   app.replaceChildren(h("p", { class: "error", role: "alert" }, e.message))
 }

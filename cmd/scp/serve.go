@@ -146,12 +146,23 @@ type deps struct {
 	launch     *auth.Launch                                   // the personal edition's one-use sign-in link
 }
 
+// vaultResolved refuses a source whose credential is in the vault of scp personal and was not resolved: serve reads files.
+func vaultResolved(cfg config.Config) error {
+	for i, src := range cfg.GitHub.Sources {
+		if src.App != nil && src.App.Credential && !src.App.PrivateKey.IsSet() { // scp personal resolves it from the vault before it gets here
+			return fmt.Errorf("github.sources[%d].app.credential: the key is in the vault of scp personal; serve reads app.private_key_file", i)
+		}
+		if src.Credential && !src.Token.IsSet() {
+			return fmt.Errorf("github.sources[%d].credential: the credential is in the vault of scp personal; serve reads app or token_file", i)
+		}
+	}
+	return nil
+}
+
 // newServer opens the store, wires the features and binds both listeners.
 func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger) (_ *server, err error) {
-	for i, src := range cfg.GitHub.Sources {
-		if src.Credential && !src.Token.IsSet() { // scp personal resolves it from the vault before it gets here
-			return nil, fmt.Errorf("github.sources[%d].credential: the credential is in the vault of scp personal; serve reads app or token_file", i)
-		}
+	if err := vaultResolved(cfg); err != nil {
+		return nil, err
 	}
 	gh, err := github.New(cfg.GitHub, d.github, log)
 	if err != nil {

@@ -146,6 +146,11 @@ func (p *personal) finishSetup(ctx context.Context, dir, cfgPath string, key []b
 	if err := v.Put(ctx, vault.Secret{ID: personalSource, Source: r.Host.Web, Kind: "token", Value: r.Token.Value, ExpiresAt: r.Token.Expires}); err != nil {
 		return nil, err
 	}
+	for _, k := range r.Apps {
+		if err := v.Put(ctx, vault.Secret{ID: appSourceID(k.Account), Source: r.Host.Web, Kind: "app-key", Value: k.Key}); err != nil {
+			return nil, err
+		}
+	}
 	if err := p.secrets(dir); err != nil {
 		return nil, err
 	}
@@ -160,7 +165,7 @@ func (p *personal) finishSetup(ctx context.Context, dir, cfgPath string, key []b
 	}
 	unassigned := r.Unassigned
 	slices.Sort(unassigned)
-	yaml := personalYAML(dir, r.Host, r.User, r.Accounts, r.Products, r.Hidden, unassigned, r.Default, webDir, p.flags.port)
+	yaml := personalYAML(dir, r.Host, r.User, r.Accounts, r.Apps, r.Products, r.Hidden, unassigned, r.Default, webDir, p.flags.port)
 	if err := os.WriteFile(cfgPath, []byte(yaml), 0o600); err != nil {
 		return nil, err
 	}

@@ -18,6 +18,23 @@ test("setting up a portal: sign in, read the repositories, sort them into produc
   await expect(page.getByRole("heading", { name: "Signed in as octo" })).toBeVisible()
   await page.getByRole("button", { name: "Continue" }).click()
 
+  // Events: a GitHub App of one's own for acme. The browser goes to GitHub with the manifest and comes back with the App made; once
+  // it is installed the account has events, and octo, without one, is polled.
+  await expect(page.getByRole("heading", { name: "Keep it fresh with events (optional)" })).toBeVisible()
+  const acme = page.locator(".app-row", { hasText: "acme" })
+  await acme.getByRole("button", { name: "Connect a GitHub App" }).click()
+  await page.getByRole("link", { name: "Create GitHub App" }).click()
+  await expect(acme).toContainText("the App scp-acme-e2e is made")
+  await expect(acme.getByRole("link", { name: "Install on GitHub" })).toHaveAttribute(
+    "href",
+    /\/apps\/scp-acme-e2e\/installations\/new$/,
+  )
+  await acme.getByRole("button", { name: "I installed it" }).click()
+  await expect(acme).toContainText("events: GitHub tells the portal")
+  await expect(page.locator(".app-row", { hasText: "octo" })).toContainText("polled every few minutes")
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  await page.getByRole("button", { name: "Continue" }).click()
+
   // The read shows its progress, then the editor opens with the suggestions: whydah-* and kcp-* each a product with a rule.
   await expect(page.getByRole("heading", { name: "Sort your repositories into products" })).toBeVisible()
   const whydah = page.locator(".pcard", { has: page.locator("input[value=Whydah]") })
