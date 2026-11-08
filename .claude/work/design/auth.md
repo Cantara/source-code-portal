@@ -1,5 +1,5 @@
 # Sign-in and admin
-Status: S1, in progress (plan.md section 4). Binding order: ../plan.md > this note. Adapted from krantho's admin authentication (OIDC
+Status: S1, built (plan.md section 4). Binding order: ../plan.md > this note. Adapted from krantho's admin authentication (OIDC
 with PKCE, a shared-token login, its own session) to SCP's model: no user store, SQLite a rebuildable cache, several instances.
 
 ## Scope

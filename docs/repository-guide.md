@@ -63,7 +63,7 @@ A private repository's packages are never named to a public registry (Maven Cent
 trunk, nuget.org, rubygems.org, Packagist): only to the registries its build files name and those the portal is configured with; a private Go module's versions are its
 tags.
 
-Changes show within seconds when the portal's webhook is set up, otherwise after the next scheduled check (a push is noticed within
+Changes show within seconds when the portal's webhook is set up (within a couple of minutes when it reads the GitHub App's delivery log instead, `webhook.catch_up`), otherwise after the next scheduled check (a push is noticed within
 the listing interval, five minutes by default).
 
 ## Health

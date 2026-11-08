@@ -42,7 +42,7 @@ an error, as is an unknown key in the file.
 | `sync` | `concurrency` (`4`) | GitHub jobs at once |
 | `github.sources[]` | `id`, `base_url` (GitHub Enterprise: `https://<host>/api/v3/`), `orgs`, `app.id`, `app.private_key_file`, `app.installations`, `token_file`, `include_forks` (`false`), `include_archived` (`true`), `exclude[]`, `include_private` (`false`) | an account belongs to one source |
 | `catalog` | `reconcile_interval` (`5m`), `groups[]`: `id`, `name`, `description`, `default_repo`, `sources`, `match[]` | at most 500 groups, 64 matchers each |
-| `webhook` | `secret_file`, `previous_secret_file` | the receiver exists only with a secret |
+| `webhook` | `secret_file`, `previous_secret_file`, `catch_up` | the receiver exists only with a secret; `catch_up: true` (needs an App source) reads the App's delivery log every 2 minutes instead, for a portal GitHub cannot reach |
 | `access` | `user_header`, `groups_header`, `private_groups` (`["*"]`: everyone signed in), `require_auth` | `include_private` needs `private_groups` and a way to know the viewer |
 | `auth` | `session_key_file`, `session_ttl` (`12h`), `admin_emails`, `admin_groups`, `tokens[]` (`name`, `secret_file`, `groups`, `admin`), `oidc.issuer`, `oidc.client_id`, `oidc.client_secret_file`, `oidc.scopes`, `oidc.groups_claim` (`groups`) | redirect URI `<public_url>/auth/callback` |
 | `llm` | `provider` (`anthropic`, `openai`, `gemini`, `openrouter`, `ollama`), `model`, `base_url`, `api_key_file` | what the tools read goes to the provider |
