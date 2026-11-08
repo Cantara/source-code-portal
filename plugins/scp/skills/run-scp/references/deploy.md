@@ -95,6 +95,7 @@ bodies on `/webhooks/github`, and pass `/api/v1/events` unbuffered with a read t
 ```sh
 sha256sum -c scp_<version>_checksums.txt --ignore-missing
 tar xzf scp_<version>_linux_amd64.tar.gz && tar xzf scp-web_<version>.tar.gz   # the bundle unpacks into bundle/
+# for a shared portal only, scp-server_<version>_linux_<arch>.tar.gz is the same program without scp personal (the image is this build)
 ```
 
 `/etc/systemd/system/scp.service` (Node.js 26 on the `PATH`, or `web.node`):

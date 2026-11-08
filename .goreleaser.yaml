@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# Release v2 (release.yml on tags v*): one CGO-free binary per platform and the platform-independent web bundle (release.yml builds
+# Release v2 (release.yml on tags v*): one CGO-free binary per platform (the full build; the server build for linux besides it) and the platform-independent web bundle (release.yml builds
 # web/bundle first) as scp-web_<version>.tar.gz, archives with sha256 checksums signed keyless by cosign, and one multi-platform image
 # around those binaries and the bundle (deploy/Dockerfile.release),
 # signed by digest and carrying a BuildKit SBOM. Full releases also move :latest.
@@ -24,11 +24,30 @@ builds:
     goarch: [amd64, arm64]
     ignore:
       - { goos: darwin, goarch: amd64 }
+  # The server build (-tags server): the shared site only, without scp personal (its setup page, sign-in to GitHub, vault and
+  # keychain are not in the binary). The container image is this one; the full build above stays what scp_<version>_<os>_<arch> holds.
+  - id: scp-server
+    main: ./cmd/scp
+    binary: scp
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    tags: [server]
+    ldflags:
+      - "-s -w -X main.version={{ .Version }} -X main.build={{ .FullCommit }}"
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos: [linux]
+    goarch: [amd64, arm64]
 
 archives:
   - id: scp
+    ids: [scp]
     formats: [tar.gz]
     name_template: "scp_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md, deploy/config.example.yaml]
+  - id: scp-server
+    ids: [scp-server]
+    formats: [tar.gz]
+    name_template: "scp-server_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files: [LICENSE, README.md, deploy/config.example.yaml]
 
 checksum:
@@ -48,7 +67,7 @@ signs:
 
 dockers_v2:
   - id: image
-    ids: [scp]
+    ids: [scp-server]
     dockerfile: deploy/Dockerfile.release
     images: [ghcr.io/cantara/source-code-portal]
     tags:

@@ -18,6 +18,7 @@ const lowRate = 0.1
 
 // status is the operator view on the admin listener: hand-written JSON that evolves with operations.
 type status struct {
+	mode         string
 	ready, alive func() bool
 	current      func() *snapshot.Snapshot
 	depth        func() (waiting, running int)
@@ -40,6 +41,7 @@ type status struct {
 }
 
 type statusBody struct {
+	Mode     string         `json:"mode"` // shared or personal: what the command that started the process made it
 	Ready    bool           `json:"ready"`
 	Alive    bool           `json:"alive"`
 	Snapshot statusSnapshot `json:"snapshot"`
@@ -100,7 +102,7 @@ func (st *status) delivery(_, result string) {
 
 func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	s, now := st.current(), time.Now()
-	b := statusBody{Ready: st.ready(), Alive: st.alive(), Warnings: []string{}, Sources: []statusSource{},
+	b := statusBody{Mode: st.mode, Ready: st.ready(), Alive: st.alive(), Warnings: []string{}, Sources: []statusSource{},
 		Snapshot: statusSnapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: len(s.Repos)}}
 	if !s.BuiltAt.IsZero() {
 		b.Snapshot.AgeSeconds = now.Sub(s.BuiltAt).Seconds()

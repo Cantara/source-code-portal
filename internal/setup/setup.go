@@ -78,7 +78,6 @@ type Config struct {
 	// CLIToken returns the token the GitHub CLI holds for a host name (github.com, github.example.org); nil: the page does not offer it.
 	CLIToken func(ctx context.Context, hostname string) (string, error)
 	HTTP     *http.Client
-	Sleep    func(context.Context, time.Duration) error
 	Now      func() time.Time
 	// Finish writes the person's choices and returns the one-use path that signs them in to the running portal.
 	Finish func(ctx context.Context, r Result) (launch string, err error)
@@ -347,7 +346,7 @@ func (s *Server) state(_ context.Context, _ []byte) (any, error) {
 }
 
 func (s *Server) client() *ghlogin.Client {
-	return &ghlogin.Client{Host: s.host, HTTP: s.cfg.HTTP, Sleep: s.cfg.Sleep, Now: s.cfg.Now}
+	return &ghlogin.Client{Host: s.host, HTTP: s.cfg.HTTP, Now: s.cfg.Now}
 }
 
 func (s *Server) reset() {

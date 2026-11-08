@@ -74,7 +74,7 @@ func (a *fakeApp) routes(mux *http.ServeMux) {
 }
 
 func TestTheAppFlow(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	r.call(t, http.MethodPost, "/setup/api/token", map[string]string{"token": token})
 
@@ -182,7 +182,7 @@ func TestTheAppFlow(t *testing.T) {
 }
 
 func TestAnAppNotInstalledIsPolled(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	r.call(t, http.MethodPost, "/setup/api/token", map[string]string{"token": token})
 	_, o := r.call(t, http.MethodPost, "/setup/api/app/start", map[string]string{"account": "acme"})
@@ -203,7 +203,7 @@ func TestAnAppNotInstalledIsPolled(t *testing.T) {
 }
 
 func TestTheManifestMayBePostedToTheHostOnly(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	req, _ := http.NewRequest(http.MethodGet, r.URL+"/setup/api/state", nil)
 	res, err := r.client.Do(req)

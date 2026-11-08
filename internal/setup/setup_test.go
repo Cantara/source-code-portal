@@ -49,9 +49,11 @@ func host(t *testing.T, gate <-chan struct{}, app *fakeApp) *httptest.Server {
 		return true
 	}
 	mux.HandleFunc("POST /login/device/code", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"device_code":"d","user_code":"AAAA-BBBB","verification_uri":"http://github.example/login/device","expires_in":900,"interval":1}`)
 	})
 	mux.HandleFunc("POST /login/oauth/access_token", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"access_token":"`+token+`","scope":"repo","expires_in":3600}`)
 	})
 	mux.HandleFunc("GET /api/v3/user", func(w http.ResponseWriter, r *http.Request) {
@@ -117,20 +119,20 @@ type rig struct {
 	token    string                                // the session token the page was given
 }
 
-func newRig(t *testing.T, clientID string, sleep func(context.Context, time.Duration) error) *rig {
+func newRig(t *testing.T, clientID string) *rig {
 	t.Helper()
-	return newRigHeld(t, clientID, sleep, nil)
+	return newRigHeld(t, clientID, nil)
 }
 
 // newRigHeld is a rig whose organisation listings wait for hold to close.
-func newRigHeld(t *testing.T, clientID string, sleep func(context.Context, time.Duration) error, hold <-chan struct{}) *rig {
+func newRigHeld(t *testing.T, clientID string, hold <-chan struct{}) *rig {
 	t.Helper()
 	app := newFakeApp()
 	gh := host(t, hold, app)
 	r := &rig{gh: gh, app: app, code: "entry-code-0123456789", finished: make(chan Result, 1), bodies: &bytes.Buffer{},
 		cli: func(string) (string, error) { return "", errors.New("no login") }}
 	ts := httptest.NewUnstartedServer(nil)
-	r.s = New(Config{Addr: ts.Listener.Addr().String(), Code: r.code, Host: gh.URL, ClientID: clientID, Sleep: sleep, HTTP: &http.Client{Transport: noKeepAlive},
+	r.s = New(Config{Addr: ts.Listener.Addr().String(), Code: r.code, Host: gh.URL, ClientID: clientID, HTTP: &http.Client{Transport: noKeepAlive},
 		CLIToken: func(_ context.Context, hostname string) (string, error) { return r.cli(hostname) },
 		Finish: func(_ context.Context, res Result) (string, error) {
 			r.finished <- res
@@ -229,7 +231,7 @@ func (r *rig) list(t *testing.T, accounts ...string) map[string]any {
 }
 
 func TestEntry(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	get := func(path, hostHeader string) int {
 		req, _ := http.NewRequest(http.MethodGet, r.URL+path, nil)
 		if hostHeader != "" {
@@ -293,7 +295,7 @@ func newRigClient(r *rig) *http.Client {
 }
 
 func TestAPIRefuses(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	if c, _ := r.call(t, http.MethodPost, "/setup/api/token", map[string]string{"token": "x"}, "Sec-Fetch-Site", "cross-site"); c != http.StatusForbidden {
 		t.Errorf("cross-site: %d", c)
@@ -319,7 +321,7 @@ func TestAPIRefuses(t *testing.T) {
 }
 
 func TestWithAToken(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	code, st := r.call(t, http.MethodGet, "/setup/api/state", nil)
 	if code != 200 || st["hostOk"] != true || st["canCode"] != false || st["user"] != nil {
@@ -408,7 +410,7 @@ func TestWithAToken(t *testing.T) {
 }
 
 func TestWithACode(t *testing.T) {
-	r := newRig(t, "Iv1.abc", func(context.Context, time.Duration) error { return nil })
+	r := newRig(t, "Iv1.abc")
 	r.enter(t)
 	if _, st := r.call(t, http.MethodGet, "/setup/api/state", nil); st["canCode"] != true {
 		t.Fatalf("state: %v", st)
@@ -433,34 +435,26 @@ func TestWithACode(t *testing.T) {
 }
 
 func TestACodeForAnotherHostIsDropped(t *testing.T) {
-	gate := make(chan struct{})
-	r := newRig(t, "Iv1.abc", func(ctx context.Context, _ time.Duration) error {
-		select {
-		case <-gate:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	})
+	r := newRig(t, "Iv1.abc")
 	r.enter(t)
 	r.call(t, http.MethodGet, "/setup/api/state", nil)
 	if code, _ := r.call(t, http.MethodPost, "/setup/api/device", map[string]any{}); code != 200 {
 		t.Fatal("device")
 	}
-	// The person goes back before confirming; the code that is confirmed afterwards must not sign them in.
+	// The person goes back before confirming; the code must not sign them in when its poll would have come (the fake host's interval
+	// is one second).
 	_, st := r.call(t, http.MethodPost, "/setup/api/signout", map[string]any{})
 	if st["flow"].(map[string]any)["state"] != "" {
 		t.Fatalf("after going back: %v", st)
 	}
-	close(gate)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(1500 * time.Millisecond)
 	if _, st = r.call(t, http.MethodGet, "/setup/api/state", nil); st["user"] != nil {
 		t.Errorf("a cancelled sign-in signed in: %v", st)
 	}
 }
 
 func TestNoCodeWithoutAClientID(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	r.call(t, http.MethodGet, "/setup/api/state", nil)
 	if code, _ := r.call(t, http.MethodPost, "/setup/api/device", map[string]any{}); code != http.StatusBadRequest {
@@ -534,7 +528,7 @@ func TestSuggestNoDuplicates(t *testing.T) {
 }
 
 func TestWithTheGitHubCLI(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	var asked string
 	r.cli = func(hostname string) (string, error) { asked = hostname; return token + "\n", nil }
@@ -552,7 +546,7 @@ func TestWithTheGitHubCLI(t *testing.T) {
 		t.Error("the token reached the page")
 	}
 
-	r2 := newRig(t, "", nil)
+	r2 := newRig(t, "")
 	r2.enter(t)
 	if code, o := r2.call(t, http.MethodPost, "/setup/api/cli", map[string]string{}); code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(o), "gh auth login") {
 		t.Errorf("no login: %d %v", code, o)
@@ -565,7 +559,7 @@ func TestWithTheGitHubCLI(t *testing.T) {
 
 func TestListingProgressAndCancel(t *testing.T) {
 	hold := make(chan struct{})
-	r := newRigHeld(t, "", nil, hold)
+	r := newRigHeld(t, "", hold)
 	r.enter(t)
 	if code, st := r.call(t, http.MethodPost, "/setup/api/token", map[string]string{"token": token}); code != 200 || st["user"] != "octo" {
 		t.Fatalf("token: %d %v", code, st)
@@ -612,7 +606,7 @@ func TestListingProgressAndCancel(t *testing.T) {
 }
 
 func TestRulesPreviewTestAndFinish(t *testing.T) {
-	r := newRig(t, "", nil)
+	r := newRig(t, "")
 	r.enter(t)
 	r.call(t, http.MethodPost, "/setup/api/token", map[string]string{"token": token})
 	accounts := []string{"octo", "acme"}

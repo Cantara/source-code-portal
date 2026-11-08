@@ -1,3 +1,5 @@
+//go:build !server
+
 package main
 
 import (
@@ -74,9 +76,11 @@ func fakeHost(t *testing.T, header map[string]string) *httptest.Server {
 		}
 	})
 	mux.HandleFunc("POST /login/device/code", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"device_code":"d","user_code":"AAAA-BBBB","verification_uri":"http://host/login/device","expires_in":900,"interval":1}`)
 	})
 	mux.HandleFunc("POST /login/oauth/access_token", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"access_token":"ghp_personal","scope":"repo","expires_in":3600}`)
 	})
 	srv := httptest.NewServer(mux)
@@ -105,7 +109,7 @@ func newPersonal(t *testing.T, ring vault.Ring, dir, host, input string, f perso
 	}
 	now := time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
 	return &personal{flags: f, in: bufio.NewReader(strings.NewReader(input)), out: out, ring: ring,
-		sleep: func(context.Context, time.Duration) error { return nil }, now: func() time.Time { return now }}, out
+		now: func() time.Time { return now }}, out
 }
 
 func credentialOf(t *testing.T, ring vault.Ring, dir string) vault.Secret {
@@ -353,6 +357,7 @@ func TestPersonalPortal(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := testDeps(t)
+	d.mode = store.Personal                                // as scp personal runs it
 	if d.launch, err = newLaunch(time.Now()); err != nil { // the auth package reads the real clock
 		t.Fatal(err)
 	}

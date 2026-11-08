@@ -1,3 +1,5 @@
+//go:build !server
+
 package main
 
 import (
@@ -53,7 +55,7 @@ func (p *personal) browserSetup(ctx context.Context, dir, cfgPath string) (*auth
 		clientID = defaultClientID
 	}
 	s := setup.New(setup.Config{Addr: ln.Addr().String(), Code: entry, Host: p.flags.host, ClientID: clientID, Scope: p.flags.scope,
-		HTTP: p.http, Sleep: p.sleep, Now: p.now, CLIToken: p.cliTokenFunc(),
+		HTTP: p.http, Now: p.now, CLIToken: p.cliTokenFunc(),
 		Finish: func(ctx context.Context, r setup.Result) (string, error) {
 			var err error
 			if launch, err = p.finishSetup(ctx, dir, cfgPath, key, r); err != nil {
@@ -131,7 +133,7 @@ func (p *personal) openPage(ctx context.Context, link string) {
 
 // finishSetup writes what the person chose: the sealed credential, personal.yaml (the old one kept as .bak) and the local secrets.
 func (p *personal) finishSetup(ctx context.Context, dir, cfgPath string, key []byte, r setup.Result) (*auth.Launch, error) {
-	st, err := store.Open(ctx, filepath.Join(dir, "scp.db"), slog.New(slog.DiscardHandler))
+	st, err := store.OpenAs(ctx, filepath.Join(dir, "scp.db"), store.Personal, slog.New(slog.DiscardHandler))
 	if err != nil {
 		return nil, err
 	}

@@ -41,9 +41,8 @@ only.** A person who already runs `scp serve` with a token file is unaffected.
 
 ## What is not in it
 
-No hosted multi-person mode (rung 1 and on), no refresh of expiring tokens, no web wizard (the terminal one is the first; a page of
-`/admin` can follow), no GitHub App registration flow (the person registers the app on their host; `docs/personal-edition.md` says
-how and with which permissions).
+No hosted multi-person mode (rung 1 and on) and no refresh of expiring tokens. (The first run later became a browser page, PE3 and PE4,
+and the Events step makes a GitHub App of the person's own, EV3: `design/sync-modes.md`. The terminal wizard stays as `--terminal`.)
 
 ## Tests
 
@@ -56,7 +55,7 @@ a session refused.
 ## As built
 
 - `internal/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (migration 0003), `internal/ghlogin` (hosts, device flow,
-  `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`), `auth.Launch` (`GET /auth/launch`),
+  `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`; the device flow is `x/oauth2`'s, every other GitHub call goes through go-github and the App's JWT through `ghinstallation`, GL1), `auth.Launch` (`GET /auth/launch`),
   `cmd/scp/personal.go`.
 - A source says `credential: true`; `scp personal` opens the vault and puts the token in the source before `newServer`; `newServer`
   refuses a source with `credential` and no token, so `scp serve` never starts with an unresolved one.
@@ -67,6 +66,25 @@ a session refused.
 - The portal refuses configurations whose listeners are not loopback (`requireLoopback`).
 - Not verified against a real GitHub Enterprise Server: the device flow's availability on a given version, and the REST base paths
   (`/api/v3/`, `api.<name>.ghe.com`) are from GitHub's documentation. A pasted token needs only the REST calls.
+
+## Kept apart from the shared site (ML1, P-102)
+
+- **The mode is a typed value** (`store.Shared`, `store.Personal`) set by the command (`deps.mode`: the zero value is the shared site,
+  `scp personal` says `Personal`), never by a configuration or the environment. `newServer` opens the store for it, refuses a launch link
+  outside `Personal`, logs the mode when it listens and reports it in the admin status. `server.routes` holds the patterns of the routes
+  the features and sign-in add; `TestEachModeRegistersItsOwnRoutes` runs one configuration in both modes and fails unless they differ by
+  `GET /auth/launch` alone and the shared site has no `/setup` route (the setup page is its own loopback server in `scp personal`).
+- **A store belongs to one mode** (`internal/store/mode.go`, `OpenAs`): the first open as a mode writes `meta.mode`; a store of the other
+  mode is refused with a `ModeError` before it is read, migrated, copied or moved aside (a read-only look first, so the file is not even
+  switched to WAL; the refusal is not an "unusable store", which would quarantine it). A store from before the mode was written is taken by
+  what it holds: a shared site's has a catalogue and no sealed credential, a personal one has a credential or is empty. `store.Open`, which
+  claims nothing, is for tests; `TestTheProgramOpensTheStoreForAMode` keeps it out of the program.
+- **The server build** (`-tags server`): `personal*.go` and their tests carry `//go:build !server` and `personal_off.go` stands in for the
+  command. The binary links none of `setup`, `ghlogin`, `vault`, `go-keyring`, `x/term` (`TestTheServerBuildHoldsNothingOfThePersonalEdition`
+  lists the dependencies of both builds; the vault's key-derivation label is absent from the server binary). `make server` builds it, `make lint`
+  and `make test` cover it, the image (`deploy/Dockerfile` and the release's `dockers_v2`) is it, and the release adds `scp-server_<version>_linux_<arch>`
+  archives; the `scp_<version>_<os>_<arch>` archives are unchanged. What stays in the server build: `auth.Launch` (a few lines of generic sign-in code
+  in `internal/auth`, reachable only through an option that `newServer` refuses outside `Personal`).
 
 ## My work (PE2)
 

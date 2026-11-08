@@ -1,3 +1,5 @@
+//go:build !server
+
 package main
 
 import (
@@ -17,6 +19,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/ghlogin"
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
 	"github.com/cantara/source-code-portal/internal/setup"
+	"github.com/cantara/source-code-portal/internal/store"
 	"github.com/cantara/source-code-portal/internal/vault"
 )
 
@@ -78,6 +81,7 @@ func TestPersonalWithAnApp(t *testing.T) {
 	// Only the App's account is read in this test: the token source's account has no fake listing, so leave it out.
 	cfg.GitHub.Sources = cfg.GitHub.Sources[:1]
 	d := testDeps(t)
+	d.mode = store.Personal // as scp personal runs it
 	if d.launch, err = newLaunch(time.Now()); err != nil {
 		t.Fatal(err)
 	}

@@ -137,7 +137,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].app.private_key_file` | | the App's private key (PEM) |
 | `github.sources[].app.installations` | all | account logins whose installations are used |
 | `github.sources[].token_file` | | a token file, instead of `app` |
-| `github.sources[].credential` | `false` | `true`: the token is in the vault of [`scp personal`](personal-edition.md); `scp serve` refuses it |
+| `github.sources[].credential` | `false` | `true`: the token is in the vault of [`scp personal`](personal-edition.md) (experimental); `scp serve` refuses it |
 | `github.sources[].app.credential` | `false` | `true`: the App's private key is in the vault of `scp personal` (instead of `app.private_key_file`); `scp serve` refuses it |
 | `github.sources[].include_forks` | `false` | list forks |
 | `github.sources[].include_archived` | `true` | list archived repositories |
@@ -611,7 +611,7 @@ or Chrome was not relaunched. The Guide (`/guide#webmcp`) shows the same steps w
 
 ## 3. Run
 
-For yourself alone on your own computer, [`scp personal`](personal-edition.md) signs you in to GitHub and needs no configuration.
+For yourself alone on your own computer, [`scp personal`](personal-edition.md) (experimental) signs you in to GitHub and needs no configuration.
 
 **Binary.** Download the archive for your platform and the web UI bundle (`scp-web_2.0.0.tar.gz`, the same for every platform) from
 the GitHub release, check them and run them with Node.js 26 on the `PATH` (or `web.node`):
@@ -621,6 +621,11 @@ sha256sum -c scp_2.0.0_checksums.txt --ignore-missing
 tar xzf scp_2.0.0_linux_amd64.tar.gz && tar xzf scp-web_2.0.0.tar.gz   # the bundle unpacks into bundle/
 ./scp config check -c scp.yaml && SCP_WEB_DIR=bundle ./scp serve -c scp.yaml
 ```
+
+For a shared portal you can take `scp-server_<version>_linux_<arch>.tar.gz` instead (Linux, amd64 and arm64): the same program built
+with `-tags server`, which leaves out `scp personal` (its setup page, its sign-in to GitHub, its vault and the keychain libraries are not
+in the binary; `scp personal` there only says so). The container image is this build. The `scp_<version>_<os>_<arch>` archives are
+the full build, as before.
 
 `scp serve` starts the bundle's server (`node server.js`) on a free loopback port, passes it nothing from its own environment,
 restarts it when it exits or when the bundle is replaced (so a new bundle can be unpacked in place), and stops it at shutdown; its output appears in the log with `component=web`. Every page goes through `scp`,

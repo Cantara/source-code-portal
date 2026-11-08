@@ -10,7 +10,7 @@ CONFIG ?= scp.yaml
 BUILD_ID ?= $(shell git rev-parse HEAD 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.build=$(BUILD_ID)
 
-.PHONY: help web build gen lint test e2e rehearse check hooks image run dev clean need-golangci
+.PHONY: help web build server gen lint test e2e rehearse check hooks image run dev clean need-golangci
 
 help: ## list targets
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
@@ -22,6 +22,9 @@ web: ## build the web UI into web/bundle (the Next.js server scp serve runs)
 build: ## build bin/scp
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/scp ./cmd/scp
 
+server: ## build bin/scp-server, the server build: the shared site only, without scp personal (the container image is this one)
+	CGO_ENABLED=0 go build -tags server -trimpath -ldflags "$(LDFLAGS)" -o bin/scp-server ./cmd/scp
+
 gen: ## regenerate generated sources (Go, chroma.css, the TypeScript API types)
 	go generate ./...
 	$(PNPM) -C web gen
@@ -32,7 +35,9 @@ need-golangci:
 
 lint: need-golangci ## vet, golangci-lint, govulncheck, eslint, tsc, prettier
 	go vet ./...
+	go vet -tags server ./...
 	golangci-lint run
+	golangci-lint run --build-tags server
 	go tool govulncheck ./...
 	$(PNPM) -C web lint
 	$(PNPM) -C web typecheck
@@ -40,6 +45,7 @@ lint: need-golangci ## vet, golangci-lint, govulncheck, eslint, tsc, prettier
 
 test: ## Go tests with the race detector, web tests
 	CGO_ENABLED=1 go test -race -count=1 -timeout 10m ./...
+	CGO_ENABLED=1 go test -tags server -race -count=1 -timeout 10m ./cmd/scp
 	go test -count=1 -p 1 -run '^(TestLoad1000|TestIndexSize)$$' ./cmd/scp ./internal/search
 	$(PNPM) -C web test
 

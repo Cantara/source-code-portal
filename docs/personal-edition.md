@@ -1,5 +1,11 @@
 # The personal edition
 
+> **Experimental.** `scp personal` is new and not yet part of the supported ways to run the portal; the portal's own Guide page does not
+> mention it yet. Its commands, flags, files and `personal.yaml` may change between releases without notice. It has been run against a
+> fake GitHub and github.com's refusal answers, not yet on a GitHub Enterprise Server or GHE.com tenant, and GitHub's reaction to the
+> App the Events step makes (see below) is unconfirmed. Shared portals (`scp serve`) are unaffected by it and do not contain it in the
+> server build.
+
 A portal of your own, on your own computer: you sign in to GitHub once, and the portal shows every repository **you** can read, the
 private ones too. It is for one person. Nothing is exposed beyond the computer, and there is no configuration to write first.
 
@@ -11,7 +17,7 @@ The first run opens a page in your browser (a link on `127.0.0.1`, printed in th
 and prints a link that signs you in to the portal. To share a portal with other people use `scp serve` ([operator
 guide](operator-guide.md)).
 
-You need the `scp` program, the web UI bundle beside it (`web/`, from the release's `scp-web_<version>.tar.gz`; `--web-dir` names it
+You need the full `scp` program (`scp_<version>_<os>_<arch>`; the server build, `scp-server_*` and the container image, does not include `scp personal`), the web UI bundle beside it (`web/`, from the release's `scp-web_<version>.tar.gz`; `--web-dir` names it
 elsewhere) and Node.js on the `PATH`.
 
 ## The first run
@@ -125,6 +131,13 @@ states cover what is yours. Review requests to a team are not expanded to its me
 - **A token that ends**: GitHub tells SCP when a fine-grained token or a code sign-in ends. SCP says so at the next start and signs
   you in again; it does not refresh tokens.
 - **Sign out of GitHub**: revoke the token or the app's authorisation on GitHub, delete `scp.db` and `vault.key`.
+
+## Kept apart from a shared portal
+
+`scp personal` and `scp serve` are two modes of one program, chosen by the command and by nothing in a configuration. A store belongs to
+one of them from its first use (the store records it): `scp serve` refuses a store that `scp personal` made, and `scp personal`
+refuses a shared portal's store, before reading or changing anything, so pointing `--dir` or `store.path` at the other's file cannot
+mix them. Give each its own directory.
 
 ## What it is not
 

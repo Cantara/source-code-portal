@@ -69,22 +69,27 @@ type DB struct {
 	docMu sync.Mutex // one document save at a time: the revision check and the write are one step
 }
 
-// Open opens or creates the store at path. A file that cannot be used is quarantined next to path and a new one created.
+// Open opens or creates the store at path, claiming no mode: tests and tools. The program opens the store with OpenAs. A file that
+// cannot be used is quarantined next to path and a new one created.
 func Open(ctx context.Context, path string, log *slog.Logger) (*DB, error) {
-	db, err := open(ctx, path, log)
+	return openFor(ctx, path, "", log)
+}
+
+func openFor(ctx context.Context, path string, mode Mode, log *slog.Logger) (*DB, error) {
+	db, err := open(ctx, path, mode, log)
 	if err == nil {
 		return &DB{db: db, log: log}, nil
 	}
 	var unusable unusableError
 	if !errors.As(err, &unusable) {
-		return nil, err
+		return nil, err // a store of another mode is not unusable: it is left where it is
 	}
 	moved, qerr := quarantine(path, time.Now())
 	if qerr != nil {
 		return nil, errors.Join(err, qerr)
 	}
 	log.Warn("store unusable; moved aside, starting empty", "err", err, "moved_to", moved)
-	db, err = open(ctx, path, log)
+	db, err = open(ctx, path, mode, log)
 	if err != nil {
 		return nil, err
 	}
@@ -97,9 +102,23 @@ type unusableError struct{ err error }
 func (e unusableError) Error() string { return e.err.Error() }
 func (e unusableError) Unwrap() error { return e.err }
 
-func open(ctx context.Context, path string, log *slog.Logger) (*sql.DB, error) {
+func open(ctx context.Context, path string, mode Mode, log *slog.Logger) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, err
+	}
+	// The mode is judged before anything is migrated or written, from a read-only look at the file (opening it for use would already
+	// switch its journal mode). A file that cannot be read here is left to check, which quarantines it.
+	var mark bool
+	if mode != "" {
+		have, credentials, catalogue, perr := peek(ctx, path)
+		if perr != nil {
+			mark = true
+		} else {
+			var cerr error
+			if mark, cerr = claim(path, have, credentials, catalogue, mode); cerr != nil {
+				return nil, cerr
+			}
+		}
 	}
 	q := url.Values{}
 	for _, p := range []string{"journal_mode(WAL)", "synchronous(NORMAL)", "busy_timeout(5000)", "foreign_keys(1)", "temp_store(MEMORY)"} {
@@ -113,6 +132,13 @@ func open(ctx context.Context, path string, log *slog.Logger) (*sql.DB, error) {
 	if err := check(ctx, db, path, log); err != nil {
 		_ = db.Close()
 		return nil, err
+	}
+	if mark {
+		if _, err := db.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+			modeKey, string(mode)); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
 	}
 	return db, nil
 }

@@ -27,6 +27,15 @@ none of the operator duties below except the network layout.
 - **No public view at all, if you want.** With `access.require_auth: true`, every request without an identity gets 401, and a browser
   is sent to sign in. Only sign-in, `/api/v1/me` (the sign-in methods), `/webhooks/` (signed by GitHub) and `robots.txt` (which then
   disallows everything) stay open.
+- **Modes are kept apart.** The program has two modes, the shared site (`scp serve`) and one person's portal (`scp personal`), chosen
+  by the command that starts the process and by nothing in a configuration or an environment variable. Over HTTP a viewer can only
+  reach the process that is running; no request starts, switches or reaches the other mode. The personal edition's routes (the launch
+  link) exist only in its mode, and a test (`TestEachModeRegistersItsOwnRoutes`) fails if a route appears in the wrong one. A store
+  belongs to its mode from the first use (`meta` key `mode`): each mode refuses the other's store before reading, migrating or writing
+  it, so a personal store (one person's private catalogue and a sealed credential) cannot be served as a site, nor a site's store
+  opened by `scp personal`. The server build (`go build -tags server`, the container image and the `scp-server_*` archives) leaves
+  the personal edition out of the binary altogether: no setup page, GitHub sign-in, vault or keychain code (`TestTheServerBuildHoldsNothingOfThePersonalEdition`).
+  The admin status (`/api/v1/status`) and the start-up log say the mode.
 - **Identity.** A viewer is identified by a session (OIDC sign-in, sealed cookie), a bearer token (`auth.tokens`, compared in constant
   time), or the user and groups headers of an authenticating proxy, believed only from addresses in `server.trusted_proxies` and
   removed from every other request. A credential that names nobody is refused, never served the public view.
@@ -90,7 +99,7 @@ none of the operator duties below except the network layout.
 - Mutual TLS between the proxy and the portal, or rate limiting of its own.
 - Writing to GitHub: the portal reads, and every change stays on GitHub.
 
-## The personal edition
+## The personal edition (experimental)
 
 [`scp personal`](personal-edition.md) runs the same portal for one person, with the same guarantees (a request without that person's
 session sees nothing; the public view never knew the private repositories), and adds a credential held by the portal itself:
@@ -110,7 +119,7 @@ session sees nothing; the public view never knew the private repositories), and 
   (DNS rebinding) or from another origin is refused, bodies are JSON and capped, and its script and style come from the page's own
   address under a strict content security policy. The token a person pastes, receives from GitHub or takes from the GitHub CLI (`gh auth token`, run by the portal on that person's click) stays in the process: the page
   is never sent it back, and it is sealed, not logged, when the setup ends.
-- The shared site is not touched by the personal edition: `scp serve` links the setup page, the GitHub sign-in and the vault only through the personal edition's own files (a test fails on any other import), refuses a configuration whose credential or App key is "in the vault", serves no `/auth/launch` and no `/setup/`, and the personal edition's one-use sign-in link exists only when `scp personal` hands it to the portal it starts.
+- The shared site is not touched by the personal edition: the personal edition's code is imported only by its own files (a test fails on any other import) and is not in the server build at all; `scp serve` refuses a configuration whose credential or App key is "in the vault", refuses a store that `scp personal` made, serves no `/auth/launch` and no `/setup/`, and the personal edition's one-use sign-in link exists only when `scp personal` hands it to the portal it starts.
 - The optional GitHub App of an account is made by GitHub's manifest flow in the person's own browser: the manifest asks for read
   permissions only (taken from the one table of what each feature needs), the page may post it only to the host the person signed
   in to (`form-action`), and GitHub's return carries a random state that works once (the cookie does not travel on a redirect from

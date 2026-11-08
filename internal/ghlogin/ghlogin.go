@@ -4,6 +4,7 @@
 package ghlogin
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,9 +13,11 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
+
+	gh "github.com/google/go-github/v93/github"
+	"golang.org/x/oauth2"
 )
 
 // Host is a GitHub host: where people sign in (Web) and where the REST API is (API, with a trailing slash, as github.sources[].base_url).
@@ -56,12 +59,11 @@ func loopback(host string) bool {
 	return err == nil && a.IsLoopback()
 }
 
-// Client talks to a host. HTTP and Sleep are replaced in tests.
+// Client talks to a host. HTTP and Now are replaced in tests.
 type Client struct {
-	Host  Host
-	HTTP  *http.Client
-	Sleep func(context.Context, time.Duration) error
-	Now   func() time.Time
+	Host Host
+	HTTP *http.Client
+	Now  func() time.Time
 }
 
 func (c *Client) http() *http.Client {
@@ -76,20 +78,6 @@ func (c *Client) now() time.Time {
 		return c.Now()
 	}
 	return time.Now()
-}
-
-func (c *Client) sleep(ctx context.Context, d time.Duration) error {
-	if c.Sleep != nil {
-		return c.Sleep(ctx, d)
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
-	}
 }
 
 // Code is what the device flow shows the person: open VerificationURI and enter UserCode.
@@ -114,113 +102,161 @@ var (
 	ErrExpired = errors.New("ghlogin: the code ran out before the sign-in was confirmed")
 )
 
-func (c *Client) form(ctx context.Context, path string, v url.Values, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Host.Web+path, strings.NewReader(v.Encode()))
-	if err != nil {
-		return err
+// The device flow is RFC 8628, which golang.org/x/oauth2 speaks (the polling, the slow-down, the deadline). GitHub is a public
+// client here: the client id goes in the body, never a secret and never a Basic header.
+func (c *Client) oauth(clientID string) *oauth2.Config {
+	return &oauth2.Config{ClientID: clientID, Endpoint: oauth2.Endpoint{
+		DeviceAuthURL: c.Host.Web + "/login/device/code", TokenURL: c.Host.Web + "/login/oauth/access_token", AuthStyle: oauth2.AuthStyleInParams}}
+}
+
+// tap keeps the error GitHub sends with a success status on the code endpoint ({"error":"incorrect_client_credentials",...}): x/oauth2
+// reads such an answer as a code with nothing in it, and the person needs the reason.
+//
+// It also bounds the request. x/oauth2 never closes the code endpoint's response body, and a body that is never closed keeps the client's
+// timer goroutine until the timeout runs out; so this request has no client timeout, and a context deadline (which the caller
+// cancels on return) bounds it instead. x/oauth2 does not attach its context to this request, so the transport does.
+type tap struct {
+	base         http.RoundTripper
+	ctx          context.Context //nolint:containedctx // the deadline of the one request this transport makes
+	code, reason string
+}
+
+func (t *tap) RoundTrip(r *http.Request) (*http.Response, error) {
+	res, err := t.base.RoundTrip(r.WithContext(t.ctx))
+	if err == nil && res.StatusCode >= 200 && res.StatusCode <= 299 {
+		res.Body = &tapBody{ReadCloser: res.Body, t: t} // the same body, read through: x/oauth2 never closes it, and a copy would hide that from the client's timer
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	res, err := c.http().Do(req)
-	if err != nil {
-		return err
+	return res, err
+}
+
+// tapBody passes the answer on as it is read and, at its end, keeps the error it carries.
+type tapBody struct {
+	io.ReadCloser
+	t    *tap
+	seen bytes.Buffer
+	done bool
+}
+
+func (b *tapBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if room := 1<<16 - b.seen.Len(); room > 0 {
+		b.seen.Write(p[:min(n, room)])
 	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<16))
-	if err != nil {
-		return err
+	if errors.Is(err, io.EOF) && !b.done {
+		b.done = true
+		var e struct {
+			Error       string `json:"error"`
+			Description string `json:"error_description"`
+		}
+		if json.Unmarshal(b.seen.Bytes(), &e) == nil {
+			b.t.code, b.t.reason = e.Error, e.Description
+		}
 	}
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s answered %d", c.Host.Web+path, res.StatusCode)
+	return n, err
+}
+
+// asJSON asks for JSON, which is what GitHub answers the poll in only when asked (x/oauth2 does not ask on the token endpoint).
+type asJSON struct{ base http.RoundTripper }
+
+func (a asJSON) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("Accept", "application/json")
+	return a.base.RoundTrip(r)
+}
+
+// declined words an error answer of the host. GitHub answers a client id it does not know with 404 and {"error":"Not Found"}
+// (observed on github.com, 2026-11-08), which says nothing to the person.
+func declined(re *oauth2.RetrieveError) error {
+	if re.Response != nil && re.Response.StatusCode == http.StatusNotFound {
+		return errors.New("ghlogin: the host does not know this client id (check it, and that it belongs to this host)")
 	}
-	return json.Unmarshal(body, out)
+	return refusal(re.ErrorCode, re.ErrorDescription)
+}
+
+func refusal(code, reason string) error {
+	if reason == "" {
+		return errors.New(code)
+	}
+	return fmt.Errorf("%s: %s", code, reason)
 }
 
 // StartDevice asks the host for a device code for the OAuth app or GitHub App clientID with scope (space-separated; empty for a GitHub
 // App, whose permissions are its own).
 func (c *Client) StartDevice(ctx context.Context, clientID, scope string) (Code, error) {
-	var r struct {
-		DeviceCode      string `json:"device_code"`
-		UserCode        string `json:"user_code"`
-		VerificationURI string `json:"verification_uri"`
-		ExpiresIn       int    `json:"expires_in"`
-		Interval        int    `json:"interval"`
-		Error           string `json:"error"`
-		Description     string `json:"error_description"`
+	hc := *c.http()
+	limit := hc.Timeout
+	if limit <= 0 { // a client handed in without one
+		limit = 20 * time.Second
 	}
-	v := url.Values{"client_id": {clientID}}
-	if scope != "" {
-		v.Set("scope", scope)
+	ctx, cancel := context.WithTimeout(ctx, limit)
+	defer cancel()
+	t := &tap{base: c.base(), ctx: ctx}
+	hc.Transport, hc.Timeout = t, 0
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, &hc)
+	var opts []oauth2.AuthCodeOption
+	if scope != "" { // on the request for the code only: the polls carry none
+		opts = append(opts, oauth2.SetAuthURLParam("scope", scope))
 	}
-	if err := c.form(ctx, "/login/device/code", v, &r); err != nil {
+	da, err := c.oauth(clientID).DeviceAuth(ctx, opts...)
+	if re := new(oauth2.RetrieveError); errors.As(err, &re) {
+		return Code{}, declined(re)
+	} else if err != nil {
 		return Code{}, err
 	}
-	if r.Error != "" {
-		return Code{}, fmt.Errorf("%s: %s", r.Error, r.Description)
+	if t.code != "" {
+		return Code{}, refusal(t.code, t.reason)
 	}
-	if r.DeviceCode == "" || r.UserCode == "" || r.VerificationURI == "" {
+	if da.DeviceCode == "" || da.UserCode == "" || da.VerificationURI == "" {
 		return Code{}, errors.New("ghlogin: the host sent no device code")
 	}
-	if u, err := url.Parse(r.VerificationURI); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+	if u, err := url.Parse(da.VerificationURI); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 		return Code{}, errors.New("ghlogin: the host sent a verification address that is not a web address")
 	}
-	if r.Interval < 1 {
-		r.Interval = 5
+	interval, expires := time.Duration(da.Interval)*time.Second, time.Until(da.Expiry)
+	if interval < time.Second {
+		interval = 5 * time.Second
 	}
-	if r.ExpiresIn < 1 {
-		r.ExpiresIn = 900
+	if da.Expiry.IsZero() {
+		expires = 15 * time.Minute
 	}
-	return Code{DeviceCode: r.DeviceCode, UserCode: r.UserCode, VerificationURI: r.VerificationURI,
-		Interval: time.Duration(r.Interval) * time.Second, Expires: c.now().Add(time.Duration(r.ExpiresIn) * time.Second)}, nil
+	return Code{DeviceCode: da.DeviceCode, UserCode: da.UserCode, VerificationURI: da.VerificationURI, Interval: interval, Expires: c.now().Add(expires)}, nil
 }
 
-// WaitDevice polls until the person confirms, denies or the code ends. It waits the host's interval and slows down when told to.
+// WaitDevice polls until the person confirms, denies or the code ends. x/oauth2 waits the host's interval and slows down when told to.
 func (c *Client) WaitDevice(ctx context.Context, clientID string, code Code) (Token, error) {
-	interval := code.Interval
-	for {
-		if err := c.sleep(ctx, interval); err != nil {
-			return Token{}, err
-		}
-		if !c.now().Before(code.Expires) {
-			return Token{}, ErrExpired
-		}
-		var r struct {
-			AccessToken string `json:"access_token"`
-			Scope       string `json:"scope"`
-			ExpiresIn   int    `json:"expires_in"`
-			Error       string `json:"error"`
-			Description string `json:"error_description"`
-			Interval    int    `json:"interval"`
-		}
-		err := c.form(ctx, "/login/oauth/access_token", url.Values{"client_id": {clientID}, "device_code": {code.DeviceCode},
-			"grant_type": {"urn:ietf:params:oauth:grant-type:device_code"}}, &r)
-		if err != nil {
-			return Token{}, err
-		}
-		switch r.Error {
-		case "":
-			if r.AccessToken == "" {
-				return Token{}, errors.New("ghlogin: the host sent no token")
-			}
-			t := Token{Value: r.AccessToken, Scopes: r.Scope}
-			if r.ExpiresIn > 0 {
-				t.Expires = c.now().Add(time.Duration(r.ExpiresIn) * time.Second)
-			}
-			return t, nil
-		case "authorization_pending":
-		case "slow_down":
-			interval += 5 * time.Second
-			if r.Interval > 0 {
-				interval = time.Duration(r.Interval) * time.Second
-			}
-		case "access_denied":
-			return Token{}, ErrDenied
-		case "expired_token":
-			return Token{}, ErrExpired
-		default:
-			return Token{}, fmt.Errorf("%s: %s", r.Error, r.Description)
-		}
+	left := code.Expires.Sub(c.now())
+	if left <= 0 {
+		return Token{}, ErrExpired
 	}
+	hc := *c.http()
+	hc.Transport = asJSON{c.base()}
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, &hc)
+	da := &oauth2.DeviceAuthResponse{DeviceCode: code.DeviceCode, Interval: int64(code.Interval / time.Second), Expiry: time.Now().Add(left)}
+	tok, err := c.oauth(clientID).DeviceAccessToken(ctx, da)
+	if err != nil {
+		if re := new(oauth2.RetrieveError); errors.As(err, &re) {
+			switch re.ErrorCode {
+			case "access_denied":
+				return Token{}, ErrDenied
+			case "expired_token", "token_expired": // GitHub's own page spells it both ways
+				return Token{}, ErrExpired
+			}
+			return Token{}, declined(re)
+		}
+		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) { // the code's own deadline, not the caller's
+			return Token{}, ErrExpired
+		}
+		return Token{}, err
+	}
+	out := Token{Value: tok.AccessToken}
+	out.Scopes, _ = tok.Extra("scope").(string)
+	switch {
+	case tok.ExpiresIn > 0:
+		out.Expires = c.now().Add(time.Duration(tok.ExpiresIn) * time.Second)
+	case !tok.Expiry.IsZero(): // the host answered in the form encoding
+		out.Expires = c.now().Add(time.Until(tok.Expiry))
+	}
+	return out, nil
 }
 
 // User is who a token is.
@@ -229,51 +265,99 @@ type User struct {
 	Expires time.Time // when the token ends, if the host says (fine-grained tokens do)
 }
 
-func (c *Client) get(ctx context.Context, token, path string, out any) (http.Header, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Host.API+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	res, err := c.http().Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-	if err != nil {
-		return nil, err
-	}
-	switch res.StatusCode {
-	case http.StatusOK:
-	case http.StatusUnauthorized:
-		return nil, ErrBadToken
-	default:
-		return nil, fmt.Errorf("%s answered %d", path, res.StatusCode)
-	}
-	return res.Header, json.Unmarshal(body, out)
-}
-
 // ErrBadToken is returned when the host does not accept the token.
 var ErrBadToken = errors.New("ghlogin: the host does not accept this token")
 
+const (
+	userAgent    = "source-code-portal-setup"
+	maxAnswer    = 4 << 20 // the most the host may send in one answer
+	maxOrgPages  = 5
+	pageSize     = 100
+	tokenEndFmt  = "2006-01-02 15:04:05 MST" // the header github-authentication-token-expiration: "2026-12-01 10:00:00 UTC"
+	tokenEndName = "github-authentication-token-expiration"
+)
+
+var errTooLarge = errors.New("ghlogin: the host's answer is larger than the setup reads")
+
+// capped bounds what a host (one the person typed in) can make the setup read in one answer; go-github does not.
+type capped struct{ base http.RoundTripper }
+
+func (c capped) RoundTrip(r *http.Request) (*http.Response, error) {
+	res, err := c.base.RoundTrip(r)
+	if err == nil {
+		res.Body = &limited{ReadCloser: res.Body, left: maxAnswer}
+	}
+	return res, err
+}
+
+type limited struct {
+	io.ReadCloser
+	left int64
+}
+
+func (l *limited) Read(p []byte) (int, error) {
+	if l.left < 0 {
+		return 0, errTooLarge
+	}
+	if int64(len(p)) > l.left+1 {
+		p = p[:l.left+1]
+	}
+	n, err := l.ReadCloser.Read(p)
+	l.left -= int64(n)
+	if l.left < 0 {
+		return n, errTooLarge
+	}
+	return n, err
+}
+
+// base is the transport every call goes through: the one the caller gave, else the default.
+func (c *Client) base() http.RoundTripper {
+	if t := c.http().Transport; t != nil {
+		return t
+	}
+	return http.DefaultTransport
+}
+
+// api is go-github's client for the host, over rt (the base transport, or an App's), with token when there is one. Its answers are bounded.
+func (c *Client) api(rt http.RoundTripper, token string) (*gh.Client, error) {
+	opts := []gh.ClientOptionsFunc{
+		gh.WithHTTPClient(&http.Client{Transport: capped{rt}, Timeout: c.http().Timeout}),
+		gh.WithUserAgent(userAgent),
+		gh.WithURLs(&c.Host.API, &c.Host.API),
+	}
+	if token != "" {
+		opts = append(opts, gh.WithAuthToken(token))
+	}
+	return gh.NewClient(opts...)
+}
+
+// asToken is the client for a person's token.
+func (c *Client) asToken(token string) (*gh.Client, error) { return c.api(c.base(), token) }
+
+// failure turns what go-github returns into this package's errors: a 401 is a token the host does not accept.
+func failure(err error) error {
+	if er := new(gh.ErrorResponse); errors.As(err, &er) && er.Response != nil && er.Response.StatusCode == http.StatusUnauthorized {
+		return ErrBadToken
+	}
+	return err
+}
+
 // Whoami asks the host who the token is (GET /user).
 func (c *Client) Whoami(ctx context.Context, token string) (User, error) {
-	var u struct {
-		Login string `json:"login"`
-	}
-	h, err := c.get(ctx, token, "user", &u)
+	cl, err := c.asToken(token)
 	if err != nil {
 		return User{}, err
 	}
-	if u.Login == "" {
+	u, res, err := cl.Users.Get(ctx, "")
+	if err != nil {
+		return User{}, failure(err)
+	}
+	if u.GetLogin() == "" {
 		return User{}, errors.New("ghlogin: the host named no user")
 	}
-	out := User{Login: u.Login}
-	if e := h.Get("github-authentication-token-expiration"); e != "" { // "2026-12-01 10:00:00 UTC"
-		if t, err := time.Parse("2006-01-02 15:04:05 MST", e); err == nil {
+	out := User{Login: u.GetLogin()}
+	if e := res.Header.Get(tokenEndName); e != "" {
+		if t, err := time.Parse(tokenEndFmt, e); err == nil {
 			out.Expires = t.UTC()
 		}
 	}
@@ -282,18 +366,20 @@ func (c *Client) Whoami(ctx context.Context, token string) (User, error) {
 
 // Orgs lists the organisations the token reaches (GET /user/orgs, up to 5 pages of 100), by login.
 func (c *Client) Orgs(ctx context.Context, token string) ([]string, error) {
+	cl, err := c.asToken(token)
+	if err != nil {
+		return nil, err
+	}
 	var logins []string
-	for page := 1; page <= 5; page++ {
-		var r []struct {
-			Login string `json:"login"`
-		}
-		if _, err := c.get(ctx, token, "user/orgs?per_page=100&page="+strconv.Itoa(page), &r); err != nil {
-			return nil, err
+	for page := 1; page <= maxOrgPages; page++ {
+		r, _, err := cl.Organizations.List(ctx, "", &gh.ListOptions{PerPage: pageSize, Page: page})
+		if err != nil {
+			return nil, failure(err)
 		}
 		for _, o := range r {
-			logins = append(logins, o.Login)
+			logins = append(logins, o.GetLogin())
 		}
-		if len(r) < 100 {
+		if len(r) < pageSize {
 			break
 		}
 	}
@@ -302,13 +388,15 @@ func (c *Client) Orgs(ctx context.Context, token string) ([]string, error) {
 
 // Newest names the repository the token's account pushed to last (GET /user/repos), "" when there is none.
 func (c *Client) Newest(ctx context.Context, token string) (string, error) {
-	var r []struct {
-		Name string `json:"name"`
-	}
-	if _, err := c.get(ctx, token, "user/repos?sort=pushed&per_page=1", &r); err != nil || len(r) == 0 {
+	cl, err := c.asToken(token)
+	if err != nil {
 		return "", err
 	}
-	return r[0].Name, nil
+	r, _, err := cl.Repositories.ListByAuthenticatedUser(ctx, &gh.RepositoryListByAuthenticatedUserOptions{Sort: "pushed", ListOptions: gh.ListOptions{PerPage: 1}})
+	if err != nil || len(r) == 0 {
+		return "", failure(err)
+	}
+	return r[0].GetName(), nil
 }
 
 // Repo is a repository the token can read, as the setup page lists it.
@@ -328,59 +416,58 @@ const MaxPerAccount = 2000
 // (the public ones and the private ones it owns or, for an organisation, holds); 0 when the host gives no count. self is the
 // token's own account (GET /user), else an organisation.
 func (c *Client) AccountSize(ctx context.Context, token, account string, self bool) (int, error) {
-	var r struct {
-		Public       int `json:"public_repos"`
-		OwnedPrivate int `json:"owned_private_repos"`
-		TotalPrivate int `json:"total_private_repos"`
-	}
-	path := "orgs/" + url.PathEscape(account)
-	if self {
-		path = "user"
-	}
-	if _, err := c.get(ctx, token, path, &r); err != nil {
+	cl, err := c.asToken(token)
+	if err != nil {
 		return 0, err
 	}
-	private := r.TotalPrivate
+	var public int
+	var private int64
 	if self {
-		private = r.OwnedPrivate
+		u, _, err := cl.Users.Get(ctx, "")
+		if err != nil {
+			return 0, failure(err)
+		}
+		public, private = u.GetPublicRepos(), u.GetOwnedPrivateRepos()
+	} else {
+		o, _, err := cl.Organizations.Get(ctx, account)
+		if err != nil {
+			return 0, failure(err)
+		}
+		public, private = o.GetPublicRepos(), o.GetTotalPrivateRepos()
 	}
-	return r.Public + private, nil
+	return public + int(private), nil
 }
 
 // AccountRepos lists the repositories of one account that the token can read, the most recently pushed first, up to
 // MaxPerAccount, and tells progress how many it has after each page. self is the token's own account (the repositories it owns:
 // GET /user/repos), else an organisation (GET /orgs/{org}/repos). more is true when there were more than the ceiling.
 func (c *Client) AccountRepos(ctx context.Context, token, account string, self bool, progress func(n int)) (repos []Repo, more bool, err error) {
-	for page := 1; page <= MaxPerAccount/100; page++ {
-		var r []struct {
-			Name     string   `json:"name"`
-			Private  bool     `json:"private"`
-			Fork     bool     `json:"fork"`
-			Archived bool     `json:"archived"`
-			Pushed   string   `json:"pushed_at"`
-			Topics   []string `json:"topics"`
-			Owner    struct {
-				Login string `json:"login"`
-			} `json:"owner"`
-		}
-		path := "orgs/" + url.PathEscape(account) + "/repos?type=all&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+	cl, err := c.asToken(token)
+	if err != nil {
+		return nil, false, err
+	}
+	for page := 1; page <= MaxPerAccount/pageSize; page++ {
+		lo := gh.ListOptions{PerPage: pageSize, Page: page}
+		var r []*gh.Repository
 		if self {
-			path = "user/repos?affiliation=owner&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+			r, _, err = cl.Repositories.ListByAuthenticatedUser(ctx, &gh.RepositoryListByAuthenticatedUserOptions{Affiliation: "owner", Sort: "pushed", ListOptions: lo})
+		} else {
+			r, _, err = cl.Repositories.ListByOrg(ctx, account, &gh.RepositoryListByOrgOptions{Type: "all", Sort: "pushed", ListOptions: lo})
 		}
-		if _, err := c.get(ctx, token, path, &r); err != nil {
-			return nil, false, err
+		if err != nil {
+			return nil, false, failure(err)
 		}
 		for _, x := range r {
-			if x.Name == "" || x.Owner.Login == "" {
+			if x.GetName() == "" || x.GetOwner().GetLogin() == "" {
 				continue
 			}
-			pushed, _ := time.Parse(time.RFC3339, x.Pushed)
-			repos = append(repos, Repo{Owner: x.Owner.Login, Name: x.Name, Private: x.Private, Fork: x.Fork, Archived: x.Archived, Pushed: pushed, Topics: x.Topics})
+			repos = append(repos, Repo{Owner: x.GetOwner().GetLogin(), Name: x.GetName(), Private: x.GetPrivate(), Fork: x.GetFork(), Archived: x.GetArchived(),
+				Pushed: x.GetPushedAt().Time, Topics: x.Topics})
 		}
 		if progress != nil {
 			progress(len(repos))
 		}
-		if len(r) < 100 {
+		if len(r) < pageSize {
 			return repos, false, nil
 		}
 	}
