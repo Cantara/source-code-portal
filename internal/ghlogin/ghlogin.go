@@ -12,9 +12,10 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
+
+	gh "github.com/google/go-github/v93/github"
 )
 
 // Host is a GitHub host: where people sign in (Web) and where the REST API is (API, with a trailing slash, as github.sources[].base_url).
@@ -229,51 +230,99 @@ type User struct {
 	Expires time.Time // when the token ends, if the host says (fine-grained tokens do)
 }
 
-func (c *Client) get(ctx context.Context, token, path string, out any) (http.Header, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Host.API+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	res, err := c.http().Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-	if err != nil {
-		return nil, err
-	}
-	switch res.StatusCode {
-	case http.StatusOK:
-	case http.StatusUnauthorized:
-		return nil, ErrBadToken
-	default:
-		return nil, fmt.Errorf("%s answered %d", path, res.StatusCode)
-	}
-	return res.Header, json.Unmarshal(body, out)
-}
-
 // ErrBadToken is returned when the host does not accept the token.
 var ErrBadToken = errors.New("ghlogin: the host does not accept this token")
 
+const (
+	userAgent    = "source-code-portal-setup"
+	maxAnswer    = 4 << 20 // the most the host may send in one answer
+	maxOrgPages  = 5
+	pageSize     = 100
+	tokenEndFmt  = "2006-01-02 15:04:05 MST" // the header github-authentication-token-expiration: "2026-12-01 10:00:00 UTC"
+	tokenEndName = "github-authentication-token-expiration"
+)
+
+var errTooLarge = errors.New("ghlogin: the host's answer is larger than the setup reads")
+
+// capped bounds what a host (one the person typed in) can make the setup read in one answer; go-github does not.
+type capped struct{ base http.RoundTripper }
+
+func (c capped) RoundTrip(r *http.Request) (*http.Response, error) {
+	res, err := c.base.RoundTrip(r)
+	if err == nil {
+		res.Body = &limited{ReadCloser: res.Body, left: maxAnswer}
+	}
+	return res, err
+}
+
+type limited struct {
+	io.ReadCloser
+	left int64
+}
+
+func (l *limited) Read(p []byte) (int, error) {
+	if l.left < 0 {
+		return 0, errTooLarge
+	}
+	if int64(len(p)) > l.left+1 {
+		p = p[:l.left+1]
+	}
+	n, err := l.ReadCloser.Read(p)
+	l.left -= int64(n)
+	if l.left < 0 {
+		return n, errTooLarge
+	}
+	return n, err
+}
+
+// base is the transport every call goes through: the one the caller gave, else the default.
+func (c *Client) base() http.RoundTripper {
+	if t := c.http().Transport; t != nil {
+		return t
+	}
+	return http.DefaultTransport
+}
+
+// api is go-github's client for the host, over rt (the base transport, or an App's), with token when there is one. Its answers are bounded.
+func (c *Client) api(rt http.RoundTripper, token string) (*gh.Client, error) {
+	opts := []gh.ClientOptionsFunc{
+		gh.WithHTTPClient(&http.Client{Transport: capped{rt}, Timeout: c.http().Timeout}),
+		gh.WithUserAgent(userAgent),
+		gh.WithURLs(&c.Host.API, &c.Host.API),
+	}
+	if token != "" {
+		opts = append(opts, gh.WithAuthToken(token))
+	}
+	return gh.NewClient(opts...)
+}
+
+// asToken is the client for a person's token.
+func (c *Client) asToken(token string) (*gh.Client, error) { return c.api(c.base(), token) }
+
+// failure turns what go-github returns into this package's errors: a 401 is a token the host does not accept.
+func failure(err error) error {
+	if er := new(gh.ErrorResponse); errors.As(err, &er) && er.Response != nil && er.Response.StatusCode == http.StatusUnauthorized {
+		return ErrBadToken
+	}
+	return err
+}
+
 // Whoami asks the host who the token is (GET /user).
 func (c *Client) Whoami(ctx context.Context, token string) (User, error) {
-	var u struct {
-		Login string `json:"login"`
-	}
-	h, err := c.get(ctx, token, "user", &u)
+	cl, err := c.asToken(token)
 	if err != nil {
 		return User{}, err
 	}
-	if u.Login == "" {
+	u, res, err := cl.Users.Get(ctx, "")
+	if err != nil {
+		return User{}, failure(err)
+	}
+	if u.GetLogin() == "" {
 		return User{}, errors.New("ghlogin: the host named no user")
 	}
-	out := User{Login: u.Login}
-	if e := h.Get("github-authentication-token-expiration"); e != "" { // "2026-12-01 10:00:00 UTC"
-		if t, err := time.Parse("2006-01-02 15:04:05 MST", e); err == nil {
+	out := User{Login: u.GetLogin()}
+	if e := res.Header.Get(tokenEndName); e != "" {
+		if t, err := time.Parse(tokenEndFmt, e); err == nil {
 			out.Expires = t.UTC()
 		}
 	}
@@ -282,18 +331,20 @@ func (c *Client) Whoami(ctx context.Context, token string) (User, error) {
 
 // Orgs lists the organisations the token reaches (GET /user/orgs, up to 5 pages of 100), by login.
 func (c *Client) Orgs(ctx context.Context, token string) ([]string, error) {
+	cl, err := c.asToken(token)
+	if err != nil {
+		return nil, err
+	}
 	var logins []string
-	for page := 1; page <= 5; page++ {
-		var r []struct {
-			Login string `json:"login"`
-		}
-		if _, err := c.get(ctx, token, "user/orgs?per_page=100&page="+strconv.Itoa(page), &r); err != nil {
-			return nil, err
+	for page := 1; page <= maxOrgPages; page++ {
+		r, _, err := cl.Organizations.List(ctx, "", &gh.ListOptions{PerPage: pageSize, Page: page})
+		if err != nil {
+			return nil, failure(err)
 		}
 		for _, o := range r {
-			logins = append(logins, o.Login)
+			logins = append(logins, o.GetLogin())
 		}
-		if len(r) < 100 {
+		if len(r) < pageSize {
 			break
 		}
 	}
@@ -302,13 +353,15 @@ func (c *Client) Orgs(ctx context.Context, token string) ([]string, error) {
 
 // Newest names the repository the token's account pushed to last (GET /user/repos), "" when there is none.
 func (c *Client) Newest(ctx context.Context, token string) (string, error) {
-	var r []struct {
-		Name string `json:"name"`
-	}
-	if _, err := c.get(ctx, token, "user/repos?sort=pushed&per_page=1", &r); err != nil || len(r) == 0 {
+	cl, err := c.asToken(token)
+	if err != nil {
 		return "", err
 	}
-	return r[0].Name, nil
+	r, _, err := cl.Repositories.ListByAuthenticatedUser(ctx, &gh.RepositoryListByAuthenticatedUserOptions{Sort: "pushed", ListOptions: gh.ListOptions{PerPage: 1}})
+	if err != nil || len(r) == 0 {
+		return "", failure(err)
+	}
+	return r[0].GetName(), nil
 }
 
 // Repo is a repository the token can read, as the setup page lists it.
@@ -328,59 +381,58 @@ const MaxPerAccount = 2000
 // (the public ones and the private ones it owns or, for an organisation, holds); 0 when the host gives no count. self is the
 // token's own account (GET /user), else an organisation.
 func (c *Client) AccountSize(ctx context.Context, token, account string, self bool) (int, error) {
-	var r struct {
-		Public       int `json:"public_repos"`
-		OwnedPrivate int `json:"owned_private_repos"`
-		TotalPrivate int `json:"total_private_repos"`
-	}
-	path := "orgs/" + url.PathEscape(account)
-	if self {
-		path = "user"
-	}
-	if _, err := c.get(ctx, token, path, &r); err != nil {
+	cl, err := c.asToken(token)
+	if err != nil {
 		return 0, err
 	}
-	private := r.TotalPrivate
+	var public int
+	var private int64
 	if self {
-		private = r.OwnedPrivate
+		u, _, err := cl.Users.Get(ctx, "")
+		if err != nil {
+			return 0, failure(err)
+		}
+		public, private = u.GetPublicRepos(), u.GetOwnedPrivateRepos()
+	} else {
+		o, _, err := cl.Organizations.Get(ctx, account)
+		if err != nil {
+			return 0, failure(err)
+		}
+		public, private = o.GetPublicRepos(), o.GetTotalPrivateRepos()
 	}
-	return r.Public + private, nil
+	return public + int(private), nil
 }
 
 // AccountRepos lists the repositories of one account that the token can read, the most recently pushed first, up to
 // MaxPerAccount, and tells progress how many it has after each page. self is the token's own account (the repositories it owns:
 // GET /user/repos), else an organisation (GET /orgs/{org}/repos). more is true when there were more than the ceiling.
 func (c *Client) AccountRepos(ctx context.Context, token, account string, self bool, progress func(n int)) (repos []Repo, more bool, err error) {
-	for page := 1; page <= MaxPerAccount/100; page++ {
-		var r []struct {
-			Name     string   `json:"name"`
-			Private  bool     `json:"private"`
-			Fork     bool     `json:"fork"`
-			Archived bool     `json:"archived"`
-			Pushed   string   `json:"pushed_at"`
-			Topics   []string `json:"topics"`
-			Owner    struct {
-				Login string `json:"login"`
-			} `json:"owner"`
-		}
-		path := "orgs/" + url.PathEscape(account) + "/repos?type=all&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+	cl, err := c.asToken(token)
+	if err != nil {
+		return nil, false, err
+	}
+	for page := 1; page <= MaxPerAccount/pageSize; page++ {
+		lo := gh.ListOptions{PerPage: pageSize, Page: page}
+		var r []*gh.Repository
 		if self {
-			path = "user/repos?affiliation=owner&sort=pushed&per_page=100&page=" + strconv.Itoa(page)
+			r, _, err = cl.Repositories.ListByAuthenticatedUser(ctx, &gh.RepositoryListByAuthenticatedUserOptions{Affiliation: "owner", Sort: "pushed", ListOptions: lo})
+		} else {
+			r, _, err = cl.Repositories.ListByOrg(ctx, account, &gh.RepositoryListByOrgOptions{Type: "all", Sort: "pushed", ListOptions: lo})
 		}
-		if _, err := c.get(ctx, token, path, &r); err != nil {
-			return nil, false, err
+		if err != nil {
+			return nil, false, failure(err)
 		}
 		for _, x := range r {
-			if x.Name == "" || x.Owner.Login == "" {
+			if x.GetName() == "" || x.GetOwner().GetLogin() == "" {
 				continue
 			}
-			pushed, _ := time.Parse(time.RFC3339, x.Pushed)
-			repos = append(repos, Repo{Owner: x.Owner.Login, Name: x.Name, Private: x.Private, Fork: x.Fork, Archived: x.Archived, Pushed: pushed, Topics: x.Topics})
+			repos = append(repos, Repo{Owner: x.GetOwner().GetLogin(), Name: x.GetName(), Private: x.GetPrivate(), Fork: x.GetFork(), Archived: x.GetArchived(),
+				Pushed: x.GetPushedAt().Time, Topics: x.Topics})
 		}
 		if progress != nil {
 			progress(len(repos))
 		}
-		if len(r) < 100 {
+		if len(r) < pageSize {
 			return repos, false, nil
 		}
 	}

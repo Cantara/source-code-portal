@@ -2,22 +2,15 @@ package ghlogin
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
+
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	gh "github.com/google/go-github/v93/github"
 )
 
 // The GitHub App of an account (design/sync-modes.md, EV3): the person creates it in their browser from a manifest (GitHub's one-click
@@ -71,83 +64,27 @@ type App struct {
 // ConvertManifest exchanges the code GitHub redirected with for the App (POST /app-manifests/{code}/conversions, unauthenticated: the
 // code is the proof). The webhook secret in the answer is not kept: the portal reads the delivery log, it has no receiver.
 func (c *Client) ConvertManifest(ctx context.Context, code string) (App, error) {
-	if code == "" || strings.ContainsAny(code, "/?#% ") {
+	if code == "" || strings.ContainsAny(code, "/?#% ") { // go-github puts the code into the path as it is
 		return App{}, errors.New("ghlogin: GitHub sent no usable code")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Host.API+"app-manifests/"+code+"/conversions", nil)
+	cl, err := c.api(c.base(), "")
 	if err != nil {
 		return App{}, err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	res, err := c.http().Do(req)
+	cfg, _, err := cl.Apps.CompleteAppManifest(ctx, code)
 	if err != nil {
+		if er := new(gh.ErrorResponse); errors.As(err, &er) && er.Response != nil {
+			return App{}, fmt.Errorf("GitHub answered %d to the App's code (it works once, within an hour)", er.Response.StatusCode)
+		}
 		return App{}, err
 	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-	if err != nil {
-		return App{}, err
-	}
-	if res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusOK {
-		return App{}, fmt.Errorf("GitHub answered %d to the App's code (it works once, within an hour)", res.StatusCode)
-	}
-	var out struct {
-		ID    int64  `json:"id"`
-		Slug  string `json:"slug"`
-		Name  string `json:"name"`
-		PEM   string `json:"pem"`
-		Owner struct {
-			Login string `json:"login"`
-		} `json:"owner"`
-	}
-	if err := json.Unmarshal(body, &out); err != nil {
-		return App{}, err
-	}
-	if out.ID <= 0 || out.Slug == "" || out.PEM == "" {
+	if cfg.GetID() <= 0 || cfg.GetSlug() == "" || cfg.GetPEM() == "" {
 		return App{}, errors.New("ghlogin: GitHub's answer holds no App")
 	}
-	if _, err := signer(out.PEM); err != nil {
-		return App{}, err
+	if _, err := ghinstallation.NewAppsTransport(http.DefaultTransport, cfg.GetID(), []byte(cfg.GetPEM())); err != nil { // the key must be one the portal can sign with
+		return App{}, errors.New("ghlogin: the App's key is not an RSA private key")
 	}
-	return App{ID: out.ID, Slug: out.Slug, Name: out.Name, Owner: out.Owner.Login, Key: out.PEM}, nil
-}
-
-func signer(keyPEM string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(keyPEM))
-	if block == nil {
-		return nil, errors.New("ghlogin: the App's key is not PEM")
-	}
-	if k, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
-		return k, nil
-	}
-	k, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, errors.New("ghlogin: the App's key is not an RSA private key")
-	}
-	rk, ok := k.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("ghlogin: the App's key is not an RSA private key")
-	}
-	return rk, nil
-}
-
-// appJWT is the short-lived token an App speaks with: RS256, issued a minute ago (clock skew), valid for ten minutes.
-func appJWT(appID int64, keyPEM string, now time.Time) (string, error) {
-	key, err := signer(keyPEM)
-	if err != nil {
-		return "", err
-	}
-	enc := base64.RawURLEncoding
-	head := enc.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
-	claims, _ := json.Marshal(map[string]any{"iat": now.Add(-time.Minute).Unix(), "exp": now.Add(9 * time.Minute).Unix(), "iss": strconv.FormatInt(appID, 10)})
-	in := head + "." + enc.EncodeToString(claims)
-	sum := sha256.Sum256([]byte(in))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, sum[:])
-	if err != nil {
-		return "", err
-	}
-	return in + "." + enc.EncodeToString(sig), nil
+	return App{ID: cfg.GetID(), Slug: cfg.GetSlug(), Name: cfg.GetName(), Owner: cfg.GetOwner().GetLogin(), Key: cfg.GetPEM()}, nil
 }
 
 // Installation is an account the App is installed on.
@@ -156,22 +93,30 @@ type Installation struct {
 	Suspended bool
 }
 
-// Installations lists where the App is installed (GET /app/installations, with the App's own token).
+const maxInstallPages = 10
+
+// Installations lists where the App is installed (GET /app/installations, with the App's own token: ghinstallation signs it).
 func (c *Client) Installations(ctx context.Context, appID int64, keyPEM string) ([]Installation, error) {
-	jwt, err := appJWT(appID, keyPEM, c.now())
+	atr, err := ghinstallation.NewAppsTransport(c.base(), appID, []byte(keyPEM))
+	if err != nil {
+		return nil, errors.New("ghlogin: the App's key is not an RSA private key")
+	}
+	cl, err := c.api(atr, "")
 	if err != nil {
 		return nil, err
 	}
-	var raw []struct {
-		Account     struct{ Login string } `json:"account"`
-		SuspendedAt *time.Time             `json:"suspended_at"`
-	}
-	if _, err := c.get(ctx, jwt, "app/installations?per_page=100", &raw); err != nil {
-		return nil, err
-	}
-	out := make([]Installation, len(raw))
-	for i, r := range raw {
-		out[i] = Installation{Account: r.Account.Login, Suspended: r.SuspendedAt != nil}
+	var out []Installation
+	for page := 1; page <= maxInstallPages; page++ {
+		r, _, err := cl.Apps.ListInstallations(ctx, &gh.ListOptions{PerPage: pageSize, Page: page})
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range r {
+			out = append(out, Installation{Account: i.GetAccount().GetLogin(), Suspended: i.SuspendedAt != nil})
+		}
+		if len(r) < pageSize {
+			break
+		}
 	}
 	return out, nil
 }
