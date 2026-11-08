@@ -164,6 +164,15 @@ func (a asJSON) RoundTrip(r *http.Request) (*http.Response, error) {
 	return a.base.RoundTrip(r)
 }
 
+// declined words an error answer of the host. GitHub answers a client id it does not know with 404 and {"error":"Not Found"}
+// (observed on github.com, 2026-11-08), which says nothing to the person.
+func declined(re *oauth2.RetrieveError) error {
+	if re.Response != nil && re.Response.StatusCode == http.StatusNotFound {
+		return errors.New("ghlogin: the host does not know this client id (check it, and that it belongs to this host)")
+	}
+	return refusal(re.ErrorCode, re.ErrorDescription)
+}
+
 func refusal(code, reason string) error {
 	if reason == "" {
 		return errors.New(code)
@@ -189,8 +198,8 @@ func (c *Client) StartDevice(ctx context.Context, clientID, scope string) (Code,
 		opts = append(opts, oauth2.SetAuthURLParam("scope", scope))
 	}
 	da, err := c.oauth(clientID).DeviceAuth(ctx, opts...)
-	if re := new(oauth2.RetrieveError); errors.As(err, &re) && re.ErrorCode != "" {
-		return Code{}, refusal(re.ErrorCode, re.ErrorDescription)
+	if re := new(oauth2.RetrieveError); errors.As(err, &re) {
+		return Code{}, declined(re)
 	} else if err != nil {
 		return Code{}, err
 	}
@@ -229,10 +238,10 @@ func (c *Client) WaitDevice(ctx context.Context, clientID string, code Code) (To
 			switch re.ErrorCode {
 			case "access_denied":
 				return Token{}, ErrDenied
-			case "expired_token":
+			case "expired_token", "token_expired": // GitHub's own page spells it both ways
 				return Token{}, ErrExpired
 			}
-			return Token{}, refusal(re.ErrorCode, re.ErrorDescription)
+			return Token{}, declined(re)
 		}
 		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) { // the code's own deadline, not the caller's
 			return Token{}, ErrExpired

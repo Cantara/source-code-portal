@@ -93,8 +93,13 @@ func (f *fakeHost) routes() {
 		f.mu.Lock()
 		f.scope = r.PostForm.Get("scope")
 		f.mu.Unlock()
-		if r.PostForm.Get("client_id") == "bad" {
-			fmt.Fprint(w, `{"error":"incorrect_client_credentials","error_description":"The client_id is not valid."}`)
+		switch r.PostForm.Get("client_id") {
+		case "bad": // what github.com answers for a client id it does not know (observed): 404 and this body
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, `{"error":"Not Found"}`)
+			return
+		case "disabled": // GitHub's page lists these errors without saying their status; a success status is the worst case for a client
+			fmt.Fprint(w, `{"error":"device_flow_disabled","error_description":"Device Flow must be explicitly enabled for this App."}`)
 			return
 		}
 		fmt.Fprint(w, `{"device_code":"dev123","user_code":"WDJB-MJHT","verification_uri":"https://example/login/device","expires_in":900,"interval":5}`)
@@ -267,12 +272,20 @@ func TestDeviceFlow(t *testing.T) {
 		}
 	})
 	run("a refused client id and an unknown error", []string{`{"error":"unsupported_grant_type","error_description":"no"}`}, func(t *testing.T, _ *fakeHost, c *Client) {
-		// GitHub answers a refusal on the code endpoint with a success status; the reason must reach the person.
-		if _, err := c.StartDevice(ctx, "bad", ""); err == nil || !strings.Contains(err.Error(), "incorrect_client_credentials") || !strings.Contains(err.Error(), "not valid") {
-			t.Errorf("%v", err)
+		if _, err := c.StartDevice(ctx, "bad", ""); err == nil || !strings.Contains(err.Error(), "does not know this client id") {
+			t.Errorf("an unknown client id: %v", err)
+		}
+		if _, err := c.StartDevice(ctx, "disabled", ""); err == nil || !strings.Contains(err.Error(), "device_flow_disabled") || !strings.Contains(err.Error(), "explicitly enabled") {
+			t.Errorf("a refusal sent with a success status must reach the person: %v", err)
 		}
 		code, _ := c.StartDevice(ctx, "id", "")
 		if _, err := c.WaitDevice(ctx, "id", code); err == nil || !strings.Contains(err.Error(), "unsupported_grant_type") {
+			t.Errorf("%v", err)
+		}
+	})
+	run("expired, spelled the other way", []string{`{"error":"token_expired"}`}, func(t *testing.T, _ *fakeHost, c *Client) {
+		code, _ := c.StartDevice(ctx, "id", "")
+		if _, err := c.WaitDevice(ctx, "id", code); !errors.Is(err, ErrExpired) {
 			t.Errorf("%v", err)
 		}
 	})
