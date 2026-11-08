@@ -111,30 +111,48 @@ func (c *Client) oauth(clientID string) *oauth2.Config {
 
 // tap keeps the error GitHub sends with a success status on the code endpoint ({"error":"incorrect_client_credentials",...}): x/oauth2
 // reads such an answer as a code with nothing in it, and the person needs the reason.
+//
+// It also bounds the request. x/oauth2 never closes the code endpoint's response body, and a body that is never closed keeps the client's
+// timer goroutine until the timeout runs out; so this request has no client timeout, and a context deadline (which the caller
+// cancels on return) bounds it instead. x/oauth2 does not attach its context to this request, so the transport does.
 type tap struct {
 	base         http.RoundTripper
+	ctx          context.Context //nolint:containedctx // the deadline of the one request this transport makes
 	code, reason string
 }
 
 func (t *tap) RoundTrip(r *http.Request) (*http.Response, error) {
-	res, err := t.base.RoundTrip(r)
-	if err != nil || res.StatusCode < 200 || res.StatusCode > 299 {
-		return res, err
+	res, err := t.base.RoundTrip(r.WithContext(t.ctx))
+	if err == nil && res.StatusCode >= 200 && res.StatusCode <= 299 {
+		res.Body = &tapBody{ReadCloser: res.Body, t: t} // the same body, read through: x/oauth2 never closes it, and a copy would hide that from the client's timer
 	}
-	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<16))
-	_ = res.Body.Close()
-	if err != nil {
-		return nil, err
+	return res, err
+}
+
+// tapBody passes the answer on as it is read and, at its end, keeps the error it carries.
+type tapBody struct {
+	io.ReadCloser
+	t    *tap
+	seen bytes.Buffer
+	done bool
+}
+
+func (b *tapBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if room := 1<<16 - b.seen.Len(); room > 0 {
+		b.seen.Write(p[:min(n, room)])
 	}
-	var e struct {
-		Error       string `json:"error"`
-		Description string `json:"error_description"`
+	if errors.Is(err, io.EOF) && !b.done {
+		b.done = true
+		var e struct {
+			Error       string `json:"error"`
+			Description string `json:"error_description"`
+		}
+		if json.Unmarshal(b.seen.Bytes(), &e) == nil {
+			b.t.code, b.t.reason = e.Error, e.Description
+		}
 	}
-	if json.Unmarshal(body, &e) == nil {
-		t.code, t.reason = e.Error, e.Description
-	}
-	res.Body = io.NopCloser(bytes.NewReader(body))
-	return res, nil
+	return n, err
 }
 
 // asJSON asks for JSON, which is what GitHub answers the poll in only when asked (x/oauth2 does not ask on the token endpoint).
@@ -157,8 +175,14 @@ func refusal(code, reason string) error {
 // App, whose permissions are its own).
 func (c *Client) StartDevice(ctx context.Context, clientID, scope string) (Code, error) {
 	hc := *c.http()
-	t := &tap{base: c.base()}
-	hc.Transport = t
+	limit := hc.Timeout
+	if limit <= 0 { // a client handed in without one
+		limit = 20 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, limit)
+	defer cancel()
+	t := &tap{base: c.base(), ctx: ctx}
+	hc.Transport, hc.Timeout = t, 0
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, &hc)
 	var opts []oauth2.AuthCodeOption
 	if scope != "" { // on the request for the code only: the polls carry none
