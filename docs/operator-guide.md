@@ -365,19 +365,12 @@ products (each for every product or for chosen ones, in your order), the pull re
 heading with a line of text.
 *Save* keeps the layout for every viewer; *Back to the built-in layout* removes it.
 
-```yaml
-layout:
-  dir: /var/lib/scp/layouts   # writable by the portal; one JSON file per page (dashboard.json)
-```
-
-- Saved layouts live in the store (the SQLite file), so they survive a restart or a crash and are in the store's backup; nothing but the store needs to be writable. "Reset" brings the built-in layout back.
-- The files are the portal's own: keep them with your configuration's backup. They are not in the cache (`store.path`), so deleting the
-  cache never loses a design; deleting `dashboard.json` brings back the built-in layout.
-- A save is written to a temporary file and renamed, so a reader never sees half a layout. Two administrators never overwrite each
-  other: a save based on a layout someone else changed since is refused with an offer to load theirs.
-- Each instance reads the files again within 5 seconds of a change, so several instances share a layout through a shared volume, and a
-  file written by hand or by configuration management is picked up too. A file that does not validate is not served: the last good
-  layout stays, and `/api/v1/status` and the design mode say why.
+Saved layouts (and announcements) live in the store, the SQLite file at `store.path` (section 4, *The store*): they survive a restart or a
+crash, and a save is synced to disk before it is acknowledged. Two administrators never overwrite each other: a save based on a layout
+someone else changed since is refused with an offer to load theirs. A layout that does not validate is not served: the last good one
+stays, and `/api/v1/status` and the design mode say why. Resetting the store loses the saved layouts (back it up first); *Back to the
+built-in layout* removes one. Only an upgrade from a release that kept them in files uses `layout.dir` (section 2, Keys): it is read once at
+the start and then removed from the configuration.
 - A layout names groups, never repositories; a viewer sees only the groups with repositories they may see.
 
 **On a wall.** `/present` is the presentation page for a tablet or a screen beside the team: the fleet's numbers, every repository's
@@ -713,7 +706,8 @@ cluster:
 
 - Give every instance the same configuration and secrets; only `store.path` is each instance's own. A new instance fills its cache from
   the cluster, so in Kubernetes the cache may be an `emptyDir`: drop the claim and `Recreate` from the Deployment above, set `replicas`
-  and use the default rolling update.
+  and use the default rolling update. The layouts and announcements administrators save are kept in the store of the instance that
+  took the request and the cluster does not carry them, so keep the store of the instances that serve administrators on a volume.
 - Hazelcast holds the portal's data (private repositories included when they are admitted) and has no authentication in the
   open-source edition: run it on a private network that only the instances reach.
 - When Hazelcast is unreachable every instance keeps serving its last good data and stays ready, but nothing is refreshed until the
@@ -733,8 +727,29 @@ items *Delayed* or *Update failing*, and retries with backoff. `/readyz` stays 2
 **Stop.** SIGTERM or SIGINT: `/readyz` answers 503, in-flight requests and jobs get `server.shutdown_grace`, the web UI server is
 stopped, the cache is closed and the process exits 0.
 
-**Upgrade.** Replace the binary and the bundle together (or the image tag) and restart. The cache holds only what GitHub can give again: if it is lost, deleted or
-unreadable, the portal rebuilds it like a first start. There is nothing to back up beyond the configuration and the secrets.
+**Upgrade.** Replace the binary and the bundle together (or the image tag) and restart. Most of the store holds only what GitHub can give again: if it is
+lost, deleted or unreadable, the portal rebuilds it like a first start. Back up the configuration, the secrets and the layouts and announcements in the store
+(*The store*, below). A release that replaces the store's schema says so in the changelog; the store of an earlier generation is moved aside and read again from GitHub.
+
+**The store.** The SQLite file at `store.path` (with its `-wal` and `-shm` files beside it while the portal runs) holds:
+
+- what GitHub can give again, and the portal rebuilds on its own: the catalogue, documents, commits, manifests, packages, releases, pull requests, issues and
+  their timers;
+- what the portal was told and has not acted on yet: parked webhook events (the poll behind each subject repairs a lost one);
+- what people save in the portal and GitHub cannot give back: the dashboard and presentation layouts and the announcements administrators write, and in the
+  personal edition the sealed GitHub credential.
+
+*Back up* the third group: stop the portal and copy the three files, or copy a consistent file while it runs (`sqlite3 <store.path> ".backup <copy>"`, or
+`VACUUM INTO '<copy>'`); a plain copy of a running portal's file may miss what is still in the `-wal` file. Everything else comes back from GitHub.
+
+*Reset* a store that misbehaves: stop the portal, move `scp.db` (and `-wal`, `-shm`) aside, start it. The first start is a cold start (above): the pages say the portal is
+loading and fill in as data arrives, and it needs about 5.5 GitHub requests for each repository. The layouts and announcements saved in the moved
+file are not in the new one; move the file back (with the portal stopped) to get them again.
+
+The portal moves a store aside by itself when it cannot use it: a file that is damaged (`quick_check` fails), one of another mode, or one made by an earlier generation
+of the schema (it carries no `SCP1` mark in its header). It is renamed `<store.path>.quarantine-<time>` (the newest two are kept) and a new store is started. Before a
+version migrates a store that holds data, it copies it to `<store.path>.pre-NNNN` (once): to go back, stop, put the copy at `store.path` and start the older
+version. Delete the moved-aside files and copies when the new version has proved itself; they are not read again.
 
 **Rotating the webhook secret.** Set the new secret in `webhook.secret_file` and the old one in `webhook.previous_secret_file`,
 restart, change the secret on GitHub, then remove the previous one.

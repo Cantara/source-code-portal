@@ -172,7 +172,8 @@ The first start reads every repository (with the App, a few minutes for a few hu
 
 - **Upgrade**: change the image tag in `compose.yaml` and run `docker compose up -d`; the cache in `scp-data` carries over and is
   rebuilt from GitHub when it cannot.
-- **Back up**: `scp.yaml`, `compose.yaml`, `Caddyfile` and `secrets/`. The cache needs no backup.
+- **Back up**: `scp.yaml`, `compose.yaml`, `Caddyfile` and `secrets/`, and the store (`scp-data`) if administrators save layouts or announcements in the
+  portal: it holds them, and the rest of it comes back from GitHub (operator guide, section 4, *The store*).
 - **Monitor**: scrape `localhost:9091/metrics`; the operator guide, section 5, lists the alerts worth having.
 - **Rotate** the webhook secret with `webhook.previous_secret_file` (operator guide, section 4); replacing `session-key` signs everyone
   out; removing a token from `auth.tokens` revokes it at the restart.

@@ -88,7 +88,7 @@ spec:
 
 Expose only `public` through the ingress: it must pass `X-Forwarded-For` from an address in `server.trusted_proxies`, accept 25 MiB
 bodies on `/webhooks/github`, and pass `/api/v1/events` unbuffered with a read timeout above 30 seconds. Several instances: add
-`cluster.addresses` (Hazelcast 5), drop the claim and `Recreate`, an `emptyDir` cache, and set `replicas`.
+`cluster.addresses` (Hazelcast 5), drop the claim and `Recreate`, and set `replicas`; the layouts and announcements administrators save stay in the store of the instance that took the request, so keep that store on a volume.
 
 ## A binary under systemd
 
