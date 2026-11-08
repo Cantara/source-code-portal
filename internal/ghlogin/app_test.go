@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestTheVerificationAddressMustBeAWebAddress(t *testing.T) {
@@ -143,5 +144,19 @@ func TestAnAnswerHasALimit(t *testing.T) {
 	c := &Client{Host: h, HTTP: &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}}
 	if _, err := c.Whoami(t.Context(), "t"); err == nil {
 		t.Error("an answer past the limit was read")
+	}
+}
+
+// x/oauth2 never closes the code endpoint's answer, and a client with a timeout keeps a goroutine for every body left open: the package's
+// goleak check fails this test if StartDevice leaves one behind.
+func TestStartingTheDeviceFlowLeavesNothingRunning(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"device_code":"d","user_code":"AAAA-BBBB","verification_uri":"https://example/login/device","expires_in":900,"interval":5}`)
+	}))
+	defer srv.Close()
+	c := &Client{Host: Host{Web: srv.URL, API: srv.URL + "/api/v3/"}, HTTP: &http.Client{Timeout: time.Minute, Transport: &http.Transport{DisableKeepAlives: true}}}
+	if code, err := c.StartDevice(t.Context(), "id", ""); err != nil || code.UserCode != "AAAA-BBBB" {
+		t.Fatalf("%+v %v", code, err)
 	}
 }
