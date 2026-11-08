@@ -1,3 +1,5 @@
+//go:build !server
+
 package main
 
 import (
@@ -131,7 +133,7 @@ func (p *personal) openPage(ctx context.Context, link string) {
 
 // finishSetup writes what the person chose: the sealed credential, personal.yaml (the old one kept as .bak) and the local secrets.
 func (p *personal) finishSetup(ctx context.Context, dir, cfgPath string, key []byte, r setup.Result) (*auth.Launch, error) {
-	st, err := store.Open(ctx, filepath.Join(dir, "scp.db"), slog.New(slog.DiscardHandler))
+	st, err := store.OpenAs(ctx, filepath.Join(dir, "scp.db"), store.Personal, slog.New(slog.DiscardHandler))
 	if err != nil {
 		return nil, err
 	}

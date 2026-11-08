@@ -1,3 +1,5 @@
+//go:build !server
+
 package main
 
 import (
@@ -179,6 +181,7 @@ func (p *personal) run(cmd *cobra.Command, opts *options, d deps) error {
 	if err := p.resolve(ctx, dir, &cfg); err != nil {
 		return failure{err}
 	}
+	d.mode = store.Personal
 	if d.launch = launch; d.launch == nil {
 		if d.launch, err = newLaunch(p.clock()); err != nil {
 			return failure{err}
@@ -229,7 +232,7 @@ func (p *personal) setup(ctx context.Context, dir string) (string, error) {
 	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: a private directory is 0700
 		return "", err
 	}
-	st, err := store.Open(ctx, filepath.Join(dir, "scp.db"), slog.New(slog.DiscardHandler))
+	st, err := store.OpenAs(ctx, filepath.Join(dir, "scp.db"), store.Personal, slog.New(slog.DiscardHandler))
 	if err != nil {
 		return "", err
 	}
@@ -301,7 +304,7 @@ func (p *personal) secrets(dir string) error {
 
 // resolve gives every source that takes its credential from the vault its token.
 func (p *personal) resolve(ctx context.Context, dir string, cfg *config.Config) error {
-	st, err := store.Open(ctx, cfg.Store.Path, slog.New(slog.DiscardHandler))
+	st, err := store.OpenAs(ctx, cfg.Store.Path, store.Personal, slog.New(slog.DiscardHandler))
 	if err != nil {
 		return err
 	}

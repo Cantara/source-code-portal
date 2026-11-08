@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -119,6 +120,8 @@ type (
 
 // server owns the store, the snapshot, the sync engine and the two listeners.
 type server struct {
+	mode              store.Mode // shared or personal: see deps.mode
+	routes            []string   // the patterns of the routes the features and sign-in add, sorted: the tests compare them between modes
 	log               *slog.Logger
 	grace             time.Duration
 	store             *store.DB
@@ -145,6 +148,10 @@ type deps struct {
 	public     map[string]string
 	cluster    func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
 	launch     *auth.Launch                                   // the personal edition's one-use sign-in link
+	// mode is what this process is, set by the command that starts it and by nothing in a configuration: the zero value is the shared
+	// site (scp serve), scp personal says store.Personal. The store is opened for it, and the personal edition's parts are wired
+	// only in it.
+	mode store.Mode
 }
 
 // vaultResolved refuses a source whose credential is in the vault of scp personal and was not resolved: serve reads files.
@@ -162,6 +169,10 @@ func vaultResolved(cfg config.Config) error {
 
 // newServer opens the store, wires the features and binds both listeners.
 func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger) (_ *server, err error) {
+	mode := cmp.Or(d.mode, store.Shared)
+	if d.launch != nil && mode != store.Personal { // a launch link signs in without a secret of the portal's: only one person's portal has it
+		return nil, errors.New("a launch link belongs to scp personal")
+	}
 	if err := vaultResolved(cfg); err != nil {
 		return nil, err
 	}
@@ -194,8 +205,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if f.Issues {
 		indexers = append(indexers, issues.Feeds())
 	}
-	s := &server{log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log, indexers...)}
-	if s.store, err = store.Open(ctx, cfg.Store.Path, log); err != nil {
+	s := &server{mode: mode, log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log, indexers...)}
+	if s.store, err = store.OpenAs(ctx, cfg.Store.Path, mode, log); err != nil {
 		return nil, err
 	}
 	defer func() {
@@ -279,7 +290,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	feed := cfg.Webhook.Secret.IsSet() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
-	st := &status{ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
+	st := &status{mode: string(mode), ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		cadence: s.engine.Cadence, webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
 		deliveries: map[string]int{}}
 	st.polled = map[string]bool{}
@@ -373,6 +384,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}
+	for _, r := range routes {
+		s.routes = append(s.routes, r.Pattern)
+	}
+	slices.Sort(s.routes)
 	s.public = httpapi.Server(httpapi.Public(opts, opts.Pages(upstream), contract.OpenAPI, features, routes...), log)
 	s.public.RegisterOnShutdown(events.Close)
 	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
@@ -584,7 +599,7 @@ func (s *server) run(ctx context.Context) error {
 		srv  *http.Server
 		ln   net.Listener
 	}{{"public", s.public, s.publicLn}, {"admin", s.admin, s.adminLn}} {
-		s.log.Info("listening", "listener", p.name, "addr", p.ln.Addr().String())
+		s.log.Info("listening", "mode", string(s.mode), "listener", p.name, "addr", p.ln.Addr().String())
 		go func() { errc <- p.srv.Serve(p.ln) }()
 	}
 

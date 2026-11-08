@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -107,5 +108,55 @@ func TestSharedSiteDoesNotLinkThePersonalEdition(t *testing.T) {
 				t.Errorf("%s imports %s: only personal*.go may", f, path)
 			}
 		}
+	}
+}
+
+// TestTheServerBuildHoldsNothingOfThePersonalEdition: built with -tags server (the container image, a server archive) the program
+// links none of the personal edition: not its setup page, its sign-in to GitHub, its vault, nor the libraries only they use (the
+// keychain, the terminal). The full build, which has all of them, is the control: if it stopped having them the test would prove nothing.
+func TestTheServerBuildHoldsNothingOfThePersonalEdition(t *testing.T) {
+	deps := func(tags ...string) []string {
+		args := append([]string{"list"}, tags...)
+		out, err := exec.CommandContext(t.Context(), "go", append(args, "-deps", "-f", "{{.ImportPath}}", ".")...).Output()
+		if err != nil {
+			t.Fatalf("go list: %v", err)
+		}
+		return strings.Fields(string(out))
+	}
+	onlyPersonal := []string{internalPrefix + "setup", internalPrefix + "ghlogin", internalPrefix + "vault", "github.com/zalando/go-keyring", "golang.org/x/term"}
+	full, server := deps(), deps("-tags", "server")
+	for _, p := range onlyPersonal {
+		if !slices.Contains(full, p) {
+			t.Errorf("the full build does not link %s: the control is empty", p)
+		}
+		if slices.Contains(server, p) {
+			t.Errorf("the server build links %s", p)
+		}
+	}
+}
+
+// TestTheProgramOpensTheStoreForAMode: store.Open claims no mode and is for tests; everything the program runs opens the store with
+// store.OpenAs, so a store of the other mode is always refused (internal/store/mode.go).
+func TestTheProgramOpensTheStoreForAMode(t *testing.T) {
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	opened := 0
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(b), "store.Open(") {
+			t.Errorf("%s opens the store without a mode: use store.OpenAs", f)
+		}
+		opened += strings.Count(string(b), "store.OpenAs(")
+	}
+	if opened < 3 {
+		t.Errorf("only %d store.OpenAs calls found: the check is looking in the wrong place", opened)
 	}
 }

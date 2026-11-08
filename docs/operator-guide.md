@@ -622,6 +622,11 @@ tar xzf scp_2.0.0_linux_amd64.tar.gz && tar xzf scp-web_2.0.0.tar.gz   # the bun
 ./scp config check -c scp.yaml && SCP_WEB_DIR=bundle ./scp serve -c scp.yaml
 ```
 
+For a shared portal you can take `scp-server_<version>_linux_<arch>.tar.gz` instead (Linux, amd64 and arm64): the same program built
+with `-tags server`, which leaves out `scp personal` (its setup page, its sign-in to GitHub, its vault and the keychain libraries are not
+in the binary; `scp personal` there only says so). The container image is this build. The `scp_<version>_<os>_<arch>` archives are
+the full build, as before.
+
 `scp serve` starts the bundle's server (`node server.js`) on a free loopback port, passes it nothing from its own environment,
 restarts it when it exits or when the bundle is replaced (so a new bundle can be unpacked in place), and stops it at shutdown; its output appears in the log with `component=web`. Every page goes through `scp`,
 so the public listener stays the one address to expose.

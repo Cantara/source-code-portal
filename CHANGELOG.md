@@ -6,6 +6,8 @@ subjects.
 
 ## Unreleased
 
+- **The modes are kept apart**: `scp serve` (the shared site) and `scp personal` are chosen by the command and nothing in a configuration. A store now belongs to one of them from its first use and each refuses the other's before touching it (an existing site's store is claimed as shared on its next start; nothing else changes for it). The admin status and the start-up log say the mode. A new server build (`go build -tags server`, `make server`) leaves `scp personal` out of the binary altogether; the container image is that build, and the release adds `scp-server_<version>_linux_<arch>` archives next to the unchanged `scp_<version>_<os>_<arch>` ones.
+
 - **The personal edition's GitHub calls use the libraries the portal already has**: creating a GitHub App from a manifest, listing where it is installed and the sign-in's reads (who you are, your organisations and repositories) go through go-github, the App's token is signed by `ghinstallation` and the sign-in by device code uses `golang.org/x/oauth2`, instead of code of our own. Nothing changes for `scp serve`.
 
 - **Everything in SQLite, and an instance that dies survives**: the layouts and announcements administrators save now live in the store

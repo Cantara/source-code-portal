@@ -21,7 +21,7 @@ COPY . .
 ARG BUILD_ID=dev
 ARG VERSION=dev
 RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod --mount=type=cache,id=go-build,target=/root/.cache/go-build \
-    go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=${VERSION} -X main.build=${BUILD_ID}" -o /out/scp ./cmd/scp \
+    go build -tags server -trimpath -buildvcs=false -ldflags "-s -w -X main.version=${VERSION} -X main.build=${BUILD_ID}" -o /out/scp ./cmd/scp \
  && /out/scp version
 
 # nodejs26-debian13 carries CA certificates and Node.js for the web server scp supervises.

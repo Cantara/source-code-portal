@@ -67,6 +67,25 @@ a session refused.
 - Not verified against a real GitHub Enterprise Server: the device flow's availability on a given version, and the REST base paths
   (`/api/v3/`, `api.<name>.ghe.com`) are from GitHub's documentation. A pasted token needs only the REST calls.
 
+## Kept apart from the shared site (ML1, P-102)
+
+- **The mode is a typed value** (`store.Shared`, `store.Personal`) set by the command (`deps.mode`: the zero value is the shared site,
+  `scp personal` says `Personal`), never by a configuration or the environment. `newServer` opens the store for it, refuses a launch link
+  outside `Personal`, logs the mode when it listens and reports it in the admin status. `server.routes` holds the patterns of the routes
+  the features and sign-in add; `TestEachModeRegistersItsOwnRoutes` runs one configuration in both modes and fails unless they differ by
+  `GET /auth/launch` alone and the shared site has no `/setup` route (the setup page is its own loopback server in `scp personal`).
+- **A store belongs to one mode** (`internal/store/mode.go`, `OpenAs`): the first open as a mode writes `meta.mode`; a store of the other
+  mode is refused with a `ModeError` before it is read, migrated, copied or moved aside (a read-only look first, so the file is not even
+  switched to WAL; the refusal is not an "unusable store", which would quarantine it). A store from before the mode was written is taken by
+  what it holds: a shared site's has a catalogue and no sealed credential, a personal one has a credential or is empty. `store.Open`, which
+  claims nothing, is for tests; `TestTheProgramOpensTheStoreForAMode` keeps it out of the program.
+- **The server build** (`-tags server`): `personal*.go` and their tests carry `//go:build !server` and `personal_off.go` stands in for the
+  command. The binary links none of `setup`, `ghlogin`, `vault`, `go-keyring`, `x/term` (`TestTheServerBuildHoldsNothingOfThePersonalEdition`
+  lists the dependencies of both builds; the vault's key-derivation label is absent from the server binary). `make server` builds it, `make lint`
+  and `make test` cover it, the image (`deploy/Dockerfile` and the release's `dockers_v2`) is it, and the release adds `scp-server_<version>_linux_<arch>`
+  archives; the `scp_<version>_<os>_<arch>` archives are unchanged. What stays in the server build: `auth.Launch` (a few lines of generic sign-in code
+  in `internal/auth`, reachable only through an option that `newServer` refuses outside `Personal`).
+
 ## My work (PE2)
 
 - The viewer may carry a GitHub login (`Identity.Login`): `auth.tokens[].login`, validated as a login; `scp personal` writes the

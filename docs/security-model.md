@@ -27,6 +27,15 @@ none of the operator duties below except the network layout.
 - **No public view at all, if you want.** With `access.require_auth: true`, every request without an identity gets 401, and a browser
   is sent to sign in. Only sign-in, `/api/v1/me` (the sign-in methods), `/webhooks/` (signed by GitHub) and `robots.txt` (which then
   disallows everything) stay open.
+- **Modes are kept apart.** The program has two modes, the shared site (`scp serve`) and one person's portal (`scp personal`), chosen
+  by the command that starts the process and by nothing in a configuration or an environment variable. Over HTTP a viewer can only
+  reach the process that is running; no request starts, switches or reaches the other mode. The personal edition's routes (the launch
+  link) exist only in its mode, and a test (`TestEachModeRegistersItsOwnRoutes`) fails if a route appears in the wrong one. A store
+  belongs to its mode from the first use (`meta` key `mode`): each mode refuses the other's store before reading, migrating or writing
+  it, so a personal store (one person's private catalogue and a sealed credential) cannot be served as a site, nor a site's store
+  opened by `scp personal`. The server build (`go build -tags server`, the container image and the `scp-server_*` archives) leaves
+  the personal edition out of the binary altogether: no setup page, GitHub sign-in, vault or keychain code (`TestTheServerBuildHoldsNothingOfThePersonalEdition`).
+  The admin status (`/api/v1/status`) and the start-up log say the mode.
 - **Identity.** A viewer is identified by a session (OIDC sign-in, sealed cookie), a bearer token (`auth.tokens`, compared in constant
   time), or the user and groups headers of an authenticating proxy, believed only from addresses in `server.trusted_proxies` and
   removed from every other request. A credential that names nobody is refused, never served the public view.
