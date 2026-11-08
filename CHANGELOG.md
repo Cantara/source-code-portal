@@ -6,6 +6,8 @@ subjects.
 
 ## Unreleased
 
+- **Upgrade and rollback rehearsal**: `make rehearse` (part of `make check`) runs the newest release and the current tree on one store against a fake GitHub and proves the migration keeps the data, takes the `.pre-NNNN` copy, that the older build quarantines a migrated store, and that the copy brings the data back.
+
 - **Personal edition: events with a GitHub App of your own**: a new "Events" step in the setup page makes a read-only GitHub App per
   account with GitHub's one-click manifest flow. Accounts with the App installed get events within a couple of minutes (the portal
   reads the App's delivery log; nothing needs to reach your computer), the others are polled with your token. `personal.yaml` then

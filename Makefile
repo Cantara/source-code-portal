@@ -10,7 +10,7 @@ CONFIG ?= scp.yaml
 BUILD_ID ?= $(shell git rev-parse HEAD 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.build=$(BUILD_ID)
 
-.PHONY: help web build gen lint test e2e check hooks image run dev clean need-golangci
+.PHONY: help web build gen lint test e2e rehearse check hooks image run dev clean need-golangci
 
 help: ## list targets
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
@@ -46,10 +46,13 @@ test: ## Go tests with the race detector, web tests
 e2e: web ## Playwright against the server running the web bundle and a fake GitHub (needs `pnpm -C web exec playwright install chromium`)
 	$(PNPM) -C web e2e
 
+rehearse: ## upgrade and rollback of the store between the newest release and this tree, offline (scripts/upgrade-rehearsal.sh)
+	scripts/upgrade-rehearsal.sh
+
 check: gen ## the gate: generated code current, modules tidy, lint, test
 	git diff --exit-code
 	go mod tidy -diff
-	$(MAKE) lint test e2e
+	$(MAKE) lint test e2e rehearse
 
 hooks: ## switch on the pre-commit hook (gofmt and Prettier on what is staged) for this clone
 	git config core.hooksPath .githooks
