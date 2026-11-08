@@ -71,9 +71,14 @@ for good: an event is either acted on, or the poll that backs its subject repair
   repository is removed after two complete listings in a row miss it, the second 30 seconds after the first. The count is kept with
   the listing's state, so a restart never resets it, and a partial listing never counts. A verified `deleted` delivery does not
   remove at once: one wrong or partial answer must not drop data.
+- **Refs (EV5, P-104).** A push to a branch other than the default, and the deletion of a branch, is the event `branch`, which only the
+  history listens to (it reads the newest branches in the same run as the default branch); a tag pushed or deleted is the event `tag`
+  (tags, releases, packages). Both come from the receiver and from the delivery log (a logged push stands for all three). A
+  `TestEveryRefEventHasAListener` keeps every event the receiver can make for a ref tied to a job that listens.
 - **Limits, by design.** A source with a token and an organisation or repository webhook has no delivery log: a delivery sent while
-  the portal is down is lost, and the polls repair it (pull requests and issues 15 minutes, the listing 5 minutes, releases 6 hours,
-  commits 2 hours). Pushes to branches other than the default, deleted tags and branches, and the event of a repository the portal
-  does not yet know are not acted on by themselves; the commits poll and the listing pick them up. Not verified against a real
-  GitHub: that deliveries to an unreachable URL are logged with no success status and returned by the log, on github.com and on
-  Enterprise Server.
+  the portal is down is lost. Such a source is in "events" mode, but its releases are read every 30 minutes (`PollTTL`, as for a
+  polled source; `unloggedSources`) instead of every 6 hours; the others recover through the polls (pull requests and issues 15
+  minutes, the listing 5 minutes, which turns a changed `pushed_at` into a push, commits 2 hours). Reading an organisation webhook's
+  own delivery log would need another read permission and is not built. The event of a repository the portal does not yet know
+  reaches it as the listing (the log names a repository by id only). Not verified against a real GitHub: that deliveries to an
+  unreachable URL are logged with no success status and returned by the log, on github.com and on Enterprise Server.

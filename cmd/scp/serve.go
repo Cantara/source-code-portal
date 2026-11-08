@@ -225,7 +225,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 	}()
 	s.engine = sync.New(s.store, s.pub, gh, ids, cfg.Sync.Concurrency, log)
-	s.engine.SetPolling(polledSources(cfg)...)
+	s.engine.SetPolling(append(polledSources(cfg), unloggedSources(cfg)...)...)
 	bi := readBuildInfo()
 	s.engine.Release(bi.Version + "+" + bi.Build) // a new build runs failed jobs again
 	if len(cfg.Cluster.Addresses) > 0 {
@@ -724,6 +724,19 @@ func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, s
 	}
 	rc.Observe(observe)
 	return []httpapi.Route{{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc}}
+}
+
+// unloggedSources are the sources a receiver tells about changes but whose missed deliveries nothing can recover: no App, so no
+// delivery log to read (EV4, EV5). They are in "events" mode, but a delivery sent while the portal was down is lost, so the jobs
+// with a faster poll under events (sync.Spec.PollTTL: the releases) run at it as for a polled source.
+func unloggedSources(cfg config.Config) []string {
+	var out []string
+	for _, src := range cfg.GitHub.Sources {
+		if cfg.Webhook.Secret.IsSet() && src.App == nil {
+			out = append(out, src.ID)
+		}
+	}
+	return out
 }
 
 // polledSources are the sources GitHub does not tell about changes: with a webhook receiver every source is told (the operator set the

@@ -80,8 +80,9 @@ pages of 100, back to the last complete read, up to 10,000 deliveries (about Git
 longer, the newest are passed on, the oldest are left to the polls below, and the status and the log say so. `/api/v1/status` lists
 under `webhook.catchUps` each App's log with when it was last read and why not, and warns when one has not been read for 10 minutes.
 A webhook on an organisation or a repository has no such log: there a delivery sent while the portal is down is lost, and the
-listing below is the net. Pushes to branches other than the default branch, deleted tags and branches, and a new repository's own
-event are not acted on by themselves; the polls pick them up. Issues and pull
+polls below are the net (releases every 30 minutes for such a source, as for one nothing tells). A push to another branch, and a
+deleted tag or branch, make the portal read that repository's history or tags again; a new repository's own event reaches the portal
+as the listing, within five minutes. Issues and pull
 requests are also read every 15 minutes whatever arrives (a 304 costs no rate limit), and the listing every five minutes asks for a
 read when a repository's count of open issues and pull requests moved.
 
@@ -473,7 +474,7 @@ finding. They need the App's *Issues* read permission (section 1); without it Gi
 
 **Releases** in the header (`/releases`) lists what the repositories published, newest first. The portal keeps each repository's 20
 newest published releases (drafts are never listed): it reads them when GitHub sends a *Release* event and every 6 hours as a safety
-net (every 30 minutes when no events reach the portal: no receiver and no `webhook.catch_up`; `/api/v1/status` lists each source's mode and
+net (every 30 minutes when no events reach the portal, or none that can be caught up: no receiver and no `webhook.catch_up`, or a receiver for a source without an App; `/api/v1/status` lists each source's mode and
 how often each subject is refreshed), as a conditional request that costs no rate limit when nothing changed. By default the page shows the latest release of
 each repository, the newer of its latest stable GitHub release and the newest release of the packages it publishes to registries
 (Maven, npm, PyPI and the others the portal reads, section 2.5): a repository that publishes only to a registry is listed too, with the
