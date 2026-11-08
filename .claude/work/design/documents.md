@@ -20,7 +20,7 @@ dies it must survive: a hard requirement.
 
 ## Documents
 
-`document (name, body, revision, updated_at)`, migration `0004`, additive (the copy `scp.db.pre-0004` is taken first). `internal/docstore`:
+`document (name, body, revision, updated_at)`, in the baseline `0001` (SC1). `internal/docstore`:
 
 - `Open` loads a document into memory; `Get` never touches the store; `Save` and `Remove` write through, then update memory. The
   revision is the content digest; a save names the revision it read, and one based on an older read is refused (412), as before.

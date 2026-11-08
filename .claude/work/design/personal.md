@@ -14,7 +14,7 @@ only.** A person who already runs `scp serve` with a token file is unaffected.
 
 - **The directory** holds `scp.db` (the store), `personal.yaml` (the configuration: no secret in it), `session.key` and `owner.token`
   (local secrets, mode 0600, the directory 0700). The portal reads no other file of the person's.
-- **The credential** is a row of `credential` (migration `0003`: only `credential` at this rung; `principal` arrives with rung 1, when more than one person exists), sealed with AES-256-GCM under a key
+- **The credential** is a row of `credential` (in the baseline `0001`: only `credential` at this rung; `principal` arrives with rung 1, when more than one person exists), sealed with AES-256-GCM under a key
   derived (HKDF) from a 32-byte vault key, with the row's id, source and kind as additional data, so a value moved to another row
   does not open. The vault key lives in the operating system's keychain (macOS Keychain, the Secret Service on Linux, the Credential
   Manager on Windows); where there is none (a server without a desktop) it is a file `vault.key` (0600) in the directory and the wizard
@@ -54,7 +54,7 @@ a session refused.
 
 ## As built
 
-- `internal/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (migration 0003), `internal/ghlogin` (hosts, device flow,
+- `internal/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (baseline `0001`), `internal/ghlogin` (hosts, device flow,
   `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`; the device flow is `x/oauth2`'s, every other GitHub call goes through go-github and the App's JWT through `ghinstallation`, GL1), `auth.Launch` (`GET /auth/launch`),
   `cmd/scp/personal.go`.
 - A source says `credential: true`; `scp personal` opens the vault and puts the token in the source before `newServer`; `newServer`

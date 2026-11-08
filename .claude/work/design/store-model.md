@@ -141,7 +141,7 @@ URLs and the API. Making it unique across hosts touches all of them, so it is st
 
 ## Migration and rollout
 
-- **Cantara's database is kept.** `0002` adds `repo.visibility` and backfills it from each source's catalogue item; `user_version`
+- **Cantara's database is kept** (until the baseline, SC1 below: its migrations `0002` to `0004` are now part of `0001`). `0002` added `repo.visibility` and backfills it from each source's catalogue item; `user_version`
   becomes 2. The visibility is then written at every listing (a listing that does not say keeps what is known).
 - **A copy before every migration of a store that holds data** (`VACUUM INTO scp.db.pre-NNNN`, the store as it was; made once, a
   copy that exists is kept; mode 0600; a failure is logged and the migration goes on). The operator removes it when the new version
@@ -221,7 +221,21 @@ SM-a (the migration, `repo.visibility`, the conflict rule, the pre-migration cop
 checks, Entra sign-in on the existing OIDC, a deployment guide for the team's AWS account) -> SM-b (`ViewOf`, `Public()` as its
 special case, the viewer seam, the leak and twin tests for many viewers) -> rung 2 (Entra groups) -> rung 3 (the person's own access).
 
+## Baseline (SC1, P-106)
+
+Goal: a flat schema for a product with two deployments. Acceptance: a fresh store is `0001_init.sql` alone (the final schema, marked
+`PRAGMA application_id = 0x53435031`, "SCP1"); a store that holds data and has no mark (the releases up to v2.2.9, whose `user_version`
+is 1 and whose tables are `meta`, `repo`, `item`) is of an earlier generation, is moved aside by the quarantine every unusable store
+goes through (`scp.db.quarantine-<time>`, the newest two kept) and the catalogue is read again from GitHub; an older binary opens the
+new store (the baseline is a superset of its tables) and the moved-aside store comes back by renaming it. Done: the store tests, and
+`make rehearse` against the newest release in both generations.
+
+What the old stores held was cache (the catalogue, documents, history) and transient events; nothing a person wrote. That is why the
+rule below (additive migrations, a copy first) is set aside once, and only while the deployments are the two that exist. From the
+baseline on it is in force again: the next change is `0002`, additive, with the `.pre-0002` copy. The mark is how the next
+generation is told from this one without reading its tables; a store with a mark is migrated by `user_version` as before.
+
 ## Update (PE1)
 
-The personal edition (`personal.md`) built only the `credential` table of this note's tables (migration 0003): `principal`, `visible`,
+The personal edition (`personal.md`) built only the `credential` table of this note's tables (since SC1 in the baseline): `principal`, `visible`,
 `source` and `item.credential_id` wait for rung 1 and on, each with its code.

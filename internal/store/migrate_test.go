@@ -2,14 +2,12 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/cantara/source-code-portal/internal/snapshot"
 )
@@ -24,26 +22,52 @@ func latestSchema(t *testing.T) int {
 	return len(names)
 }
 
-// schemaOne writes a store as the first release left it: migration 0001 only, with a catalogue listing and two items.
-func schemaOne(t *testing.T, path string) {
+// generationOne is the schema the deployed releases (v2.0.0 to v2.2.9) made: one migration, no application mark, no visibility, no
+// credential or document table. SC1 replaced it with one baseline.
+const generationOne = `-- The store is a rebuildable cache of the last good state. Times are UTC unix seconds.
+CREATE TABLE meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+) STRICT;
+
+-- Catalogued repositories: identity and address. Items of a repository go with it.
+CREATE TABLE repo (
+  key       TEXT PRIMARY KEY,          -- lower-case owner/name
+  source    TEXT NOT NULL,
+  github_id INTEGER NOT NULL,
+  UNIQUE (source, github_id)
+) STRICT;
+
+-- One row per sync job key: its last outcome, schedule and payload.
+CREATE TABLE item (
+  key         TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  repo_key    TEXT REFERENCES repo (key) ON DELETE CASCADE, -- NULL for source jobs
+  status      TEXT NOT NULL CHECK (status IN ('never', 'ok', 'not_found', 'too_large', 'no_content', 'unsupported', 'error')),
+  fetched_at  INTEGER,
+  checked_at  INTEGER,
+  next_due_at INTEGER,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  content_sha TEXT,
+  error       TEXT,
+  payload     BLOB
+) STRICT;
+`
+
+// earlierStore writes a store as a deployed release left it: generationOne at user_version 1, with a catalogue listing and two items.
+func earlierStore(t *testing.T, path string) {
 	t.Helper()
 	raw, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = raw.Close() }()
-	body, err := migrations.ReadFile("migrations/0001_init.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	listing := `{"repos":[{"repo":{"id":{"Source":"gh","GitHubID":1},"owner":"acme","name":"open","visibility":"public"}},` +
-		`{"repo":{"id":{"Source":"gh","GitHubID":2},"owner":"acme","name":"secret","visibility":"private"}},` +
-		`{"repo":{"id":{"Source":"gh","GitHubID":3},"owner":"acme","name":"inner","visibility":"internal"}}]}`
-	for _, q := range []string{string(body),
-		"INSERT INTO repo (key, source, github_id) VALUES ('acme/open','gh',1),('acme/secret','gh',2),('acme/inner','gh',3),('x/other','nolisting',9)",
+	listing := `{"repos":[{"repo":{"id":{"Source":"gh","GitHubID":1},"owner":"acme","name":"open","visibility":"public"}}]}`
+	for _, q := range []string{generationOne,
+		"INSERT INTO repo (key, source, github_id) VALUES ('acme/open','gh',1),('x/other','nolisting',9)",
 		"INSERT INTO item (key, kind, repo_key, status, fetched_at, checked_at, next_due_at, attempts, content_sha, payload) VALUES " +
 			"('catalog.reconcile/gh','catalog.reconcile',NULL,'ok',100,100,200,0,'abc',CAST('" + listing + "' AS BLOB))," +
-			"('commits/acme/secret','commits','acme/secret','ok',101,102,300,2,'def',CAST('{\"commits\":[1,2,3]}' AS BLOB))",
+			"('commits/acme/open','commits','acme/open','ok',101,102,300,2,'def',CAST('{\"commits\":[1,2,3]}' AS BLOB))",
 		"PRAGMA user_version = 1"} {
 		if _, err := raw.Exec(q); err != nil {
 			t.Fatalf("%s: %v", q[:40], err)
@@ -51,130 +75,167 @@ func schemaOne(t *testing.T, path string) {
 	}
 }
 
-// fingerprint hashes every repository and item of a store, payload bytes included, apart from the visibility the migration adds.
-func fingerprint(t *testing.T, s *DB) string {
+func pragma(t *testing.T, path, name string) int {
 	t.Helper()
-	repos, items, err := s.Load(context.Background())
+	raw, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := sha256.New()
-	for _, r := range repos {
-		fmt.Fprintf(h, "R %s %s %d\n", r.Key, r.ID.Source, r.ID.GitHubID)
+	defer func() { _ = raw.Close() }()
+	var v int
+	if err := raw.QueryRow("PRAGMA " + name).Scan(&v); err != nil {
+		t.Fatal(err)
 	}
-	for _, it := range items {
-		fmt.Fprintf(h, "I %s %s %s %s %d %d %d %d %s %s\n", it.Key, it.Kind, it.Repo, it.State, it.FetchedAt.Unix(), it.CheckedAt.Unix(),
-			it.NextDue.Unix(), it.Attempts, it.ErrCode, it.ContentSHA)
-		h.Write(it.Payload)
-	}
-	return hex.EncodeToString(h.Sum(nil))
+	return v
 }
 
-// TestMigrationKeepsTheData: a store of the first release opens, keeps every repository, item and payload byte, learns each
-// repository's visibility from its source's listing, and leaves a copy of itself as it was.
-func TestMigrationKeepsTheData(t *testing.T) {
-	ctx := context.Background()
+// A new store is the baseline: its mark, its one version and every table, with nothing copied.
+func TestAFreshStoreIsTheBaseline(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "scp.db")
-	schemaOne(t, path)
-
-	// The fingerprint of the old store, read without migrating it (the same Load queries minus visibility are what 0001 offers).
-	raw, _ := sql.Open("sqlite", path)
-	var rows, items int
-	_ = raw.QueryRow("SELECT count(*) FROM repo").Scan(&rows)
-	_ = raw.QueryRow("SELECT count(*) FROM item").Scan(&items)
-	var beforeSum string
-	{
-		h := sha256.New()
-		r1, _ := raw.Query("SELECT key, source, github_id FROM repo ORDER BY key")
-		for r1.Next() {
-			var k, s string
-			var id int64
-			_ = r1.Scan(&k, &s, &id)
-			fmt.Fprintf(h, "R %s %s %d\n", k, s, id)
-		}
-		_ = r1.Close()
-		r2, _ := raw.Query("SELECT key, kind, coalesce(repo_key,''), status, coalesce(fetched_at,0), coalesce(checked_at,0), coalesce(next_due_at,0), attempts, coalesce(error,''), coalesce(content_sha,''), payload FROM item ORDER BY key")
-		for r2.Next() {
-			var k, kind, rk, st, e, sha string
-			var f, c, n int64
-			var a int
-			var p []byte
-			_ = r2.Scan(&k, &kind, &rk, &st, &f, &c, &n, &a, &e, &sha, &p)
-			fmt.Fprintf(h, "I %s %s %s %s %d %d %d %d %s %s\n", k, kind, rk, st, f, c, n, a, e, sha)
-			h.Write(p)
-		}
-		_ = r2.Close()
-		beforeSum = hex.EncodeToString(h.Sum(nil))
+	db, err := Open(t.Context(), path, quiet)
+	if err != nil {
+		t.Fatal(err)
 	}
-	_ = raw.Close()
+	for _, q := range []string{"SELECT visibility FROM repo", "SELECT sealed FROM credential", "SELECT revision FROM document", "SELECT value FROM meta"} {
+		if _, err := db.db.Exec(q); err != nil {
+			t.Errorf("%s: %v", q, err)
+		}
+	}
+	_ = db.Close()
+	if got := pragma(t, path, "application_id"); got != applicationID {
+		t.Errorf("application_id %#x, want %#x", got, applicationID)
+	}
+	if got, want := pragma(t, path, "user_version"), latestSchema(t); got != want {
+		t.Errorf("user_version %d, want %d", got, want)
+	}
+	if left, _ := filepath.Glob(path + ".*"); len(left) != 0 {
+		t.Errorf("a new store left files behind: %v", left)
+	}
+}
 
+// TestAnEarlierGenerationIsMovedAside: a store of the deployed releases is not migrated. It is renamed (the way back, with its data as it
+// was), and the portal starts on a new baseline store that the catalogue is read into again.
+func TestAnEarlierGenerationIsMovedAside(t *testing.T) {
+	ctx := t.Context()
+	for _, mode := range []Mode{"", Shared} {
+		t.Run("mode "+string(mode), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "scp.db")
+			earlierStore(t, path)
+			var db *DB
+			var err error
+			if mode == "" {
+				db, err = Open(ctx, path, quiet)
+			} else {
+				db, err = OpenAs(ctx, path, mode, quiet)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			repos, items, _ := db.Load(ctx)
+			_ = db.Close()
+			if len(repos) != 0 || len(items) != 0 {
+				t.Errorf("the new store holds %d repositories and %d items of the old one", len(repos), len(items))
+			}
+			if got := pragma(t, path, "application_id"); got != applicationID {
+				t.Errorf("the new store's application_id %#x", got)
+			}
+			aside, _ := filepath.Glob(path + ".quarantine-*")
+			if len(aside) != 1 {
+				t.Fatalf("moved aside: %v", aside)
+			}
+			// The old store is whole where it was put: renaming it back is the way back.
+			if v := pragma(t, aside[0], "user_version"); v != 1 {
+				t.Errorf("the old store's user_version %d", v)
+			}
+			raw, err := sql.Open("sqlite", "file:"+aside[0]+"?mode=ro")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = raw.Close() }()
+			var n int
+			if err := raw.QueryRow("SELECT count(*) FROM item").Scan(&n); err != nil || n != 2 {
+				t.Errorf("the old store holds %d items (%v), want its 2", n, err)
+			}
+		})
+	}
+}
+
+// migrations2 is the embedded baseline and one more migration, to test the runner as the next change will use it.
+func migrations2(t *testing.T) fs.FS {
+	t.Helper()
+	base, err := migrations.ReadFile("migrations/0001_init.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fstest.MapFS{
+		"migrations/0001_init.sql": {Data: base},
+		"migrations/0002_note.sql": {Data: []byte("ALTER TABLE meta ADD COLUMN note TEXT;")},
+	}
+}
+
+// TestMigrationsAreAdditiveWithACopy: a store that holds data is copied before a later migration (once, 0600) and keeps every row; a new
+// store is not copied; a copy that exists is not replaced; a store newer than the binary is refused.
+func TestMigrationsAreAdditiveWithACopy(t *testing.T) {
+	ctx := t.Context()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "scp.db")
 	db, err := Open(ctx, path, quiet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = db.Close() }()
-	if got := fingerprint(t, db); got != beforeSum {
-		t.Errorf("the migration changed what the store holds:\n before %s\n after  %s", beforeSum, got)
-	}
-	repos, _, _ := db.Load(ctx)
-	want := map[snapshot.RepoKey]string{"acme/open": "public", "acme/secret": "private", "acme/inner": "internal", "x/other": ""}
-	for _, r := range repos {
-		if r.Visibility != want[r.Key] {
-			t.Errorf("%s: visibility %q, want %q (learned from its source's listing; unknown without one)", r.Key, r.Visibility, want[r.Key])
-		}
-	}
-	var v int
-	_ = db.db.QueryRow("PRAGMA user_version").Scan(&v)
-	if v != latestSchema(t) {
-		t.Errorf("user_version %d", v)
-	}
-
-	// The copy is the store as it was: schema 1, no visibility, the same rows.
-	cp, err := sql.Open("sqlite", path+".pre-0002")
-	if err != nil {
+	if err := db.SetMeta(ctx, "k", "v"); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = cp.Close() }()
-	var cv, n int
-	_ = cp.QueryRow("PRAGMA user_version").Scan(&cv)
-	_ = cp.QueryRow("SELECT count(*) FROM item").Scan(&n)
-	if cv != 1 || n != items {
-		t.Errorf("copy: user_version %d, %d items; want 1 and %d", cv, n, items)
-	}
-	if err := cp.QueryRow("SELECT visibility FROM repo LIMIT 1").Scan(new(string)); err == nil {
-		t.Error("the copy already has the new column")
-	}
-	if fi, err := os.Stat(path + ".pre-0002"); err != nil || fi.Mode().Perm() != 0o600 {
-		t.Errorf("copy mode %v %v, want 0600", fi, err)
-	}
-}
-
-// TestNoCopyOfAnEmptyStoreOrTwice: a new store has nothing to keep, and a copy that exists is not replaced.
-func TestNoCopyOfAnEmptyStoreOrTwice(t *testing.T) {
-	ctx := context.Background()
-	dir := t.TempDir()
-	fresh := filepath.Join(dir, "fresh.db")
-	db, err := Open(ctx, fresh, quiet)
-	if err != nil {
+	files := migrations2(t)
+	if err := migrate(ctx, db.db, path, quiet, files); err != nil {
 		t.Fatal(err)
+	}
+	if got := pragma(t, path, "user_version"); got != 2 {
+		t.Errorf("user_version %d, want 2", got)
+	}
+	if v, _ := db.Meta(ctx, "k"); v != "v" {
+		t.Errorf("a row was lost: %q", v)
+	}
+	fi, err := os.Stat(path + ".pre-0002")
+	if err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("copy %v %v, want a 0600 file", fi, err)
+	}
+	if got := pragma(t, path+".pre-0002", "user_version"); got != 1 {
+		t.Errorf("the copy is of user_version %d, want the store as it was (1)", got)
 	}
 	_ = db.Close()
+
+	// A new store is not copied, whatever it migrates through.
+	fresh := filepath.Join(dir, "fresh.db")
+	raw, err := sql.Open("sqlite", fresh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, raw, fresh, quiet, files); err != nil {
+		t.Fatal(err)
+	}
+	_ = raw.Close()
 	if left, _ := filepath.Glob(fresh + ".pre-*"); len(left) != 0 {
 		t.Errorf("a new store was copied: %v", left)
 	}
 
-	path := filepath.Join(dir, "scp.db")
-	schemaOne(t, path)
-	copyPath := path + ".pre-0002"
-	if err := os.WriteFile(copyPath, []byte("an operator's earlier copy"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	db, err = Open(ctx, path, quiet)
+	// A copy that exists is kept, not replaced.
+	again := filepath.Join(dir, "again.db")
+	db, err = Open(ctx, again, quiet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = db.Close()
-	if b, _ := os.ReadFile(copyPath); string(b) != "an operator's earlier copy" {
+	defer func() { _ = db.Close() }()
+	if err := db.SetMeta(ctx, "k", "v"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(again+".pre-0002", []byte("an operator's earlier copy"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db.db, again, quiet, files); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(again + ".pre-0002"); string(b) != "an operator's earlier copy" {
 		t.Error("an existing copy was replaced")
 	}
 }
