@@ -3,7 +3,7 @@ import { HttpResponse, http as raw } from "msw"
 import { act, renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import { http, server } from "@/test/server"
-import { api, ProblemError, unwrap } from "./api/client"
+import { api, asking, getter, ProblemError, unwrap } from "./api/client"
 import { relative } from "./format"
 import { retryDelay } from "./query"
 import { apply, isDark, stored, themeKey, useTheme } from "./theme"
@@ -156,5 +156,28 @@ describe("side panel preference", () => {
     expect(sideOf("open:26", "issues,nope,latest-commits").folded).toEqual(["latest-commits", "issues"])
     expect(sideOf("open:26", "").folded).toEqual([])
     expect(sectionsValue(["issues", "pulls"])).toBe("pulls,issues")
+  })
+})
+
+describe("forks", () => {
+  it("asks for the forks in the URL, which keeps the answers apart in a cache", () => {
+    expect(asking(new Request("http://portal/api/v1/dashboard?work=hand")).url).toBe(
+      "http://portal/api/v1/dashboard?work=hand&forks=show",
+    )
+    expect(asking(new Request("http://portal/api/v1/groups")).url).toBe("http://portal/api/v1/groups?forks=show")
+  })
+
+  it("adds them to a Get only when the reader asked", async () => {
+    const seen: string[] = []
+    server.use(
+      raw.get("http://portal/api/v1/*", ({ request }) => {
+        seen.push(new URL(request.url).search)
+        return HttpResponse.json({})
+      }),
+    )
+    await getter("http://portal/api/v1")("/admin/status")
+    await getter("http://portal/api/v1", {}, () => true)("/admin/status")
+    await getter("http://portal/api/v1", {}, () => true)("/x?a=1")
+    expect(seen).toEqual(["", "?forks=show", "?a=1&forks=show"])
   })
 })

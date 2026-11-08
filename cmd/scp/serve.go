@@ -262,13 +262,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 	}
 
-	// view is what a request may see: the full snapshot for a private viewer, else its public view.
+	// view is what a request may see: the full snapshot for a private viewer, else its public view, and the forks no source shows and
+	// no group pins only when the request asked for them (?forks=show).
 	view := func(ctx context.Context) *snapshot.Snapshot {
-		cur := s.pub.Current()
-		if httpapi.Private(ctx) {
-			return cur
-		}
-		return cur.Public()
+		return s.pub.Current().View(httpapi.Private(ctx), httpapi.ShowForks(ctx))
 	}
 	events := httpapi.NewEvents(view, s.pub.Published)
 	g := gauges{current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining, streams: events.Streams}

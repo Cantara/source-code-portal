@@ -82,8 +82,8 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    `prefix: payments-`, `glob: "*-service"`, `regexp: "^(api|web)-.*$"` (RE2, whole name, case-sensitive unless `(?i)`),
    `exact: handbook`, `topic: payments`, `catch_all: true`, `unclaimed: true` (what no other group took: give the last group this
    so nothing is homeless). Each group needs an `id` (`[a-z0-9-]`), a `name`, a `default_repo` (its main repository) and 1 to 64
-   matchers; keep their own names and descriptions. Keep repositories out with the source's `exclude` (same matchers); forks are left
-   out unless `include_forks`. Run `scp config groups` and show the landing in a small table; iterate until it matches their picture.
+   matchers; keep their own names and descriptions. Keep repositories out with the source's `exclude` (same matchers); forks are hidden
+   unless `include_forks`, a group names one (as its `default_repo` or with `exact`) or the reader asks. Run `scp config groups` and show the landing in a small table; iterate until it matches their picture.
 5. **The configuration.** Start from the release's `deploy/config.example.yaml` or the starter in
    [references/essentials.md](references/essentials.md). Set `server.public_url` (absolute links, HSTS on https) and
    `server.trusted_proxies` (only the reverse proxy's network). Add only the sections they asked for: `webhook`, `access` and

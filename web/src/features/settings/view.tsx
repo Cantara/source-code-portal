@@ -1,10 +1,21 @@
 "use client"
 
+import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { useId, useState, type ReactNode } from "react"
 import { Card, CardTitle } from "@/components/ui/card"
 import { pageSizes, sizeCookie, type PagedList } from "@/lib/paging"
-import { forget, kinds, productsViews, remember, viewCookie, workCookie, type ProductsView, type Work } from "@/lib/preferences"
+import {
+  forget,
+  forksCookie,
+  kinds,
+  productsViews,
+  remember,
+  viewCookie,
+  workCookie,
+  type ProductsView,
+  type Work,
+} from "@/lib/preferences"
 import { apply, useTheme, type Choice } from "@/lib/theme"
 import { PageHeader } from "@/shared/page-header"
 import { useFeatures } from "@/lib/rules-context"
@@ -12,6 +23,7 @@ import { useFeatures } from "@/lib/rules-context"
 type Settings = {
   work: Work
   view: ProductsView
+  forks: boolean
   commits: number
   history: number
   pulls: number
@@ -104,6 +116,7 @@ function Section({ title, about, children }: { title: string; about: string; chi
 export function SettingsView({ initial }: { initial: Settings }) {
   const features = useFeatures()
   const router = useRouter()
+  const queries = useQueryClient()
   const theme = useTheme()
   const [s, setS] = useState(initial)
   const [saved, setSaved] = useState("")
@@ -167,6 +180,25 @@ export function SettingsView({ initial }: { initial: Settings }) {
             onChange={(view) => {
               remember(viewCookie, view)
               keep({ view }, `Products: ${view}`)
+            }}
+          />
+        </Section>
+        <Section
+          title="Forks"
+          about="Forks of other repositories are left out unless a source shows them or a group names one. Choose whether to see the rest."
+        >
+          <Choices
+            legend="Forks"
+            value={s.forks ? "show" : "hide"}
+            options={[
+              { value: "hide", label: "Hidden", about: "Only the forks the portal's configuration shows." },
+              { value: "show", label: "Shown", about: "Every fork, marked as one, in the groups they match." },
+            ]}
+            onChange={(v) => {
+              if (v === "show") remember(forksCookie, "show")
+              else forget(forksCookie)
+              queries.clear() // what the pages hold was read with the other choice
+              keep({ forks: v === "show" }, `Forks: ${v === "show" ? "shown" : "hidden"}`)
             }}
           />
         </Section>

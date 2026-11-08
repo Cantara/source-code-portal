@@ -1,4 +1,6 @@
-import type { Schemas } from "./api/client"
+import { forksCookie, type Schemas } from "./api/client"
+
+export { forksCookie }
 
 /**
  * The reader's preferences, kept in the portal's own cookies (`scp-*`) so the server renders the first page with them (Ctx.cookies)

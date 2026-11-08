@@ -42,7 +42,7 @@ github:
         id: 123456
         private_key_file: /run/secrets/scp-app.pem
       # token_file: /run/secrets/github-token
-      include_forks: false
+      include_forks: false # forks are read always; true shows them by default, else a group names the ones to show (default_repo, exact)
       include_archived: true
       exclude: [] # e.g. [{glob: 'client-*'}, {topic: confidential}]: never catalogued
       include_private: false # true needs access.private_groups and a way to know the viewer: the proxy or auth

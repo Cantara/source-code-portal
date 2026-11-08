@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardTitle } from "@/components/ui/card"
 import { api, type Repo, type Schemas } from "@/lib/api/client"
 import { useNow } from "@/lib/clock"
@@ -12,6 +13,7 @@ import { CommitList } from "@/entities/commit/commit-list"
 import { EmptyState } from "@/shared/empty-state"
 import { FreshnessBadge } from "@/shared/freshness-badge"
 import { crumbs } from "@/lib/crumbs"
+import { ForksSwitch } from "@/shared/forks-switch"
 import { PageHeader } from "@/shared/page-header"
 import { PanelBoundary } from "@/shared/panel-boundary"
 import { ProblemAlert } from "@/shared/problem-alert"
@@ -180,6 +182,11 @@ export function GroupView({ group }: { group: string }) {
     <>
       <PageHeader title={data?.name ?? group} trail={crumbs.group(data?.id ?? group, data?.name ?? group)}>
         {data?.description && <p className="text-muted-foreground">{data.description}</p>}
+        {data && data.hiddenForks > 0 && (
+          <div>
+            <ForksSwitch hidden={data.hiddenForks} />
+          </div>
+        )}
       </PageHeader>
       {error && !data && <ProblemAlert error={error} />}
       {data && (
@@ -225,6 +232,7 @@ export function GroupView({ group }: { group: string }) {
                                   {r.name}
                                 </Link>
                                 <VisibilityBadge visibility={r.visibility} />
+                                {r.fork && <Badge>Fork</Badge>}
                                 {r.freshness.status !== "fresh" && <FreshnessBadge freshness={r.freshness} />}
                               </span>
                               {(r.language || r.description) && (

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it } from "vitest"
@@ -16,9 +17,21 @@ describe("settings", () => {
   it("keeps each preference in its cookie at once, and Default forgets a page size", async () => {
     const user = userEvent.setup()
     render(
-      <SettingsView
-        initial={{ work: ["hand", "ai"], view: "cards", commits: 0, history: 0, pulls: 0, issues: 0, releases: 0, archive: 0 }}
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <SettingsView
+          initial={{
+            work: ["hand", "ai"],
+            view: "cards",
+            forks: false,
+            commits: 0,
+            history: 0,
+            pulls: 0,
+            issues: 0,
+            releases: 0,
+            archive: 0,
+          }}
+        />
+      </QueryClientProvider>,
     )
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument()
     const work = screen.getByRole("group", { name: "Count, at least one" })
@@ -40,5 +53,11 @@ describe("settings", () => {
     await user.selectOptions(commits, "Default")
     expect(document.cookie).not.toContain("scp-per-commits")
     expect(screen.getByText(/Saved\. Commit timelines: the default\./)).toBeInTheDocument()
+    // Forks are hidden until the reader chooses to see them.
+    expect(screen.getByRole("radio", { name: /^Hidden/ })).toBeChecked()
+    await user.click(screen.getByRole("radio", { name: /^Shown/ }))
+    expect(document.cookie).toContain("scp-forks=show")
+    await user.click(screen.getByRole("radio", { name: /^Hidden/ }))
+    expect(document.cookie).not.toContain("scp-forks")
   })
 })

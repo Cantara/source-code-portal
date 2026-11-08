@@ -141,7 +141,7 @@ API version header, conditional cache, rate observer), then `http.Transport`. `s
 | `github.sources[].app.id`, `.app.private_key_file` | none | App mode: App id and PEM file (mounted secret) |
 | `github.sources[].app.installations` | `[]` (all) | allowed account logins |
 | `github.sources[].token_file` | none | token mode (exclusive with `app`) |
-| `github.sources[].include_forks` / `.include_archived` | `false` / `true` | admission filters, applied by catalog |
+| `github.sources[].include_forks` / `.include_archived` | `false` / `true` | forks shown by default (they are always read, `forks.md`) / an admission filter |
 | `github.sources[].include_private` | `false` | private repositories (access.md) |
 
 ## Tests (what proves it; fake GitHub, no network)

@@ -62,11 +62,11 @@ func TestPlanFilters(t *testing.T) {
 	internal := pub(5, "internal")
 	internal.Visibility = "internal"
 	listed := []snapshot.Repo{pub(1, "a"), fork, archived, bad, internal, pub(6, "a")}
-	if got := names(Plan(listed, nil, Filter{IncludeArchived: true})); !slices.Equal(got, []string{"acme/a", "acme/old"}) {
-		t.Errorf("default filter = %v (an address taken twice keeps the lower id)", got)
+	if got := names(Plan(listed, nil, Filter{IncludeArchived: true})); !slices.Equal(got, []string{"acme/a", "acme/fork", "acme/old"}) {
+		t.Errorf("default filter = %v (forks are admitted, an address taken twice keeps the lower id)", got)
 	}
-	if got := names(Plan(listed, nil, Filter{IncludeForks: true})); !slices.Equal(got, []string{"acme/a", "acme/fork"}) {
-		t.Errorf("forks, no archived = %v", got)
+	if got := names(Plan(listed, nil, Filter{})); !slices.Equal(got, []string{"acme/a", "acme/fork"}) {
+		t.Errorf("no archived = %v", got)
 	}
 }
 

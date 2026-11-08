@@ -26,7 +26,7 @@ func TestConfigGroupsPreview(t *testing.T) {
 	code, stdout, stderr := execute(t, "config", "groups", "-c", path, "--repos", listing)
 	for _, want := range []string{"whydah: Whydah (1 repositories; default acme/whydah-sso)\n  Whydah-SSO\n",
 		"libs: Libraries (1 repositories; default MISSING: no member is named commons)\n  tools\n",
-		"In no group (1):\n  stray\n", "Left out by the source filters (1):\n  Whydah-Fork (fork; include_forks)\n"} {
+		"In no group (1):\n  stray\n", "Forks hidden by default (1):\n  Whydah-Fork (fork; name it as a default_repo or an exact matcher, or set include_forks)\n"} {
 		if code != exitOK || !strings.Contains(stdout, want) {
 			t.Errorf("exit %d, stdout misses %q:\n%s\nstderr %s", code, want, stdout, stderr)
 		}

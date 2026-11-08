@@ -1,8 +1,8 @@
 import "server-only"
 import createClient from "openapi-fetch"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { cache } from "react"
-import { getter, querySerializer, type Api, type Get } from "./client"
+import { asking, forksCookie, getter, querySerializer, type Api, type Get } from "./client"
 import type { paths } from "./schema"
 
 // The headers the Go server puts on a proxied page request that the API calls of the page carry back: the viewer (its kind, name
@@ -21,13 +21,25 @@ const pass = cache(async (): Promise<Record<string, string>> => {
   return out
 })
 
+/** forks says whether the reader of this request asked for the forks (cookie `scp-forks=show`): every call of the page then does. */
+const forks = cache(async (): Promise<boolean> => (await cookies()).get(forksCookie)?.value === "show")
+
 /** serverApi is the API client of the current request: it reaches the Go server at SCP_API as the page's viewer. */
-export const serverApi = cache(async (): Promise<Api> =>
-  createClient<paths>({ baseUrl: base(), headers: await pass(), querySerializer }),
-)
+export const serverApi = cache(async (): Promise<Api> => {
+  const ask = await forks()
+  return createClient<paths>({
+    baseUrl: base(),
+    headers: await pass(),
+    querySerializer,
+    fetch: (r) => globalThis.fetch(ask ? asking(r) : r),
+  })
+})
 
 /** serverGet is the current request's Get, as the page's viewer. */
-export const serverGet = cache(async (): Promise<Get> => getter(base(), await pass()))
+export const serverGet = cache(async (): Promise<Get> => {
+  const ask = await forks()
+  return getter(base(), await pass(), () => ask)
+})
 
 /** origin is the portal's public origin, for canonical and sitemap URLs: the Go server's X-Scp-Origin, else this request's host. */
 export const origin = cache(async (): Promise<string> => {

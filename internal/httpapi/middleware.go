@@ -82,6 +82,7 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		viewer, verr := o.viewer(w, r)
 		private := viewer.Private || viewer.SignedIn() // what a signed-in viewer sees names them: no shared cache may store it
 		base := context.WithValue(r.Context(), viewerKey{}, viewer)
+		base = context.WithValue(base, forksKey{}, r.URL.Query().Get("forks") == "show")
 		ctx, cancel := context.WithTimeout(context.WithValue(base, baseKey{}, base), requestTimeout)
 		defer cancel()
 		r = r.WithContext(ctx)

@@ -34,6 +34,21 @@ export type Api = Client<paths>
 /** querySerializer writes array parameters as the contract has them: comma-separated in one value (work=hand,ai). */
 export const querySerializer = { array: { style: "form", explode: false } } as const
 
+/** forksCookie is the reader's choice to see the forks no source shows and no group names (Settings, the switch on the dashboard). */
+export const forksCookie = "scp-forks"
+
+/** asking is the request with forks=show added to its URL: the API leaves forks out unless asked, and the URL tells caches apart. */
+export function asking(request: Request): Request {
+  const url = new URL(request.url)
+  url.searchParams.set("forks", "show")
+  return new Request(url, request)
+}
+
+/** forksShown reports whether this browser asks for the forks (`scp-forks=show`); false on the server, which reads its own cookies. */
+export function forksShown(): boolean {
+  return typeof document !== "undefined" && document.cookie.split("; ").includes(`${forksCookie}=show`)
+}
+
 /** apiBase is where /api/v1 is: this page's origin (the tests' own without one). */
 const apiBase = () => `${globalThis.location?.origin ?? "http://localhost"}/api/v1`
 
@@ -44,7 +59,7 @@ const apiBase = () => `${globalThis.location?.origin ?? "http://localhost"}/api/
  */
 export const api: Api = createClient<paths>({
   baseUrl: apiBase(),
-  fetch: (r) => globalThis.fetch(r),
+  fetch: (r) => globalThis.fetch(forksShown() ? asking(r) : r),
   querySerializer,
 })
 
@@ -61,14 +76,17 @@ function request<T>(url: string, init: RequestInit): Promise<T> {
   )
 }
 
-/** getter is a Get against base with headers. */
-export function getter(base: string, headers: Record<string, string> = {}): Get {
+/** getter is a Get against base with headers, asking for the forks when forks says so. */
+export function getter(base: string, headers: Record<string, string> = {}, forks: () => boolean = () => false): Get {
   return <T>(path: string, signal?: AbortSignal) =>
-    request<T>(`${base}${path}`, { headers: { Accept: "application/json", ...headers }, signal })
+    request<T>(`${base}${path}${forks() ? `${path.includes("?") ? "&" : "?"}forks=show` : ""}`, {
+      headers: { Accept: "application/json", ...headers },
+      signal,
+    })
 }
 
 /** get is the browser's Get. */
-export const get: Get = (path, signal) => getter(apiBase())(path, signal)
+export const get: Get = (path, signal) => getter(apiBase(), {}, forksShown)(path, signal)
 
 /** send writes to a path of /api/v1 outside the contract (the admin's layouts) with a JSON body, failing as unwrap does. */
 export function send<T>(method: "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {

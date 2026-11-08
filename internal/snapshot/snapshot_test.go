@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"slices"
 	"sync"
 	"testing"
@@ -401,5 +402,75 @@ func TestAddressOwnedByOneSource(t *testing.T) {
 			t.Errorf("order %v: a source lost its other repositories: %v", order, s.Repos)
 		}
 		p.Close()
+	}
+}
+
+// A snapshot has four views, by private repositories and by hidden forks; a view that would hold what another holds is that view.
+func TestViewsByPrivateAndByHiddenForks(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
+	pub := repo("gh", 1, "acme", "open")
+	pub.Repo.Visibility = "public"
+	fork := repo("gh", 2, "acme", "copy")
+	fork.Repo.Visibility, fork.Repo.Fork = "public", true
+	pinned := repo("gh", 3, "acme", "main-copy")
+	pinned.Repo.Visibility, pinned.Repo.Fork = "public", true
+	secret := repo("gh", 4, "acme", "secret")
+	secret.Repo.Visibility = "private"
+	secretFork := repo("gh", 5, "acme", "secret-copy")
+	secretFork.Repo.Visibility, secretFork.Repo.Fork = "private", true
+
+	all := []RepoKey{"acme/copy", "acme/main-copy", "acme/open", "acme/secret", "acme/secret-copy"}
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{pub}, nil, SourceStatus{ID: "gh", Repos: 1})
+		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/open", Members: []RepoKey{"acme/open"}}})
+	})
+	p.Flush()
+	s := p.Current()
+	if s.View(true, true) != s || s.View(false, false) != s || s.View(true, false) != s || s.HiddenForks() != 0 {
+		t.Error("a snapshot with neither private repositories nor hidden forks is every one of its views")
+	}
+
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{pub, fork, pinned, secret, secretFork}, nil, SourceStatus{ID: "gh", Repos: 5})
+		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/main-copy", Members: all}})
+		b.SetHidden(map[RepoKey]bool{"acme/copy": true, "acme/secret-copy": true})
+	})
+	p.Flush()
+	s = p.Current()
+	for _, tc := range []struct {
+		name            string
+		private, forks  bool
+		repos           []RepoKey
+		hiddenForks     int
+		defaultRepoKept bool
+	}{
+		{"everything", true, true, all, 2, true},
+		{"private, forks hidden", true, false, []RepoKey{"acme/main-copy", "acme/open", "acme/secret"}, 2, true},
+		{"public, forks shown", false, true, []RepoKey{"acme/copy", "acme/main-copy", "acme/open"}, 1, true},
+		{"public, forks hidden", false, false, []RepoKey{"acme/main-copy", "acme/open"}, 1, true},
+	} {
+		v := s.View(tc.private, tc.forks)
+		got := slices.Sorted(maps.Keys(v.Repos))
+		g, _ := v.Group("all")
+		if !slices.Equal(got, tc.repos) || !slices.Equal(g.Members, tc.repos) || v.HiddenForks() != tc.hiddenForks ||
+			(g.DefaultRepo == "acme/main-copy") != tc.defaultRepoKept || v.Sources[0].Repos != len(tc.repos) {
+			t.Errorf("%s: repos %v, members %v, hidden forks %d, default %q, source count %d", tc.name, got, g.Members, v.HiddenForks(), g.DefaultRepo, v.Sources[0].Repos)
+		}
+		if noteCount.Get(v) != 0 || v.Hidden("acme/copy") != true {
+			t.Errorf("%s: index %d, hidden(copy) %v", tc.name, noteCount.Get(v), v.Hidden("acme/copy"))
+		}
+	}
+	if s.Public().Public() != s.Public() || s.View(true, false).View(true, false) != s.View(true, false) {
+		t.Error("a view is not its own sibling of its kind")
+	}
+	// A hidden fork's item moves the versions of the views that hold it, and of no other.
+	p.Update(func(b *Builder) { b.Mark("notes/acme/copy", "acme/copy", 9, 9) })
+	p.Flush()
+	next := p.Current()
+	if next.View(true, true).Version == s.View(true, true).Version || next.View(false, true).Version == s.View(false, true).Version {
+		t.Error("a fork's change did not move the views that show it")
+	}
+	if next.View(true, false).Version != s.View(true, false).Version || next.View(false, false).Version != s.View(false, false).Version {
+		t.Error("a hidden fork's change moved the views that leave it out")
 	}
 }

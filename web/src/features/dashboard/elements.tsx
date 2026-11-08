@@ -58,6 +58,7 @@ export function Elements({
             key={`${i}-${el.view}`}
             groups={pick(data.groups, el.groups)}
             repoCount={data.repoCount}
+            hiddenForks={data.hiddenForks}
             view={view ?? el.view ?? "cards"}
             work={data.work}
             now={now}

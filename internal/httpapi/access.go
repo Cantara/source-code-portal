@@ -61,6 +61,15 @@ func ViewerOf(ctx context.Context) Viewer {
 // Private reports whether the request's viewer sees private repositories.
 func Private(ctx context.Context) bool { return ViewerOf(ctx).Private }
 
+type forksKey struct{}
+
+// ShowForks reports whether the request asked for the forks the default views leave out (?forks=show). It names the URL, so a
+// cache keeps the two answers apart.
+func ShowForks(ctx context.Context) bool {
+	v, _ := ctx.Value(forksKey{}).(bool)
+	return v
+}
+
 // WithViewer returns ctx carrying v, for tests of handlers that read the viewer.
 func WithViewer(ctx context.Context, v Viewer) context.Context {
 	return context.WithValue(ctx, viewerKey{}, v)

@@ -40,7 +40,7 @@ an error, as is an unknown key in the file.
 | `log` | `level` (`info`), `format` (`json`, or `text`) | |
 | `store` | `path` (`/data/scp.db`) | one SQLite file: block or local storage, not NFS |
 | `sync` | `concurrency` (`4`) | GitHub jobs at once |
-| `github.sources[]` | `id`, `base_url` (GitHub Enterprise: `https://<host>/api/v3/`), `orgs`, `app.id`, `app.private_key_file`, `app.installations`, `token_file`, `include_forks` (`false`), `include_archived` (`true`), `exclude[]`, `include_private` (`false`) | an account belongs to one source |
+| `github.sources[]` | `id`, `base_url` (GitHub Enterprise: `https://<host>/api/v3/`), `orgs`, `app.id`, `app.private_key_file`, `app.installations`, `token_file`, `include_forks` (`false`: forks are hidden unless a group names one with `default_repo` or `exact`, or the reader asks), `include_archived` (`true`), `exclude[]`, `include_private` (`false`) | an account belongs to one source |
 | `catalog` | `reconcile_interval` (`5m`), `groups[]`: `id`, `name`, `description`, `default_repo`, `sources`, `match[]` | at most 500 groups, 64 matchers each |
 | `webhook` | `secret_file`, `previous_secret_file`, `catch_up` | the receiver exists only with a secret; `catch_up: true` (needs an App source) reads the App's delivery log every 2 minutes instead, for a portal GitHub cannot reach |
 | `access` | `user_header`, `groups_header`, `private_groups` (`["*"]`: everyone signed in), `require_auth` | `include_private` needs `private_groups` and a way to know the viewer |

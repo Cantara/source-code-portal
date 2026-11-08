@@ -145,7 +145,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].token_file` | | a token file, instead of `app` |
 | `github.sources[].credential` | `false` | `true`: the token is in the vault of [`scp personal`](personal-edition.md) (experimental); `scp serve` refuses it |
 | `github.sources[].app.credential` | `false` | `true`: the App's private key is in the vault of `scp personal` (instead of `app.private_key_file`); `scp serve` refuses it |
-| `github.sources[].include_forks` | `false` | list forks |
+| `github.sources[].include_forks` | `false` | show forks by default. Forks are always read; unless this is set a fork is left out of the pages and the API until the reader asks for it (`Show forks` on the dashboard and the group page, in Settings; `?forks=show` in the API), except a fork a group names: its `default_repo`, or an `exact` matcher |
 | `github.sources[].include_archived` | `true` | list archived repositories |
 | `github.sources[].exclude` | `[]` | repositories kept out of the catalogue even where the credential reads them: matchers as in the groups (`exact`, `prefix`, `glob`, `regexp`, `topic`) |
 | `github.sources[].include_private` | `false` | list private and internal repositories too (section 2.1) |
@@ -795,7 +795,7 @@ steps, and job failures. Secrets are never logged.
 | `config check` exits 2 | every problem is listed with its key; unknown keys and `SCP_*` variables are errors |
 | `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub prerequisites* card names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation, or switch the feature off with `features.pulls` or `features.issues` (section 1) |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
-| A repository is missing | it must be public, not a fork (unless `include_forks`), not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it) |
+| A repository is missing | it must be public, not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it); a fork is hidden unless `include_forks` is set or a group names it (the dashboard says how many are hidden; `scp config groups` lists them) |
 | Pushes, issues or pull requests show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository (a delivery shown as failed is read from that log within minutes: `scp_webhook_deliveries_total{result="caught_up"}`), `scp_webhook_deliveries_total` by result; the App must subscribe to *Issues*, *Pull request* and *Pull request review* (the *GitHub prerequisites* card) |
 | The assistant answers with an error | *Test the provider* on the *Admin* page; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |

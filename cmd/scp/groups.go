@@ -103,7 +103,9 @@ func previewGroups(w io.Writer, cfg config.Config, listed []listedRepo) error {
 	groups, _ := catalog.Compile(cfg.Catalog.Groups) // errors were refused by loadConfig
 	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
 	var left []string
+	shown := map[string]bool{}
 	for _, src := range cfg.GitHub.Sources {
+		shown[src.ID] = src.IncludeForks
 		var mine []snapshot.Repo
 		for _, l := range listed {
 			if l.Owner.Login == "" || slices.ContainsFunc(src.Orgs, func(o string) bool { return strings.EqualFold(o, l.Owner.Login) }) {
@@ -130,6 +132,12 @@ func previewGroups(w io.Writer, cfg config.Config, listed []listedRepo) error {
 			}
 		}
 	}
+	// The forks the portal leaves out of its default views are not in the groups it shows; they are listed apart.
+	var hidden []string
+	for k := range groups.Hidden(repos, shown) {
+		hidden = append(hidden, repos[k].Repo.Name+" (fork; name it as a default_repo or an exact matcher, or set include_forks)")
+		delete(repos, k)
+	}
 	grouped := map[snapshot.RepoKey]bool{}
 	for _, g := range groups.Resolve(repos) {
 		def := string(g.DefaultRepo)
@@ -151,7 +159,7 @@ func previewGroups(w io.Writer, cfg config.Config, listed []listedRepo) error {
 	for _, list := range []struct {
 		title string
 		names []string
-	}{{"In no group", none}, {"Left out by the source filters", left}} {
+	}{{"In no group", none}, {"Left out by the source filters", left}, {"Forks hidden by default", hidden}} {
 		if len(list.names) > 0 {
 			slices.Sort(list.names)
 			fmt.Fprintf(w, "%s (%d):\n  %s\n", list.title, len(list.names), strings.Join(list.names, "\n  "))
@@ -162,8 +170,6 @@ func previewGroups(w io.Writer, cfg config.Config, listed []listedRepo) error {
 
 func why(r snapshot.Repo) string {
 	switch {
-	case r.Fork:
-		return "fork; include_forks"
 	case r.Archived:
 		return "archived; include_archived"
 	case !r.Public():
