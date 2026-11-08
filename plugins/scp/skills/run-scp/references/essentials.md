@@ -10,7 +10,7 @@ server:
   public_url: https://scp.example.org     # absolute links; https turns on HSTS
   trusted_proxies: [172.30.0.0/24]        # the reverse proxy's network only
 store:
-  path: /data/scp.db                      # the cache; rebuildable, needs no backup
+  path: /data/scp.db                      # rebuildable from GitHub, except the saved layouts and announcements: back those up
 github:
   sources:
     - id: github
