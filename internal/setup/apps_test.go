@@ -143,7 +143,7 @@ func TestTheAppFlow(t *testing.T) {
 	u, _ = url.Parse(o["action"].(string))
 	state = u.Query().Get("state")
 	code, body := get("code=good-code&state=" + url.QueryEscape(state))
-	if code != 200 || !strings.Contains(body, "/setup/callback.js") {
+	if code != 200 || !strings.Contains(body, "/setup/callback.js") || !strings.Contains(body, `content="`+r.token+`"`) {
 		t.Fatalf("callback: %d %s", code, body)
 	}
 	if code, _ := get("code=good-code&state=" + url.QueryEscape(state)); code != http.StatusBadRequest {

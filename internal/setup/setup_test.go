@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
 	"slices"
 	"strings"
@@ -115,6 +114,7 @@ type rig struct {
 	finished chan Result
 	bodies   *bytes.Buffer                         // every answer the page was given
 	cli      func(hostname string) (string, error) // the GitHub CLI's answer
+	token    string                                // the session token the page was given
 }
 
 func newRig(t *testing.T, clientID string, sleep func(context.Context, time.Duration) error) *rig {
@@ -140,21 +140,37 @@ func newRigHeld(t *testing.T, clientID string, sleep func(context.Context, time.
 	ts.Start()
 	t.Cleanup(func() { ts.Close(); r.s.Close() })
 	r.Server = ts
-	jar, _ := cookiejar.New(nil)
-	r.client = &http.Client{Jar: jar, Transport: noKeepAlive, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	r.client = &http.Client{Transport: noKeepAlive, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	return r
 }
 
+// enter opens the page with the one-use code, as the person's browser does, and keeps the session token it is given.
 func (r *rig) enter(t *testing.T) {
 	t.Helper()
-	res, err := r.client.Get(r.URL + "/setup/?code=" + r.code)
+	r.token = tokenOf(t, r.client, r.URL+"/setup/?code="+r.code)
+	if r.token == "" {
+		t.Fatal("the page gave no session token")
+	}
+}
+
+// tokenOf opens address and returns the session token in the page, empty when it holds none.
+func tokenOf(t *testing.T, c *http.Client, address string) string {
+	t.Helper()
+	res, err := c.Get(address)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = res.Body.Close()
-	if res.StatusCode != http.StatusSeeOther {
-		t.Fatalf("entering: %d", res.StatusCode)
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("the page: %d", res.StatusCode)
 	}
+	_, rest, ok := strings.Cut(string(b), `<meta name="setup-token" content="`)
+	if !ok {
+		t.Fatal("the page has no token meta")
+	}
+	tok, _, _ := strings.Cut(rest, `"`)
+	return tok
 }
 
 func (r *rig) call(t *testing.T, method, path string, body any, header ...string) (int, map[string]any) {
@@ -170,6 +186,9 @@ func (r *rig) call(t *testing.T, method, path string, body any, header ...string
 	}
 	if method == http.MethodPost {
 		req.Header.Set("Sec-Fetch-Site", "same-origin")
+	}
+	if r.token != "" {
+		req.Header.Set("X-Setup-Token", r.token)
 	}
 	for i := 0; i+1 < len(header); i += 2 {
 		if header[i+1] == "" {
@@ -223,32 +242,43 @@ func TestEntry(t *testing.T) {
 		_ = res.Body.Close()
 		return res.StatusCode
 	}
-	if c := get("/setup/", ""); c != http.StatusForbidden {
-		t.Errorf("without the code: %d", c)
+	// The page is the same for everyone and holds no secret: without the code, or with a wrong one, it carries no session token.
+	if tok := tokenOf(t, r.client, r.URL+"/setup/"); tok != "" {
+		t.Errorf("the token without the code: %q", tok)
 	}
-	if c := get("/setup/?code=wrong", ""); c != http.StatusForbidden {
-		t.Errorf("a wrong code: %d", c)
+	if tok := tokenOf(t, r.client, r.URL+"/setup/?code=wrong"); tok != "" {
+		t.Errorf("the token for a wrong code: %q", tok)
 	}
 	if c := get("/setup/?code="+r.code, "evil.example"); c != http.StatusMisdirectedRequest {
 		t.Errorf("another host name (DNS rebinding): %d", c)
 	}
 	if c, _ := r.call(t, http.MethodGet, "/setup/api/state", nil); c != http.StatusForbidden {
-		t.Errorf("the api without the cookie: %d", c)
+		t.Errorf("the api without the token: %d", c)
 	}
 	r.enter(t)
-	if c := get("/setup/", ""); c != http.StatusOK {
-		t.Errorf("with the cookie: %d", c)
+	if c, _ := r.call(t, http.MethodGet, "/setup/api/state", nil); c != http.StatusOK {
+		t.Errorf("with the token: %d", c)
 	}
-	// The code is used up: another browser gets nothing.
-	other := newRigClient(r)
-	res, _ := other.Get(r.URL + "/setup/?code=" + r.code)
+	if c, _ := r.call(t, http.MethodGet, "/setup/api/state", nil, "X-Setup-Token", "not-it"); c != http.StatusForbidden {
+		t.Errorf("a wrong token: %d", c)
+	}
+	// The code is used up: another browser gets no token, and a cookie, were there one, would open nothing: only the header does.
+	if tok := tokenOf(t, newRigClient(r), r.URL+"/setup/?code="+r.code); tok != "" {
+		t.Errorf("the code twice gave a token: %q", tok)
+	}
+	req, _ := http.NewRequest(http.MethodGet, r.URL+"/setup/api/state", nil)
+	req.AddCookie(&http.Cookie{Name: "scp_setup", Value: r.token})
+	res, err := r.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = res.Body.Close()
 	if res.StatusCode != http.StatusForbidden {
-		t.Errorf("the code twice: %d", res.StatusCode)
+		t.Errorf("the token as a cookie, as another server on this computer could replay it: %d", res.StatusCode)
 	}
 	localhost := strings.Replace(r.URL, "127.0.0.1", "localhost", 1)
-	req, _ := http.NewRequest(http.MethodGet, localhost+"/setup/", nil)
-	res, err := r.client.Do(req)
+	req, _ = http.NewRequest(http.MethodGet, localhost+"/setup/", nil)
+	res, err = r.client.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,8 +289,7 @@ func TestEntry(t *testing.T) {
 }
 
 func newRigClient(r *rig) *http.Client {
-	jar, _ := cookiejar.New(nil)
-	return &http.Client{Jar: jar, Transport: noKeepAlive, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	return &http.Client{Transport: noKeepAlive, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }
 
 func TestAPIRefuses(t *testing.T) {
@@ -481,7 +510,7 @@ func TestSuggestNoDuplicates(t *testing.T) {
 		repos = append(repos, ghlogin.Repo{Owner: "Cantara", Name: fmt.Sprintf("cantara-%03d", i)})
 	}
 	repos = append(repos, ghlogin.Repo{Owner: "Cantara", Name: "left-1"}, ghlogin.Repo{Owner: "Cantara", Name: "left-2"},
-		ghlogin.Repo{Owner: "Cantara", Name: ".github"}, ghlogin.Repo{Owner: "DNB", Name: ".github"},
+		ghlogin.Repo{Owner: "Cantara", Name: ".github"}, ghlogin.Repo{Owner: "Example", Name: ".github"},
 		ghlogin.Repo{Owner: "descoped", Name: "same"}, ghlogin.Repo{Owner: "oranheim", Name: "same"})
 	if got := OnePerName(repos); len(got) != 3+2+1+1 {
 		t.Fatalf("one per name: %d", len(got))

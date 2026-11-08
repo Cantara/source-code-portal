@@ -83,3 +83,29 @@ func TestBoundaryCheckFindsViolation(t *testing.T) {
 		t.Errorf("violations = %q, want docs/docs.go importing catalog and snapshot/s.go importing ci", got)
 	}
 }
+
+// TestSharedSiteDoesNotLinkThePersonalEdition: the shared site (`scp serve`, the prime way of deploying) must not be touched by the
+// personal edition, so the packages that only the personal edition uses (its setup page, signing in to GitHub, the vault) are imported
+// by its own files, personal*.go, and by no other file of the program.
+func TestSharedSiteDoesNotLinkThePersonalEdition(t *testing.T) {
+	personalOnly := []string{internalPrefix + "setup", internalPrefix + "ghlogin", internalPrefix + "vault"}
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") || strings.HasPrefix(f, "personal") {
+			continue
+		}
+		af, err := parser.ParseFile(token.NewFileSet(), f, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imp := range af.Imports {
+			path, _ := strconv.Unquote(imp.Path.Value)
+			if slices.Contains(personalOnly, path) {
+				t.Errorf("%s imports %s: only personal*.go may", f, path)
+			}
+		}
+	}
+}

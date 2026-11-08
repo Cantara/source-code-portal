@@ -4,6 +4,8 @@
 set -eu
 cd "$(git rev-parse --show-toplevel)"
 
+scripts/check-neutral.sh staged
+
 go_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.go')
 if [ -n "$go_files" ]; then
 	# shellcheck disable=SC2086

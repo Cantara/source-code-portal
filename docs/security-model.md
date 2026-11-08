@@ -105,10 +105,12 @@ session sees nothing; the public view never knew the private repositories), and 
   never does itself (the fake GitHub of the tests fails on any write).
 - It does not refresh a token that ends: it says so and asks the person to sign in again.
 - The first-run page is served on a loopback address only, by the same process, for as long as the setup lasts. Its link carries a
-  random code that works once and gives the browser a `SameSite=Strict`, `HttpOnly` cookie; a request with another `Host` header
+  random code that works once and gives that tab a session token, kept in its session storage and sent as a header with every call (a
+  cookie would also go to any other server on this computer, whatever its port); a request with another `Host` header
   (DNS rebinding) or from another origin is refused, bodies are JSON and capped, and its script and style come from the page's own
   address under a strict content security policy. The token a person pastes, receives from GitHub or takes from the GitHub CLI (`gh auth token`, run by the portal on that person's click) stays in the process: the page
   is never sent it back, and it is sealed, not logged, when the setup ends.
+- The shared site is not touched by the personal edition: `scp serve` links the setup page, the GitHub sign-in and the vault only through the personal edition's own files (a test fails on any other import), refuses a configuration whose credential or App key is "in the vault", serves no `/auth/launch` and no `/setup/`, and the personal edition's one-use sign-in link exists only when `scp personal` hands it to the portal it starts.
 - The optional GitHub App of an account is made by GitHub's manifest flow in the person's own browser: the manifest asks for read
   permissions only (taken from the one table of what each feature needs), the page may post it only to the host the person signed
   in to (`form-action`), and GitHub's return carries a random state that works once (the cookie does not travel on a redirect from

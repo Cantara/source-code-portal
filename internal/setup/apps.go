@@ -204,11 +204,13 @@ func (s *Server) appCallback(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, callbackFailed)
 		return
 	}
-	_, _ = io.WriteString(w, callbackMade)
+	// The one who comes back with the state made on the page is the page's own tab: hand it the session token again, in case the
+	// browser dropped its session storage on the way through GitHub.
+	_, _ = io.WriteString(w, strings.Replace(callbackMade, `content=""`, `content="`+s.session+`"`, 1))
 }
 
 const (
-	callbackMade = `<!doctype html><meta charset="utf-8"><title>Source Code Portal setup</title><body><h1>The App is made</h1>` +
+	callbackMade = `<!doctype html><meta charset="utf-8"><meta name="setup-token" content=""><title>Source Code Portal setup</title><body><h1>The App is made</h1>` +
 		`<p>Going on to the setup page…</p><p><a href="/setup/">Continue</a></p><script src="/setup/callback.js"></script>`
 	callbackFailed = `<!doctype html><meta charset="utf-8"><title>Source Code Portal setup</title><body><h1>The App was not made</h1>` +
 		`<p>This link is not the one the setup page made, it ran out, or GitHub did not hand the App over (its code works once, within an hour). ` +

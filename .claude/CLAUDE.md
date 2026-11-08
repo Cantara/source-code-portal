@@ -49,6 +49,7 @@ never modify it, push to it or open issues or pull requests on it.
   GitHub fails a test on anything else. A feature that needs another permission or event adds its row to `internal/prereq.Needs`
   and to the documentation's table in the same commit (`TestPrerequisitesDocumented`).
 - **Data lives in SQLite; memory only loads it** (owner, P-97): every new piece of data the portal keeps is a row in the store, written through before it is acknowledged, loaded into memory at the start for fast reads. An instance that dies must come back with everything it had acknowledged (a hard requirement, proved by `make rehearse`). Keep it simple.
+- **The repo stays deployment-neutral** (owner): no company, host or customer name anywhere in it, commit messages and PR text included; such facts go to the dossier. `scripts/check-neutral.sh` (the commit hooks and `make check`) refuses the names listed in a private file outside the repo.
 - **No Hazelcast, Redis or Postgres in any new work** (owner, repeated): no design, feature, test run, rehearsal or verification item rests on them, and they are never listed as unverified. The existing `internal/cluster` code stays as it is until the owner says otherwise; the Hazelcast container commands below are not run. Search stays in memory; the store is SQLite.
 - Keep it small: no package, config key, metric or dependency before the code that needs it. Avoid over-engineering.
 - Dependencies are the latest releases of the best-in-class choice (owner P-17), pure Go on the server; `bluemonday` is the one exception

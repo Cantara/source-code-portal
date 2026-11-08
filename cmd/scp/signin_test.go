@@ -124,6 +124,12 @@ github:
 	if code, _ := do(anon, http.MethodGet, "/api/v1/admin/status"); code != http.StatusUnauthorized {
 		t.Errorf("anonymous status: %d", code)
 	}
+	// A shared site is not the personal edition: nothing of it answers here (a launch link, the setup page, a token from the vault).
+	for _, path := range []string{"/auth/launch?code=anything", "/setup/", "/setup/api/state", "/setup/app/callback?code=x&state=y"} {
+		if code, b := do(anon, http.MethodGet, path); code == http.StatusOK || strings.Contains(b, "Set up your portal") || me(anon).SignedIn {
+			t.Errorf("%s on a shared site: %d %.80s", path, code, b)
+		}
+	}
 
 	// Ada is an admin by her email.
 	ada := newBrowser()

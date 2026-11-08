@@ -192,6 +192,13 @@ func backup(ctx context.Context, db *sql.DB, path string, n int, log *slog.Logge
 	if _, err := os.Stat(dst); err == nil {
 		return
 	}
+	// The copy holds sealed credentials and the documents: create it private before anything is written (SQLite fills an empty file).
+	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // G304: next to the store, named by us
+	if err != nil {
+		log.Warn("store: no copy before the migration", "migration", n, "err", err)
+		return
+	}
+	_ = f.Close()
 	if _, err := db.ExecContext(ctx, "VACUUM INTO ?", dst); err != nil {
 		log.Warn("store: no copy before the migration", "migration", n, "err", err)
 		_ = os.Remove(dst)
