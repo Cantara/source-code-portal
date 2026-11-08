@@ -119,7 +119,7 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
 | `/pulls` or `/issues` says the feature is off, or stays empty | *Admin*, *GitHub prerequisites* (or `/api/v1/status` warnings, the log's `prerequisites unmet`): the missing permissions and events and the installation; grant them in the App's *Permissions & events*, accept them on the installation, then check with `gh api /orgs/<org>/installations --jq '.installations[] \| {app_slug, permissions, events}'` |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for 401/403 (credential, App not installed, missing permission) |
 | A repository is missing | public (or `include_private` with access), not a fork, not in `exclude`, in a listed account; `scp config groups` |
-| Pushes show only after minutes | the webhook: GitHub's delivery log, `scp_webhook_deliveries_total` by result; without one the portal lists every 5 minutes |
+| Pushes show only after minutes | the webhook: GitHub's delivery log, `scp_webhook_deliveries_total` by result; without one the portal lists every 5 minutes (releases every 30 minutes); a portal GitHub cannot reach can set `webhook.catch_up: true` with an App source to read the App's delivery log |
 | Pages say *Delayed* | `scp_github_rate_remaining_ratio`; with a token, move to a GitHub App |
 | Sign-in fails | `/signin?error=`, the provider's redirect URI, `auth.oidc.groups_claim`, the session key the same on every instance |
 | The assistant errs | *Test the provider* on *Admin*; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines |

@@ -1,6 +1,6 @@
 # Presentation mode: the fleet on a wall (K1 to K2)
 
-Status: K1 and K2 built (plan.md section 4). Binding order: ../plan.md > this note > `layout.md`.
+Status: K1 to K3 built (plan.md section 4). Binding order: ../plan.md > this note > `layout.md`.
 
 A tablet or a screen on the wall shows the portal all day: an iPad in landscape beside the team, a TV in the corridor. The dashboard is
 built for a reader who scrolls, hovers and clicks; on a wall nobody does. K1 and K2 give the portal one page made for being looked at

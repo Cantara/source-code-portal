@@ -80,7 +80,7 @@ webhook on an organisation or a repository has no such log: there the listing be
 requests are also read every 15 minutes whatever arrives (a 304 costs no rate limit), and the listing every five minutes asks for a
 read when a repository's count of open issues and pull requests moved.
 
-Without a webhook the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
+Without a webhook, and without `webhook.catch_up` (the App's delivery log), the portal still refreshes: it lists every account every five minutes and notices pushes from that listing;
 commits, documents, descriptors and manifests are also re-read on their own schedule.
 
 ## 2. Configure

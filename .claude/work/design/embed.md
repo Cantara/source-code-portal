@@ -1,6 +1,6 @@
 # Embedding SCP in other sites (E1 to E4)
 
-Status: queued, after the next release (plan.md section 4). Binding order: ../plan.md > this note.
+Status: dequeued until the owner returns to it (plan.md section 4); never started or proposed meanwhile. Binding order: ../plan.md > this note.
 
 A host site (a company's own website, a CMS-built site, an intranet) shows the portal's signals in its own pages: the fleet map, a
 product's card, the telemetry, the latest commits, a repository's health. The host may be built on any stack (Next.js, SvelteKit,
