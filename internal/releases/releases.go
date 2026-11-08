@@ -198,12 +198,16 @@ func (f *Releases) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if err != nil {
 		return sync.Result{}, err
 	}
-	text, err := src.Changelog(ctx, owner, name)
-	if err != nil {
-		return sync.Result{}, err
-	}
 	set := build(listed)
-	set.Changelog = sections(string(text))
+	if text, err := src.Changelog(ctx, owner, name); err == nil {
+		set.Changelog = sections(string(text))
+	} else {
+		// the changelog is a nicety: the releases are published, the sections known stay
+		var prev Set
+		if json.Unmarshal(j.Prev.Payload, &prev) == nil {
+			set.Changelog = prev.Changelog
+		}
+	}
 	payload, err := json.Marshal(set)
 	if err != nil {
 		return sync.Result{}, err

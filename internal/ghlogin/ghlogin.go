@@ -30,7 +30,7 @@ type Host struct {
 // /api/v3/), or "https://name.ghe.com" (a GHE.com tenant: REST at api.name.ghe.com). http is accepted for loopback only.
 func ParseHost(s string) (Host, error) {
 	s = strings.TrimSpace(s)
-	if s == "" || s == "github.com" || s == "https://github.com" {
+	if k := strings.ToLower(strings.TrimRight(s, "/")); k == "" || k == "github.com" || k == "https://github.com" || k == "www.github.com" || k == "https://www.github.com" {
 		return Host{Web: "https://github.com", API: "https://api.github.com/"}, nil
 	}
 	if !strings.Contains(s, "://") {

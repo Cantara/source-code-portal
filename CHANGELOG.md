@@ -6,6 +6,8 @@ subjects.
 
 ## Unreleased
 
+- **Review fixes before 2.2.10**: a store whose mode could not be read at the first look is judged on the open store and never takes another mode's mark; removing a sealed credential is synced to disk like writing one; a changelog that cannot be read no longer costs a repository its releases (the sections known stay); a tag pushed or deleted refreshes the history's tag labels; the live stream follows the forks the reader chose; the rendered release notes are kept (4 MiB) instead of rendered at every request; `https://github.com/` and `GitHub.com` are github.com in the personal wizard.
+
 - **The store's schema is flat**: the four migrations became one baseline (`0001_init.sql`, marked with the application id `SCP1`). A store made by an earlier release is moved aside on the first start (`<store.path>.quarantine-<time>`, nothing to do, the newest two are kept) and the catalogue is read again from GitHub, a minute or two; it held only what GitHub gives again. An older release can still open the new store, and renaming the moved-aside file back restores the old one. From here on the store changes only by additive migrations again, with the `.pre-NNNN` copy first. `make rehearse` proves both generations.
 
 - **Branch pushes and deleted refs reach the portal**: a push to a branch other than the default, and a deleted branch, make the history read that repository again at once (it waited for the 2-hour poll); a deleted tag reads the tags and releases again. A source with a webhook receiver but no GitHub App, whose missed deliveries nothing can recover, reads its releases every 30 minutes instead of every 6 hours.

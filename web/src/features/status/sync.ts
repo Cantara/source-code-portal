@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, type Query } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
-import { api } from "@/lib/api/client"
+import { api, forksShown } from "@/lib/api/client"
 import { setLive } from "@/lib/connection"
 import type { components } from "@/lib/api/schema"
 import { snapshotKey, snapshotQuery } from "@/lib/api/snapshot"
@@ -58,7 +58,7 @@ function useLiveSnapshot(): boolean {
     const connect = () => {
       close()
       if (stopped) return
-      const s = new EventSource("/api/v1/events")
+      const s = new EventSource(forksShown() ? "/api/v1/events?forks=show" : "/api/v1/events")
       source = s
       const alive = () => wait(silenceLimit, connect)
       s.onopen = () => {
