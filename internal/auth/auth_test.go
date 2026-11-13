@@ -404,3 +404,33 @@ func TestRenewalKeepsWhenAnOldSessionWasIssued(t *testing.T) {
 		t.Errorf("Began = %d, want the first issue %d", renewed.Began, first.Unix())
 	}
 }
+
+// An Entra ID-style account: no email claim, preferred_username always. With the identity claim set, preferred_username is the
+// email matched against the admin list and shown; with userinfo off the provider's userinfo endpoint is never asked.
+func TestSignInIdentityClaimAndNoUserinfo(t *testing.T) {
+	for name, tc := range map[string]struct {
+		claim      string
+		noUserInfo bool
+		want       string
+		userinfos  int
+	}{
+		"email, as today: none, so userinfo is asked": {"", false, "/ oidc Ada  staff", 1},
+		"preferred_username":                          {"preferred_username", false, "/ oidc Ada ada@octocorp.example staff", 0},
+		"preferred_username, userinfo off":            {"preferred_username", true, "/ oidc Ada ada@octocorp.example staff", 0},
+		"email, userinfo off: never asked":            {"", true, "/ oidc Ada  staff", 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			idp, o := withProvider(t)
+			idp.SetUser(oidctest.User{Subject: "u-4", Name: "Ada", PreferredUsername: "ada@octocorp.example", NoEmail: true,
+				Groups: []string{"staff"}})
+			o.OIDC.IdentityClaim, o.OIDC.NoUserInfo = tc.claim, tc.noUserInfo
+			p := newPortal(t, o)
+			if _, body := p.get(t, "/auth/login"); body != tc.want {
+				t.Errorf("signed in: %q, want %q", body, tc.want)
+			}
+			if n := idp.UserinfoCalls(); n != tc.userinfos {
+				t.Errorf("userinfo asked %d times, want %d", n, tc.userinfos)
+			}
+		})
+	}
+}

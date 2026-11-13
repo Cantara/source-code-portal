@@ -168,7 +168,9 @@ func (a *Auth) exchange(ctx context.Context, code string, f flow) (session, erro
 	if err := idt.Claims(&claims); err != nil {
 		return session{}, err
 	}
-	if _, ok := claims["email"]; !ok || claims[p.o.GroupsClaim] == nil { // some providers give these only from userinfo
+	// Some providers give the identity or the groups only from userinfo; enterprise.oidc.userinfo turns that call off for one whose
+	// userinfo never adds them (Entra ID's is on another host and carries no groups).
+	if _, ok := claims[p.o.identity()]; !p.o.NoUserInfo && (!ok || claims[p.o.GroupsClaim] == nil) {
 		if ui, err := p.p.UserInfo(ctx, oauth2.StaticTokenSource(tok)); err == nil {
 			var more map[string]any
 			if ui.Claims(&more) == nil && more["sub"] == idt.Subject {
@@ -180,7 +182,13 @@ func (a *Auth) exchange(ctx context.Context, code string, f flow) (session, erro
 			}
 		}
 	}
-	s := session{Issuer: idt.Issuer, Subject: idt.Subject, Email: str(claims["email"]), Verified: emailVerified(claims["email_verified"], p.o.RequireVerifiedEmail),
+	// The identity matched against auth.admin_emails is the configured claim (email unless enterprise.oidc.identity_claim says);
+	// email_verified speaks of the email only, so another claim is as verified as the provider's own sign-in.
+	verified := true
+	if p.o.identity() == "email" {
+		verified = emailVerified(claims["email_verified"], p.o.RequireVerifiedEmail)
+	}
+	s := session{Issuer: idt.Issuer, Subject: idt.Subject, Email: str(claims[p.o.identity()]), Verified: verified,
 		Groups: a.o.Keep(stringList(claims[p.o.GroupsClaim]))}
 	for _, k := range []string{"name", "preferred_username", "email"} {
 		if s.Name = str(claims[k]); s.Name != "" {

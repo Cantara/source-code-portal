@@ -52,7 +52,17 @@ type OIDC struct {
 	Issuer, ClientID, ClientSecret string
 	Scopes                         []string
 	GroupsClaim                    string
-	RequireVerifiedEmail           bool // an email_verified claim the provider does not send counts as not verified
+	RequireVerifiedEmail           bool   // an email_verified claim the provider does not send counts as not verified
+	IdentityClaim                  string // the claim matched against the admin emails and shown; empty: email
+	NoUserInfo                     bool   // never call the provider's userinfo endpoint
+}
+
+// identity is the claim that names the person: IdentityClaim, else email.
+func (o *OIDC) identity() string {
+	if o.IdentityClaim == "" {
+		return "email"
+	}
+	return o.IdentityClaim
 }
 
 // Auth identifies requests by their bearer token or session cookie, and serves the sign-in routes.

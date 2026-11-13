@@ -443,7 +443,8 @@ func newAuth(cfg config.Config, log *slog.Logger, launch *auth.Launch) (*auth.Au
 	}
 	if a.OIDC.Issuer != "" {
 		o.OIDC = &auth.OIDC{Issuer: a.OIDC.Issuer, ClientID: a.OIDC.ClientID, ClientSecret: string(a.OIDC.ClientSecret.Reveal()),
-			Scopes: a.OIDC.Scopes, GroupsClaim: a.OIDC.GroupsClaim, RequireVerifiedEmail: a.OIDC.RequireVerifiedEmail}
+			Scopes: a.OIDC.Scopes, GroupsClaim: a.OIDC.GroupsClaim, RequireVerifiedEmail: a.OIDC.RequireVerifiedEmail,
+			IdentityClaim: a.OIDC.IdentityClaim, NoUserInfo: !a.OIDC.UserInfo}
 	}
 	return auth.New(o)
 }
