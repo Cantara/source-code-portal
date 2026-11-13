@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -112,7 +113,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	return &fixture{gh: srv, db: db, path: path, key: []byte(strings.Repeat("k", 32)), now: now,
-		src: Source{ID: "ghe", WebURL: "https://ghe.example.test/", Owners: []string{"Acme"}, Login: Managed, Check: c.Source("ghe").CheckToken}}
+		src: Source{ID: "ghe", WebURL: "https://ghe.example.test/", Owners: []string{"Acme"}, Login: Managed, Check: c.Source("ghe").CheckToken, List: c.Source("ghe").ListWith}}
 }
 
 func (f *fixture) open(t *testing.T) *People {
@@ -191,3 +192,109 @@ func TestLink(t *testing.T) {
 		}
 	}
 }
+
+// clock is a time the test moves.
+type clock struct{ t time.Time }
+
+func (c *clock) now() time.Time { return c.t }
+
+// Each person's list is what their own token lists, kept across a restart; a repository GitHub stops listing leaves at the next
+// refresh; a token GitHub refuses, or a listing older than the limit, reads nothing (fail closed).
+func TestAccessLists(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	secret := f.gh.AddRepo("acme", gh.Repository{Name: new("secret"), Visibility: new("private")})
+	inner := f.gh.ID("acme", "inner")
+	f.gh.AddUserToken("github_pat_bo", "bo-lee_octo")
+	f.gh.Reach("github_pat_ann", inner, secret)
+	f.gh.Reach("github_pat_bo", inner)
+	c := &clock{time.Now()}
+	open := func() *People {
+		t.Helper()
+		p, err := Open(ctx, Options{Store: f.db, Key: f.key, Issuer: "iss", Sources: []Source{f.src}, Refresh: 15 * time.Minute, MaxAge: time.Hour,
+			Now: c.now, Log: slog.New(slog.DiscardHandler)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	ids := func(p *People, w Who) []int64 {
+		t.Helper()
+		_, set := p.Allowed(w.Subject)
+		var out []int64
+		for id := range set {
+			out = append(out, id.GitHubID)
+		}
+		slices.Sort(out)
+		return out
+	}
+	bo := Who{Subject: "u-2", Identity: "bo.lee@example.org"}
+	p := open()
+	if _, err := p.Link(ctx, ann, "ghe", "acme", "github_pat_ann"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Link(ctx, bo, "ghe", "acme", "github_pat_bo"); err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(p, ann); got != nil {
+		t.Errorf("a list before its listing: %v", got)
+	}
+	p.listDue(ctx)
+	if got, want := ids(p, ann), sorted(inner, secret); !slices.Equal(got, want) {
+		t.Errorf("Ann: %v, want %v", got, want)
+	}
+	if got := ids(p, bo); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Bo: %v", got)
+	}
+	ka, _ := p.Allowed(ann.Subject)
+	kb, _ := p.Allowed(bo.Subject)
+	if ka == kb || ka == "" {
+		t.Errorf("set keys %q and %q", ka, kb)
+	}
+
+	p = open() // a restart: the lists are the store's until they are listed again
+	if got := ids(p, ann); !slices.Equal(got, sorted(inner, secret)) {
+		t.Errorf("Ann after a restart: %v", got)
+	}
+
+	f.gh.Reach("github_pat_ann", inner) // Ann loses the private repository
+	c.t = c.t.Add(16 * time.Minute)
+	p.listDue(ctx)
+	if got := ids(p, ann); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Ann after the revocation: %v", got)
+	}
+
+	f.gh.Expires("github_pat_ann", time.Now().Add(-time.Second)) // GitHub refuses Ann's token
+	c.t = c.t.Add(16 * time.Minute)
+	p.listDue(ctx)
+	if got := ids(p, ann); got != nil {
+		t.Errorf("Ann with a refused token: %v", got)
+	}
+	if tok := p.Tokens(ann); len(tok) != 1 || tok[0].State != "unauthorized" {
+		t.Errorf("Ann's token: %+v", tok)
+	}
+
+	f.gh.Fail("GET /orgs/acme/repos", 503, 100, 0) // GitHub unavailable: Bo's list ages until it counts for nothing
+	c.t = c.t.Add(30 * time.Minute)
+	p.listDue(ctx)
+	if got := ids(p, bo); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Bo within the limit: %v", got)
+	}
+	c.t = c.t.Add(time.Hour)
+	if got := ids(p, bo); got != nil {
+		t.Errorf("Bo past the limit: %v", got)
+	}
+	f.gh.Heal()
+	p.listDue(ctx)
+	if got := ids(p, bo); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Bo listed again: %v", got)
+	}
+	if err := p.Unlink(ctx, bo, "ghe", "acme"); err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(p, bo); got != nil {
+		t.Errorf("Bo after removing the token: %v", got)
+	}
+}
+
+func sorted(ids ...int64) []int64 { slices.Sort(ids); return ids }

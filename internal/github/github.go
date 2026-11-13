@@ -116,6 +116,7 @@ type Source struct {
 	owners   map[string]*credential // App mode: lower-case owner login -> installation
 	grants   []Grant                // App mode: what each installation may read, from the last listing
 	accounts map[string]account     // token mode: lower-case owner login -> what it is, looked up once
+	persons  map[string]*credential // people mode: a person's token by its holder key, made once (its rate book is its own)
 }
 
 // credential is one rate bucket: a token, or one App installation.
@@ -133,7 +134,7 @@ type account struct {
 
 func newSource(sc config.Source, base http.RoundTripper, log *slog.Logger) (*Source, error) {
 	s := &Source{id: sc.ID, cfg: sc, log: log, cache: newETagCache(etagBytes), sem: make(chan struct{}, inFlight), base: base,
-		owners: map[string]*credential{}, accounts: map[string]account{}}
+		owners: map[string]*credential{}, accounts: map[string]account{}, persons: map[string]*credential{}}
 	if sc.People { // scp enterprise: no credential of its own, and so no request without a person's token
 		return s, nil
 	}
@@ -312,7 +313,11 @@ func (s *Source) ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, 
 	if err != nil {
 		return nil, err
 	}
-	list := lister(c, owner, acct, s.token == nil)
+	return s.listAll(ctx, owner, lister(c, owner, acct, s.token == nil))
+}
+
+// listAll reads every page of list, each repository once.
+func (s *Source) listAll(ctx context.Context, owner string, list listPage) ([]snapshot.Repo, error) {
 	seen := map[int64]bool{}
 	var out []snapshot.Repo
 	for page := 0; ; page++ {

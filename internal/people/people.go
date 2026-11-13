@@ -1,6 +1,7 @@
 package people
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/github"
+	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 )
 
@@ -22,6 +24,8 @@ type Source struct {
 	Login  string   // Managed or Exact
 	// Check asks GitHub with token who it belongs to and whether it reads owner (github.Source.CheckToken).
 	Check func(ctx context.Context, owner string, token []byte) (github.TokenCheck, error)
+	// List lists the repositories of owner a person's token reads (github.Source.ListWith).
+	List func(ctx context.Context, owner string, h github.Holder) ([]snapshot.Repo, error)
 }
 
 // Options are what People needs.
@@ -31,6 +35,10 @@ type Options struct {
 	Issuer  string // the OIDC issuer: a person is its subject
 	Sources []Source
 	Portal  string // the portal's address, in the token's description
+	// Refresh is how often a token's repositories are listed again; MaxAge how old a listing may be before it counts for nothing.
+	Refresh, MaxAge time.Duration
+	// Changed is told the source after a person's listing of it changed what they read (optional).
+	Changed func(source string)
 	Now     func() time.Time
 	Log     *slog.Logger
 }
@@ -42,6 +50,8 @@ type People struct {
 	sealer  *sealer
 	sources map[string]Source
 
+	kick chan struct{} // a token waits to be listed now
+
 	mu     sync.Mutex
 	people map[string]*person
 }
@@ -50,6 +60,13 @@ type person struct {
 	store.Person
 	tokens map[slot]store.PersonToken
 	access map[slot][]int64
+	listed map[slot][]snapshot.Repo // the last listing of each token since the start
+	retry  map[slot]time.Time       // a listing that failed for a while is tried again then
+}
+
+func newPerson(sp store.Person) *person {
+	return &person{Person: sp, tokens: map[slot]store.PersonToken{}, access: map[slot][]int64{}, listed: map[slot][]snapshot.Repo{},
+		retry: map[slot]time.Time{}}
 }
 
 type slot struct{ source, owner string }
@@ -69,11 +86,12 @@ func Open(ctx context.Context, o Options) (*People, error) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
+	o.Refresh, o.MaxAge = cmp.Or(o.Refresh, 15*time.Minute), cmp.Or(o.MaxAge, time.Hour)
 	s, err := newSealer(o.Key)
 	if err != nil {
 		return nil, err
 	}
-	p := &People{o: o, sealer: s, sources: map[string]Source{}, people: map[string]*person{}}
+	p := &People{o: o, sealer: s, sources: map[string]Source{}, people: map[string]*person{}, kick: make(chan struct{}, 1)}
 	for _, src := range o.Sources {
 		p.sources[src.ID] = src
 	}
@@ -82,7 +100,7 @@ func Open(ctx context.Context, o Options) (*People, error) {
 		return nil, fmt.Errorf("people: %w", err)
 	}
 	for _, sp := range people {
-		p.people[sp.ID] = &person{Person: sp, tokens: map[slot]store.PersonToken{}, access: map[slot][]int64{}}
+		p.people[sp.ID] = newPerson(sp)
 	}
 	for _, t := range tokens {
 		if pp := p.people[t.Person]; pp != nil {
@@ -124,7 +142,7 @@ func (p *People) Seen(ctx context.Context, w Who) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if pp = p.people[id]; pp == nil {
-		pp = &person{tokens: map[slot]store.PersonToken{}, access: map[slot][]int64{}}
+		pp = newPerson(rec)
 		p.people[id] = pp
 	}
 	pp.Person = rec
@@ -177,8 +195,12 @@ func (p *People) Link(ctx context.Context, w Who, source, owner, token string) (
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	pp := p.people[id]
-	pp.tokens[slot{source, owner}] = t
-	delete(pp.access, slot{source, owner})
+	sl := slot{source, owner}
+	pp.tokens[sl] = t
+	delete(pp.access, sl)
+	delete(pp.listed, sl)
+	delete(pp.retry, sl)
+	p.wake()
 	return view(t), nil
 }
 
@@ -208,11 +230,14 @@ func (p *People) Unlink(ctx context.Context, w Who, source, owner string) error 
 		return err
 	}
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if pp := p.people[id]; pp != nil {
-		delete(pp.tokens, slot{source, owner})
-		delete(pp.access, slot{source, owner})
+		sl := slot{source, owner}
+		delete(pp.tokens, sl)
+		delete(pp.access, sl)
+		delete(pp.listed, sl)
 	}
+	p.mu.Unlock()
+	p.changed(source)
 	return nil
 }
 

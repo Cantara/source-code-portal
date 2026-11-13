@@ -185,7 +185,7 @@ func (d deps) checkedMode(cfg config.Config) (store.Mode, error) {
 // each person reads what their access list holds, and nothing without one (fail closed).
 func (s *server) views(log *slog.Logger) (view, assets func(context.Context) *snapshot.Snapshot) {
 	if s.mode == store.Enterprise {
-		people := newPeopleViews(s.pub.Current, nobody, log)
+		people := newPeopleViews(s.pub.Current, allowedOf(s.people), log)
 		return func(ctx context.Context) *snapshot.Snapshot { return people.of(ctx, httpapi.ShowForks(ctx)) },
 			func(ctx context.Context) *snapshot.Snapshot { return people.of(ctx, true) }
 	}
@@ -641,6 +641,14 @@ func (s *server) run(ctx context.Context) error {
 	checksDone := make(chan struct{})
 	go func() { s.watchPrereqs(sideCtx); close(checksDone) }()
 	defer func() { stopSide(); <-checksDone }()
+	peopleCtx, stopPeople := context.WithCancel(context.WithoutCancel(ctx)) // the enterprise mode's listings: stopped before the store closes
+	peopleDone := make(chan struct{})
+	go func() {
+		if s.people != nil {
+			s.people.Run(peopleCtx)
+		}
+		close(peopleDone)
+	}()
 	memberCtx, stopMember := context.WithCancel(context.WithoutCancel(ctx))
 	memberDone := make(chan error, 1)
 	if s.member != nil {
@@ -697,6 +705,8 @@ func (s *server) run(ctx context.Context) error {
 	if engineRunning {
 		err = errors.Join(err, <-engineDone)
 	}
+	stopPeople()
+	<-peopleDone
 	s.pub.Close()
 	return errors.Join(err, s.store.Close())
 }
