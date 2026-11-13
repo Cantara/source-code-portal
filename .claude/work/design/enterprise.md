@@ -1,6 +1,6 @@
 # Enterprise (EN1 to EN8)
 
-Status: EN1, EN3 to EN7 built, EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
+Status: EN1 and EN3 to EN8 built, EN2 planned. Binding order: ../plan.md > this note.
 
 A portal that reads GitHub Enterprise (Server, or Cloud with data residency on `*.ghe.com`) and signs people in with Microsoft
 Entra ID needs a few settings that github.com and a generic OpenID Connect provider do not: GitHub addresses that cannot be worked
@@ -204,7 +204,14 @@ name only where the request named it; a mutation that serves the full snapshot f
 (`restrictLoad` in `TestLoad1000`): 200 people of 20 sets of half of 1,000 repositories: a set's first view within 100 ms (about
 4 ms measured), a kept one within 1 ms.
 
-## EN8: the experience and the documents
+## EN8: the experience and the documents (built)
 
-The onboarding page (the empty view: what to do, the pre-filled links, each token's and list's state), the operator guide's section for
-the mode, the plugin's reference and the Guide.
+`/github`, **Your GitHub access** (`web/src/features/github`): per organisation the three steps (GitHub's pre-filled form, All
+repositories and Generate, paste and Link), the linked token's login, end and when the access was read, a warning 14 days before the
+end, GitHub's refusal in words; removing the token. A portal of another mode answers it with the not-found page (its tokens API is
+absent). The header's key icon leads to it and the empty dashboard says to link a token, both only when `/api/v1/rules` says
+`features.people` (the contract's switch for the mode). The operator guide's section 2.9 (the configuration, what each person does,
+access, network, rate limits), the plugin's reference and the Guide's paragraph describe the mode.
+
+Acceptance: `web/src/app/github.test.tsx` (a reader without a token reaches a linked one through the page; a refusal and an ending
+token in words), the rules fixture with `people`.
