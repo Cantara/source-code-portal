@@ -714,7 +714,65 @@ enterprise:
   refuses: the sources have no credential of their own (no `app`, `token_file` or `credential`), sign-in through OIDC is required and
   implies `access.require_auth`, there is no webhook, no `auth.tokens` and no `access.private_groups`, and the proxy's identity headers
   are not read. Its store belongs to the mode. Each person sees only the repositories their own tokens read, and nothing until they
-  are read; until a person has linked a token GitHub is asked nothing.
+  are read; until a person has linked a token GitHub is asked nothing. Section 2.9 runs it.
+
+### 2.9 The enterprise mode: each person reads with their own token
+
+`scp enterprise` serves GitHub Enterprise organisations to everyone who signs in through your OIDC provider, without an App, a
+webhook or an administrator's rights on GitHub. Each person links a token of their own, and sees exactly what GitHub lets them read,
+everywhere in the portal: the lists, the dashboard, search, the feeds, the documents, the badges, `llms.txt`, the event stream, the
+tools and the assistant. Repository data is read once, with the token of one person who can read it, and shared by everyone who can.
+
+```yaml
+store: {path: /var/lib/scp/scp.db}
+server: {public_url: https://scp.example.com}
+auth:
+  session_key_file: /run/secrets/session
+  oidc: {issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0", client_id: <client-id>,
+         client_secret_file: /run/secrets/oidc, scopes: [openid, email, profile]}
+github:
+  sources:
+    - {id: ghe, base_url: "https://api.octocorp.ghe.com/", orgs: [octocorp]}   # no app, token_file or credential
+catalog:
+  groups:
+    - {id: all, name: All, default_repo: handbook, match: [{catch_all: true}]}
+enterprise:
+  enabled: true
+  token_key_file: /run/secrets/tokens        # at least 32 random bytes; keep it with the store's backups
+  github: [{source: ghe, web_url: "https://octocorp.ghe.com/", people: true}]
+  oidc: {identity_claim: preferred_username, userinfo: false}
+```
+
+Run it with `scp enterprise -c scp.yaml` (the container: `scp enterprise` as the command). `scp config check` checks the same
+configuration.
+
+**What each person does, once per organisation.** The portal's page **Your GitHub access** (`/github`, the key icon in the header,
+and the empty dashboard's link) walks them through it:
+
+1. Open GitHub's form for a new fine-grained personal access token, which the page fills in: the name, the organisation as resource
+   owner, 90 days, and the repository permissions **Contents**, **Metadata**, **Pull requests**, **Issues** and **Commit statuses**, all
+   read-only.
+2. Choose **All repositories** (internal repositories are only reached that way) and **Generate token**. An organisation that
+   approves fine-grained tokens has to approve it first.
+3. Paste it into the page and **Link**. The portal checks it with GitHub before it keeps it: GitHub accepts it, it reads the
+   organisation, and it is the person's own: its login is tied to their identity claim by `login` (`managed`: a managed user's login is
+   the identity before its `@` with other characters as `-`, then `_` and the enterprise's short code; `exact`: the login is the
+   claim). A classic token is refused: it carries write scopes.
+
+The token is sealed (AES-256-GCM, a key derived from `token_key_file`), never shown again, and only read with. The person's
+repositories appear within a minute. The page shows when the token ends and warns 14 days before; a token GitHub refuses (expired,
+revoked, or refused by the enterprise's network rules) reads nothing until a new one is linked.
+
+**Access.** Each token's repositories are listed every `enterprise.access.refresh` (15 minutes); a list older than
+`enterprise.access.max_age` (1 hour), because GitHub could not be asked, counts for nothing: the person then sees nothing until it is
+read again. A repository nobody linked can read any longer leaves the catalogue after two listings.
+
+**Network.** An enterprise with IP conditions in its identity provider's Conditional Access applies them to personal access tokens:
+the portal's outbound address must be allowed, or every token is refused (`unauthorized` on the page).
+
+**Rate limits.** Each person's token has GitHub's 5,000 requests an hour, shared with whatever else they run. The portal spreads a
+repository's reads over the people who can read it, choosing the token with the most left, and polls (`sync.*` cadences, section 2):
+with few people and many repositories the first read takes longer.
 
 ## 3. Run
 

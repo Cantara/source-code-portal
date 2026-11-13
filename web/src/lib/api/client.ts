@@ -88,8 +88,8 @@ export function getter(base: string, headers: Record<string, string> = {}, forks
 /** get is the browser's Get. */
 export const get: Get = (path, signal) => getter(apiBase(), {}, forksShown)(path, signal)
 
-/** send writes to a path of /api/v1 outside the contract (the admin's layouts) with a JSON body, failing as unwrap does. */
-export function send<T>(method: "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
+/** send writes to a path of /api/v1 outside the contract (the admin's layouts, a person's tokens) with a JSON body, failing as unwrap does. */
+export function send<T>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
   return request<T>(`${apiBase()}${path}`, {
     method,
     headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },

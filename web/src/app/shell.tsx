@@ -7,6 +7,7 @@ import {
   BookIcon,
   CheckIcon,
   ChevronDownIcon,
+  KeyIcon,
   LogInIcon,
   LogOutIcon,
   MonitorIcon,
@@ -136,9 +137,13 @@ export function ThemeMenu() {
   )
 }
 
-/** PortalNav is the reader's own corner of the header: the Guide, the theme and Settings, as icons named for assistive technology. */
+/**
+ * PortalNav is the reader's own corner of the header: the Guide, the theme, the reader's GitHub access in a portal read with people's
+ * tokens, and Settings, as icons named for assistive technology.
+ */
 export function PortalNav() {
   const path = usePathname()
+  const { people } = useFeatures()
   return (
     <nav aria-label="Portal" className="flex items-center gap-0.5">
       <Link href="/guide" className={tool} title="Guide" aria-current={path === "/guide" ? "page" : undefined}>
@@ -151,6 +156,12 @@ export function PortalNav() {
         <span className="sr-only">Present</span>
       </a>
       <ThemeMenu />
+      {people && (
+        <Link href="/github" className={tool} title="Your GitHub access" aria-current={path === "/github" ? "page" : undefined}>
+          <KeyIcon className="size-[1.125rem]" />
+          <span className="sr-only">Your GitHub access</span>
+        </Link>
+      )}
       <Link href="/settings" className={tool} title="Settings" aria-current={path === "/settings" ? "page" : undefined}>
         <SlidersIcon className="size-[1.125rem]" />
         <span className="sr-only">Settings</span>

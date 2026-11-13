@@ -723,10 +723,11 @@ components:
         features:
           type: object
           description: "The parts an operator may switch off (features in scp.yaml); a switched-off one has no pages, data, tools or findings"
-          required: [pulls, issues]
+          required: [pulls, issues, people]
           properties:
             pulls: { type: boolean, description: The open pull requests }
             issues: { type: boolean, description: The open issues }
+            people: { type: boolean, description: "Each viewer reads with GitHub tokens of their own, linked at /github (scp enterprise)" }
         levels: { type: array, items: { $ref: "#/components/schemas/LevelRule" } }
         severities: { type: array, items: { $ref: "#/components/schemas/SeverityRule" } }
         activity: { type: array, items: { $ref: "#/components/schemas/ActivityRule" } }

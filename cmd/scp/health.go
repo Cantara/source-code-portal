@@ -134,10 +134,15 @@ func groupHealthAPI(s *snapshot.Snapshot, g snapshot.Group, out *oapi.Group) {
 
 // rulesAPI serves the rules the portal judges by (health.Describe, less a switched-off feature's) and the switches, so every page
 // explains the signals in the server's terms and shows only the parts switched on.
-type rulesAPI struct{ features config.Features }
+type rulesAPI struct {
+	features config.Features
+	people   bool // the enterprise mode: each viewer links their own GitHub tokens
+}
 
 func (a rulesAPI) GetRules(context.Context, oapi.GetRulesRequestObject) (oapi.GetRulesResponseObject, error) {
-	return oapi.GetRules200JSONResponse{Body: rulesFor(a.features)}, nil
+	r := rulesFor(a.features)
+	r.Features.People = a.people
+	return oapi.GetRules200JSONResponse{Body: r}, nil
 }
 
 // rulesFor is the rules and the switches as /rules tells them.

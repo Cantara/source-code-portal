@@ -344,7 +344,7 @@ describe("pages", () => {
         name: /^Commits per week.*; by automation 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 5$/,
       }),
     ).toBeInTheDocument()
-    expect(card).toHaveTextContent(/Last change \d/)
+    expect(card).toHaveTextContent(/Last change \S/) // a time, in whatever words its age takes
     expect(screen.getByRole("heading", { name: "Latest commits" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Show commits by the team or automation" })).toBeInTheDocument()
   })
@@ -362,7 +362,7 @@ describe("pages", () => {
   })
 
   it("leaves out the pull requests and issues an operator switched off", async () => {
-    const off = { ...rules, features: { pulls: false, issues: false } }
+    const off = { ...rules, features: { pulls: false, issues: false, people: false } }
     show(
       <RulesProvider rules={off}>
         <MainNav />
