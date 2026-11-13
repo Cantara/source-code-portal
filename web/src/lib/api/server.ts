@@ -6,8 +6,8 @@ import { asking, forksCookie, getter, querySerializer, type Api, type Get } from
 import type { paths } from "./schema"
 
 // The headers the Go server puts on a proxied page request that the API calls of the page carry back: the viewer (its kind, name
-// and how it was identified) with the web UI's token, and the request id.
-const forwarded = ["x-scp-token", "x-scp-viewer", "x-scp-name", "x-scp-via", "x-scp-login", "x-request-id"]
+// and how it was identified, its GitHub login and its stable id) with the web UI's token, and the request id.
+const forwarded = ["x-scp-token", "x-scp-viewer", "x-scp-name", "x-scp-via", "x-scp-login", "x-scp-user", "x-request-id"]
 
 const base = () => `${process.env.SCP_API ?? "http://127.0.0.1:9090"}/api/v1`
 
