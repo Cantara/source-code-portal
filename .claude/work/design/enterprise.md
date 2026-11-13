@@ -1,6 +1,6 @@
 # Enterprise (EN1 to EN8)
 
-Status: EN1, EN3, EN4 and EN5 built, EN6 to EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
+Status: EN1, EN3 to EN6 built, EN7 and EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
 
 A portal that reads GitHub Enterprise (Server, or Cloud with data residency on `*.ghe.com`) and signs people in with Microsoft
 Entra ID needs a few settings that github.com and a generic OpenID Connect provider do not: GitHub addresses that cannot be worked
@@ -172,10 +172,23 @@ Acceptance: `TestAccessLists` (two people, two lists, kept across a restart; a r
 token reads nothing; GitHub unavailable past `max_age` reads nothing, and the list returns once GitHub does; a removed token reads
 nothing).
 
-## EN6: the shared fetch through people's tokens
+## EN6: the shared fetch through people's tokens (built)
 
-The source's credential for a repository is a fresh token of a person whose list holds it (`github.People`), the one with the most rate
-left; another when it fails. The catalogue is the union of what linked people list; nothing is fetched twice.
+The source's credential for a repository is a fresh token of a person whose listing holds it, the one with the most of its rate limit
+left. The catalogue is the union of what linked people list; nothing is fetched twice.
+
+Built as `github.Broker` (`Listed`: the union of the fresh listings of an owner, `Holders`: the tokens of the people whose fresh
+listing holds a repository), implemented by `People` and given to each source by `SetBroker`. `Source.ListRepos` of a people source
+reads the broker, not GitHub (the people's listings are the GitHub calls); every call about a repository takes its holder
+(`client(ctx, owner, name)`, so `REST` names the repository too). A source without a fresh listing, or a repository without a holder,
+is the new error kind `Waiting` (`no_person`): the engine neither pauses the source nor backs off (`classWaiting`), keeps what it held,
+and runs the job again at an event or within 5 minutes. Each listing tells the engine (`EventSourceChanged`), so the catalogue follows
+the people. A repository no linked person lists any longer leaves after the catalogue's two misses.
+
+Acceptance: `TestEnterpriseTwoPeople` (two people of different access: every request about a repository went with a token that reads
+it, none answered 404; each person reads exactly their repositories in the repositories, the dashboard, a group, the commits, search,
+`llms.txt`, `llms-full.txt`, the sitemap, `knowledge.yaml` and the snapshot, the other's repository and badge answer 404; a person who
+removes their token reads nothing), `TestPeopleSourceSendsNothingWithoutAToken`.
 
 ## EN7: per-viewer views
 
