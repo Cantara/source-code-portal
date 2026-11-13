@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -305,9 +306,12 @@ func TestEnterpriseTwoPeople(t *testing.T) {
 	sha := 0
 	repo := func(name, vis string) int64 {
 		sha++
-		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new(vis), Description: new(name + " tools")})
-		gh.SetCommits(id, githubtest.Commit{SHA: strings.Repeat(strconv.Itoa(sha), 40), Message: name + " change", AuthorName: "Ann", Date: at})
-		gh.SetFile(id, "README.md", "# "+name+"\n")
+		mark := "m4rk" + name // a word only this repository holds, never asked for
+		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new(vis), Description: new(name + " tools " + mark), Topics: []string{mark}})
+		gh.SetCommits(id, githubtest.Commit{SHA: strings.Repeat(strconv.Itoa(sha), 40), Message: name + " change " + mark, AuthorName: "Ann", Date: at})
+		gh.SetFile(id, "README.md", "# "+name+"\n\n"+mark+"\n")
+		gh.SetFile(id, "docs/guide.md", "# Guide to "+name+"\n\n"+mark+"\n")
+		gh.SetFile(id, "go.mod", "module example.com/"+name+"\n\ngo 1.27\n")
 		return id
 	}
 	inner, adas, bos := repo("inner", "internal"), repo("zq-ada", "private"), repo("xk-bo", "private")
@@ -366,6 +370,40 @@ func TestEnterpriseTwoPeople(t *testing.T) {
 		}
 		if code, _ := call(t, tc.who, http.MethodGet, public+"/badges/repos/acme/"+tc.not+"/health.svg", ""); code != http.StatusNotFound {
 			t.Errorf("%s reads the other's badge: %d", tc.name, code)
+		}
+	}
+
+	// Every contract GET, every guessed address and every tool, as each person: never a trace of the other's repository. A path or
+	// input that names it may echo the name back; the word only its content holds must never come.
+	for _, tc := range []struct {
+		who       *http.Client
+		mine, not string
+	}{{ada, "zq-ada", "xk-bo"}, {bo, "xk-bo", "zq-ada"}} {
+		name := func(s string) string {
+			return strings.ReplaceAll(strings.ReplaceAll(s, "zq-hidden", tc.not), "/open", "/inner")
+		}
+		for _, p := range append(publicPaths(t), edgePaths...) {
+			p = name(p)
+			_, b := call(t, tc.who, http.MethodGet, public+p, "")
+			if strings.Contains(strings.ToLower(b), "m4rk"+tc.not) || !strings.Contains(strings.ToLower(p), tc.not) && strings.Contains(b, tc.not) {
+				t.Errorf("%s reads the other's repository at %s: %.300s", tc.mine, p, b)
+			}
+		}
+		_, list := call(t, tc.who, http.MethodGet, public+"/api/v1/tools", "")
+		var tools struct{ Tools []struct{ Name string } }
+		if err := json.Unmarshal([]byte(list), &tools); err != nil || len(tools.Tools) < 5 {
+			t.Fatalf("tools: %v %s", err, list)
+		}
+		for _, tool := range tools.Tools {
+			for _, in := range toolInputs(tool.Name) {
+				_, b := call(t, tc.who, http.MethodPost, public+"/api/v1/tools/"+tool.Name, name(in), same...)
+				if strings.Contains(strings.ToLower(b), "m4rk"+tc.not) || !strings.Contains(in, "zq-hidden") && strings.Contains(b, tc.not) {
+					t.Errorf("%s's tool %s(%s) reads the other's repository: %.300s", tc.mine, tool.Name, name(in), b)
+				}
+			}
+		}
+		if _, b := call(t, tc.who, http.MethodPost, public+"/api/v1/tools/search", `{"input":{"query":"m4rk`+tc.mine+`"}}`, same...); !strings.Contains(b, tc.mine) {
+			t.Errorf("%s's search finds nothing of their own: %.300s", tc.mine, b)
 		}
 	}
 
