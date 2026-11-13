@@ -36,6 +36,8 @@ type Config struct {
 	Packages  Packages  `mapstructure:"packages"`
 	Ops       Ops       `mapstructure:"ops"`
 	Features  Features  `mapstructure:"features"`
+	// Enterprise holds what GitHub Enterprise and Entra ID need (design/enterprise.md), off by default.
+	Enterprise Enterprise `mapstructure:"enterprise"`
 	// Announcements are the deployment's announcements (design/announcements.md), locked in the admin's card.
 	Announcements []Announcement `mapstructure:"announcements"`
 }
@@ -123,6 +125,8 @@ func defaults() map[string]any {
 		"packages.public":                  true,
 		"features.pulls":                   true,
 		"features.issues":                  true,
+		"enterprise.enabled":               false,
+		"enterprise.oidc.identity_claim":   "",
 	}
 }
 
@@ -258,6 +262,7 @@ func (c Config) validate() []string {
 	p = append(p, c.Access.validate(c.GitHub, identified)...)
 	p = append(p, c.LLM.validate(c.Assistant, identified)...)
 	p = append(p, c.Auth.validate(c.Server.PublicURL)...)
+	p = append(p, c.Enterprise.validate(c.GitHub, c.Auth)...)
 	p = append(p, c.Cluster.validate()...)
 	p = append(p, c.Web.validate()...)
 	p = append(p, c.Layout.validate()...)

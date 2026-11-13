@@ -418,11 +418,26 @@ func (s *Source) Tree(ctx context.Context, owner, name, ref string, recursive bo
 
 // WebURL is the web host of the source with a trailing slash: https://github.com/ for github.com, the GHES host otherwise.
 func (s *Source) WebURL() string {
+	if s.cfg.WebURL != "" {
+		return s.cfg.WebURL // configured (enterprise.github): GitHub Enterprise Cloud's web host is not its API host
+	}
 	if u, err := url.Parse(s.cfg.BaseURL); err == nil && u.Host != "api.github.com" {
 		u.Path = strings.TrimSuffix(strings.TrimSuffix(u.Path, "/"), "/api/v3") + "/"
 		return u.String()
 	}
 	return "https://github.com/"
+}
+
+// GraphQLURL is the source's GraphQL endpoint: configured (enterprise.github), else beside its REST base.
+func (s *Source) GraphQLURL() string {
+	if s.cfg.GraphQLURL != "" {
+		return s.cfg.GraphQLURL
+	}
+	u, err := url.Parse(s.cfg.BaseURL)
+	if err != nil {
+		return s.cfg.BaseURL + "graphql"
+	}
+	return graphQLEndpoint(u)
 }
 
 // Tags are the names of a repository's tags, the first 100 GitHub lists (the newest first, by its own order).

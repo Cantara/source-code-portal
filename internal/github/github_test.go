@@ -304,6 +304,28 @@ func TestWebURL(t *testing.T) {
 	}
 }
 
+// TestEnterpriseAddresses: a source's configured addresses (enterprise.github) win over the ones derived from its REST base;
+// GitHub Enterprise Cloud's web host is not its API host, so it is configured, and GraphQL defaults beside the base.
+func TestEnterpriseAddresses(t *testing.T) {
+	for _, tc := range []struct{ base, web, graphql, wantWeb, wantGraphQL string }{
+		{"https://api.github.com/", "", "", "https://github.com/", "https://api.github.com/graphql"},
+		{"https://ghe.example/api/v3/", "", "", "https://ghe.example/", "https://ghe.example/api/graphql"},
+		{"https://api.octocorp.ghe.com/", "https://octocorp.ghe.com/", "", "https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql"},
+		{"https://api.octocorp.ghe.com/", "https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql",
+			"https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql"},
+		{"https://ghe.example/api/v3/", "https://ghe.example/", "https://ghe.example/api/graphql", "https://ghe.example/", "https://ghe.example/api/graphql"},
+	} {
+		c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: tc.base, Orgs: []string{"acme"}, WebURL: tc.web,
+			GraphQLURL: tc.graphql, Token: config.NewSecret([]byte("t"))}}}, nil, slog.New(slog.DiscardHandler))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s := c.Source("gh"); s.WebURL() != tc.wantWeb || s.GraphQLURL() != tc.wantGraphQL {
+			t.Errorf("%s (web %q): WebURL %s, GraphQLURL %s", tc.base, tc.web, s.WebURL(), s.GraphQLURL())
+		}
+	}
+}
+
 func TestRateBookResetInstant(t *testing.T) {
 	r := &rateBook{limit: 100, left: 1, reset: time.Now().Add(time.Hour), known: true}
 	if f, _ := r.remaining(); f != 0.01 {

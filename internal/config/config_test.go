@@ -49,7 +49,7 @@ func TestDefaults(t *testing.T) {
 		Catalog: Catalog{ReconcileInterval: 5 * time.Minute},
 		Access:  Access{UserHeader: "X-Forwarded-User", GroupsHeader: "X-Forwarded-Groups", PrivateGroups: []string{}},
 		Auth: Auth{SessionTTL: 12 * time.Hour, AdminEmails: []string{}, AdminGroups: []string{},
-			OIDC: OIDC{Scopes: []string{"openid", "email", "profile"}, GroupsClaim: "groups"}},
+			OIDC: OIDC{Scopes: []string{"openid", "email", "profile"}, GroupsClaim: "groups", IdentityClaim: "email", UserInfo: true}},
 		Assistant: Assistant{Access: "signed-in", Concurrency: 4, MaxTurns: 8, MaxToolCalls: 16, MaxTokens: 16000, MaxHistory: 40,
 			MaxInputChars: 60000, ToolResultChars: 12000},
 		Cluster:  Cluster{Addresses: []string{}, Name: "dev", Namespace: "scp"},

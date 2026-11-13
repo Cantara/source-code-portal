@@ -48,6 +48,8 @@ type Source struct {
 	RawIncludeArchived *bool  `mapstructure:"include_archived"`
 	IncludeArchived    bool   `mapstructure:"-"`
 	Token              Secret `mapstructure:"-"` // read from TokenFile
+	// WebURL and GraphQLURL are the configured addresses of an enterprise source (enterprise.github); empty: derived from BaseURL.
+	WebURL, GraphQLURL string `mapstructure:"-"`
 }
 
 // credentials counts the credentials a source names.
@@ -264,6 +266,7 @@ func (c *Config) normalise() {
 		}
 		s.IncludeArchived = s.RawIncludeArchived == nil || *s.RawIncludeArchived
 	}
+	c.applyEnterprise()
 }
 
 func (g GitHub) validate() []string {
