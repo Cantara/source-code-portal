@@ -474,3 +474,57 @@ func TestViewsByPrivateAndByHiddenForks(t *testing.T) {
 		t.Error("a hidden fork's change moved the views that leave it out")
 	}
 }
+
+func TestRestrict(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
+	mine := repo("gh", 1, "acme", "mine")
+	mine.Repo.Visibility = "private"
+	theirs := repo("gh", 2, "acme", "theirs")
+	theirs.Repo.Visibility = "private"
+	inner := repo("gh", 3, "acme", "inner")
+	inner.Repo.Visibility = "internal"
+	copyOf := repo("gh", 4, "acme", "copy")
+	copyOf.Repo.Visibility, copyOf.Repo.Fork = "internal", true
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{mine, theirs, inner, copyOf}, map[RepoKey]RepoKey{"acme/was-theirs": "acme/theirs"},
+			SourceStatus{ID: "gh", Repos: 4})
+		b.SetGroups([]Group{{ID: "ours", DefaultRepo: "acme/mine", Members: []RepoKey{"acme/copy", "acme/inner", "acme/mine"}},
+			{ID: "secret", DefaultRepo: "acme/theirs", Members: []RepoKey{"acme/theirs"}}})
+		b.SetHidden(map[RepoKey]bool{"acme/copy": true})
+		b.UpdateRepo("acme/mine", func(e *RepoEntry) { notes.Set(e, []string{"m"}, Freshness{}) })
+		b.UpdateRepo("acme/theirs", func(e *RepoEntry) { notes.Set(e, []string{"t"}, Freshness{}) })
+	})
+	p.Flush()
+	s := p.Current()
+	log := slog.New(slog.DiscardHandler)
+
+	for _, allowed := range []map[RepoKey]bool{nil, {}, {"acme/elsewhere": true}} {
+		v := s.Restrict(allowed, true, log)
+		if len(v.Repos) != 0 || len(v.Groups) != 0 || len(v.Aliases) != 0 || noteCount.Get(v) != 0 || v.Sources[0].Repos != 0 {
+			t.Errorf("Restrict(%v): repos %v, groups %v, aliases %v, index %d", allowed, v.Repos, v.Groups, v.Aliases, noteCount.Get(v))
+		}
+	}
+
+	set := map[RepoKey]bool{"acme/mine": true, "acme/inner": true, "acme/copy": true}
+	fat, lean := s.Restrict(set, true, log), s.Restrict(set, false, log)
+	if got := slices.Sorted(maps.Keys(fat.Repos)); !slices.Equal(got, []RepoKey{"acme/copy", "acme/inner", "acme/mine"}) {
+		t.Errorf("with forks: %v", got)
+	}
+	if got := slices.Sorted(maps.Keys(lean.Repos)); !slices.Equal(got, []RepoKey{"acme/inner", "acme/mine"}) {
+		t.Errorf("without forks: %v", got)
+	}
+	for _, v := range []*Snapshot{fat, lean} {
+		if _, ok := v.Group("secret"); ok || len(v.Groups) != 1 || noteCount.Get(v) != 1 || v.HiddenForks() != 1 {
+			t.Errorf("groups %v, index %d, hidden forks %d", v.Groups, noteCount.Get(v), v.HiddenForks())
+		}
+		if e, _ := v.Repo("acme/was-theirs"); e != nil || v.Public() != v || v.View(false, true).Repos["acme/theirs"] != nil {
+			t.Error("an alias to another's repository resolves, or the view's public view is not its own")
+		}
+	}
+	if all := s.Restrict(map[RepoKey]bool{"acme/mine": true, "acme/theirs": true, "acme/inner": true, "acme/copy": true}, true, log); all != s {
+		t.Error("a set of every repository is not the full snapshot")
+	}
+	if len(s.Repos) != 4 || len(s.Groups) != 2 {
+		t.Error("restricting changed the snapshot")
+	}
+}

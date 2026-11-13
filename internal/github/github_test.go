@@ -373,3 +373,29 @@ func TestFilesStreamsTheTreeAndWalksATruncatedOne(t *testing.T) {
 		t.Errorf("files of a truncated tree = %v, %v; want %v", paths(got), err, want)
 	}
 }
+
+// TestPeopleSourceSendsNothingWithoutAToken: a source read with people's tokens (scp enterprise) has no credential of its own, so
+// until a person's token is given it never asks GitHub anything, not even anonymously.
+func TestPeopleSourceSendsNothingWithoutAToken(t *testing.T) {
+	srv := githubtest.New(t)
+	srv.AddRepo("acme", gh.Repository{Name: new("open")})
+	c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, People: true}}},
+		nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("gh")
+	var e *Error
+	if _, err := s.ListRepos(t.Context(), "acme"); !errors.As(err, &e) || e.Kind != Auth || e.Code != "no_person" {
+		t.Errorf("listing: %v, want the Auth error no_person", err)
+	}
+	if _, err := s.Blob(t.Context(), "acme", "open", "abc"); !errors.As(err, &e) || e.Code != "no_person" {
+		t.Errorf("blob: %v", err)
+	}
+	if got := srv.Ledger(); len(got) != 0 {
+		t.Errorf("requests sent: %v", got)
+	}
+	if r := c.RateRemaining()["gh"]; r != 1 {
+		t.Errorf("rate remaining %v", r)
+	}
+}

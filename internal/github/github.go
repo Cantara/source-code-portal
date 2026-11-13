@@ -134,6 +134,9 @@ type account struct {
 func newSource(sc config.Source, base http.RoundTripper, log *slog.Logger) (*Source, error) {
 	s := &Source{id: sc.ID, cfg: sc, log: log, cache: newETagCache(etagBytes), sem: make(chan struct{}, inFlight), base: base,
 		owners: map[string]*credential{}, accounts: map[string]account{}}
+	if sc.People { // scp enterprise: no credential of its own, and so no request without a person's token
+		return s, nil
+	}
 	if sc.App == nil {
 		rate := &rateBook{}
 		client, err := s.newClient(s.transport(rate), sc.Token.Reveal())
@@ -285,6 +288,9 @@ func (s *Source) REST(ctx context.Context, owner string) (*gh.Client, error) {
 func (s *Source) client(ctx context.Context, owner string) (*gh.Client, error) {
 	if c := s.credentialFor(owner); c != nil {
 		return c.client, nil
+	}
+	if s.cfg.People {
+		return nil, &Error{Kind: Auth, Code: "no_person", Err: fmt.Errorf("no linked person's token reads %s", owner)}
 	}
 	if err := s.RefreshInstallations(ctx); err != nil {
 		return nil, err

@@ -127,6 +127,9 @@ func defaults() map[string]any {
 		"features.issues":                  true,
 		"enterprise.enabled":               false,
 		"enterprise.oidc.identity_claim":   "",
+		"enterprise.token_key_file":        "",
+		"enterprise.access.refresh":        "15m",
+		"enterprise.access.max_age":        "1h",
 	}
 }
 
@@ -262,7 +265,7 @@ func (c Config) validate() []string {
 	p = append(p, c.Access.validate(c.GitHub, identified)...)
 	p = append(p, c.LLM.validate(c.Assistant, identified)...)
 	p = append(p, c.Auth.validate(c.Server.PublicURL)...)
-	p = append(p, c.Enterprise.validate(c.GitHub, c.Auth)...)
+	p = append(p, c.Enterprise.validate(c)...)
 	p = append(p, c.Cluster.validate()...)
 	p = append(p, c.Web.validate()...)
 	p = append(p, c.Layout.validate()...)

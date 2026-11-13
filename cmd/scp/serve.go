@@ -66,24 +66,29 @@ func newServeCmd(opts *options) *cobra.Command {
 		Short: "Run the portal until SIGINT or SIGTERM",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, _, err := loadConfig(cmd, opts)
-			if err != nil {
-				return err
-			}
-			log := newLogger(cfg.Log, cmd.ErrOrStderr())
-			srv, err := newServer(cmd.Context(), cfg, deps{}, log)
-			if err != nil {
-				return failure{err}
-			}
-			if err := srv.run(cmd.Context()); err != nil {
-				return failure{err}
-			}
-			return nil
+			return runServer(cmd, opts, deps{})
 		},
 	}
 	cmd.Flags().String("public-addr", "", "public listener address (default :9090)")
 	cmd.Flags().String("admin-addr", "", "admin listener address (default :9091)")
 	return cmd
+}
+
+// runServer loads the configuration, then runs the portal of d's mode until the command's context ends (scp serve, scp enterprise).
+func runServer(cmd *cobra.Command, opts *options, d deps) error {
+	cfg, _, err := loadConfig(cmd, opts)
+	if err != nil {
+		return err
+	}
+	log := newLogger(cfg.Log, cmd.ErrOrStderr())
+	srv, err := newServer(cmd.Context(), cfg, d, log)
+	if err != nil {
+		return failure{err}
+	}
+	if err := srv.run(cmd.Context()); err != nil {
+		return failure{err}
+	}
+	return nil
 }
 
 // api composes the strict server from the features that implement its methods. The aliases give the embedded fields distinct names.
@@ -121,7 +126,7 @@ type (
 
 // server owns the store, the snapshot, the sync engine and the two listeners.
 type server struct {
-	mode              store.Mode // shared or personal: see deps.mode
+	mode              store.Mode // shared, personal or enterprise: see deps.mode
 	routes            []string   // the patterns of the routes the features and sign-in add, sorted: the tests compare them between modes
 	log               *slog.Logger
 	grace             time.Duration
@@ -150,19 +155,58 @@ type deps struct {
 	cluster    func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
 	launch     *auth.Launch                                   // the personal edition's one-use sign-in link
 	// mode is what this process is, set by the command that starts it and by nothing in a configuration: the zero value is the shared
-	// site (scp serve), scp personal says store.Personal. The store is opened for it, and the personal edition's parts are wired
-	// only in it.
+	// site (scp serve), scp personal says store.Personal and scp enterprise store.Enterprise. The store is opened for it, and each
+	// mode's own parts are wired only in it.
 	mode store.Mode
 }
 
-// checkedMode is the process's mode (the shared site unless the command said otherwise), after the one check that ties a part of the
-// personal edition to it: a launch link signs in without a secret of the portal's, so only one person's portal may have one.
-func (d deps) checkedMode() (store.Mode, error) {
+// checkedMode is the process's mode (the shared site unless the command said otherwise), after the checks that tie a part of a mode
+// to it: a launch link signs in without a secret of the portal's, so only one person's portal may have one; a configuration whose
+// sources are read with people's tokens is the enterprise mode's, and that mode has no other.
+func (d deps) checkedMode(cfg config.Config) (store.Mode, error) {
 	mode := cmp.Or(d.mode, store.Shared)
-	if d.launch != nil && mode != store.Personal {
+	switch {
+	case d.launch != nil && mode != store.Personal:
 		return "", errors.New("a launch link belongs to scp personal")
+	case cfg.People() && mode != store.Enterprise:
+		return "", errors.New("the sources are read with people's tokens (enterprise.github[].people): run scp enterprise")
+	case !cfg.People() && mode == store.Enterprise:
+		return "", errors.New("scp enterprise reads its sources with people's tokens: set enterprise.github[].people on every source")
 	}
 	return mode, nil
+}
+
+// views are what a request may see (view) and what its pictures may name (assets): the full snapshot for a private viewer, else its
+// public view, and the forks no source shows and no group pins only when the request asked for them (?forks=show). A badge and a
+// document's image are fetched by the browser as pictures, with nothing to say that the reader asked for forks, and they are named by
+// the repository's own address: they answer for every repository of the viewer's view, hidden forks included. In the enterprise mode
+// each person reads what their access list holds, and nothing without one (fail closed).
+func (s *server) views(log *slog.Logger) (view, assets func(context.Context) *snapshot.Snapshot) {
+	if s.mode == store.Enterprise {
+		people := newPeopleViews(s.pub.Current, nobody, log)
+		return func(ctx context.Context) *snapshot.Snapshot { return people.of(ctx, httpapi.ShowForks(ctx)) },
+			func(ctx context.Context) *snapshot.Snapshot { return people.of(ctx, true) }
+	}
+	return func(ctx context.Context) *snapshot.Snapshot {
+			return s.pub.Current().View(httpapi.Private(ctx), httpapi.ShowForks(ctx))
+		},
+		func(ctx context.Context) *snapshot.Snapshot { return s.pub.Current().View(httpapi.Private(ctx), true) }
+}
+
+// ready is the readiness probe: not stopping, a catalogue loaded and the web UI server up. The enterprise mode has a catalogue once a
+// person has linked a token, and serves its onboarding before that.
+func (s *server) ready() bool {
+	catalogued := s.pub.Current().Catalogued || s.mode == store.Enterprise
+	return !s.stopping.Load() && catalogued && (s.web == nil || s.web.Ready())
+}
+
+// identityHeaders are the trusted proxy's identity headers; none in the enterprise mode, whose viewer is who OIDC signed in, never a
+// header a proxy may pass on from the client.
+func identityHeaders(a config.Access, mode store.Mode) (user, groups string) {
+	if mode == store.Enterprise {
+		return "", ""
+	}
+	return a.UserHeader, a.GroupsHeader
 }
 
 // vaultResolved refuses a source whose credential is in the vault of scp personal and was not resolved: serve reads files.
@@ -180,7 +224,7 @@ func vaultResolved(cfg config.Config) error {
 
 // newServer opens the store, wires the features and binds both listeners.
 func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger) (_ *server, err error) {
-	mode, err := d.checkedMode()
+	mode, err := d.checkedMode(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -263,11 +307,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 	}
 
-	// view is what a request may see: the full snapshot for a private viewer, else its public view, and the forks no source shows and
-	// no group pins only when the request asked for them (?forks=show).
-	view := func(ctx context.Context) *snapshot.Snapshot {
-		return s.pub.Current().View(httpapi.Private(ctx), httpapi.ShowForks(ctx))
-	}
+	view, assets := s.views(log)
 	events := httpapi.NewEvents(view, s.pub.Published)
 	g := gauges{current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining, streams: events.Streams}
 	if s.member != nil {
@@ -287,9 +327,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		upstream = s.web.URL()
 	}
-	ready := func() bool {
-		return !s.stopping.Load() && s.pub.Current().Catalogued && (s.web == nil || s.web.Ready())
-	}
+	ready := s.ready
 	imported, err := docstore.Import(ctx, s.store, cfg.Layout.Dir, append(layout.Names(), announce.Name))
 	if err != nil {
 		return nil, fmt.Errorf("layout.dir: %w", err)
@@ -316,17 +354,15 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	private := slices.ContainsFunc(cfg.GitHub.Sources, func(src config.Source) bool { return src.IncludePrivate })
 	opts := httpapi.Options{Log: log, HSTS: strings.HasPrefix(cfg.Server.PublicURL, "https://"), PublicURL: cfg.Server.PublicURL,
 		WebToken: newToken(), TrustedProxies: cfg.Server.TrustedProxies,
-		Access: httpapi.Access{UserHeader: cfg.Access.UserHeader, GroupsHeader: cfg.Access.GroupsHeader, PrivateGroups: cfg.Access.PrivateGroups,
+		Access: httpapi.Access{PrivateGroups: cfg.Access.PrivateGroups,
 			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
 		Observe: m.request, ObservePrivate: m.privateView, RequireAuth: cfg.Access.RequireAuth}
+	opts.Access.UserHeader, opts.Access.GroupsHeader = identityHeaders(cfg.Access, mode)
 	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin, f))
 	external := d.images
 	if external == nil {
 		external = egress.Guarded(10 * time.Second)
 	}
-	// A badge and a document's image are fetched by the browser as pictures, with nothing to say that the reader asked for forks, and they
-	// are named by the repository's own address: they answer for every repository of the viewer's view, hidden forks included.
-	assets := func(ctx context.Context) *snapshot.Snapshot { return s.pub.Current().View(httpapi.Private(ctx), true) }
 	routes := []httpapi.Route{{Pattern: "GET /badges/", Handler: badges.Handler(assets,
 		badgeData(f))},
 		{Pattern: "GET /images/{owner}/{name}/{id}", Handler: documents.Images(assets, external)},

@@ -205,6 +205,12 @@ func buildIndex(ix Indexer, s *Snapshot) (v any, err error) {
 // derive is s with the repositories keep refuses taken out, or s itself when it refuses none. before is the sibling view of the
 // snapshot before, whose indexes are kept when one cannot be built.
 func (s *Snapshot) derive(keep func(*RepoEntry) bool, before *Snapshot, log *slog.Logger) *Snapshot {
+	return s.cut(keep, before, false, log)
+}
+
+// cut is derive, and with members only the groups that keep one of their members (a restricted view does not tell the groups it
+// holds nothing of).
+func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, members bool, log *slog.Logger) *Snapshot {
 	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !keep(e) }) {
 		return s
 	}
@@ -224,6 +230,9 @@ func (s *Snapshot) derive(keep func(*RepoEntry) bool, before *Snapshot, log *slo
 	}
 	for _, g := range s.Groups {
 		g.Members = slices.DeleteFunc(slices.Clone(g.Members), func(k RepoKey) bool { return p.Repos[k] == nil })
+		if members && len(g.Members) == 0 {
+			continue
+		}
 		if g.DefaultRepo != "" && p.Repos[g.DefaultRepo] == nil {
 			// Private: told as a default that does not exist. An empty "ok" would tell that it exists and is private, since every
 			// group names a default.

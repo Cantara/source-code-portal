@@ -70,3 +70,51 @@ func TestEnterpriseInvalid(t *testing.T) {
 		}
 	}
 }
+
+// peopleYAML is a configuration of the enterprise mode: one source read with people's tokens, sign-in, the token key.
+func peopleYAML(t *testing.T) string {
+	t.Helper()
+	return "github:\n  sources:\n    - {id: ghe, base_url: 'https://api.octocorp.ghe.com/', orgs: [octocorp]}\n" + oidcYAML(t) +
+		"enterprise:\n  enabled: true\n  token_key_file: " + write(t, "tokens", strings.Repeat("t", 32)) +
+		"\n  github: [{source: ghe, web_url: 'https://octocorp.ghe.com/', people: true}]\n"
+}
+
+func TestEnterpriseMode(t *testing.T) {
+	cfg, _, err := Load(write(t, "scp.yaml", peopleYAML(t)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := cfg.GitHub.Sources[0]
+	if !cfg.People() || !s.People || s.Login != "managed" || !s.IncludePrivate || !cfg.Access.RequireAuth ||
+		len(cfg.Enterprise.TokenKey.Reveal()) != 32 {
+		t.Errorf("source %+v, require_auth %v, people %v", s, cfg.Access.RequireAuth, cfg.People())
+	}
+}
+
+func TestEnterpriseModeInvalid(t *testing.T) {
+	token := write(t, "token", "ghp_test")
+	for _, tc := range []struct {
+		edit func(string) string
+		want string
+	}{
+		{func(y string) string {
+			return strings.Replace(y, "orgs: [octocorp]}", "orgs: [octocorp], token_file: "+token+"}", 1)
+		},
+			"a source read with people's tokens has no app, token_file or credential of its own"},
+		{func(y string) string {
+			return strings.Replace(y, "orgs: [octocorp]}", "orgs: [octocorp]}\n    - {id: gh, orgs: [acme], token_file: "+token+"}", 1)
+		}, "github.sources[1]: every source is read with people's tokens once one is"},
+		{func(y string) string { return strings.Replace(y, "  token_key_file: ", "  # ", 1) }, "enterprise.token_key_file: required"},
+		{func(y string) string { return y + "webhook: {catch_up: true}\n" }, "webhook: not with people's tokens"},
+		{func(y string) string { return y + "access: {private_groups: [staff]}\n" }, "access.private_groups: not with people's tokens"},
+		{func(y string) string { return strings.Replace(y, "people: true}", "people: true, login: guess}", 1) }, `login: "guess" is not one of managed, exact`},
+		{func(y string) string { return strings.Replace(y, "people: true}", "login: exact}", 1) }, "login: only for a source read with people's tokens"},
+		{func(y string) string { return y + "  access: {refresh: 10s}\n" }, "enterprise.access.refresh: must be 1m..24h"},
+	} {
+		_, _, err := Load(write(t, "scp.yaml", tc.edit(peopleYAML(t))), nil)
+		var inv *Invalid
+		if !errors.As(err, &inv) || !strings.Contains(strings.Join(inv.Problems, "\n"), tc.want) {
+			t.Errorf("%v, want %q", err, tc.want)
+		}
+	}
+}
