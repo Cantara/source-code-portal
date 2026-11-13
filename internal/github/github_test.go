@@ -399,3 +399,35 @@ func TestPeopleSourceSendsNothingWithoutAToken(t *testing.T) {
 		t.Errorf("rate remaining %v", r)
 	}
 }
+
+// TestCheckToken: a person's token says whose it is and when it ends, and is refused when it reads nothing of the organisation or
+// GitHub does not know it.
+func TestCheckToken(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("inner"), Visibility: new("internal")})
+	srv.AddRepo("other", gh.Repository{Name: new("x"), Visibility: new("private")})
+	end := time.Date(2027, 2, 11, 12, 0, 0, 0, time.UTC)
+	srv.AddUserToken("github_pat_ann", "ann_oc")
+	srv.Expires("github_pat_ann", end)
+	srv.Reach("github_pat_ann", id)
+	c, err := New(config.GitHub{Sources: []config.Source{{ID: "ghe", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, People: true}}},
+		nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("ghe")
+	got, err := s.CheckToken(t.Context(), "acme", []byte("github_pat_ann"))
+	if err != nil || got.Login != "ann_oc" || !got.Expires.Equal(end) {
+		t.Errorf("check: %+v %v", got, err)
+	}
+	var e *Error
+	if _, err := s.CheckToken(t.Context(), "other", []byte("github_pat_ann")); !errors.As(err, &e) || e.Code != "reads_nothing" {
+		t.Errorf("another organisation: %v", err)
+	}
+	if _, err := s.CheckToken(t.Context(), "acme", []byte("github_pat_wrong")); !errors.As(err, &e) || e.Kind != Auth {
+		t.Errorf("an unknown token: %v", err)
+	}
+	if r := tokenEnd(&http.Response{Header: http.Header{"Github-Authentication-Token-Expiration": {"2024-01-31 06:25:19 -0800"}}}); !r.Equal(time.Date(2024, 1, 31, 14, 25, 19, 0, time.UTC)) {
+		t.Errorf("an end with an offset: %v", r)
+	}
+}

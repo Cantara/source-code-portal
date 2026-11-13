@@ -7,7 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/github"
+	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/lru"
+	"github.com/cantara/source-code-portal/internal/people"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 )
@@ -77,3 +81,33 @@ func (p *peopleViews) of(ctx context.Context, forks bool) *snapshot.Snapshot {
 
 // nobody is the access of every viewer until their lists are read: nothing.
 func nobody(context.Context) (string, map[snapshot.RepoKey]bool) { return "", nil }
+
+// open opens the store for the server's mode and, in the enterprise mode, the people it holds.
+func (s *server) open(ctx context.Context, cfg config.Config, gh *github.Client) error {
+	var err error
+	if s.store, err = store.OpenAs(ctx, cfg.Store.Path, s.mode, s.log); err != nil {
+		return err
+	}
+	if s.mode != store.Enterprise {
+		return nil
+	}
+	var sources []people.Source
+	for _, src := range cfg.GitHub.Sources {
+		g := gh.Source(src.ID)
+		sources = append(sources, people.Source{ID: src.ID, WebURL: g.WebURL(), Owners: src.Orgs, Login: src.Login, Check: g.CheckToken})
+	}
+	s.people, err = people.Open(ctx, people.Options{Store: s.store, Key: cfg.Enterprise.TokenKey.Reveal(), Issuer: cfg.Auth.OIDC.Issuer,
+		Sources: sources, Portal: cfg.Server.PublicURL, Log: s.log.With("component", "people")})
+	if err != nil {
+		_ = s.store.Close()
+	}
+	return err
+}
+
+// peopleRoutes are the enterprise mode's own routes: a person's GitHub tokens. None in the other modes.
+func (s *server) peopleRoutes(cfg config.Config) []httpapi.Route {
+	if s.people == nil {
+		return nil
+	}
+	return s.people.Routes(cfg.Server.PublicURL)
+}

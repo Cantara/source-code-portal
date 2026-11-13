@@ -42,6 +42,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/mcpserver"
 	"github.com/cantara/source-code-portal/internal/packages"
+	"github.com/cantara/source-code-portal/internal/people"
 	"github.com/cantara/source-code-portal/internal/pulls"
 	"github.com/cantara/source-code-portal/internal/releases"
 	"github.com/cantara/source-code-portal/internal/safehtml"
@@ -139,6 +140,7 @@ type server struct {
 	layouts           *layout.Store
 	notices           *announce.Notices
 	prereqs           *prereqs
+	people            *people.People // the enterprise mode's people; nil in the other modes
 	stopping          atomic.Bool
 	public, admin     *http.Server
 	publicLn, adminLn net.Listener
@@ -261,7 +263,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		indexers = append(indexers, issues.Feeds())
 	}
 	s := &server{mode: mode, log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log, indexers...)}
-	if s.store, err = store.OpenAs(ctx, cfg.Store.Path, mode, log); err != nil {
+	if err := s.open(ctx, cfg, gh); err != nil {
 		return nil, err
 	}
 	defer func() {
@@ -429,6 +431,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, mcpserver.Routes(mcpserver.Options{Catalogue: catalogue, Version: version, PublicURL: cfg.Server.PublicURL,
 		RequireAuth: cfg.Access.RequireAuth, Log: log.With("component", "mcp")})...)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
+	routes = append(routes, s.peopleRoutes(cfg)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
 	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, newReleases(view, documents), newInsights(view), docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For, Off: offElements(f)},

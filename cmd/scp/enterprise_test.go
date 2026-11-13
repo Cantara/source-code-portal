@@ -20,6 +20,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/auth/oidctest"
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/people"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
 )
@@ -64,18 +65,18 @@ enterprise:
 // mode's store is refused by the other two as theirs are by it.
 func TestEnterpriseModeKeepsApart(t *testing.T) {
 	dir := t.TempDir()
-	people := enterpriseConfig(t, filepath.Join(dir, "e.db"), "https://api.ghe.example.test/", "https://idp.example.test", "https://scp.example")
-	if _, err := standUp(t, people, deps{}); err == nil || !strings.Contains(err.Error(), "run scp enterprise") {
+	peopleCfg := enterpriseConfig(t, filepath.Join(dir, "e.db"), "https://api.ghe.example.test/", "https://idp.example.test", "https://scp.example")
+	if _, err := standUp(t, peopleCfg, deps{}); err == nil || !strings.Contains(err.Error(), "run scp enterprise") {
 		t.Errorf("serve with people's tokens: %v", err)
 	}
-	if _, err := standUp(t, people, deps{mode: store.Personal, launch: launchFor("owner")}); err == nil {
+	if _, err := standUp(t, peopleCfg, deps{mode: store.Personal, launch: launchFor("owner")}); err == nil {
 		t.Error("personal with people's tokens started")
 	}
 	if _, err := standUp(t, modeConfig(t, filepath.Join(dir, "s.db")), deps{mode: store.Enterprise}); err == nil ||
 		!strings.Contains(err.Error(), "people's tokens") {
 		t.Errorf("enterprise without people's tokens: %v", err)
 	}
-	if _, err := standUp(t, people, deps{mode: store.Enterprise, launch: launchFor("owner")}); err == nil {
+	if _, err := standUp(t, peopleCfg, deps{mode: store.Enterprise, launch: launchFor("owner")}); err == nil {
 		t.Error("enterprise took a launch link")
 	}
 
@@ -95,7 +96,7 @@ func TestEnterpriseModeKeepsApart(t *testing.T) {
 			t.Errorf("enterprise on a %s store: %v", other, err)
 		}
 	}
-	e, err := standUp(t, people, deps{mode: store.Enterprise})
+	e, err := standUp(t, peopleCfg, deps{mode: store.Enterprise})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,11 +107,14 @@ func TestEnterpriseModeKeepsApart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !slices.Contains(e.routes, "POST "+people.TokensPattern) || slices.ContainsFunc(shared.routes, func(r string) bool { return strings.Contains(r, people.TokensPattern) }) {
+		t.Error("the people's token routes are not the enterprise mode's own")
+	}
 	for _, r := range e.routes {
 		if strings.Contains(r, "/setup") || r == "GET /auth/launch" || strings.Contains(r, "webhook") && r != "POST /github/webhook" {
 			t.Errorf("the enterprise mode registers %s", r)
 		}
-		if !slices.Contains(shared.routes, r) {
+		if !slices.Contains(shared.routes, r) && !strings.HasPrefix(strings.Fields(r)[1], people.TokensPattern) {
 			t.Errorf("the enterprise mode registers %s, which the shared site does not", r)
 		}
 	}
@@ -123,29 +127,7 @@ func TestEnterpriseFailsClosed(t *testing.T) {
 	gh.AddRepo("acme", gogh.Repository{Name: new("zq-secret"), Visibility: new("private")})
 	idp := oidctest.New("scp")
 	defer idp.Close()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	addr := ln.Addr().String()
-	_ = ln.Close()
-	public := "http://" + addr
-	cfg := enterpriseConfig(t, filepath.Join(t.TempDir(), "scp.db"), gh.BaseURL(), idp.Issuer(), public)
-	cfg.Server.PublicAddr = addr
-	srv, err := newServer(t.Context(), cfg, deps{mode: store.Enterprise, github: nil, registries: newFakeRegistry(t)},
-		slog.New(slog.NewTextHandler(io.Discard, nil)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	done := make(chan error, 1)
-	go func() { done <- srv.run(ctx) }()
-	defer func() {
-		cancel()
-		if err := <-done; err != nil {
-			t.Errorf("run: %v", err)
-		}
-	}()
+	srv, public := enterprisePortal(t, gh, idp, filepath.Join(t.TempDir(), "scp.db"))
 	// What a shared fetch would have published: the views must not show it to a person without a list.
 	srv.pub.Update(func(b *snapshot.Builder) {
 		e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "ghe", GitHubID: 1}, Owner: "acme", Name: "zq-secret", Visibility: "private"}}
@@ -157,17 +139,7 @@ func TestEnterpriseFailsClosed(t *testing.T) {
 
 	do := func(c *http.Client, path string, header ...string) (int, string) {
 		t.Helper()
-		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, public+path, nil)
-		for i := 0; i+1 < len(header); i += 2 {
-			req.Header.Set(header[i], header[i+1])
-		}
-		resp, err := c.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() { _ = resp.Body.Close() }()
-		b, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode, string(b)
+		return call(t, c, http.MethodGet, public+path, "", header...)
 	}
 	anon := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	defer anon.CloseIdleConnections()
@@ -209,5 +181,116 @@ func TestEnterpriseFailsClosed(t *testing.T) {
 	}
 	if got := gh.Ledger(); len(got) != 0 {
 		t.Errorf("GitHub was asked without a person's token: %v", got)
+	}
+}
+
+// enterprisePortal runs scp enterprise against gh and idp on the store at path until the test ends; public is its address.
+func enterprisePortal(t *testing.T, gh *githubtest.Server, idp *oidctest.Provider, path string) (*server, string) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0") // a free port: the redirect URI is under server.public_url
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	public := "http://" + addr
+	cfg := enterpriseConfig(t, path, gh.BaseURL(), idp.Issuer(), public)
+	cfg.Server.PublicAddr = addr
+	srv, err := newServer(t.Context(), cfg, deps{mode: store.Enterprise, registries: newFakeRegistry(t)}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- srv.run(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("run: %v", err)
+		}
+	})
+	return srv, public
+}
+
+// call sends method to url with body (JSON when not empty) and the header pairs, and returns the status and the body.
+func call(t *testing.T, c *http.Client, method, url, body string, header ...string) (int, string) {
+	t.Helper()
+	var r io.Reader
+	if body != "" {
+		r = strings.NewReader(body)
+	}
+	req, _ := http.NewRequestWithContext(t.Context(), method, url, r)
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for i := 0; i+1 < len(header); i += 2 {
+		req.Header.Set(header[i], header[i+1])
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
+}
+
+// browserFor is a browser signed in to the portal at public as the provider's current user.
+func browserFor(t *testing.T, public string) *http.Client {
+	t.Helper()
+	jar, _ := cookiejar.New(nil)
+	c := &http.Client{Jar: jar, Timeout: 5 * time.Second}
+	t.Cleanup(c.CloseIdleConnections)
+	if code, b := call(t, c, http.MethodGet, public+"/auth/login?return_to=/api/v1/me", ""); code != http.StatusOK || !strings.Contains(b, `"signedIn":true`) {
+		t.Fatalf("sign-in: %d %s", code, b)
+	}
+	return c
+}
+
+// A person signed in links their own token through the API, reads it back without its secret, and removes it; another person's
+// token, a cross-origin request and an anonymous one are refused; the token is kept across a restart, sealed.
+func TestEnterpriseLinksTokens(t *testing.T) {
+	gh := githubtest.New(t)
+	inner := gh.AddRepo("acme", gogh.Repository{Name: new("inner"), Visibility: new("internal")})
+	for tok, login := range map[string]string{"github_pat_ada": "ada_octo", "github_pat_bo": "bo_octo"} {
+		gh.AddUserToken(tok, login)
+		gh.Reach(tok, inner)
+	}
+	idp := oidctest.New("scp")
+	defer idp.Close()
+	path := filepath.Join(t.TempDir(), "scp.db")
+	srv, public := enterprisePortal(t, gh, idp, path)
+	url := public + people.TokensPattern
+	anon := &http.Client{Timeout: 5 * time.Second}
+	defer anon.CloseIdleConnections()
+	if code, _ := call(t, anon, http.MethodGet, url, ""); code != http.StatusUnauthorized {
+		t.Errorf("anonymous: %d", code)
+	}
+	ada := browserFor(t, public) // the fake provider's user is ada@example.org
+	same := []string{"Sec-Fetch-Site", "same-origin"}
+	if code, b := call(t, ada, http.MethodPost, url, `{"source":"ghe","owner":"acme","token":"github_pat_ada"}`, "Sec-Fetch-Site", "cross-site"); code != http.StatusForbidden {
+		t.Errorf("cross-origin: %d %s", code, b)
+	}
+	if code, b := call(t, ada, http.MethodPost, url, `{"source":"ghe","owner":"acme","token":"github_pat_bo"}`, same...); code != http.StatusUnprocessableEntity ||
+		!strings.Contains(b, "not-yours") {
+		t.Errorf("another's token: %d %s", code, b)
+	}
+	if code, b := call(t, ada, http.MethodPost, url, `{"source":"ghe","owner":"acme","token":"github_pat_ada"}`, same...); code != http.StatusCreated ||
+		!strings.Contains(b, `"login":"ada_octo"`) || strings.Contains(b, "github_pat_ada") {
+		t.Fatalf("link: %d %s", code, b)
+	}
+	code, b := call(t, ada, http.MethodGet, url, "")
+	if code != http.StatusOK || !strings.Contains(b, `"login":"ada_octo"`) || strings.Contains(b, "github_pat_ada") ||
+		!strings.Contains(b, "settings/personal-access-tokens/new?") {
+		t.Errorf("list: %d %s", code, b)
+	}
+	if srv.people.Tokens(people.Who{Subject: "u-1"}) == nil {
+		t.Error("the token is not the signed-in person's")
+	}
+	if code, _ := call(t, ada, http.MethodDelete, url+"/ghe/acme", "", same...); code != http.StatusNoContent {
+		t.Errorf("remove: %d", code)
+	}
+	if _, b := call(t, ada, http.MethodGet, url, ""); strings.Contains(b, "ada_octo") {
+		t.Errorf("after removal: %s", b)
 	}
 }

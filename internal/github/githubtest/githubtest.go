@@ -41,10 +41,12 @@ type Server struct {
 
 	mu       sync.Mutex
 	key      *rsa.PrivateKey
-	tokens   map[string]string // accepted personal tokens -> the account login they belong to ("" for none)
-	users    map[string]bool   // lower-case logins of user accounts; every other owner is an organisation
-	installs map[int64]string  // installation id -> account login
-	grants   map[string]grant  // by account login (lower case); absent: every permission and event
+	tokens   map[string]string         // accepted personal tokens -> the account login they belong to ("" for none)
+	reach    map[string]map[int64]bool // a personal token -> the only repositories it reads (Reach); absent: every one
+	expiry   map[string]time.Time      // a personal token -> its end, sent in GitHub's header (Expires)
+	users    map[string]bool           // lower-case logins of user accounts; every other owner is an organisation
+	installs map[int64]string          // installation id -> account login
+	grants   map[string]grant          // by account login (lower case); absent: every permission and event
 	t        testing.TB
 	issued   map[string]string // installation token -> account login
 	orgs     map[string][]*gh.Repository
@@ -77,7 +79,7 @@ func New(t testing.TB) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, t: t, issued: map[string]string{},
+	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, reach: map[string]map[int64]bool{}, expiry: map[string]time.Time{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, t: t, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
 		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
 		releases: map[int64][]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
@@ -122,6 +124,25 @@ func (s *Server) AddUserToken(tok, login string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tokens[tok] = login
+}
+
+// Reach limits what the personal token tok reads to the repositories ids, as a person's token reads only what GitHub lets that person
+// read: listings leave the others out and every /repos/{owner}/{name} call of another answers 404. Without it a token reads every one.
+func (s *Server) Reach(tok string, ids ...int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reach[tok] = map[int64]bool{}
+	for _, id := range ids {
+		s.reach[tok][id] = true
+	}
+}
+
+// Expires makes the personal token tok end at end: every answer to it carries GitHub's GitHub-Authentication-Token-Expiration header,
+// and after end it is refused (401).
+func (s *Server) Expires(tok string, end time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.expiry[tok] = end
 }
 
 // AddUser makes login a user account (owners are organisations otherwise): GET /orgs/{login}/repos answers 404, its repositories
@@ -328,6 +349,21 @@ func (s *Server) charge(w http.ResponseWriter, req *http.Request) string {
 		writeError(w, http.StatusUnauthorized, "Bad credentials")
 		return ""
 	}
+	if end, ok := s.expiry[tok]; personal && ok {
+		if time.Now().After(end) {
+			writeError(w, http.StatusUnauthorized, "Bad credentials")
+			return ""
+		}
+		w.Header().Set("GitHub-Authentication-Token-Expiration", end.UTC().Format("2006-01-02 15:04:05 MST"))
+	}
+	if reach := s.reach[tok]; personal && reach != nil {
+		if rest, ok := strings.CutPrefix(req.URL.Path, "/repos/"); ok {
+			if parts := strings.SplitN(rest, "/", 3); len(parts) < 2 || !reach[s.lookup(parts[0], parts[1]).GetID()] {
+				writeError(w, http.StatusNotFound, "Not Found")
+				return ""
+			}
+		}
+	}
 	if now := time.Now(); s.reset.IsZero() || now.After(s.reset) {
 		s.reset = now.Add(time.Hour).Truncate(time.Second)
 		clear(s.used)
@@ -464,7 +500,10 @@ func (s *Server) listRepos(w http.ResponseWriter, req *http.Request) {
 		owner = strings.ToLower(s.issued[bearer(req)])
 	}
 	repos, ok := s.orgs[owner]
-	repos = slices.DeleteFunc(slices.Clone(repos), func(r *gh.Repository) bool { return public && r.GetVisibility() == "private" })
+	reach := s.reach[bearer(req)]
+	repos = slices.DeleteFunc(slices.Clone(repos), func(r *gh.Repository) bool {
+		return public && r.GetVisibility() == "private" || reach != nil && !reach[r.GetID()]
+	})
 	s.mu.Unlock()
 	if !ok && req.URL.Path != "/user/repos" && req.URL.Path != "/installation/repositories" {
 		writeError(w, http.StatusNotFound, "Not Found")
@@ -500,11 +539,12 @@ func (s *Server) getUser(w http.ResponseWriter, req *http.Request) {
 	}
 	s.mu.Lock()
 	login, kind := req.PathValue("user"), "Organization"
-	if login == "" {
+	self := login == ""
+	if self {
 		login = s.tokens[bearer(req)]
 	}
 	_, known := s.orgs[strings.ToLower(login)]
-	user := s.users[strings.ToLower(login)]
+	user := s.users[strings.ToLower(login)] || self && !known // a token's own account is a user's
 	s.mu.Unlock()
 	if user {
 		kind = "User"
