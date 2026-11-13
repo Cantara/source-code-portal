@@ -310,7 +310,7 @@ func TestEnterpriseTwoPeople(t *testing.T) {
 	repo := func(name, vis string) int64 {
 		sha++
 		mark := "m4rk" + name // a word only this repository holds, never asked for
-		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new(vis), Description: new(name + " tools " + mark), Topics: []string{mark}})
+		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new(vis), Description: new(name + " tools " + mark), Topics: []string{mark}, Archived: new(name == "zq-ada")})
 		gh.SetCommits(id, githubtest.Commit{SHA: strings.Repeat(strconv.Itoa(sha), 40), Message: name + " change " + mark, AuthorName: "Ann", Date: at})
 		gh.SetFile(id, "README.md", "# "+name+"\n\n"+mark+"\n")
 		gh.SetFile(id, "docs/guide.md", "# Guide to "+name+"\n\n"+mark+"\n")
@@ -352,6 +352,14 @@ func TestEnterpriseTwoPeople(t *testing.T) {
 	waitFor(ada, "/api/v1/repos/acme/zq-ada", "zq-ada change")
 	waitFor(bo, "/api/v1/repos/acme/xk-bo", "xk-bo change")
 	waitFor(ada, "/api/v1/repos/acme/inner", "inner change")
+
+	// A repository archived on GitHub is retired in its reader's view: marked so and listed in the archive, as in every mode.
+	if _, b := call(t, ada, http.MethodGet, public+"/api/v1/repos/acme/zq-ada", ""); !strings.Contains(b, `"archived":true`) {
+		t.Errorf("zq-ada is not marked archived: %.300s", b)
+	}
+	if _, b := call(t, ada, http.MethodGet, public+"/api/v1/archive", ""); !strings.Contains(b, "acme/zq-ada") || strings.Contains(b, "acme/inner") {
+		t.Errorf("Ada's archive: %.300s", b)
+	}
 
 	for _, tc := range []struct {
 		who       *http.Client

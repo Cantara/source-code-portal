@@ -21,7 +21,7 @@ import { setLocation } from "@/test/navigation"
 import { MainNav } from "./shell"
 import { RulesProvider } from "@/lib/rules-context"
 import type { Filters } from "@/lib/preferences"
-import { activity, commit, fresh, http, me, noPulls, rules, server, snapshot } from "@/test/server"
+import { activity, commit, fresh, http, me, noPulls, product, repo, rules, server, snapshot } from "@/test/server"
 
 function client() {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10_000 } } })
@@ -379,6 +379,35 @@ describe("pages", () => {
     expect(screen.getByRole("columnheader", { name: /Issues/ })).toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /open issues$/ })).not.toBeInTheDocument()
     expect(screen.queryByRole("heading", { name: "Pull requests" })).not.toBeInTheDocument()
+  })
+
+  it("marks an archived repository in its group's rows", async () => {
+    server.use(
+      http.get("/groups/{group}", ({ response }) =>
+        response(200).json({
+          id: "iam",
+          name: "IAM",
+          description: "Identity and access",
+          defaultRepo: null,
+          hiddenForks: 0,
+          defaultRepoState: "missing",
+          repoCount: 2,
+          health: product,
+          repos: [repo("Core"), repo("Agent", { archived: true })],
+        }),
+      ),
+    )
+    show(<GroupView group="iam" />, "/groups/iam")
+    await screen.findByRole("heading", { level: 1, name: "IAM" })
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1)
+    // The activity light names the level for assistive technology; the badge says it to every reader.
+    const badged = rows.filter((r) =>
+      within(r)
+        .queryAllByText("Archived")
+        .some((e) => e.className.includes("rounded")),
+    )
+    expect(badged).toHaveLength(1)
+    expect(badged[0]).toHaveTextContent("Agent")
   })
 
   it("filters and sorts the repositories of a group through the URL", async () => {

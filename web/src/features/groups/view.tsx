@@ -233,6 +233,7 @@ export function GroupView({ group }: { group: string }) {
                                 </Link>
                                 <VisibilityBadge visibility={r.visibility} />
                                 {r.fork && <Badge>Fork</Badge>}
+                                {r.archived && <Badge variant="warn">Archived</Badge>}
                                 {r.freshness.status !== "fresh" && <FreshnessBadge freshness={r.freshness} />}
                               </span>
                               {(r.language || r.description) && (
