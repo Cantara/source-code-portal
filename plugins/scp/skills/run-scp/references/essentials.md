@@ -53,6 +53,7 @@ an error, as is an unknown key in the file.
 | `layout` | `dir` | the administrators' dashboard designs; back it up |
 | `packages` | `public` (`true`), `registries[]`: `id`, `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`, `network` (`public`, or `private`: on your network, http allowed), `auth` (`user` and `password_file`, or `token_file` with an optional `header`) | credentials go only to the registry's own URL; GitHub Packages needs a token with `read:packages`, not the App |
 | `ops` | `pprof` | profiles on the admin listener |
+| `enterprise` | `enabled` (`false`), `github[]`: `source`, `web_url`, `graphql_url`; `oidc.identity_claim` (`email`), `oidc.userinfo` (`true`) | GitHub Enterprise Cloud (`https://api.<name>.ghe.com/` with web `https://<name>.ghe.com/`) and Entra ID (`identity_claim: preferred_username`, `userinfo: false`); every key but `enabled` is refused while it is off (operator guide 2.8) |
 
 ## Matchers
 

@@ -1,6 +1,6 @@
 {
   "name": "scp",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Configure, deploy, upgrade and troubleshoot a Source Code Portal (SCP) from its released binary or container image.",
   "author": {
     "name": "Cantara",

@@ -203,6 +203,10 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 | `features.pulls` | `true` | the open pull requests (section 2.4.2); `false`: switched off, as if the portal had none (section 1) |
 | `features.issues` | `true` | the open issues (section 2.4.3); `false`: switched off (section 1) |
+| `enterprise.enabled` | `false` | the settings GitHub Enterprise and Entra ID need (section 2.8); while `false` every other `enterprise` key is refused |
+| `enterprise.github[]` | `[]` | per source: `source` (a `github.sources[].id`), `web_url` (its web address, ending in `/`), `graphql_url` (optional; default beside `base_url`) |
+| `enterprise.oidc.identity_claim` | `email` | the claim matched against `auth.admin_emails` and shown as the viewer (`preferred_username` for Entra ID) |
+| `enterprise.oidc.userinfo` | `true` | `false`: never ask the provider's userinfo endpoint; the ID token's claims only |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
 
@@ -669,6 +673,40 @@ image tag. To ship one artifact instead, start from the release image and copy t
   manifest. The guide, the assistant and the texts for agents keep the product's name, which they describe.
 - **Check it.** Look at the dashboard, a repository page and `/present` in both themes (the theme menu in the header), and run a
   contrast check on what you changed; the health and activity colours are judged by eye on the fleet map.
+
+### 2.8 GitHub Enterprise and Entra ID
+
+GitHub Enterprise Cloud with data residency (`<name>.ghe.com`) and some GitHub Enterprise Server setups have addresses the portal
+cannot work out from the API base, and Entra ID's tokens carry other claims than a generic OpenID Connect provider's. Both are set in
+the `enterprise` section, switched on with `enterprise.enabled: true`; without it the portal behaves as everywhere else in this guide.
+
+```yaml
+github:
+  sources:
+    - id: ghe
+      base_url: https://api.octocorp.ghe.com/          # REST, as for any source
+      orgs: [octocorp]
+      app: { id: 123456, private_key_file: /run/secrets/scp-app-key }
+enterprise:
+  enabled: true
+  github:
+    - source: ghe
+      web_url: https://octocorp.ghe.com/              # links to repositories and files in documents
+      graphql_url: https://api.octocorp.ghe.com/graphql  # optional
+  oidc:
+    identity_claim: preferred_username                # Entra ID sends email only when the account has a mail attribute
+    userinfo: false                                   # Entra ID's userinfo is on Microsoft Graph and adds no groups
+```
+
+- **Addresses.** GitHub Enterprise Cloud: REST `https://api.<name>.ghe.com/`, GraphQL `https://api.<name>.ghe.com/graphql`, web
+  `https://<name>.ghe.com/`. GitHub Enterprise Server: REST `https://<host>/api/v3/`, GraphQL `https://<host>/api/graphql`, web
+  `https://<host>/`. Without an `enterprise.github` entry a source keeps the derived ones: the web address is the base without
+  `/api/v3/`, GraphQL is beside the base.
+- **Entra ID.** Register the portal as a web application (section 2.2) with the scopes `openid email profile`. The issuer is
+  `https://login.microsoftonline.com/<tenant-id>/v2.0`. Entra ID sends no `email_verified`, so leave
+  `auth.oidc.require_verified_email` off (with it on, `identity_claim` must stay `email`). Groups arrive as object ids in `groups`
+  once the registration's token configuration adds them, or use app roles and `auth.oidc.groups_claim: roles`; name those ids or roles
+  in `access.private_groups` and `auth.admin_groups`.
 
 ## 3. Run
 
