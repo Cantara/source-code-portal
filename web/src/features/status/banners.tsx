@@ -1,9 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { Alert } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { useNewVersion } from "@/lib/build"
 import { useConnectionFailing, useLive } from "@/lib/connection"
+import { useFeatures } from "@/lib/rules-context"
 import { useSnapshotSync } from "./sync"
 
 /** StatusBanners keeps the snapshot in sync and says when the portal is warming, unreachable or has a new version. */
@@ -11,6 +13,7 @@ export function StatusBanners() {
   const snapshot = useSnapshotSync()
   const failing = useConnectionFailing()
   const newer = useNewVersion()
+  const { people } = useFeatures()
   return (
     <div className="flex flex-col gap-2 px-4 empty:hidden lg:px-6">
       <div role="status" aria-live="polite" className="contents">
@@ -19,7 +22,17 @@ export function StatusBanners() {
             Cannot refresh right now. Showing the last data that loaded.
           </Alert>
         )}
-        {snapshot && !snapshot.ready && (
+        {snapshot && !snapshot.ready && people && (
+          // A portal read with people's tokens has a catalogue once someone has linked one: the reader's own is the way in.
+          <Alert variant="warn" className="mt-3">
+            The portal shows what your GitHub token reads.{" "}
+            <Link href="/github" className="font-medium underline underline-offset-2">
+              Link your GitHub access
+            </Link>
+            ; your repositories fill in a minute later.
+          </Alert>
+        )}
+        {snapshot && !snapshot.ready && !people && (
           <Alert variant="warn" className="mt-3">
             The portal is loading its catalogue from GitHub. Pages fill in as it arrives.
           </Alert>

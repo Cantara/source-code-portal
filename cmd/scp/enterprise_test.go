@@ -269,6 +269,9 @@ func TestEnterpriseLinksTokens(t *testing.T) {
 		t.Errorf("anonymous: %d", code)
 	}
 	ada := browserFor(t, public) // the fake provider's user is ada@example.org
+	if _, b := call(t, ada, http.MethodGet, public+"/api/v1/rules", ""); !strings.Contains(b, `"people":true`) {
+		t.Errorf("the rules do not say the mode: %.200s", b)
+	}
 	same := []string{"Sec-Fetch-Site", "same-origin"}
 	if code, b := call(t, ada, http.MethodPost, url, `{"source":"ghe","owner":"acme","token":"github_pat_ada"}`, "Sec-Fetch-Site", "cross-site"); code != http.StatusForbidden {
 		t.Errorf("cross-origin: %d %s", code, b)

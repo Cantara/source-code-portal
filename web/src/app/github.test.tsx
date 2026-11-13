@@ -5,7 +5,9 @@ import { http as raw, HttpResponse } from "msw"
 import { describe, expect, it } from "vitest"
 import type { Tokens } from "@/features/github/api"
 import { GitHubView } from "@/features/github/view"
-import { server } from "@/test/server"
+import { StatusBanners } from "@/features/status/banners"
+import { RulesProvider } from "@/lib/rules-context"
+import { rules, server, snapshot } from "@/test/server"
 
 const create =
   "https://ghe.example/settings/personal-access-tokens/new?name=x&target_name=acme&expires_in=90&contents=read&metadata=read"
@@ -120,5 +122,20 @@ describe("your GitHub access", () => {
     server.use(raw.get("*/api/v1/me/github/tokens", () => HttpResponse.json(linked({ state: "unauthorized" }))))
     view()
     expect(await screen.findByText(/GitHub refused the token: it expired or was revoked/)).toBeInTheDocument()
+  })
+})
+
+describe("the status banner in a portal read with people's tokens", () => {
+  it("leads a reader to their GitHub access while there is no catalogue, not to wait for one", async () => {
+    server.use(raw.get("*/api/v1/snapshot", () => HttpResponse.json(snapshot(1, false))))
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <RulesProvider rules={{ ...rules, features: { ...rules.features, people: true } }}>
+          <StatusBanners />
+        </RulesProvider>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByRole("link", { name: "Link your GitHub access" })).toHaveAttribute("href", "/github")
+    expect(screen.queryByText(/loading its catalogue/)).not.toBeInTheDocument()
   })
 })
