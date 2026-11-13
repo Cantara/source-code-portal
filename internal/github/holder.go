@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"fmt"
 
 	gh "github.com/google/go-github/v93/github"
 
@@ -53,4 +54,47 @@ func (s *Source) ListWith(ctx context.Context, owner string, h Holder) ([]snapsh
 	return s.listAll(ctx, owner, func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
 		return c.client.Repositories.ListByOrg(ctx, owner, &gh.RepositoryListByOrgOptions{Type: "all", Sort: "pushed", Direction: "desc", ListOptions: p})
 	})
+}
+
+// Broker is what a source read with people's tokens asks of the people (scp enterprise): every repository of owner their fresh
+// listings hold, and the tokens of the people whose fresh listing holds owner/name.
+type Broker interface {
+	Listed(source, owner string) ([]snapshot.Repo, bool)
+	Holders(source, owner, name string) []Holder
+}
+
+// SetBroker gives a people source its broker. Call it before the first request; without one the source reads nothing.
+func (s *Source) SetBroker(b Broker) { s.broker = b }
+
+// listed is owner's repositories as the people's fresh listings hold them, most recently pushed first: the catalogue of a people source.
+func (s *Source) listed(owner string) ([]snapshot.Repo, error) {
+	if s.broker != nil {
+		if repos, ok := s.broker.Listed(s.id, owner); ok {
+			return repos, nil
+		}
+	}
+	return nil, &Error{Kind: Waiting, Code: "no_person", Err: fmt.Errorf("no linked person's token has listed %s lately", owner)}
+}
+
+// holderFor is the client of the token, among those of the people who read owner/name, with the most of its rate limit left.
+func (s *Source) holderFor(owner, name string) (*gh.Client, error) {
+	var holders []Holder
+	if s.broker != nil && name != "" {
+		holders = s.broker.Holders(s.id, owner, name)
+	}
+	var best *credential
+	bestLeft := -1.0
+	for _, h := range holders {
+		c, err := s.holder(h)
+		if err != nil {
+			return nil, err
+		}
+		if left := c.rate.fraction(); left > bestLeft {
+			best, bestLeft = c, left
+		}
+	}
+	if best == nil {
+		return nil, &Error{Kind: Waiting, Code: "no_person", Err: fmt.Errorf("no linked person's token reads %s/%s", owner, name)}
+	}
+	return best.client, nil
 }

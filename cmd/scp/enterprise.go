@@ -14,6 +14,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/people"
 	"github.com/cantara/source-code-portal/internal/snapshot"
 	"github.com/cantara/source-code-portal/internal/store"
+	"github.com/cantara/source-code-portal/internal/sync"
 )
 
 // newEnterpriseCmd is scp enterprise (design/enterprise.md, EN3): a portal of GitHub Enterprise sources read with the tokens of the
@@ -127,11 +128,16 @@ func (s *server) open(ctx context.Context, cfg config.Config, gh *github.Client)
 	}
 	s.people, err = people.Open(ctx, people.Options{Store: s.store, Key: cfg.Enterprise.TokenKey.Reveal(), Issuer: cfg.Auth.OIDC.Issuer,
 		Sources: sources, Portal: cfg.Server.PublicURL, Refresh: cfg.Enterprise.Access.Refresh, MaxAge: cfg.Enterprise.Access.MaxAge,
-		Log: s.log.With("component", "people")})
+		Changed: func(source string) { s.engine.NotifySource(sync.EventSourceChanged, source) }, // the catalogue is what they list
+		Log:     s.log.With("component", "people")})
 	if err != nil {
 		_ = s.store.Close()
+		return err
 	}
-	return err
+	for _, src := range cfg.GitHub.Sources {
+		gh.Source(src.ID).SetBroker(s.people) // each repository is read with the token of a person who reads it
+	}
+	return nil
 }
 
 // peopleRoutes are the enterprise mode's own routes: a person's GitHub tokens. None in the other modes.

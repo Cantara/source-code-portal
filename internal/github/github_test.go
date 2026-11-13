@@ -249,7 +249,7 @@ func TestLargeResponseIsReadWhole(t *testing.T) {
 		cs = append(cs, githubtest.Commit{SHA: fmt.Sprintf("%040x", i+1), Message: long, AuthorName: "Bo", Date: time.Now()})
 	}
 	srv.SetCommits(id, cs...)
-	c, err := tokenSource(t, srv, "acme").REST(t.Context(), "acme")
+	c, err := tokenSource(t, srv, "acme").REST(t.Context(), "acme", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,8 +386,8 @@ func TestPeopleSourceSendsNothingWithoutAToken(t *testing.T) {
 	}
 	s := c.Source("gh")
 	var e *Error
-	if _, err := s.ListRepos(t.Context(), "acme"); !errors.As(err, &e) || e.Kind != Auth || e.Code != "no_person" {
-		t.Errorf("listing: %v, want the Auth error no_person", err)
+	if _, err := s.ListRepos(t.Context(), "acme"); !errors.As(err, &e) || e.Kind != Waiting || e.Code != "no_person" {
+		t.Errorf("listing: %v, want the Waiting error no_person", err)
 	}
 	if _, err := s.Blob(t.Context(), "acme", "open", "abc"); !errors.As(err, &e) || e.Code != "no_person" {
 		t.Errorf("blob: %v", err)

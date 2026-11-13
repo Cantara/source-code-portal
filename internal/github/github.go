@@ -72,6 +72,9 @@ func (c *Client) RateRemaining() map[string]float64 {
 		for _, cr := range s.owners {
 			creds = append(creds, cr)
 		}
+		for _, cr := range s.persons {
+			creds = append(creds, cr)
+		}
 		for _, cr := range creds {
 			if cr != nil {
 				least = min(least, cr.rate.fraction())
@@ -117,6 +120,7 @@ type Source struct {
 	grants   []Grant                // App mode: what each installation may read, from the last listing
 	accounts map[string]account     // token mode: lower-case owner login -> what it is, looked up once
 	persons  map[string]*credential // people mode: a person's token by its holder key, made once (its rate book is its own)
+	broker   Broker                 // people mode: the people's listings and tokens
 }
 
 // credential is one rate bucket: a token, or one App installation.
@@ -279,19 +283,20 @@ func (s *Source) Grants() (grants []Grant, known bool) {
 // App reports whether the source reads through a GitHub App, not a token.
 func (s *Source) App() bool { return s.app != nil }
 
-// REST returns the go-github client for owner's credential, for the calls only one feature makes; classify their failures with
+// REST returns the go-github client for the credential that reads owner's repository name, for the calls only one feature makes; classify their failures with
 // Classify.
-func (s *Source) REST(ctx context.Context, owner string) (*gh.Client, error) {
-	return s.client(ctx, owner)
+func (s *Source) REST(ctx context.Context, owner, name string) (*gh.Client, error) {
+	return s.client(ctx, owner, name)
 }
 
-// client returns the client for owner, listing installations first when owner has none yet.
-func (s *Source) client(ctx context.Context, owner string) (*gh.Client, error) {
+// client returns the client for owner's repository name (name is empty for a call about owner): in people mode a token of a person who
+// reads it, else owner's credential, listing installations first when owner has none yet.
+func (s *Source) client(ctx context.Context, owner, name string) (*gh.Client, error) {
+	if s.cfg.People {
+		return s.holderFor(owner, name)
+	}
 	if c := s.credentialFor(owner); c != nil {
 		return c.client, nil
-	}
-	if s.cfg.People {
-		return nil, &Error{Kind: Auth, Code: "no_person", Err: fmt.Errorf("no linked person's token reads %s", owner)}
 	}
 	if err := s.RefreshInstallations(ctx); err != nil {
 		return nil, err
@@ -305,7 +310,10 @@ func (s *Source) client(ctx context.Context, owner string) (*gh.Client, error) {
 // ListRepos returns every repository of owner, an organisation or a user account, most recently pushed first (an App's user
 // installation lists in GitHub's order). Any failed page fails the listing.
 func (s *Source) ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error) {
-	c, err := s.client(ctx, owner)
+	if s.cfg.People {
+		return s.listed(owner)
+	}
+	c, err := s.client(ctx, owner, "")
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +408,7 @@ func (s *Source) account(ctx context.Context, c *gh.Client, owner string) (accou
 
 // Repo returns one repository.
 func (s *Source) Repo(ctx context.Context, owner, name string) (snapshot.Repo, error) {
-	c, err := s.client(ctx, owner)
+	c, err := s.client(ctx, owner, name)
 	if err != nil {
 		return snapshot.Repo{}, err
 	}
@@ -453,7 +461,7 @@ func (s *Source) GraphQLURL() string {
 
 // Tags are the names of a repository's tags, the first 100 GitHub lists (the newest first, by its own order).
 func (s *Source) Tags(ctx context.Context, owner, name string) ([]string, error) {
-	c, err := s.client(ctx, owner)
+	c, err := s.client(ctx, owner, name)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +478,7 @@ func (s *Source) Tags(ctx context.Context, owner, name string) ([]string, error)
 
 // Blob returns the content of a blob.
 func (s *Source) Blob(ctx context.Context, owner, name, sha string) ([]byte, error) {
-	c, err := s.client(ctx, owner)
+	c, err := s.client(ctx, owner, name)
 	if err != nil {
 		return nil, err
 	}
@@ -510,6 +518,7 @@ const (
 	Auth                        // the credential was refused
 	NotFound                    // missing or not visible
 	Permanent                   // will not succeed by retrying soon
+	Waiting                     // no credential to read it with yet (a people source without a person's token): not an attempt
 )
 
 // Error is a classified GitHub failure.
@@ -528,6 +537,7 @@ func (e *Error) Unwrap() error { return e.Err }
 func (e *Error) RateLimitedUntil() (time.Time, bool) { return e.RetryAt, e.Kind == RateLimited }
 func (e *Error) AuthFailed() bool                    { return e.Kind == Auth }
 func (e *Error) Permanent() bool                     { return e.Kind == Permanent }
+func (e *Error) Waiting() bool                       { return e.Kind == Waiting }
 func (e *Error) IsNotFound() bool                    { return e.Kind == NotFound }
 func (e *Error) ErrorCode() string                   { return e.Code }
 

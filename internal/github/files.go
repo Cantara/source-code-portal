@@ -65,7 +65,7 @@ func (s *Source) walk(ctx context.Context, owner, name string, keep func(dir str
 
 // readTree reads one tree, keeping the entries want admits, and reports whether GitHub truncated it.
 func (s *Source) readTree(ctx context.Context, owner, name, ref string, recursive bool, want func(TreeEntry) bool) ([]TreeEntry, bool, error) {
-	c, err := s.client(ctx, owner)
+	c, err := s.client(ctx, owner, name)
 	if err != nil {
 		return nil, false, err
 	}

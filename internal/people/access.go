@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/github"
@@ -214,4 +215,56 @@ func (p *People) Allowed(subject string) (key string, repos map[snapshot.RepoID]
 		h.Write(n[:])
 	}
 	return hex.EncodeToString(h.Sum(nil)[:16]), repos
+}
+
+// fresh reports whether a token's listing counts at now: GitHub took the token and listed it within MaxAge.
+func (p *People) fresh(t store.PersonToken, now time.Time) bool {
+	return t.State == "ok" && !t.ListedAt.IsZero() && now.Sub(t.ListedAt) <= p.o.MaxAge
+}
+
+// Listed is every repository of the source's owner that a fresh listing since the start holds, each once, most recently pushed
+// first: the catalogue the people's tokens read (github.Broker). False when no such listing exists.
+func (p *People) Listed(source, owner string) ([]snapshot.Repo, bool) {
+	now, sl := p.o.Now(), slot{source, strings.ToLower(owner)}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	seen := map[int64]bool{}
+	var out []snapshot.Repo
+	found := false
+	for _, pp := range p.people {
+		repos, ok := pp.listed[sl]
+		if !ok || !p.fresh(pp.tokens[sl], now) {
+			continue
+		}
+		found = true
+		for _, r := range repos {
+			if !seen[r.ID.GitHubID] {
+				seen[r.ID.GitHubID] = true
+				out = append(out, r)
+			}
+		}
+	}
+	slices.SortStableFunc(out, func(a, b snapshot.Repo) int { return b.PushedAt.Compare(a.PushedAt) })
+	return out, found
+}
+
+// Holders are the tokens of the people whose fresh listing holds owner/name (github.Broker).
+func (p *People) Holders(source, owner, name string) []github.Holder {
+	now, sl := p.o.Now(), slot{source, strings.ToLower(owner)}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var out []github.Holder
+	for id, pp := range p.people {
+		t := pp.tokens[sl]
+		if !p.fresh(t, now) || !slices.ContainsFunc(pp.listed[sl], func(r snapshot.Repo) bool { return strings.EqualFold(r.Name, name) }) {
+			continue
+		}
+		token, err := p.sealer.open(id, source, sl.owner, t.Sealed)
+		if err != nil {
+			continue
+		}
+		out = append(out, github.Holder{Key: holderKey(id, sl, token), Token: token})
+	}
+	slices.SortFunc(out, func(a, b github.Holder) int { return strings.Compare(a.Key, b.Key) })
+	return out
 }

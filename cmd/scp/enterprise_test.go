@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -292,5 +293,101 @@ func TestEnterpriseLinksTokens(t *testing.T) {
 	}
 	if _, b := call(t, ada, http.MethodGet, url, ""); strings.Contains(b, "ada_octo") {
 		t.Errorf("after removal: %s", b)
+	}
+}
+
+// Two people with different access to one organisation: each repository is read with the token of a person who reads it, never with
+// another's; each person sees exactly the repositories their token lists, in every list, page and search; a person who removes their
+// token sees nothing.
+func TestEnterpriseTwoPeople(t *testing.T) {
+	gh := githubtest.New(t)
+	at := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+	sha := 0
+	repo := func(name, vis string) int64 {
+		sha++
+		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new(vis), Description: new(name + " tools")})
+		gh.SetCommits(id, githubtest.Commit{SHA: strings.Repeat(strconv.Itoa(sha), 40), Message: name + " change", AuthorName: "Ann", Date: at})
+		gh.SetFile(id, "README.md", "# "+name+"\n")
+		return id
+	}
+	inner, adas, bos := repo("inner", "internal"), repo("zq-ada", "private"), repo("xk-bo", "private")
+	gh.AddUserToken("github_pat_ada", "ada_octo")
+	gh.Reach("github_pat_ada", inner, adas)
+	gh.AddUserToken("github_pat_bo", "bo_octo")
+	gh.Reach("github_pat_bo", inner, bos)
+	idp := oidctest.New("scp")
+	defer idp.Close()
+	_, public := enterprisePortal(t, gh, idp, filepath.Join(t.TempDir(), "scp.db"))
+	same := []string{"Sec-Fetch-Site", "same-origin"}
+	link := func(c *http.Client, token string) {
+		t.Helper()
+		if code, b := call(t, c, http.MethodPost, public+people.TokensPattern, `{"source":"ghe","owner":"acme","token":"`+token+`"}`, same...); code != http.StatusCreated {
+			t.Fatalf("link %s: %d %s", token, code, b)
+		}
+	}
+	ada := browserFor(t, public)
+	idp.SetUser(oidctest.User{Subject: "u-2", Email: "bo@example.org", Name: "Bo"})
+	bo := browserFor(t, public)
+	link(ada, "github_pat_ada")
+	link(bo, "github_pat_bo")
+
+	waitFor := func(c *http.Client, path, want string) string {
+		t.Helper()
+		var b string
+		for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+			if _, b = call(t, c, http.MethodGet, public+path, ""); strings.Contains(b, want) {
+				return b
+			}
+		}
+		t.Fatalf("%s never held %q: %.300s", path, want, b)
+		return ""
+	}
+	waitFor(ada, "/api/v1/repos/acme/zq-ada", "zq-ada change")
+	waitFor(bo, "/api/v1/repos/acme/xk-bo", "xk-bo change")
+	waitFor(ada, "/api/v1/repos/acme/inner", "inner change")
+
+	for _, tc := range []struct {
+		who       *http.Client
+		mine, not string
+		name      string
+	}{{ada, "zq-ada", "xk-bo", "Ada"}, {bo, "xk-bo", "zq-ada", "Bo"}} {
+		for _, p := range []string{"/api/v1/repos", "/api/v1/dashboard", "/api/v1/groups/all", "/api/v1/commits", "/api/v1/search?q=tools",
+			"/llms.txt", "/llms-full.txt", "/sitemap.xml", "/knowledge.yaml", "/api/v1/snapshot"} {
+			code, b := call(t, tc.who, http.MethodGet, public+p, "")
+			if strings.Contains(b, tc.not) {
+				t.Errorf("%s reads %s in %s: %.300s", tc.name, tc.not, p, b)
+			}
+			if p == "/api/v1/repos" && (code != http.StatusOK || !strings.Contains(b, tc.mine) || !strings.Contains(b, "acme/inner")) {
+				t.Errorf("%s's repositories: %d %.300s", tc.name, code, b)
+			}
+		}
+		if code, _ := call(t, tc.who, http.MethodGet, public+"/api/v1/repos/acme/"+tc.not, ""); code != http.StatusNotFound {
+			t.Errorf("%s reads the other's repository: %d", tc.name, code)
+		}
+		if code, _ := call(t, tc.who, http.MethodGet, public+"/badges/repos/acme/"+tc.not+"/health.svg", ""); code != http.StatusNotFound {
+			t.Errorf("%s reads the other's badge: %d", tc.name, code)
+		}
+	}
+
+	// Nothing was asked with a token about a repository it does not read.
+	for tok, reach := range map[string][]string{"github_pat_ada": {"inner", "zq-ada"}, "github_pat_bo": {"inner", "xk-bo"}} {
+		asked := gh.Asked(tok)
+		if len(asked) == 0 {
+			t.Errorf("nothing asked with %s", tok)
+		}
+		for _, a := range asked {
+			if rest, ok := strings.CutPrefix(strings.Fields(a)[1], "/repos/acme/"); ok {
+				if name, _, _ := strings.Cut(rest, "/"); !slices.Contains(reach, name) || strings.HasSuffix(a, " 404") {
+					t.Errorf("%s asked %s", tok, a)
+				}
+			}
+		}
+	}
+
+	if code, _ := call(t, bo, http.MethodDelete, public+people.TokensPattern+"/ghe/acme", "", same...); code != http.StatusNoContent {
+		t.Fatalf("Bo removes the token: %d", code)
+	}
+	if _, b := call(t, bo, http.MethodGet, public+"/api/v1/repos", ""); strings.Contains(b, "acme/") {
+		t.Errorf("Bo without a token: %.300s", b)
 	}
 }

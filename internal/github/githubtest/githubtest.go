@@ -44,6 +44,7 @@ type Server struct {
 	tokens   map[string]string         // accepted personal tokens -> the account login they belong to ("" for none)
 	reach    map[string]map[int64]bool // a personal token -> the only repositories it reads (Reach); absent: every one
 	expiry   map[string]time.Time      // a personal token -> its end, sent in GitHub's header (Expires)
+	asked    map[string][]string       // a personal token with a login or a reach -> what was asked with it (Asked)
 	users    map[string]bool           // lower-case logins of user accounts; every other owner is an organisation
 	installs map[int64]string          // installation id -> account login
 	grants   map[string]grant          // by account login (lower case); absent: every permission and event
@@ -79,7 +80,7 @@ func New(t testing.TB) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, reach: map[string]map[int64]bool{}, expiry: map[string]time.Time{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, t: t, issued: map[string]string{},
+	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, reach: map[string]map[int64]bool{}, expiry: map[string]time.Time{}, asked: map[string][]string{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, t: t, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
 		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
 		releases: map[int64][]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
@@ -135,6 +136,13 @@ func (s *Server) Reach(tok string, ids ...int64) {
 	for _, id := range ids {
 		s.reach[tok][id] = true
 	}
+}
+
+// Asked is every request made with the personal token tok (one with a login or a reach), as "METHOD /path status".
+func (s *Server) Asked(tok string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.asked[tok])
 }
 
 // Expires makes the personal token tok end at end: every answer to it carries GitHub's GitHub-Authentication-Token-Expiration header,
@@ -268,6 +276,9 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 		defer func() {
 			s.mu.Lock()
 			s.ledger = append(s.ledger, fmt.Sprintf("%s %s %d", req.Method, req.URL.RequestURI(), rec.status))
+			if tok := bearer(req); s.tokens[tok] != "" || s.reach[tok] != nil {
+				s.asked[tok] = append(s.asked[tok], fmt.Sprintf("%s %s %d", req.Method, req.URL.Path, rec.status))
+			}
 			s.mu.Unlock()
 		}()
 		line := req.Method + " " + req.URL.Path

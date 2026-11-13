@@ -55,7 +55,7 @@ const maxAsk = 100
 
 // REST is a source's GitHub API client per owner and its GraphQL endpoint; *github.Source implements it.
 type REST interface {
-	REST(ctx context.Context, owner string) (*gh.Client, error)
+	REST(ctx context.Context, owner, name string) (*gh.Client, error)
 	GraphQLURL() string
 }
 
@@ -66,7 +66,7 @@ type rest struct{ src REST }
 
 // Open lists the open pull requests through the conditional transport: an unchanged listing is a 304, which GitHub does not count.
 func (r rest) Open(ctx context.Context, owner, name string) ([]Listed, error) {
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (r rest) Details(ctx context.Context, owner, name string, numbers []int, to
 	if len(numbers) == 0 && !total {
 		return map[int]Detail{}, -1, nil
 	}
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, -1, err
 	}
