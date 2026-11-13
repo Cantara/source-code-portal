@@ -4,6 +4,16 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.13
+
+A retired repository, archived on GitHub or marked `lifecycle: deprecated` in its `scp.yaml`, is no longer one of its product's
+repositories: users find it in the Archive. Nothing to configure, and nothing new is asked of GitHub.
+
+- **Retired repositories leave their product**: the product's page and count, the dashboard's cards and fleet map, the product's
+  health and its lists of commits, pull requests, issues and releases leave them out; the product's page links to its retired ones in
+  the Archive (`/archive?group=`). A repository archived later leaves at the next refresh, and one brought back returns.
+- **The Archived badge** marks an archived repository wherever one is still listed.
+
 ## 2.2.12
 
 A portal can serve a GitHub Enterprise with sign-in through Microsoft Entra ID, and a new command, `scp enterprise`, serves one to
