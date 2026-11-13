@@ -4,6 +4,27 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.12
+
+A portal can serve a GitHub Enterprise with sign-in through Microsoft Entra ID, and a new command, `scp enterprise`, serves one to
+everyone who signs in, each person seeing exactly what GitHub lets them read, with no App, webhook or administrator's rights on
+GitHub. Nothing changes for a portal without the new `enterprise` section: its keys are off by default, and nothing new is asked of
+GitHub. The store gains three empty tables at the first start (an additive migration; the copy `<store.path>.pre-0002` is taken
+first). Built with Go 1.27.4.
+
+- **GitHub Enterprise and Entra ID**: the `enterprise` section, behind `enterprise.enabled`, gives a source its web and GraphQL
+  addresses (`enterprise.github[].web_url`, `graphql_url`: GitHub Enterprise Cloud with data residency on `*.ghe.com`, or Enterprise
+  Server) and adapts sign-in to Entra ID (`enterprise.oidc.identity_claim`, for example `preferred_username`, matched against
+  `auth.admin_emails`; `enterprise.oidc.userinfo: false`). Operator guide, section 2.8.
+- **The enterprise mode, `scp enterprise`**: with `people: true` on its sources, the portal reads GitHub with the tokens of the people
+  who sign in. Each person links a read-only fine-grained token of their own on **Your GitHub access** (`/github`, the key in the header:
+  GitHub's form pre-filled, the token checked with GitHub, tied to the person, kept encrypted with `enterprise.token_key_file`, a warning
+  before it ends) and then sees exactly the repositories their token lists, everywhere: the lists, the dashboard, search, the feeds,
+  the documents, the badges, `llms.txt`, the event stream, the tools and the assistant. Repository data is read once, with the token of
+  a person who can read it, and shared by everyone who can. A list older than `enterprise.access.max_age` shows nothing (fail
+  closed). The mode has its own store, no public view and no webhook; `scp serve` refuses its configuration. Operator guide, section 2.9.
+- **Go 1.27.4**, for the standard library's GO-2026-6859.
+
 ## 2.2.11
 
 A portal can wear its owner's colours, logo and name from files, without a build. Nothing changes for a portal that sets neither new key
