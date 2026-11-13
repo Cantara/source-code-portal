@@ -1,6 +1,6 @@
 # Enterprise (EN1 to EN8)
 
-Status: EN1 and EN3 built, EN4 to EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
+Status: EN1, EN3 and EN4 built, EN5 to EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
 
 A portal that reads GitHub Enterprise (Server, or Cloud with data residency on `*.ghe.com`) and signs people in with Microsoft
 Entra ID needs a few settings that github.com and a generic OpenID Connect provider do not: GitHub addresses that cannot be worked
@@ -132,13 +132,24 @@ site's), `TestEnterpriseFailsClosed` (an empty store starts and is ready; every 
 forged proxy header included; a signed-in person without a list reads none of what the snapshot holds; the fake GitHub saw no
 request), `TestRestrict`, `TestPeopleSourceSendsNothingWithoutAToken`, `TestTheEnterpriseModeKeepsItsOwnStore`.
 
-## EN4: people link their tokens
+## EN4: people link their tokens (built)
 
 `GET`, `POST` and `DELETE /api/v1/me/github/tokens` (signed in, same origin): a fine-grained token per organisation, checked before it is
 kept (`GET /user` answers; its login is bound to the identity claim by `login`; it reads the organisation's repositories), sealed
 (AES-256-GCM, a key derived with HKDF from `token_key_file`, the person and organisation as additional data) in the mode's own tables
 (migration `0002`), never shown again. The page builds GitHub's pre-filled creation link from the web address, the organisation and
 the read permissions. Token health: its expiry from GitHub's answer header; a refused token marks the person's list unknown.
+
+Built as `internal/people` (`People`: `Seen`, `Link`, `Unlink`, `Tokens`, `Overview`, `Routes`), the store's `person`, `person_token`
+and `person_access` (migration `0002_people.sql`) and `github.Source.CheckToken` (`GET /user`, then one repository of
+`GET /orgs/{owner}/repos`). Only a token beginning `github_pat_` is taken: a classic token carries write scopes. A refusal is a 422
+problem with its code: `unknown-owner`, `not-fine-grained`, `not-yours`, `unauthorized` (wrong, expired, revoked, or the enterprise's
+network rules), `forbidden` (awaiting the organisation's approval), `reads-nothing`, `expired`, `unavailable`. Replacing a token drops
+what its predecessor listed. The person is `<issuer>#<subject>`; a person row is written at most hourly on use.
+
+Acceptance: `TestLink` (each refusal, a token sealed, kept across a restart, removed), `TestBound`, `TestCreationLink`, `TestSealing`,
+`TestCheckToken`, `TestPeopleSurviveARestart`, `TestEnterpriseLinksTokens` (the API signed in, anonymous and cross-origin refused, the
+secret never answered).
 
 **Binding (`login`).** `managed`: the identity claim's part before `@`, every character but letters, digits and `-` as `-`, must equal
 the login before its last `_` (a managed user's login is that, `_` and the enterprise's short code), compared without case. `exact`: the
