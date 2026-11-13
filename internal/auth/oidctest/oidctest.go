@@ -20,6 +20,8 @@ import (
 // User is who the provider signs in.
 type User struct {
 	Subject, Email, Name string
+	PreferredUsername    string   // preferred_username, when set (Entra ID always sends it)
+	NoEmail              bool     // no email claim, as Entra ID for an account without a mail attribute
 	Unverified           bool     // email_verified false
 	NoVerifiedClaim      bool     // email_verified left out, as Microsoft Entra does
 	Groups               []string // in the ID token, or with GroupsInUserinfo only from userinfo
@@ -38,6 +40,7 @@ type Provider struct {
 	access     map[string]User
 	wrongNonce bool
 	expired    bool
+	userinfos  int // the userinfo requests answered
 }
 
 type grant struct {
@@ -134,8 +137,14 @@ func (p *Provider) token(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	claims := map[string]any{"iss": p.URL, "sub": g.user.Subject, "aud": p.ClientID, "iat": now.Unix(), "exp": now.Add(time.Hour).Unix(),
 		"nonce": g.nonce, "name": g.user.Name, "email": g.user.Email, "email_verified": !g.user.Unverified}
-	if g.user.NoVerifiedClaim {
+	if g.user.NoVerifiedClaim || g.user.NoEmail {
 		delete(claims, "email_verified")
+	}
+	if g.user.NoEmail {
+		delete(claims, "email")
+	}
+	if g.user.PreferredUsername != "" {
+		claims["preferred_username"] = g.user.PreferredUsername
 	}
 	if wrongNonce {
 		claims["nonce"] = "another"
@@ -156,13 +165,21 @@ func (p *Provider) token(w http.ResponseWriter, r *http.Request) {
 func (p *Provider) userinfo(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	u, ok := p.access[stripBearer(r.Header.Get("Authorization"))]
+	p.userinfos++
 	p.mu.Unlock()
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	writeJSON(w, map[string]any{"sub": u.Subject, "email": u.Email, "name": u.Name, "groups": u.Groups})
+	info := map[string]any{"sub": u.Subject, "email": u.Email, "name": u.Name, "groups": u.Groups}
+	if u.NoEmail {
+		delete(info, "email")
+	}
+	writeJSON(w, info)
 }
+
+// UserinfoCalls is the number of userinfo requests the provider answered.
+func (p *Provider) UserinfoCalls() int { p.mu.Lock(); defer p.mu.Unlock(); return p.userinfos }
 
 // endSession signs out and sends the browser back to post_logout_redirect_uri, as providers do.
 func (p *Provider) endSession(w http.ResponseWriter, r *http.Request) {

@@ -134,3 +134,32 @@ func TestARefusedStoreIsNotMigrated(t *testing.T) {
 	}
 	_ = db.Close()
 }
+
+// The enterprise mode takes a new store and its own, and refuses the others', marked or not.
+func TestTheEnterpriseModeKeepsItsOwnStore(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scp.db")
+	db, err := OpenAs(t.Context(), path, Enterprise, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := modeOf(t, db); got != "enterprise" {
+		t.Errorf("mode %q", got)
+	}
+	_ = db.Close()
+	for _, other := range []Mode{Shared, Personal} {
+		var me *ModeError
+		if _, err := OpenAs(t.Context(), path, other, quiet); !errors.As(err, &me) || me.Have != Enterprise {
+			t.Errorf("%s opened the enterprise store: %v", other, err)
+		}
+	}
+	shared := filepath.Join(t.TempDir(), "scp.db")
+	db, err = OpenAs(t.Context(), shared, Shared, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	var me *ModeError
+	if _, err := OpenAs(t.Context(), shared, Enterprise, quiet); !errors.As(err, &me) || me.Have != Shared {
+		t.Errorf("the enterprise mode opened a shared store: %v", err)
+	}
+}

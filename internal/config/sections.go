@@ -48,6 +48,11 @@ type Source struct {
 	RawIncludeArchived *bool  `mapstructure:"include_archived"`
 	IncludeArchived    bool   `mapstructure:"-"`
 	Token              Secret `mapstructure:"-"` // read from TokenFile
+	// WebURL and GraphQLURL are the configured addresses of an enterprise source (enterprise.github); empty: derived from BaseURL.
+	WebURL, GraphQLURL string `mapstructure:"-"`
+	// People and Login: the source is read with its viewers' own tokens, tied to them by Login (enterprise.github[].people).
+	People bool   `mapstructure:"-"`
+	Login  string `mapstructure:"-"`
 }
 
 // credentials counts the credentials a source names.
@@ -187,7 +192,8 @@ func (a Access) validate(g GitHub, identified bool) []string {
 			p = append(p, fmt.Sprintf("access.private_groups: %q is not a group name", gr))
 		}
 	}
-	private := slices.ContainsFunc(g.Sources, func(s Source) bool { return s.IncludePrivate })
+	// A source read with people's tokens shows each viewer what their tokens read, not what private_groups say.
+	private := slices.ContainsFunc(g.Sources, func(s Source) bool { return s.IncludePrivate && !s.People })
 	switch {
 	case private && len(a.PrivateGroups) == 0:
 		p = append(p, "access.private_groups: required when a source sets include_private")
@@ -264,6 +270,7 @@ func (c *Config) normalise() {
 		}
 		s.IncludeArchived = s.RawIncludeArchived == nil || *s.RawIncludeArchived
 	}
+	c.applyEnterprise()
 }
 
 func (g GitHub) validate() []string {
@@ -306,6 +313,10 @@ func (g GitHub) validate() []string {
 			}
 		}
 		switch {
+		case s.People:
+			if s.credentials() > 0 {
+				p = append(p, at+": a source read with people's tokens has no app, token_file or credential of its own")
+			}
 		case s.credentials() > 1:
 			p = append(p, at+": set one of app, token_file or credential")
 		case s.credentials() == 0:
@@ -412,6 +423,12 @@ func (c *Config) readSecrets() []string {
 		read("webhook.previous_secret_file", c.Webhook.PreviousSecretFile, &c.Webhook.PreviousSecret)
 	}
 	p = append(p, c.Auth.readSecrets(read)...)
+	if c.Enterprise.Enabled && c.Enterprise.TokenKeyFile != "" {
+		read("enterprise.token_key_file", c.Enterprise.TokenKeyFile, &c.Enterprise.TokenKey)
+		if c.Enterprise.TokenKey.IsSet() && len(c.Enterprise.TokenKey.Reveal()) < MinSecret {
+			p = append(p, fmt.Sprintf("enterprise.token_key_file: at least %d bytes", MinSecret))
+		}
+	}
 	c.LLM.readSecrets(read)
 	c.Packages.readSecrets(read)
 	slices.Sort(p)

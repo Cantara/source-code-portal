@@ -87,8 +87,8 @@ const (
 // r, so nothing behind the middleware reads a forged identity.
 func (o Options) viewer(w http.ResponseWriter, r *http.Request) (Viewer, error) {
 	token, kind, name, via := r.Header.Get(headerToken), r.Header.Get(headerViewer), r.Header.Get(headerName), r.Header.Get(headerVia)
-	login := r.Header.Get(headerLogin)
-	for _, h := range []string{headerToken, headerViewer, headerName, headerVia, headerLogin} {
+	login, subject := r.Header.Get(headerLogin), r.Header.Get(headerUser)
+	for _, h := range []string{headerToken, headerViewer, headerName, headerVia, headerLogin, headerUser} {
 		r.Header.Del(h)
 	}
 	proxied := o.Access.UserHeader != "" && o.fromTrusted(r)
@@ -101,6 +101,7 @@ func (o Options) viewer(w http.ResponseWriter, r *http.Request) (Viewer, error) 
 		v := Viewer{Private: kind == viewerPrivate || kind == viewerAdmin, Admin: kind == viewerAdmin}
 		v.Name, _ = url.PathUnescape(name)
 		v.Login, _ = url.PathUnescape(login)
+		v.User, _ = url.PathUnescape(subject)
 		v.Via, v.web = via, true
 		return v, nil
 	}

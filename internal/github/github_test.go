@@ -249,7 +249,7 @@ func TestLargeResponseIsReadWhole(t *testing.T) {
 		cs = append(cs, githubtest.Commit{SHA: fmt.Sprintf("%040x", i+1), Message: long, AuthorName: "Bo", Date: time.Now()})
 	}
 	srv.SetCommits(id, cs...)
-	c, err := tokenSource(t, srv, "acme").REST(t.Context(), "acme")
+	c, err := tokenSource(t, srv, "acme").REST(t.Context(), "acme", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,6 +304,28 @@ func TestWebURL(t *testing.T) {
 	}
 }
 
+// TestEnterpriseAddresses: a source's configured addresses (enterprise.github) win over the ones derived from its REST base;
+// GitHub Enterprise Cloud's web host is not its API host, so it is configured, and GraphQL defaults beside the base.
+func TestEnterpriseAddresses(t *testing.T) {
+	for _, tc := range []struct{ base, web, graphql, wantWeb, wantGraphQL string }{
+		{"https://api.github.com/", "", "", "https://github.com/", "https://api.github.com/graphql"},
+		{"https://ghe.example/api/v3/", "", "", "https://ghe.example/", "https://ghe.example/api/graphql"},
+		{"https://api.octocorp.ghe.com/", "https://octocorp.ghe.com/", "", "https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql"},
+		{"https://api.octocorp.ghe.com/", "https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql",
+			"https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql"},
+		{"https://ghe.example/api/v3/", "https://ghe.example/", "https://ghe.example/api/graphql", "https://ghe.example/", "https://ghe.example/api/graphql"},
+	} {
+		c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: tc.base, Orgs: []string{"acme"}, WebURL: tc.web,
+			GraphQLURL: tc.graphql, Token: config.NewSecret([]byte("t"))}}}, nil, slog.New(slog.DiscardHandler))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s := c.Source("gh"); s.WebURL() != tc.wantWeb || s.GraphQLURL() != tc.wantGraphQL {
+			t.Errorf("%s (web %q): WebURL %s, GraphQLURL %s", tc.base, tc.web, s.WebURL(), s.GraphQLURL())
+		}
+	}
+}
+
 func TestRateBookResetInstant(t *testing.T) {
 	r := &rateBook{limit: 100, left: 1, reset: time.Now().Add(time.Hour), known: true}
 	if f, _ := r.remaining(); f != 0.01 {
@@ -349,5 +371,63 @@ func TestFilesStreamsTheTreeAndWalksATruncatedOne(t *testing.T) {
 	got, err = s.Files(t.Context(), "acme", "big", keep)
 	if err != nil || !slices.Equal(paths(got), want) {
 		t.Errorf("files of a truncated tree = %v, %v; want %v", paths(got), err, want)
+	}
+}
+
+// TestPeopleSourceSendsNothingWithoutAToken: a source read with people's tokens (scp enterprise) has no credential of its own, so
+// until a person's token is given it never asks GitHub anything, not even anonymously.
+func TestPeopleSourceSendsNothingWithoutAToken(t *testing.T) {
+	srv := githubtest.New(t)
+	srv.AddRepo("acme", gh.Repository{Name: new("open")})
+	c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, People: true}}},
+		nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("gh")
+	var e *Error
+	if _, err := s.ListRepos(t.Context(), "acme"); !errors.As(err, &e) || e.Kind != Waiting || e.Code != "no_person" {
+		t.Errorf("listing: %v, want the Waiting error no_person", err)
+	}
+	if _, err := s.Blob(t.Context(), "acme", "open", "abc"); !errors.As(err, &e) || e.Code != "no_person" {
+		t.Errorf("blob: %v", err)
+	}
+	if got := srv.Ledger(); len(got) != 0 {
+		t.Errorf("requests sent: %v", got)
+	}
+	if r := c.RateRemaining()["gh"]; r != 1 {
+		t.Errorf("rate remaining %v", r)
+	}
+}
+
+// TestCheckToken: a person's token says whose it is and when it ends, and is refused when it reads nothing of the organisation or
+// GitHub does not know it.
+func TestCheckToken(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("inner"), Visibility: new("internal")})
+	srv.AddRepo("other", gh.Repository{Name: new("x"), Visibility: new("private")})
+	end := time.Date(2027, 2, 11, 12, 0, 0, 0, time.UTC)
+	srv.AddUserToken("github_pat_ann", "ann_oc")
+	srv.Expires("github_pat_ann", end)
+	srv.Reach("github_pat_ann", id)
+	c, err := New(config.GitHub{Sources: []config.Source{{ID: "ghe", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, People: true}}},
+		nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("ghe")
+	got, err := s.CheckToken(t.Context(), "acme", []byte("github_pat_ann"))
+	if err != nil || got.Login != "ann_oc" || !got.Expires.Equal(end) {
+		t.Errorf("check: %+v %v", got, err)
+	}
+	var e *Error
+	if _, err := s.CheckToken(t.Context(), "other", []byte("github_pat_ann")); !errors.As(err, &e) || e.Code != "reads_nothing" {
+		t.Errorf("another organisation: %v", err)
+	}
+	if _, err := s.CheckToken(t.Context(), "acme", []byte("github_pat_wrong")); !errors.As(err, &e) || e.Kind != Auth {
+		t.Errorf("an unknown token: %v", err)
+	}
+	if r := tokenEnd(&http.Response{Header: http.Header{"Github-Authentication-Token-Expiration": {"2024-01-31 06:25:19 -0800"}}}); !r.Equal(time.Date(2024, 1, 31, 14, 25, 19, 0, time.UTC)) {
+		t.Errorf("an end with an offset: %v", r)
 	}
 }

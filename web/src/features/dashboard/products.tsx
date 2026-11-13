@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useFeatures } from "@/lib/rules-context"
 import { useState, type ReactNode } from "react"
 import type { Schemas } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
@@ -319,6 +320,7 @@ export function Products({
   now: number
 }) {
   const [view, setView] = useState(initial)
+  const { people } = useFeatures()
   const choose = (v: ProductsView) => {
     setView(v)
     remember(viewCookie, v)
@@ -349,7 +351,15 @@ export function Products({
           </div>
         </div>
       </div>
-      {groups.length === 0 ? (
+      {groups.length === 0 && people ? (
+        <EmptyState title="Nothing you can read yet">
+          This portal shows what GitHub lets you read.{" "}
+          <Link href="/github" className="font-medium underline underline-offset-2">
+            Link your GitHub token
+          </Link>{" "}
+          and your repositories appear here a minute later.
+        </EmptyState>
+      ) : groups.length === 0 ? (
         <EmptyState title="No groups configured">{plural(repoCount, "repository", "repositories")} in the catalogue.</EmptyState>
       ) : view === "tiles" ? (
         <ProductTiles groups={groups} work={work} now={now} heading={false} />

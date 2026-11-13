@@ -2415,6 +2415,9 @@ type Rules struct {
 		// Issues The open issues
 		Issues bool `json:"issues"`
 
+		// People Each viewer reads with GitHub tokens of their own, linked at /github (scp enterprise)
+		People bool `json:"people"`
+
 		// Pulls The open pull requests
 		Pulls bool `json:"pulls"`
 	} `json:"features"`

@@ -64,7 +64,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	root.SetErr(stderr)
 	root.PersistentFlags().StringVarP(&opts.configPath, "config", "c", "", "YAML configuration file (default: built-in defaults and SCP_* environment)")
 	root.PersistentFlags().String("log-level", "", "log level: debug, info, warn, error (default info)")
-	root.AddCommand(newServeCmd(&opts), newPersonalCmd(&opts), newConfigCmd(&opts), newVersionCmd())
+	root.AddCommand(newServeCmd(&opts), newEnterpriseCmd(&opts), newPersonalCmd(&opts), newConfigCmd(&opts), newVersionCmd())
 	return root
 }
 
@@ -165,11 +165,17 @@ func newVersionCmd() *cobra.Command {
 
 // emailWarnings names the administrator emails that a provider's silence would grant: with sign-in through OIDC and private
 // repositories in view (or no public view at all), auth.admin_emails matches an address whose email_verified claim is absent, and an
-// administrator sees every private repository.
+// administrator sees every private repository. With another identity claim (enterprise.oidc.identity_claim) there is no verified
+// flag to ask for, so the warning names the claim instead.
 func emailWarnings(cfg config.Config) []string {
 	private := cfg.Access.RequireAuth || slices.ContainsFunc(cfg.GitHub.Sources, func(s config.Source) bool { return s.IncludePrivate })
 	if !private || cfg.Auth.OIDC.Issuer == "" || len(cfg.Auth.AdminEmails) == 0 || cfg.Auth.OIDC.RequireVerifiedEmail {
 		return nil
+	}
+	if c := cfg.Auth.OIDC.IdentityClaim; c != "" && c != "email" {
+		return []string{fmt.Sprintf("auth.admin_emails: administrators are matched on the %s claim, which the provider asserts without "+
+			"verification, while private repositories are served; make sure only your organisation's accounts can sign in, or use "+
+			"auth.admin_groups", c)}
 	}
 	return []string{"auth.admin_emails: a provider that does not send email_verified is trusted for these addresses while private " +
 		"repositories are served; set auth.oidc.require_verified_email: true if yours sends the claim, or use auth.admin_groups"}

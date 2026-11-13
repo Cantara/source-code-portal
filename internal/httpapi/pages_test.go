@@ -46,7 +46,7 @@ func TestPages(t *testing.T) {
 		t.Fatalf("page: %d %q %v", rec.Code, rec.Body, rec.Header())
 	}
 	for k, want := range map[string]string{"Content-Security-Policy": csp, headerToken: "t0ken", headerViewer: "private",
-		headerOrigin: "https://scp.example", "X-Request-Id": "req-7", "X-Forwarded-User": "", "X-Forwarded-Proto": "http"} {
+		headerOrigin: "https://scp.example", headerUser: "ann", "X-Request-Id": "req-7", "X-Forwarded-User": "", "X-Forwarded-Proto": "http"} {
 		if got := seen.Get(k); got != want {
 			t.Errorf("upstream %s = %q, want %q", k, got, want)
 		}

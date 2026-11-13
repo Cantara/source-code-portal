@@ -26,7 +26,7 @@ const none: Rules = {
   severities: [],
   activity: [],
   findings: [],
-  features: { pulls: true, issues: true },
+  features: { pulls: true, issues: true, people: false },
 }
 
 /** cardRows are the product card's rows, in the order of their callouts. */
@@ -949,6 +949,11 @@ head -c 32 /dev/urandom | base64 > secrets/webhook-secret`}</Code>
             saved in <code className="font-mono text-xs">secrets/github-token</code> does instead of an App:{" "}
             <code className="font-mono text-xs">token_file: /run/secrets/github-token</code> in place of{" "}
             <code className="font-mono text-xs">app</code>, without the webhook.
+          </p>
+          <p className="max-w-prose text-sm text-muted-foreground">
+            No one to install an App on a GitHub Enterprise? <code className="font-mono text-xs">scp enterprise</code> reads it
+            with the tokens of the people who sign in: each links a read-only token of their own on <em>Your GitHub access</em>{" "}
+            (the key in the header), and sees exactly what GitHub lets them read (operator guide, section 2.9).
           </p>
         </Section>
 

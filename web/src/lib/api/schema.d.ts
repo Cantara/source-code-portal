@@ -732,6 +732,8 @@ export interface components {
         pulls: boolean
         /** @description The open issues */
         issues: boolean
+        /** @description Each viewer reads with GitHub tokens of their own, linked at /github (scp enterprise) */
+        people: boolean
       }
       levels: components["schemas"]["LevelRule"][]
       severities: components["schemas"]["SeverityRule"][]

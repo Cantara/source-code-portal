@@ -12,16 +12,12 @@ import (
 	gh "github.com/google/go-github/v93/github"
 )
 
-// GraphQL posts query with vars to the GraphQL endpoint beside c's REST base and decodes the answer's data into out. An answer
+// GraphQL posts query with vars to endpoint (the source's GraphQLURL) through c and decodes the answer's data into out. An answer
 // with errors and no data is a Transient error coded "graphql" (or "graphql_rate_limited"): GraphQL has its own rate limit, so a
 // caller treats it as a missing extra and never pauses the source. An answer with data and errors (an alias GitHub does not
 // resolve) decodes the data and drops the errors.
-func GraphQL(ctx context.Context, c *gh.Client, query string, vars map[string]any, out any) error {
-	base, err := url.Parse(c.BaseURL())
-	if err != nil {
-		return err
-	}
-	req, err := c.NewRequest(ctx, http.MethodPost, graphQLEndpoint(base), map[string]any{"query": query, "variables": vars})
+func GraphQL(ctx context.Context, c *gh.Client, endpoint, query string, vars map[string]any, out any) error {
+	req, err := c.NewRequest(ctx, http.MethodPost, endpoint, map[string]any{"query": query, "variables": vars})
 	if err != nil {
 		return err
 	}

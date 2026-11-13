@@ -43,7 +43,7 @@ const (
 
 // REST is a source's GitHub API client per owner; *github.Source implements it.
 type REST interface {
-	REST(ctx context.Context, owner string) (*gh.Client, error)
+	REST(ctx context.Context, owner, name string) (*gh.Client, error)
 }
 
 // FromGitHub reads issues through src.
@@ -53,7 +53,7 @@ type rest struct{ src REST }
 
 // Open reads the listing page by page through the conditional transport: an unchanged page is a 304, which GitHub does not count.
 func (r rest) Open(ctx context.Context, owner, name string) ([]Listed, bool, error) {
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, false, err
 	}

@@ -203,6 +203,13 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 | `features.pulls` | `true` | the open pull requests (section 2.4.2); `false`: switched off, as if the portal had none (section 1) |
 | `features.issues` | `true` | the open issues (section 2.4.3); `false`: switched off (section 1) |
+| `enterprise.enabled` | `false` | the settings GitHub Enterprise and Entra ID need (section 2.8); while `false` every other `enterprise` key is refused |
+| `enterprise.github[]` | `[]` | per source: `source` (a `github.sources[].id`), `web_url` (its web address, ending in `/`), `graphql_url` (optional; default beside `base_url`), `people` (`false`; `true`: read with its viewers' own tokens, `scp enterprise`), `login` (`managed`; with `people`: how a token's login is tied to the identity claim, `managed` or `exact`) |
+| `enterprise.token_key_file` | | with `people`: the key (at least 32 bytes) that seals the people's tokens in the store |
+| `enterprise.access.refresh` | `15m` | with `people`: how often a person's access is read from GitHub |
+| `enterprise.access.max_age` | `1h` | with `people`: how old a person's access may be before they see nothing until it is read again |
+| `enterprise.oidc.identity_claim` | `email` | the claim matched against `auth.admin_emails` and shown as the viewer (`preferred_username` for Entra ID) |
+| `enterprise.oidc.userinfo` | `true` | `false`: never ask the provider's userinfo endpoint; the ID token's claims only |
 
 Matchers (each has exactly one field) see the repository name, except `topic`:
 
@@ -669,6 +676,103 @@ image tag. To ship one artifact instead, start from the release image and copy t
   manifest. The guide, the assistant and the texts for agents keep the product's name, which they describe.
 - **Check it.** Look at the dashboard, a repository page and `/present` in both themes (the theme menu in the header), and run a
   contrast check on what you changed; the health and activity colours are judged by eye on the fleet map.
+
+### 2.8 GitHub Enterprise and Entra ID
+
+GitHub Enterprise Cloud with data residency (`<name>.ghe.com`) and some GitHub Enterprise Server setups have addresses the portal
+cannot work out from the API base, and Entra ID's tokens carry other claims than a generic OpenID Connect provider's. Both are set in
+the `enterprise` section, switched on with `enterprise.enabled: true`; without it the portal behaves as everywhere else in this guide.
+
+```yaml
+github:
+  sources:
+    - id: ghe
+      base_url: https://api.octocorp.ghe.com/          # REST, as for any source
+      orgs: [octocorp]
+      app: { id: 123456, private_key_file: /run/secrets/scp-app-key }
+enterprise:
+  enabled: true
+  github:
+    - source: ghe
+      web_url: https://octocorp.ghe.com/              # links to repositories and files in documents
+      graphql_url: https://api.octocorp.ghe.com/graphql  # optional
+  oidc:
+    identity_claim: preferred_username                # Entra ID sends email only when the account has a mail attribute
+    userinfo: false                                   # Entra ID's userinfo is on Microsoft Graph and adds no groups
+```
+
+- **Addresses.** GitHub Enterprise Cloud: REST `https://api.<name>.ghe.com/`, GraphQL `https://api.<name>.ghe.com/graphql`, web
+  `https://<name>.ghe.com/`. GitHub Enterprise Server: REST `https://<host>/api/v3/`, GraphQL `https://<host>/api/graphql`, web
+  `https://<host>/`. Without an `enterprise.github` entry a source keeps the derived ones: the web address is the base without
+  `/api/v3/`, GraphQL is beside the base.
+- **Entra ID.** Register the portal as a web application (section 2.2) with the scopes `openid email profile`. The issuer is
+  `https://login.microsoftonline.com/<tenant-id>/v2.0`. Entra ID sends no `email_verified`, so leave
+  `auth.oidc.require_verified_email` off (with it on, `identity_claim` must stay `email`). Groups arrive as object ids in `groups`
+  once the registration's token configuration adds them, or use app roles and `auth.oidc.groups_claim: roles`; name those ids or roles
+  in `access.private_groups` and `auth.admin_groups`.
+- **The enterprise mode.** With `people: true` on its sources the configuration is one of `scp enterprise`, which `scp serve`
+  refuses: the sources have no credential of their own (no `app`, `token_file` or `credential`), sign-in through OIDC is required and
+  implies `access.require_auth`, there is no webhook, no `auth.tokens` and no `access.private_groups`, and the proxy's identity headers
+  are not read. Its store belongs to the mode. Each person sees only the repositories their own tokens read, and nothing until they
+  are read; until a person has linked a token GitHub is asked nothing. Section 2.9 runs it.
+
+### 2.9 The enterprise mode: each person reads with their own token
+
+`scp enterprise` serves GitHub Enterprise organisations to everyone who signs in through your OIDC provider, without an App, a
+webhook or an administrator's rights on GitHub. Each person links a token of their own, and sees exactly what GitHub lets them read,
+everywhere in the portal: the lists, the dashboard, search, the feeds, the documents, the badges, `llms.txt`, the event stream, the
+tools and the assistant. Repository data is read once, with the token of one person who can read it, and shared by everyone who can.
+
+```yaml
+store: {path: /var/lib/scp/scp.db}
+server: {public_url: https://scp.example.com}
+auth:
+  session_key_file: /run/secrets/session
+  oidc: {issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0", client_id: <client-id>,
+         client_secret_file: /run/secrets/oidc, scopes: [openid, email, profile]}
+github:
+  sources:
+    - {id: ghe, base_url: "https://api.octocorp.ghe.com/", orgs: [octocorp]}   # no app, token_file or credential
+catalog:
+  groups:
+    - {id: all, name: All, default_repo: handbook, match: [{catch_all: true}]}
+enterprise:
+  enabled: true
+  token_key_file: /run/secrets/tokens        # at least 32 random bytes; keep it with the store's backups
+  github: [{source: ghe, web_url: "https://octocorp.ghe.com/", people: true}]
+  oidc: {identity_claim: preferred_username, userinfo: false}
+```
+
+Run it with `scp enterprise -c scp.yaml` (the container: `scp enterprise` as the command). `scp config check` checks the same
+configuration.
+
+**What each person does, once per organisation.** The portal's page **Your GitHub access** (`/github`, the key icon in the header,
+and the empty dashboard's link) walks them through it:
+
+1. Open GitHub's form for a new fine-grained personal access token, which the page fills in: the name, the organisation as resource
+   owner, 90 days, and the repository permissions **Contents**, **Metadata**, **Pull requests**, **Issues**, **Commit statuses** and
+   **Checks**, all read-only.
+2. Choose **All repositories** (internal repositories are only reached that way) and **Generate token**. An organisation that
+   approves fine-grained tokens has to approve it first.
+3. Paste it into the page and **Link**. The portal checks it with GitHub before it keeps it: GitHub accepts it, it reads the
+   organisation, and it is the person's own: the account's public email is their identity claim, or its login is tied to the claim by
+   `login` (`managed`: a managed user's login is the identity before its `@` with other characters as `-`, on some hosts followed by
+   `_` and the enterprise's short code; `exact`: the login is the claim). A classic token is refused: it carries write scopes.
+
+The token is sealed (AES-256-GCM, a key derived from `token_key_file`), never shown again, and only read with. The person's
+repositories appear within a minute. The page shows when the token ends and warns 14 days before; a token GitHub refuses (expired,
+revoked, or refused by the enterprise's network rules) reads nothing until a new one is linked.
+
+**Access.** Each token's repositories are listed every `enterprise.access.refresh` (15 minutes); a list older than
+`enterprise.access.max_age` (1 hour), because GitHub could not be asked, counts for nothing: the person then sees nothing until it is
+read again. A repository nobody linked can read any longer leaves the catalogue after two listings.
+
+**Network.** An enterprise with IP conditions in its identity provider's Conditional Access applies them to personal access tokens:
+the portal's outbound address must be allowed, or every token is refused (`unauthorized` on the page).
+
+**Rate limits.** Each person's token has GitHub's 5,000 requests an hour, shared with whatever else they run. The portal spreads a
+repository's reads over the people who can read it, choosing the token with the most left, and polls (`sync.*` cadences, section 2):
+with few people and many repositories the first read takes longer.
 
 ## 3. Run
 

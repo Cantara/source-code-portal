@@ -10,16 +10,17 @@ import (
 	"os"
 )
 
-// Mode is what a store is for. A store belongs to one mode for good: the shared site's (scp serve), or one person's (scp personal,
-// with the sealed credential of that person). The mode is written into the store (meta, key "mode") when it is first opened as one,
+// Mode is what a store is for. A store belongs to one mode for good: the shared site's (scp serve), one person's (scp personal,
+// with the sealed credential of that person), or an enterprise's (scp enterprise, with the sealed tokens of the people who read it). The mode is written into the store (meta, key "mode") when it is first opened as one,
 // and a store of the other mode is refused before anything is read, migrated or written: a personal store can never be served as a
 // site, and a site's store can never be opened by scp personal, whatever the configuration or the directory says.
 type Mode string
 
-// The two modes.
+// The three modes.
 const (
-	Shared   Mode = "shared"
-	Personal Mode = "personal"
+	Shared     Mode = "shared"
+	Personal   Mode = "personal"
+	Enterprise Mode = "enterprise"
 )
 
 const modeKey = "mode"
@@ -39,7 +40,7 @@ func (e *ModeError) Error() string {
 // what it holds fits: a shared site's store holds no sealed credential; a personal one does, or is empty). Every part of the program
 // that opens the store for use goes through it; Open, which claims nothing, is for tests and tools.
 func OpenAs(ctx context.Context, path string, mode Mode, log *slog.Logger) (*DB, error) {
-	if mode != Shared && mode != Personal {
+	if mode != Shared && mode != Personal && mode != Enterprise {
 		return nil, fmt.Errorf("store: %q is not a mode", mode)
 	}
 	return openFor(ctx, path, mode, log)
@@ -56,6 +57,13 @@ func claim(path string, have Mode, credentials, catalogue bool, want Mode) (clai
 		return false, &ModeError{Path: path, Have: Personal, Want: want, Why: "it holds a sealed credential, which only scp personal writes"}
 	case want == Personal && catalogue && !credentials:
 		return false, &ModeError{Path: path, Have: Shared, Want: want, Why: "it holds a catalogue and no credential of scp personal: it looks like a shared site's"}
+	case want == Enterprise && (catalogue || credentials):
+		// The enterprise mode came after the mode was written: a store of it always has its mark, so one without holds another's data.
+		have := Shared
+		if credentials {
+			have = Personal
+		}
+		return false, &ModeError{Path: path, Have: have, Want: want, Why: "it holds another mode's data and no mark of scp enterprise"}
 	}
 	return true, nil
 }

@@ -345,3 +345,13 @@ export function MegaphoneIcon({ className }: { className?: string }) {
     </Icon>
   )
 }
+
+/** KeyIcon stands for the reader's own GitHub access (the enterprise mode's tokens). */
+export function KeyIcon({ className }: { className?: string }) {
+  return (
+    <Icon className={className}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m10.8 12.2 8.2-8.2M16 7l2 2M14 9l2 2" />
+    </Icon>
+  )
+}

@@ -18,6 +18,7 @@ const (
 	headerName   = "X-Scp-Name"   // the signed-in viewer's name, path-escaped
 	headerVia    = "X-Scp-Via"    // how the viewer is identified: proxy, oidc, token; empty when anonymous
 	headerLogin  = "X-Scp-Login"  // the viewer's GitHub login when known, path-escaped
+	headerUser   = "X-Scp-User"   // the viewer's stable id (Identity.User), path-escaped: what a person's own view is chosen by
 	headerOrigin = "X-Scp-Origin" // the portal's public origin, for canonical URLs
 )
 
@@ -59,6 +60,7 @@ func (o Options) Pages(upstream *url.URL) http.Handler {
 			h.Set(headerName, url.PathEscape(v.Name))
 			h.Set(headerVia, v.Via)
 			h.Set(headerLogin, url.PathEscape(v.Login))
+			h.Set(headerUser, url.PathEscape(v.User))
 			h.Del("Authorization") // the web UI server needs only the viewer
 			h.Set(headerOrigin, o.Origin(pr.In))
 		},

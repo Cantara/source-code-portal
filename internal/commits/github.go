@@ -42,9 +42,10 @@ type Fetcher interface {
 // pageSize is the commits per listed page.
 const pageSize = 100
 
-// REST is a source's GitHub API client per owner; *github.Source implements it.
+// REST is a source's GitHub API client per owner and its GraphQL endpoint; *github.Source implements it.
 type REST interface {
-	REST(ctx context.Context, owner string) (*gh.Client, error)
+	REST(ctx context.Context, owner, name string) (*gh.Client, error)
+	GraphQLURL() string
 }
 
 // FromGitHub lists commits through src.
@@ -53,7 +54,7 @@ func FromGitHub(src REST) Fetcher { return rest{src} }
 type rest struct{ src REST }
 
 func (r rest) Commits(ctx context.Context, owner, name, ref string, page int) ([]CommitInfo, bool, error) {
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, false, err
 	}
@@ -173,7 +174,7 @@ func readGitCommit(d *jsonstream.Reader, ci *CommitInfo) error {
 }
 
 func (r rest) Branches(ctx context.Context, owner, name string) ([]RefInfo, error) {
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +190,7 @@ func (r rest) Branches(ctx context.Context, owner, name string) ([]RefInfo, erro
 }
 
 func (r rest) Tags(ctx context.Context, owner, name string) ([]RefInfo, error) {
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +217,7 @@ func (r rest) Stats(ctx context.Context, owner, name string, shas []string) (map
 	if len(shas) > statsBatch {
 		return nil, fmt.Errorf("commits: %d stats asked, at most %d", len(shas), statsBatch)
 	}
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +237,7 @@ func (r rest) Stats(ctx context.Context, owner, name string, shas []string) (map
 			ChangedFilesIfAvailable *int `json:"changedFilesIfAvailable"`
 		} `json:"repository"`
 	}
-	if err := github.GraphQL(ctx, c, q.String(), map[string]any{"owner": owner, "name": name}, &out); err != nil {
+	if err := github.GraphQL(ctx, c, r.src.GraphQLURL(), q.String(), map[string]any{"owner": owner, "name": name}, &out); err != nil {
 		return nil, err
 	}
 	if out.Repository == nil {

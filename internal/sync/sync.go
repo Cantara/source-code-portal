@@ -27,7 +27,8 @@ const (
 	retryBase      = 2 * time.Second
 	retryMax       = 15 * time.Minute
 	permanentRetry = 24 * time.Hour
-	rateWaitBase   = time.Minute // secondary limit without Retry-After; doubles to rateWaitMax
+	waitRetry      = 5 * time.Minute // a job waiting for a credential (Waiting): at the latest then, at once on an event
+	rateWaitBase   = time.Minute     // secondary limit without Retry-After; doubles to rateWaitMax
 	rateWaitMax    = 15 * time.Minute
 	authWaitBase   = 5 * time.Minute
 	authWaitMax    = time.Hour
@@ -133,6 +134,7 @@ type (
 	rateLimited interface{ RateLimitedUntil() (time.Time, bool) }
 	authFailed  interface{ AuthFailed() bool }
 	permanent   interface{ Permanent() bool }
+	waiting     interface{ Waiting() bool } // nothing to read it with yet (scp enterprise: no person's token): not an attempt
 	coded       interface{ ErrorCode() string }
 )
 
@@ -548,6 +550,8 @@ func (e *Engine) finish(ctx context.Context, o outcome) {
 	case classTransient:
 		en.item = failed(en.item, o.err)
 		en.due, en.backoff = now.Add(backoff(en.item.Attempts)), true
+	case classWaiting: // what it holds stays; an event (a credential arrived) runs it again at once
+		en.due = now.Add(min(waitRetry, e.TTLOf(en.spec, en.source)))
 	}
 	if en.dirty && !en.backoff {
 		en.due, en.prio = en.settled(now), PrioEvent
@@ -743,6 +747,7 @@ const (
 	classRate
 	classAuth
 	classPermanent
+	classWaiting
 )
 
 func classify(err error) (class, time.Time) {
@@ -754,6 +759,10 @@ func classify(err error) (class, time.Time) {
 		if t, ok := rl.RateLimitedUntil(); ok {
 			return classRate, t
 		}
+	}
+	var wt waiting
+	if errors.As(err, &wt) && wt.Waiting() {
+		return classWaiting, time.Time{}
 	}
 	var af authFailed
 	if errors.As(err, &af) && af.AuthFailed() {

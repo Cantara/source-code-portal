@@ -13,7 +13,7 @@ const none: Rules = {
   severities: [],
   activity: [],
   findings: [],
-  features: { pulls: true, issues: true },
+  features: { pulls: true, issues: true, people: false },
 }
 
 const Context = createContext<Rules>(none)

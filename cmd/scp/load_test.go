@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -165,6 +166,7 @@ func TestLoad1000(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Logf("warm start: %v", time.Since(warm))
+	restrictLoad(t, srv.pub.Current, log)
 	pages := []string{"/api/v1/dashboard", "/api/v1/groups", "/api/v1/groups/g3", "/api/v1/repos", "/api/v1/repos?group=g5",
 		"/api/v1/repos/acme/g3-svc-003", "/api/v1/repos/acme/g3-svc-003/docs", "/api/v1/commits?limit=200",
 		"/api/v1/commits?group=g7&limit=50", "/api/v1/repos/acme/g0-svc-100/history", "/api/v1/repos/acme/g0-svc-100/history?q=change+4", "/api/v1/repos/acme/g0-svc-100/history?page=4&limit=25",
@@ -207,6 +209,53 @@ func TestLoad1000(t *testing.T) {
 		if p99 > bound {
 			t.Errorf("%s: p99 %v over %v", p, p99, bound)
 		}
+	}
+}
+
+// restrictLoad is the enterprise mode's share of the load check (EN7): 200 people of 20 distinct access sets of half the fleet each read
+// their views of one snapshot. A set's view is built once per snapshot, whoever of its people asks first, within a bound; the others'
+// requests take the kept view.
+func restrictLoad(t *testing.T, current func() *snapshot.Snapshot, log *slog.Logger) {
+	t.Helper()
+	s := current()
+	keys := slices.Sorted(maps.Keys(s.Repos))
+	sets := make([]map[snapshot.RepoID]bool, 20)
+	for n := range sets {
+		sets[n] = map[snapshot.RepoID]bool{}
+		for i, k := range keys {
+			if (i+n)%2 == 0 || i%20 == n { // half the fleet, and one repository in twenty that only this set reads
+				sets[n][s.Repos[k].Repo.ID] = true
+			}
+		}
+	}
+	type personKey struct{}
+	pv := newPeopleViews(current, func(ctx context.Context) (string, map[snapshot.RepoID]bool) {
+		n := ctx.Value(personKey{}).(int) % len(sets)
+		return fmt.Sprint(n), sets[n]
+	}, log)
+	var builds, reads []time.Duration
+	for person := range 200 {
+		ctx := context.WithValue(t.Context(), personKey{}, person)
+		t0 := time.Now()
+		v := pv.of(ctx, false)
+		d := time.Since(t0)
+		if person < len(sets) {
+			builds = append(builds, d)
+		} else {
+			reads = append(reads, d)
+		}
+		if want := person % len(sets); len(v.Repos) == 0 || len(v.Repos) > len(sets[want]) {
+			t.Fatalf("person %d reads %d repositories of a set of %d", person, len(v.Repos), len(sets[want]))
+		}
+	}
+	slices.Sort(builds)
+	slices.Sort(reads)
+	t.Logf("restricted views: a set's first view %v (slowest %v), a kept one %v (p99)", builds[len(builds)/2], builds[len(builds)-1], reads[len(reads)*99/100])
+	if worst, bound := builds[len(builds)-1], 100*time.Millisecond*slack(); worst > bound {
+		t.Errorf("a set's view took %v to build, over %v", worst, bound)
+	}
+	if p99, bound := reads[len(reads)*99/100], time.Millisecond*slack(); p99 > bound {
+		t.Errorf("a kept view took %v (p99), over %v", p99, bound)
 	}
 }
 

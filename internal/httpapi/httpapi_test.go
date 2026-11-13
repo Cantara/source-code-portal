@@ -345,9 +345,12 @@ func TestViewerSources(t *testing.T) {
 	}
 	signedIn := fakeAuth{id: Identity{User: "u-1", Name: "Ada", Email: "ada@example.org", Via: "oidc"}, ok: true}
 	// The web UI server's word comes first, then the authenticator, then the proxy.
-	if v, _ := view(signedIn, headerToken, "t0ken", headerViewer, "admin", headerName, "Ada%20L", headerVia, "oidc"); !v.Admin || !v.Private ||
-		v.Name != "Ada L" || v.Via != "oidc" {
+	if v, _ := view(signedIn, headerToken, "t0ken", headerViewer, "admin", headerName, "Ada%20L", headerVia, "oidc", headerUser, "u%2F1"); !v.Admin || !v.Private ||
+		v.Name != "Ada L" || v.Via != "oidc" || v.User != "u/1" {
 		t.Errorf("web UI server: %+v", v)
+	}
+	if v, _ := view(fakeAuth{}, headerToken, "wrong", headerViewer, "admin", headerUser, "u-1"); v.User != "" || v.Admin {
+		t.Errorf("a forged web UI viewer: %+v", v)
 	}
 	if v, _ := view(signedIn, "X-Forwarded-User", "bob", "X-Forwarded-Groups", "staff"); v.User != "u-1" || !v.Admin || !v.Private {
 		t.Errorf("session before proxy: %+v", v)

@@ -509,4 +509,11 @@ func TestEmailWarnings(t *testing.T) {
 			t.Errorf("%s: %q", name, got)
 		}
 	}
+	// Another identity claim: no email_verified to ask for, so the warning names the claim and not require_verified_email.
+	c := cfg(true, false, "https://idp", ada, false)
+	c.Auth.OIDC.IdentityClaim = "preferred_username"
+	if got := emailWarnings(c); len(got) != 1 || !strings.Contains(got[0], "matched on the preferred_username claim") ||
+		strings.Contains(got[0], "require_verified_email") {
+		t.Errorf("identity claim: %q", got)
+	}
 }

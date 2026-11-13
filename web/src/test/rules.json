@@ -33,6 +33,7 @@
   ],
   "features": {
     "issues": true,
+    "people": false,
     "pulls": true
   },
   "findings": [

@@ -44,6 +44,10 @@ type OIDC struct {
 	// RequireVerifiedEmail treats an email_verified claim the provider does not send as not verified, so the email does not match
 	// auth.admin_emails. Off by default: some providers (Microsoft Entra) never send it.
 	RequireVerifiedEmail bool `mapstructure:"require_verified_email"`
+	// IdentityClaim is the claim matched against auth.admin_emails and shown (email, or enterprise.oidc.identity_claim); UserInfo
+	// false never calls the provider's userinfo endpoint (enterprise.oidc.userinfo).
+	IdentityClaim string `mapstructure:"-"`
+	UserInfo      bool   `mapstructure:"-"`
 }
 
 // SignIn reports whether people can sign in: a session key is configured.

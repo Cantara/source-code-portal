@@ -109,7 +109,7 @@ type Fetcher interface {
 
 // Client is a source's GitHub client; *github.Source implements it.
 type Client interface {
-	REST(ctx context.Context, owner string) (*gh.Client, error)
+	REST(ctx context.Context, owner, name string) (*gh.Client, error)
 	Tree(ctx context.Context, owner, name, ref string, recursive bool) ([]github.TreeEntry, error)
 	Blob(ctx context.Context, owner, name, sha string) ([]byte, error)
 }
@@ -121,7 +121,7 @@ type rest struct{ src Client }
 
 // Releases lists the Keep newest published releases; drafts and releases without a publication time are left out.
 func (r rest) Releases(ctx context.Context, owner, name string) ([]Release, error) {
-	c, err := r.src.REST(ctx, owner)
+	c, err := r.src.REST(ctx, owner, name)
 	if err != nil {
 		return nil, err
 	}

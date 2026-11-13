@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -160,17 +161,24 @@ func TestAnEarlierGenerationIsMovedAside(t *testing.T) {
 	}
 }
 
-// migrations2 is the embedded baseline and one more migration, to test the runner as the next change will use it.
-func migrations2(t *testing.T) fs.FS {
+// migrationsNext is the embedded migrations and one more, to test the runner as the next change will use it; next is its number.
+func migrationsNext(t *testing.T) (files fs.FS, next int) {
 	t.Helper()
-	base, err := migrations.ReadFile("migrations/0001_init.sql")
+	names, err := fs.Glob(migrations, "migrations/*.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fstest.MapFS{
-		"migrations/0001_init.sql": {Data: base},
-		"migrations/0002_note.sql": {Data: []byte("ALTER TABLE meta ADD COLUMN note TEXT;")},
+	m := fstest.MapFS{}
+	for _, name := range names {
+		b, err := migrations.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m[name] = &fstest.MapFile{Data: b}
 	}
+	next = len(names) + 1
+	m[fmt.Sprintf("migrations/%04d_note.sql", next)] = &fstest.MapFile{Data: []byte("ALTER TABLE meta ADD COLUMN note TEXT;")}
+	return m, next
 }
 
 // TestMigrationsAreAdditiveWithACopy: a store that holds data is copied before a later migration (once, 0600) and keeps every row; a new
@@ -186,22 +194,23 @@ func TestMigrationsAreAdditiveWithACopy(t *testing.T) {
 	if err := db.SetMeta(ctx, "k", "v"); err != nil {
 		t.Fatal(err)
 	}
-	files := migrations2(t)
+	files, next := migrationsNext(t)
+	pre := fmt.Sprintf(".pre-%04d", next)
 	if err := migrate(ctx, db.db, path, quiet, files); err != nil {
 		t.Fatal(err)
 	}
-	if got := pragma(t, path, "user_version"); got != 2 {
-		t.Errorf("user_version %d, want 2", got)
+	if got := pragma(t, path, "user_version"); got != next {
+		t.Errorf("user_version %d, want %d", got, next)
 	}
 	if v, _ := db.Meta(ctx, "k"); v != "v" {
 		t.Errorf("a row was lost: %q", v)
 	}
-	fi, err := os.Stat(path + ".pre-0002")
+	fi, err := os.Stat(path + pre)
 	if err != nil || fi.Mode().Perm() != 0o600 {
 		t.Fatalf("copy %v %v, want a 0600 file", fi, err)
 	}
-	if got := pragma(t, path+".pre-0002", "user_version"); got != 1 {
-		t.Errorf("the copy is of user_version %d, want the store as it was (1)", got)
+	if got := pragma(t, path+pre, "user_version"); got != next-1 {
+		t.Errorf("the copy is of user_version %d, want the store as it was (%d)", got, next-1)
 	}
 	_ = db.Close()
 
@@ -229,13 +238,13 @@ func TestMigrationsAreAdditiveWithACopy(t *testing.T) {
 	if err := db.SetMeta(ctx, "k", "v"); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(again+".pre-0002", []byte("an operator's earlier copy"), 0o600); err != nil {
+	if err := os.WriteFile(again+pre, []byte("an operator's earlier copy"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := migrate(ctx, db.db, again, quiet, files); err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(again + ".pre-0002"); string(b) != "an operator's earlier copy" {
+	if b, _ := os.ReadFile(again + pre); string(b) != "an operator's earlier copy" {
 		t.Error("an existing copy was replaced")
 	}
 }

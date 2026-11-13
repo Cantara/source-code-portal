@@ -1,0 +1,304 @@
+package people
+
+import (
+	"errors"
+	"log/slog"
+	"net/url"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	gh "github.com/google/go-github/v93/github"
+	"go.uber.org/goleak"
+
+	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/github"
+	"github.com/cantara/source-code-portal/internal/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/store"
+)
+
+func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
+
+func TestBound(t *testing.T) {
+	for _, tc := range []struct {
+		rule, identity, login, email string
+		want                         bool
+	}{
+		{Managed, "ann.lee@example.org", "ann-lee_octo", "", true},
+		{Managed, "Ann.Lee@example.org", "ann-lee_OCTO", "", true},
+		{Managed, "ann.lee@example.org", "Ann-Lee", "", true},   // a host without the short code
+		{Managed, "ann.lee@example.org", "ann-lee_", "", false}, // an empty short code
+		{Managed, "ann.lee@example.org", "bo-lee_octo", "", false},
+		{Managed, "ann.lee@example.org", "bo-lee", "", false},
+		{Managed, "ann.lee@example.org", "ann-lee-x_octo", "", false},
+		{Managed, "ann_lee@example.org", "ann-lee_octo", "", true},               // _ is not kept in a managed login
+		{Managed, "ann.lee@example.org", "someone", "Ann.Lee@example.org", true}, // the account's email is the identity
+		{Managed, "ann.lee@example.org", "someone", "bo@example.org", false},
+		{Managed, "", "ann_octo", "", false},
+		{Exact, "ann", "ANN", "", true},
+		{Exact, "ann@example.org", "ann", "", false},
+		{Exact, "ann@example.org", "ann", "ann@example.org", true},
+	} {
+		if got := Bound(tc.rule, tc.identity, tc.login, tc.email); got != tc.want {
+			t.Errorf("Bound(%s, %q, %q, %q) = %v", tc.rule, tc.identity, tc.login, tc.email, got)
+		}
+	}
+}
+
+func TestCreationLink(t *testing.T) {
+	u, err := url.Parse(CreationLink("https://octocorp.ghe.com/", "octocorp", "for the portal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := u.Query()
+	if u.Host != "octocorp.ghe.com" || u.Path != "/settings/personal-access-tokens/new" || q.Get("target_name") != "octocorp" ||
+		q.Get("expires_in") != "90" || q.Get("contents") != "read" || q.Get("statuses") != "read" || q.Get("pull_requests") != "read" ||
+		q.Get("description") != "for the portal" || len(q) != 4+len(Permissions) {
+		t.Errorf("link %s", u)
+	}
+}
+
+func TestSealing(t *testing.T) {
+	s, err := newSealer([]byte(strings.Repeat("k", 32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed := s.seal("p1", "ghe", "acme", []byte("github_pat_x"))
+	if strings.Contains(string(sealed), "github_pat_x") {
+		t.Fatal("the token is in the sealed bytes")
+	}
+	if got, err := s.open("p1", "ghe", "acme", sealed); err != nil || string(got) != "github_pat_x" {
+		t.Errorf("open: %q %v", got, err)
+	}
+	if _, err := s.open("p2", "ghe", "acme", sealed); err == nil {
+		t.Error("another person's row opened the token")
+	}
+	other, _ := newSealer([]byte(strings.Repeat("j", 32)))
+	if _, err := other.open("p1", "ghe", "acme", sealed); err == nil {
+		t.Error("another key opened the token")
+	}
+	if _, err := newSealer([]byte("short")); err == nil {
+		t.Error("a short key was taken")
+	}
+}
+
+type fixture struct {
+	gh   *githubtest.Server
+	db   *store.DB
+	path string
+	key  []byte
+	src  Source
+	now  time.Time
+}
+
+func newFixture(t *testing.T) *fixture {
+	t.Helper()
+	srv := githubtest.New(t)
+	inner := srv.AddRepo("acme", gh.Repository{Name: new("inner"), Visibility: new("internal")})
+	srv.AddRepo("other", gh.Repository{Name: new("x"), Visibility: new("private")})
+	for tok, login := range map[string]string{"github_pat_ann": "ann-lee_octo", "github_pat_bo": "bo_octo", "ghp_classic": "ann-lee_octo",
+		"github_pat_old": "ann-lee_octo"} {
+		srv.AddUserToken(tok, login)
+		srv.Reach(tok, inner)
+	}
+	now := time.Now()
+	srv.Expires("github_pat_ann", now.Add(90*24*time.Hour).Truncate(time.Second))
+	c, err := github.New(config.GitHub{Sources: []config.Source{{ID: "ghe", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, People: true}}},
+		nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "scp.db")
+	db, err := store.OpenAs(t.Context(), path, store.Enterprise, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return &fixture{gh: srv, db: db, path: path, key: []byte(strings.Repeat("k", 32)), now: now,
+		src: Source{ID: "ghe", WebURL: "https://ghe.example.test/", Owners: []string{"Acme"}, Login: Managed, Check: c.Source("ghe").CheckToken, List: c.Source("ghe").ListWith}}
+}
+
+func (f *fixture) open(t *testing.T) *People {
+	t.Helper()
+	p, err := Open(t.Context(), Options{Store: f.db, Key: f.key, Issuer: "https://idp.example.test", Sources: []Source{f.src},
+		Portal: "https://scp.example", Log: slog.New(slog.DiscardHandler)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+var ann = Who{Subject: "u-1", Identity: "ann.lee@example.org", Name: "Ann"} //nolint:gochecknoglobals // test value
+
+// A person links their own fine-grained token, which is kept sealed and survives a restart; every other kind of token is refused
+// with its reason; removing it leaves nothing.
+func TestLink(t *testing.T) {
+	f := newFixture(t)
+	p := f.open(t)
+	ctx := t.Context()
+	for _, tc := range []struct {
+		owner, token, code string
+	}{
+		{"elsewhere", "github_pat_ann", "unknown-owner"},
+		{"acme", "ghp_classic", "not-fine-grained"},
+		{"acme", "github_pat_ann with spaces", "not-fine-grained"},
+		{"acme", "github_pat_bo", "not-yours"},
+		{"acme", "github_pat_unknown", "unauthorized"},
+	} {
+		var r *Refusal
+		if _, err := p.Link(ctx, ann, "ghe", tc.owner, tc.token); !errors.As(err, &r) || r.Code != tc.code || r.Detail == "" {
+			t.Errorf("%s %s: %v, want %s", tc.owner, tc.token, err, tc.code)
+		}
+	}
+	f.gh.Expires("github_pat_old", f.now.Add(-time.Minute))
+	var r *Refusal
+	if _, err := p.Link(ctx, ann, "ghe", "acme", "github_pat_old"); !errors.As(err, &r) || r.Code != "unauthorized" {
+		t.Errorf("an expired token: %v", err)
+	}
+	if got := p.Tokens(ann); len(got) != 0 {
+		t.Fatalf("a refused token was kept: %+v", got)
+	}
+
+	tok, err := p.Link(ctx, ann, "ghe", "ACME", " github_pat_ann\n")
+	if err != nil || tok.Login != "ann-lee_octo" || tok.Owner != "acme" || tok.State != "ok" || tok.ExpiresAt == nil {
+		t.Fatalf("link: %+v %v", tok, err)
+	}
+	_, tokens, _, _ := f.db.People(ctx)
+	if len(tokens) != 1 || strings.Contains(string(tokens[0].Sealed), "github_pat_ann") {
+		t.Fatalf("stored %+v", tokens)
+	}
+
+	again := f.open(t) // a restart
+	if got := again.Tokens(ann); len(got) != 1 || got[0].Login != "ann-lee_octo" || !got[0].ExpiresAt.Equal(*tok.ExpiresAt) {
+		t.Errorf("after a restart: %+v", got)
+	}
+	if got, err := again.sealer.open(again.id(ann.Subject), "ghe", "acme", tokens[0].Sealed); err != nil || string(got) != "github_pat_ann" {
+		t.Errorf("the sealed token: %q %v", got, err)
+	}
+	ov := again.Overview(ann)
+	if len(ov) != 1 || len(ov[0].Owners) != 1 || ov[0].Owners[0].Token == nil || !strings.Contains(ov[0].Owners[0].CreateURL, "target_name=Acme") {
+		t.Errorf("overview %+v", ov)
+	}
+	if ov := again.Overview(Who{Subject: "u-2"}); ov[0].Owners[0].Token != nil {
+		t.Error("another person sees Ann's token")
+	}
+	if err := again.Unlink(ctx, ann, "ghe", "Acme"); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.open(t).Tokens(ann); len(got) != 0 {
+		t.Errorf("after removal: %+v", got)
+	}
+	for _, l := range f.gh.Ledger() {
+		if !strings.HasPrefix(l, "GET ") {
+			t.Errorf("a request that is not a read: %s", l)
+		}
+	}
+}
+
+// clock is a time the test moves.
+type clock struct{ t time.Time }
+
+func (c *clock) now() time.Time { return c.t }
+
+// Each person's list is what their own token lists, kept across a restart; a repository GitHub stops listing leaves at the next
+// refresh; a token GitHub refuses, or a listing older than the limit, reads nothing (fail closed).
+func TestAccessLists(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	secret := f.gh.AddRepo("acme", gh.Repository{Name: new("secret"), Visibility: new("private")})
+	inner := f.gh.ID("acme", "inner")
+	f.gh.AddUserToken("github_pat_bo", "bo-lee_octo")
+	f.gh.Reach("github_pat_ann", inner, secret)
+	f.gh.Reach("github_pat_bo", inner)
+	c := &clock{time.Now()}
+	open := func() *People {
+		t.Helper()
+		p, err := Open(ctx, Options{Store: f.db, Key: f.key, Issuer: "iss", Sources: []Source{f.src}, Refresh: 15 * time.Minute, MaxAge: time.Hour,
+			Now: c.now, Log: slog.New(slog.DiscardHandler)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	ids := func(p *People, w Who) []int64 {
+		t.Helper()
+		_, set := p.Allowed(w.Subject)
+		var out []int64
+		for id := range set {
+			out = append(out, id.GitHubID)
+		}
+		slices.Sort(out)
+		return out
+	}
+	bo := Who{Subject: "u-2", Identity: "bo.lee@example.org"}
+	p := open()
+	if _, err := p.Link(ctx, ann, "ghe", "acme", "github_pat_ann"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Link(ctx, bo, "ghe", "acme", "github_pat_bo"); err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(p, ann); got != nil {
+		t.Errorf("a list before its listing: %v", got)
+	}
+	p.listDue(ctx)
+	if got, want := ids(p, ann), sorted(inner, secret); !slices.Equal(got, want) {
+		t.Errorf("Ann: %v, want %v", got, want)
+	}
+	if got := ids(p, bo); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Bo: %v", got)
+	}
+	ka, _ := p.Allowed(ann.Subject)
+	kb, _ := p.Allowed(bo.Subject)
+	if ka == kb || ka == "" {
+		t.Errorf("set keys %q and %q", ka, kb)
+	}
+
+	p = open() // a restart: the lists are the store's until they are listed again
+	if got := ids(p, ann); !slices.Equal(got, sorted(inner, secret)) {
+		t.Errorf("Ann after a restart: %v", got)
+	}
+
+	f.gh.Reach("github_pat_ann", inner) // Ann loses the private repository
+	c.t = c.t.Add(16 * time.Minute)
+	p.listDue(ctx)
+	if got := ids(p, ann); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Ann after the revocation: %v", got)
+	}
+
+	f.gh.Expires("github_pat_ann", time.Now().Add(-time.Second)) // GitHub refuses Ann's token
+	c.t = c.t.Add(16 * time.Minute)
+	p.listDue(ctx)
+	if got := ids(p, ann); got != nil {
+		t.Errorf("Ann with a refused token: %v", got)
+	}
+	if tok := p.Tokens(ann); len(tok) != 1 || tok[0].State != "unauthorized" {
+		t.Errorf("Ann's token: %+v", tok)
+	}
+
+	f.gh.Fail("GET /orgs/acme/repos", 503, 100, 0) // GitHub unavailable: Bo's list ages until it counts for nothing
+	c.t = c.t.Add(30 * time.Minute)
+	p.listDue(ctx)
+	if got := ids(p, bo); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Bo within the limit: %v", got)
+	}
+	c.t = c.t.Add(time.Hour)
+	if got := ids(p, bo); got != nil {
+		t.Errorf("Bo past the limit: %v", got)
+	}
+	f.gh.Heal()
+	p.listDue(ctx)
+	if got := ids(p, bo); !slices.Equal(got, []int64{inner}) {
+		t.Errorf("Bo listed again: %v", got)
+	}
+	if err := p.Unlink(ctx, bo, "ghe", "acme"); err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(p, bo); got != nil {
+		t.Errorf("Bo after removing the token: %v", got)
+	}
+}
+
+func sorted(ids ...int64) []int64 { slices.Sort(ids); return ids }
