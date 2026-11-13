@@ -18,6 +18,7 @@ const permission: Record<string, string> = {
   pull_requests: "Pull requests",
   issues: "Issues",
   statuses: "Commit statuses",
+  checks: "Checks",
 }
 
 const refused: Record<string, string> = {

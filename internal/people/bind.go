@@ -6,29 +6,39 @@ import (
 	"strings"
 )
 
-// Login rules: how a token's GitHub login is tied to the identity claim of the person who links it (enterprise.github[].login).
+// Login rules: how a token's GitHub account is tied to the identity claim of the person who links it (enterprise.github[].login).
+// Either rule also takes the account's email, when GitHub shows one, equal to the identity claim.
 const (
-	// Managed: a managed user's login is the identity before its @, every character but a letter, a digit or - as -, then _ and the
-	// enterprise's short code. The login without its last _ part must be the identity so made, letter case aside.
+	// Managed: a managed user's login is made by the enterprise from the identity: its part before @, every character but a letter, a
+	// digit or - as -, on some hosts followed by _ and the enterprise's short code. The login, with or without that suffix, must be
+	// the identity so made, letter case aside. Managed users cannot choose their login.
 	Managed = "managed"
 	// Exact: the login is the identity claim, letter case aside.
 	Exact = "exact"
 )
 
-// Bound reports whether login belongs to the person whose identity claim is identity, by rule.
-func Bound(rule, identity, login string) bool {
+// Bound reports whether the GitHub account with login and email (empty when GitHub shows none) belongs to the person whose identity
+// claim is identity, by rule.
+func Bound(rule, identity, login, email string) bool {
 	if identity == "" || login == "" {
 		return false
+	}
+	if email != "" && strings.EqualFold(email, identity) {
+		return true
 	}
 	if rule == Exact {
 		return strings.EqualFold(identity, login)
 	}
 	local, _, _ := strings.Cut(identity, "@")
-	name, code, ok := cutLast(login, "_")
-	if !ok || code == "" || local == "" {
+	if local == "" {
 		return false
 	}
-	return strings.EqualFold(name, normalise(local))
+	want := normalise(local)
+	if strings.EqualFold(login, want) {
+		return true
+	}
+	name, code, ok := cutLast(login, "_")
+	return ok && code != "" && strings.EqualFold(name, want)
 }
 
 func cutLast(s, sep string) (before, after string, found bool) {
@@ -49,8 +59,8 @@ func normalise(s string) string {
 }
 
 // Permissions are the repository permissions a person's token needs, all read: the contents and metadata, the pull requests, the
-// issues and the commit statuses. Nothing else, and no write.
-var Permissions = []string{"contents", "metadata", "pull_requests", "issues", "statuses"} //nolint:gochecknoglobals // a fixed list
+// issues, the commit statuses and the checks (a pull request's checks). Nothing else, and no write.
+var Permissions = []string{"contents", "metadata", "pull_requests", "issues", "statuses", "checks"} //nolint:gochecknoglobals // a fixed list
 
 // tokenDays is the lifetime the creation link proposes; an organisation's policy may allow less.
 const tokenDays = 90

@@ -23,22 +23,26 @@ func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
 
 func TestBound(t *testing.T) {
 	for _, tc := range []struct {
-		rule, identity, login string
-		want                  bool
+		rule, identity, login, email string
+		want                         bool
 	}{
-		{Managed, "ann.lee@example.org", "ann-lee_octo", true},
-		{Managed, "Ann.Lee@example.org", "ann-lee_OCTO", true},
-		{Managed, "ann.lee@example.org", "ann-lee", false},     // no short code: not a managed user's login
-		{Managed, "ann.lee@example.org", "ann-lee_", false},    // an empty short code
-		{Managed, "ann.lee@example.org", "bo-lee_octo", false}, // someone else
-		{Managed, "ann.lee@example.org", "ann-lee-x_octo", false},
-		{Managed, "ann_lee@example.org", "ann-lee_octo", true}, // _ is not kept in a managed login
-		{Managed, "", "ann_octo", false},
-		{Exact, "ann", "ANN", true},
-		{Exact, "ann@example.org", "ann", false},
+		{Managed, "ann.lee@example.org", "ann-lee_octo", "", true},
+		{Managed, "Ann.Lee@example.org", "ann-lee_OCTO", "", true},
+		{Managed, "ann.lee@example.org", "Ann-Lee", "", true},   // a host without the short code
+		{Managed, "ann.lee@example.org", "ann-lee_", "", false}, // an empty short code
+		{Managed, "ann.lee@example.org", "bo-lee_octo", "", false},
+		{Managed, "ann.lee@example.org", "bo-lee", "", false},
+		{Managed, "ann.lee@example.org", "ann-lee-x_octo", "", false},
+		{Managed, "ann_lee@example.org", "ann-lee_octo", "", true},               // _ is not kept in a managed login
+		{Managed, "ann.lee@example.org", "someone", "Ann.Lee@example.org", true}, // the account's email is the identity
+		{Managed, "ann.lee@example.org", "someone", "bo@example.org", false},
+		{Managed, "", "ann_octo", "", false},
+		{Exact, "ann", "ANN", "", true},
+		{Exact, "ann@example.org", "ann", "", false},
+		{Exact, "ann@example.org", "ann", "ann@example.org", true},
 	} {
-		if got := Bound(tc.rule, tc.identity, tc.login); got != tc.want {
-			t.Errorf("Bound(%s, %q, %q) = %v", tc.rule, tc.identity, tc.login, got)
+		if got := Bound(tc.rule, tc.identity, tc.login, tc.email); got != tc.want {
+			t.Errorf("Bound(%s, %q, %q, %q) = %v", tc.rule, tc.identity, tc.login, tc.email, got)
 		}
 	}
 }

@@ -750,14 +750,14 @@ configuration.
 and the empty dashboard's link) walks them through it:
 
 1. Open GitHub's form for a new fine-grained personal access token, which the page fills in: the name, the organisation as resource
-   owner, 90 days, and the repository permissions **Contents**, **Metadata**, **Pull requests**, **Issues** and **Commit statuses**, all
-   read-only.
+   owner, 90 days, and the repository permissions **Contents**, **Metadata**, **Pull requests**, **Issues**, **Commit statuses** and
+   **Checks**, all read-only.
 2. Choose **All repositories** (internal repositories are only reached that way) and **Generate token**. An organisation that
    approves fine-grained tokens has to approve it first.
 3. Paste it into the page and **Link**. The portal checks it with GitHub before it keeps it: GitHub accepts it, it reads the
-   organisation, and it is the person's own: its login is tied to their identity claim by `login` (`managed`: a managed user's login is
-   the identity before its `@` with other characters as `-`, then `_` and the enterprise's short code; `exact`: the login is the
-   claim). A classic token is refused: it carries write scopes.
+   organisation, and it is the person's own: the account's public email is their identity claim, or its login is tied to the claim by
+   `login` (`managed`: a managed user's login is the identity before its `@` with other characters as `-`, on some hosts followed by
+   `_` and the enterprise's short code; `exact`: the login is the claim). A classic token is refused: it carries write scopes.
 
 The token is sealed (AES-256-GCM, a key derived from `token_key_file`), never shown again, and only read with. The person's
 repositories appear within a minute. The page shows when the token ends and warns 14 days before; a token GitHub refuses (expired,

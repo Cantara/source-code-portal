@@ -179,7 +179,7 @@ func (p *People) Link(ctx context.Context, w Who, source, owner, token string) (
 	if err != nil {
 		return Token{}, refusal(err, owner)
 	}
-	if !Bound(src.Login, w.Identity, checked.Login) {
+	if !Bound(src.Login, w.Identity, checked.Login, checked.Email) {
 		return Token{}, &Refusal{"not-yours", fmt.Sprintf("The token belongs to the GitHub user %s, who is not you (%s). Make the token signed in to GitHub as yourself.",
 			checked.Login, w.Identity)}
 	}

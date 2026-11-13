@@ -12,6 +12,7 @@ import (
 // TokenCheck is what GitHub says of a person's token (scp enterprise): whose it is and when it ends.
 type TokenCheck struct {
 	Login   string
+	Email   string    // the account's public email; empty when it shows none
 	Expires time.Time // zero: GitHub named no end
 }
 
@@ -27,7 +28,7 @@ func (s *Source) CheckToken(ctx context.Context, owner string, token []byte) (To
 	if err != nil {
 		return TokenCheck{}, classify(resp, err)
 	}
-	check := TokenCheck{Login: u.GetLogin(), Expires: tokenEnd(resp.Response)}
+	check := TokenCheck{Login: u.GetLogin(), Email: u.GetEmail(), Expires: tokenEnd(resp.Response)}
 	repos, resp, err := c.Repositories.ListByOrg(ctx, owner, &gh.RepositoryListByOrgOptions{ListOptions: gh.ListOptions{PerPage: 1}})
 	if err != nil {
 		return TokenCheck{}, classify(resp, err)
