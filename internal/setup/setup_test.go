@@ -505,7 +505,7 @@ func TestSuggestNoDuplicates(t *testing.T) {
 	}
 	repos = append(repos, ghlogin.Repo{Owner: "Cantara", Name: "left-1"}, ghlogin.Repo{Owner: "Cantara", Name: "left-2"},
 		ghlogin.Repo{Owner: "Cantara", Name: ".github"}, ghlogin.Repo{Owner: "Example", Name: ".github"},
-		ghlogin.Repo{Owner: "descoped", Name: "same"}, ghlogin.Repo{Owner: "oranheim", Name: "same"})
+		ghlogin.Repo{Owner: "acme", Name: "same"}, ghlogin.Repo{Owner: "octocat", Name: "same"})
 	if got := OnePerName(repos); len(got) != 3+2+1+1 {
 		t.Fatalf("one per name: %d", len(got))
 	}
