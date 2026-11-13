@@ -1,6 +1,6 @@
 # Enterprise (EN1 to EN8)
 
-Status: EN1, EN3 and EN4 built, EN5 to EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
+Status: EN1, EN3, EN4 and EN5 built, EN6 to EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
 
 A portal that reads GitHub Enterprise (Server, or Cloud with data residency on `*.ghe.com`) and signs people in with Microsoft
 Entra ID needs a few settings that github.com and a generic OpenID Connect provider do not: GitHub addresses that cannot be worked
@@ -155,11 +155,22 @@ secret never answered).
 the login before its last `_` (a managed user's login is that, `_` and the enterprise's short code), compared without case. `exact`: the
 login equals the identity claim, without case.
 
-## EN5: access lists
+## EN5: access lists (built)
 
-Per person, after linking and every `access.refresh`: the repositories each of their tokens lists (the organisations' listings read with
-it, private and internal), intersected with the catalogue, written in one transaction with the time read. Fresh means read within
-`access.max_age`; older, refused or never read is unknown: the empty view.
+Per person, after linking and every `access.refresh`: the repositories each of their tokens lists (the organisation's listing read with
+it, `GET /orgs/{owner}/repos?type=all`, private and internal), written in one transaction with the time read. Fresh means read within
+`access.max_age`; older, refused or never read is unknown: the empty view. The view keeps only what the catalogue holds.
+
+Built as `People.Run` (the loop `cmd/scp` runs beside the engine and stops before the store closes), `listDue` and `list` (through
+`github.Source.ListWith`: a credential per token, its own rate book and conditional answers, under a key that changes with the token),
+`refused` (a 401, a 403 or a 404 drops what the token read and records why), a minute's retry for any other failure, and `Allowed`
+(the person's fresh repositories by GitHub id with a key equal for equal sets). `peopleViews` maps the ids to the snapshot's addresses
+and restricts. A list read before a restart counts from the store until it is read again; the listed repositories themselves are held
+in memory for EN6.
+
+Acceptance: `TestAccessLists` (two people, two lists, kept across a restart; a revoked repository leaves at the next refresh; a refused
+token reads nothing; GitHub unavailable past `max_age` reads nothing, and the list returns once GitHub does; a removed token reads
+nothing).
 
 ## EN6: the shared fetch through people's tokens
 
