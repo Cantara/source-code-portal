@@ -1,6 +1,6 @@
 # Enterprise (EN1 to EN8)
 
-Status: EN1, EN3 to EN6 built, EN7 and EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
+Status: EN1, EN3 to EN7 built, EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
 
 A portal that reads GitHub Enterprise (Server, or Cloud with data residency on `*.ghe.com`) and signs people in with Microsoft
 Entra ID needs a few settings that github.com and a generic OpenID Connect provider do not: GitHub addresses that cannot be worked
@@ -190,10 +190,19 @@ it, none answered 404; each person reads exactly their repositories in the repos
 `llms.txt`, `llms-full.txt`, the sitemap, `knowledge.yaml` and the snapshot, the other's repository and badge answer 404; a person who
 removes their token reads nothing), `TestPeopleSourceSendsNothingWithoutAToken`.
 
-## EN7: per-viewer views
+## EN7: per-viewer views (built)
 
-The access set's view everywhere (`peopleViews` with the person's list); the leak and twin tests with two people of different access;
-the load check with many people and few distinct sets.
+The access set's view everywhere: `server.views` gives every surface (the contract, the pages, the badges and images, the Markdown
+and llms files, the sitemap, the event stream, the tools, the assistant) `peopleViews.of`, the snapshot restricted to the person's
+fresh set. A view is kept per snapshot, set and choice of forks (64), so the people of one set share it; it is built with its own
+indexes (search reuses its segments per repository). Agents reach the mode through the portal's pages only: there are no
+configured tokens, and MCP with a session cookie is the public, which the mode refuses.
+
+Acceptance: `TestEnterpriseTwoPeople` walks every contract GET, the guessed addresses (`edgePaths`) and every tool with each of its
+inputs as each of two people, with the other's repository named: the word only the other's repository holds never comes, and its
+name only where the request named it; a mutation that serves the full snapshot fails it 64 times. The load check
+(`restrictLoad` in `TestLoad1000`): 200 people of 20 sets of half of 1,000 repositories: a set's first view within 100 ms (about
+4 ms measured), a kept one within 1 ms.
 
 ## EN8: the experience and the documents
 
