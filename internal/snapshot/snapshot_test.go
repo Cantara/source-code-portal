@@ -528,3 +528,39 @@ func TestRestrict(t *testing.T) {
 		t.Error("restricting changed the snapshot")
 	}
 }
+
+// A retired member leaves its group's Members for its Retired at every publish, still belongs to the group, comes back when it is no
+// longer retired, and keeps its group in a restricted view that holds only it.
+func TestRetiredMembers(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	defer p.Close()
+	p.Retire(func(e *RepoEntry) bool { return e.Repo.Archived })
+	live, old := repo("gh", 1, "acme", "live"), repo("gh", 2, "acme", "old")
+	old.Repo.Archived = true
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{live, old}, nil, SourceStatus{ID: "gh", Repos: 2})
+		b.SetGroups([]Group{{ID: "all", Members: []RepoKey{"acme/live", "acme/old"}}})
+	})
+	p.Flush()
+	s := p.Current()
+	g, _ := s.Group("all")
+	if !slices.Equal(g.Members, []RepoKey{"acme/live"}) || !slices.Equal(g.Retired, []RepoKey{"acme/old"}) {
+		t.Fatalf("group %+v", g)
+	}
+	if got := s.GroupsOf("acme/old"); !slices.Equal(got, []string{"all"}) {
+		t.Errorf("a retired member's groups: %v", got)
+	}
+	r, _ := s.Restrict(map[RepoKey]bool{"acme/old": true}, true, slog.New(slog.DiscardHandler)).Group("all")
+	if len(r.Members) != 0 || !slices.Equal(r.Retired, []RepoKey{"acme/old"}) {
+		t.Errorf("restricted to the retired member: %+v", r)
+	}
+
+	back := repo("gh", 2, "acme", "old")
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{live, back}, nil, SourceStatus{ID: "gh", Repos: 2})
+	})
+	p.Flush()
+	if g, _ := p.Current().Group("all"); !slices.Equal(g.Members, []RepoKey{"acme/live", "acme/old"}) || len(g.Retired) != 0 {
+		t.Errorf("unarchived: %+v", g)
+	}
+}

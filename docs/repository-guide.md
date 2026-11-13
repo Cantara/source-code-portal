@@ -87,7 +87,7 @@ Commits by automation do not count as change: authors ending in `[bot]` or named
 coding agents (Claude, Copilot's coding agent, Devin, Jules, Codex) and commits with an AI co-author do count: someone set the agent to
 work. They do count as unreleased changes. 80 and above is good, 50 and above is to watch, below 50 needs
 attention. Archived repositories and those with `lifecycle: deprecated`
-in their descriptor have no score; the portal lists them on its *Archive* page.
+in their descriptor have no score and leave their product; the portal lists them on its *Archive* page.
 
 A group's health weighs its repositories: one changed in the last 6 months counts twice, the group's default repository three times
 more. A group with a repository that needs attention is never shown as good.

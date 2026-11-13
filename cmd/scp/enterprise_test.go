@@ -310,7 +310,7 @@ func TestEnterpriseTwoPeople(t *testing.T) {
 	repo := func(name, vis string) int64 {
 		sha++
 		mark := "m4rk" + name // a word only this repository holds, never asked for
-		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new(vis), Description: new(name + " tools " + mark), Topics: []string{mark}})
+		id := gh.AddRepo("acme", gogh.Repository{Name: new(name), Visibility: new(vis), Description: new(name + " tools " + mark), Topics: []string{mark}, Archived: new(name == "zq-ada")})
 		gh.SetCommits(id, githubtest.Commit{SHA: strings.Repeat(strconv.Itoa(sha), 40), Message: name + " change " + mark, AuthorName: "Ann", Date: at})
 		gh.SetFile(id, "README.md", "# "+name+"\n\n"+mark+"\n")
 		gh.SetFile(id, "docs/guide.md", "# Guide to "+name+"\n\n"+mark+"\n")
@@ -352,6 +352,30 @@ func TestEnterpriseTwoPeople(t *testing.T) {
 	waitFor(ada, "/api/v1/repos/acme/zq-ada", "zq-ada change")
 	waitFor(bo, "/api/v1/repos/acme/xk-bo", "xk-bo change")
 	waitFor(ada, "/api/v1/repos/acme/inner", "inner change")
+
+	// A repository archived on GitHub is retired in its reader's view, as in every mode: marked so, listed in the archive with its
+	// group, and not among the group's repositories.
+	if _, b := call(t, ada, http.MethodGet, public+"/api/v1/repos/acme/zq-ada", ""); !strings.Contains(b, `"archived":true`) {
+		t.Errorf("zq-ada is not marked archived: %.300s", b)
+	}
+	if _, b := call(t, ada, http.MethodGet, public+"/api/v1/archive?group=all", ""); !strings.Contains(b, "acme/zq-ada") || strings.Contains(b, "acme/inner") {
+		t.Errorf("Ada's archive: %.300s", b)
+	}
+	for _, p := range []string{"/api/v1/groups/all", "/api/v1/repos?group=all"} {
+		if _, b := call(t, ada, http.MethodGet, public+p, ""); strings.Contains(b, "acme/zq-ada") || !strings.Contains(b, "acme/inner") {
+			t.Errorf("Ada's %s holds the archived repository: %.300s", p, b)
+		}
+	}
+	var dash struct {
+		Groups []struct {
+			RepoCount int
+			Members   []struct{ Address string }
+		}
+	}
+	if _, b := call(t, ada, http.MethodGet, public+"/api/v1/dashboard", ""); json.Unmarshal([]byte(b), &dash) != nil || len(dash.Groups) != 1 ||
+		dash.Groups[0].RepoCount != 1 || len(dash.Groups[0].Members) != 1 || dash.Groups[0].Members[0].Address != "acme/inner" {
+		t.Errorf("Ada's product holds the archived repository: %.300s", b)
+	}
 
 	for _, tc := range []struct {
 		who       *http.Client

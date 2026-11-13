@@ -499,7 +499,9 @@ permission and the *Release* event, which the portal already asks for.
 `scp.yaml` says `lifecycle: deprecated` (archived wins). A quiet repository is not retired, only dormant. Each row says why, when the
 repository was last active (its newest commit; GitHub dates no archive, so the portal does not invent a date of retirement), its
 latest release, how many other repositories still depend on it (archived ones are not counted), and how many people wrote its
-recent commits, counted and never named. The reasons are filters; the product, a name, *still depended on* and the order are a form
+recent commits, counted and never named. A retired repository is not one of its product's repositories: the product's page, card,
+counts, health, fleet map and lists of commits, pull requests, issues and releases leave it out, and the product's page links to
+its retired ones here. The reasons are filters; the product, a name, *still depended on* and the order are a form
 that works without JavaScript. The page needs no setting and nothing from GitHub that the portal does not already read, and a
 private archive entry is shown only to those who may see the repository.
 
