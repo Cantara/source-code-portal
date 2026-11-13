@@ -199,7 +199,8 @@ The access set's view everywhere: `server.views` gives every surface (the contra
 and llms files, the sitemap, the event stream, the tools, the assistant) `peopleViews.of`, the snapshot restricted to the person's
 fresh set. A view is kept per snapshot, set and choice of forks (64), so the people of one set share it; it is built with its own
 indexes (search reuses its segments per repository). Agents reach the mode through the portal's pages only: there are no
-configured tokens, and MCP with a session cookie is the public, which the mode refuses.
+configured tokens, and MCP with a session cookie is the public, which the mode refuses. A page the web UI server renders asks the API as the page's viewer with the viewer's stable id (`X-Scp-User`, believed with the web
+UI's token like the rest of the viewer), so the server-rendered pages read the person's own view too.
 
 Acceptance: `TestEnterpriseTwoPeople` walks every contract GET, the guessed addresses (`edgePaths`) and every tool with each of its
 inputs as each of two people, with the other's repository named: the word only the other's repository holds never comes, and its
