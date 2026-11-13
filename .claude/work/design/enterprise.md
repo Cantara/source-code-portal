@@ -1,6 +1,6 @@
-# Enterprise (EN1, EN2)
+# Enterprise (EN1 to EN8)
 
-Status: EN1 in progress, EN2 planned. Binding order: ../plan.md > this note.
+Status: EN1 and EN3 built, EN4 to EN8 in progress, EN2 planned. Binding order: ../plan.md > this note.
 
 A portal that reads GitHub Enterprise (Server, or Cloud with data residency on `*.ghe.com`) and signs people in with Microsoft
 Entra ID needs a few settings that github.com and a generic OpenID Connect provider do not: GitHub addresses that cannot be worked
@@ -62,7 +62,105 @@ beside an Enterprise Server base and `/graphql` beside any other.
    `identity_claim: preferred_username`; with `userinfo: false` the fake provider's userinfo endpoint is never called.
 4. `scp config check` refuses each invalid combination in the table, with the key in the message.
 
-## Done when
+## Done when (EN1)
 
 Code and tests as above, `make check` green, `docs/operator-guide.md` and the plugin's reference describe the section, the code map
 in `.claude/CLAUDE.md` is current. Push and pull request only on the owner's go.
+
+# The enterprise mode (EN3 to EN8, P-110)
+
+## Goal
+
+`scp enterprise` serves GitHub Enterprise organisations to everyone who signs in through the organisation's OIDC provider and has
+linked their own GitHub token. Each viewer sees only the repositories GitHub lets them read, everywhere in the portal. Repository data
+is polled once with the people's tokens and shared; only the access list is per person. No admin rights are needed on GitHub or on the
+identity provider: no App, no webhook.
+
+## The rules every milestone keeps
+
+1. **A mode of its own.** A third command beside `scp serve` and `scp personal`. Its store belongs to the mode `enterprise` (`store.OpenAs`)
+   and refuses the other modes' stores, as they refuse its. No public view, no anonymous request but the open paths, no webhook
+   receiver, no source with a credential of its own, no proxy identity headers: a viewer is who OIDC signed in.
+2. **Fail closed, decided in one place.** The view a request reads is chosen in `server.views` (`cmd/scp/serve.go`), the one hook
+   every surface reads. In the enterprise mode it is `peopleViews.of`: the published snapshot restricted to the viewer's access set
+   (`snapshot.Restrict`). A viewer without a fresh access list reads the empty view. No feature decides access.
+3. **Data lives in SQLite**: people, their sealed tokens and their access lists are rows, written through before acknowledged, loaded at
+   the start; additive migrations only (P-89).
+4. **Generic**: any GitHub Enterprise (Server, Cloud, data residency) and any OIDC provider.
+
+## Configuration
+
+```yaml
+auth:
+  session_key_file: /run/secrets/session
+  oidc: {issuer: https://login.example/tenant/v2.0, client_id: scp, client_secret_file: /run/secrets/oidc}
+github:
+  sources:
+    - {id: ghe, base_url: https://api.octocorp.ghe.com/, orgs: [octocorp]}   # no app, token_file or credential
+enterprise:
+  enabled: true
+  token_key_file: /run/secrets/tokens   # at least 32 bytes: seals the people's tokens in the store
+  github:
+    - {source: ghe, web_url: https://octocorp.ghe.com/, people: true, login: managed}
+  access: {refresh: 15m, max_age: 1h}
+```
+
+| Key | Checked by `scp config check` |
+|---|---|
+| `github[].people` | true: the source is read with its viewers' tokens; then every source must be, and has no `app`, `token_file` or `credential` |
+| `github[].login` | only with `people`; `managed` (default) or `exact` |
+| `token_key_file` | required with `people`, refused without; at least 32 bytes |
+| `access.refresh` | 1m..24h, default 15m |
+| `access.max_age` | from `refresh` to 168h, default 1h |
+| with `people` | `auth.oidc.issuer` required; `webhook.*`, `auth.tokens` and `access.private_groups` refused; `access.require_auth` implied; `include_private` implied (the access list decides) |
+
+`scp serve` refuses a configuration with `people`, and `scp enterprise` one without (`deps.checkedMode`).
+
+## EN3: the mode (built)
+
+- `scp enterprise` (`cmd/scp/enterprise.go`, also in the server build) runs `runServer` with `store.Enterprise`.
+- `store.Enterprise`: a fresh store is marked for it; a store holding a catalogue or credentials without its mark is refused.
+- A `people` source has no credential: every call of it fails with the `Auth` error `no_person` before a request is sent
+  (`github.Source.client`), so GitHub is never asked anything anonymously.
+- `snapshot.Restrict(allowed, forks)`: the published snapshot cut to a set, with only the groups that keep a member, its own indexes
+  (built with no fallback to the full snapshot's), its own public view. `peopleViews` keeps the restricted views per snapshot, set key and
+  choice of forks (LRU, 64). Until EN5 every viewer's set is empty (`nobody`).
+- Readiness does not wait for a catalogue in the mode: it has none until a person links a token.
+
+Acceptance: `TestEnterpriseModeKeepsApart` (each command refuses the other's configuration and store; the mode's routes are the shared
+site's), `TestEnterpriseFailsClosed` (an empty store starts and is ready; every contract path and page answers 401 anonymously, a
+forged proxy header included; a signed-in person without a list reads none of what the snapshot holds; the fake GitHub saw no
+request), `TestRestrict`, `TestPeopleSourceSendsNothingWithoutAToken`, `TestTheEnterpriseModeKeepsItsOwnStore`.
+
+## EN4: people link their tokens
+
+`GET`, `POST` and `DELETE /api/v1/me/github/tokens` (signed in, same origin): a fine-grained token per organisation, checked before it is
+kept (`GET /user` answers; its login is bound to the identity claim by `login`; it reads the organisation's repositories), sealed
+(AES-256-GCM, a key derived with HKDF from `token_key_file`, the person and organisation as additional data) in the mode's own tables
+(migration `0002`), never shown again. The page builds GitHub's pre-filled creation link from the web address, the organisation and
+the read permissions. Token health: its expiry from GitHub's answer header; a refused token marks the person's list unknown.
+
+**Binding (`login`).** `managed`: the identity claim's part before `@`, every character but letters, digits and `-` as `-`, must equal
+the login before its last `_` (a managed user's login is that, `_` and the enterprise's short code), compared without case. `exact`: the
+login equals the identity claim, without case.
+
+## EN5: access lists
+
+Per person, after linking and every `access.refresh`: the repositories each of their tokens lists (the organisations' listings read with
+it, private and internal), intersected with the catalogue, written in one transaction with the time read. Fresh means read within
+`access.max_age`; older, refused or never read is unknown: the empty view.
+
+## EN6: the shared fetch through people's tokens
+
+The source's credential for a repository is a fresh token of a person whose list holds it (`github.People`), the one with the most rate
+left; another when it fails. The catalogue is the union of what linked people list; nothing is fetched twice.
+
+## EN7: per-viewer views
+
+The access set's view everywhere (`peopleViews` with the person's list); the leak and twin tests with two people of different access;
+the load check with many people and few distinct sets.
+
+## EN8: the experience and the documents
+
+The onboarding page (the empty view: what to do, the pre-filled links, each token's and list's state), the operator guide's section for
+the mode, the plugin's reference and the Guide.

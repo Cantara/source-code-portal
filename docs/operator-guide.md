@@ -204,7 +204,10 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `features.pulls` | `true` | the open pull requests (section 2.4.2); `false`: switched off, as if the portal had none (section 1) |
 | `features.issues` | `true` | the open issues (section 2.4.3); `false`: switched off (section 1) |
 | `enterprise.enabled` | `false` | the settings GitHub Enterprise and Entra ID need (section 2.8); while `false` every other `enterprise` key is refused |
-| `enterprise.github[]` | `[]` | per source: `source` (a `github.sources[].id`), `web_url` (its web address, ending in `/`), `graphql_url` (optional; default beside `base_url`) |
+| `enterprise.github[]` | `[]` | per source: `source` (a `github.sources[].id`), `web_url` (its web address, ending in `/`), `graphql_url` (optional; default beside `base_url`), `people` (`false`; `true`: read with its viewers' own tokens, `scp enterprise`), `login` (`managed`; with `people`: how a token's login is tied to the identity claim, `managed` or `exact`) |
+| `enterprise.token_key_file` | | with `people`: the key (at least 32 bytes) that seals the people's tokens in the store |
+| `enterprise.access.refresh` | `15m` | with `people`: how often a person's access is read from GitHub |
+| `enterprise.access.max_age` | `1h` | with `people`: how old a person's access may be before they see nothing until it is read again |
 | `enterprise.oidc.identity_claim` | `email` | the claim matched against `auth.admin_emails` and shown as the viewer (`preferred_username` for Entra ID) |
 | `enterprise.oidc.userinfo` | `true` | `false`: never ask the provider's userinfo endpoint; the ID token's claims only |
 
@@ -707,6 +710,11 @@ enterprise:
   `auth.oidc.require_verified_email` off (with it on, `identity_claim` must stay `email`). Groups arrive as object ids in `groups`
   once the registration's token configuration adds them, or use app roles and `auth.oidc.groups_claim: roles`; name those ids or roles
   in `access.private_groups` and `auth.admin_groups`.
+- **The enterprise mode.** With `people: true` on its sources the configuration is one of `scp enterprise`, which `scp serve`
+  refuses: the sources have no credential of their own (no `app`, `token_file` or `credential`), sign-in through OIDC is required and
+  implies `access.require_auth`, there is no webhook, no `auth.tokens` and no `access.private_groups`, and the proxy's identity headers
+  are not read. Its store belongs to the mode. Each person sees only the repositories their own tokens read, and nothing until they
+  are read; until a person has linked a token GitHub is asked nothing.
 
 ## 3. Run
 
