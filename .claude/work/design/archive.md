@@ -21,9 +21,13 @@ no job, no GitHub call and no permission.
   people (L1): the portal ranks no person.
 - **Still used.** An archive entry that live repositories still depend on is the useful exception: the row says `used by N` and the page
   can filter to them (`?used=1`). It is a finding for the owners, not a health penalty (retired repositories are not scored).
-- **Out of the live views.** The Archive stays out of the dashboard's product cards and health as today; the fleet map keeps showing them
-  as `archived`. The group page and the repositories list keep their rows with the *Archived* badge; a group says `N retired` with a
-  link to `/archive?group=`.
+- **Out of the products (P-111).** A retired repository is not one of its group's members: `snapshot.Group.Members` holds the live
+  ones and `Group.Retired` the retired ones, sorted at every publish by `Publisher.Retire` (`catalog.Retired`, wired in `cmd/scp`), so
+  a repository archived or deprecated since its listing leaves the product at the next publish and one brought back returns. Every
+  reader of a group (its page, the dashboard's cards and counts, health, the fleet map, the group's commits, pull requests, issues
+  and releases, badges, llms) reads `Members`; the Archive's `group` filter and `GroupsOf` (a repository page's product, search's
+  `group:`) read both. A group says `N retired` with a link to `/archive?group=`; the *Archived* badge stays on the rows that still
+  show one (the repositories list, search, the repository page).
 
 ## As built
 

@@ -263,6 +263,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		indexers = append(indexers, issues.Feeds())
 	}
 	s := &server{mode: mode, log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log, indexers...)}
+	s.pub.Retire(func(e *snapshot.RepoEntry) bool { return catalog.Retired(e) != "" }) // a retired repository is in the Archive, not its group
 	if err := s.open(ctx, cfg, gh); err != nil {
 		return nil, err
 	}

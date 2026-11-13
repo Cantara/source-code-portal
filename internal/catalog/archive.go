@@ -46,7 +46,7 @@ func (a API) ListArchive(ctx context.Context, req oapi.ListArchiveRequestObject)
 		if !ok {
 			return oapi.ListArchive404ApplicationProblemPlusJSONResponse{NotFoundApplicationProblemPlusJSONResponse: notFound("no such group")}, nil
 		}
-		keys = append(keys, g.Members...)
+		keys = append(slices.Concat(keys, g.Members), g.Retired...) // the retired members are in Retired once the publisher knows them
 	} else {
 		for k := range s.Repos {
 			keys = append(keys, k)

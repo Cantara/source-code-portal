@@ -53,14 +53,16 @@ func (r Repo) Key() RepoKey { return KeyOf(r.Owner, r.Name) }
 // Public reports whether everyone may see the repository: it is neither private nor internal.
 func (r Repo) Public() bool { return r.Visibility != "private" && r.Visibility != "internal" }
 
-// Group is a configured group with its resolved members.
+// Group is a configured group with its resolved members. A retired member (archived, deprecated: Publisher.Retire) is not one of the
+// product's Members: it is in Retired, which the Archive reads; everything that presents the group reads Members.
 type Group struct {
 	ID             string
 	Name           string
 	Description    string
 	DefaultRepo    RepoKey // resolved address; empty when DefaultMissing
 	DefaultMissing bool
-	Members        []RepoKey // sorted
+	Members        []RepoKey // sorted; the live members
+	Retired        []RepoKey // sorted; the retired members
 }
 
 // SourceStatus reports the last listing of one configured source.
@@ -98,12 +100,13 @@ type Snapshot struct {
 	Groups     []Group             // config order
 	Sources    []SourceStatus      // sorted by id
 	groupsOf   map[RepoKey][]string
-	indexers   []Indexer        // what the features derive from every repository, run at publish
-	indexes    map[string]any   // index name -> what its indexer built
-	public     *Snapshot        // this view without its private and internal repositories; s itself when there are none
-	lean       *Snapshot        // this view without the hidden forks; s itself when there are none
-	fat        *Snapshot        // this view with the hidden forks; s itself when it has them or there are none
-	hidden     map[RepoKey]bool // the forks no source shows and no group pins (Builder.SetHidden)
+	indexers   []Indexer             // what the features derive from every repository, run at publish
+	retire     func(*RepoEntry) bool // a group member it says yes to is retired (Publisher.Retire); nil: none
+	indexes    map[string]any        // index name -> what its indexer built
+	public     *Snapshot             // this view without its private and internal repositories; s itself when there are none
+	lean       *Snapshot             // this view without the hidden forks; s itself when there are none
+	fat        *Snapshot             // this view with the hidden forks; s itself when it has them or there are none
+	hidden     map[RepoKey]bool      // the forks no source shows and no group pins (Builder.SetHidden)
 	marks      map[string]mark
 	sum        uint64
 	digests    map[RepoKey]uint64 // per repository: the sum of its items' content digests
@@ -186,5 +189,5 @@ func (s *Snapshot) Group(id string) (Group, bool) {
 	return Group{}, false
 }
 
-// GroupsOf returns the ids of the groups that contain key, in config order.
+// GroupsOf returns the ids of the groups that contain key, as a live or a retired member, in config order.
 func (s *Snapshot) GroupsOf(key RepoKey) []string { return s.groupsOf[key] }

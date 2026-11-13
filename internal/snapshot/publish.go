@@ -29,6 +29,7 @@ func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
 		Sources:    slices.Clone(cur.Sources),
 		hidden:     cur.hidden,
 		indexers:   cur.indexers,
+		retire:     cur.retire,
 	}}
 }
 
@@ -131,6 +132,7 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 			s.digests[m.repo] += m.content
 		}
 	}
+	s.retireMembers()
 	s.index(b.prev.indexes, b.log)
 	s.views(b.prev, b.log)
 	return s
@@ -167,6 +169,27 @@ func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
 	b.hidden, c.hidden, d.hidden = s.hidden, s.hidden, s.hidden
 }
 
+// retireMembers sorts every group's members, live and retired, by what retire says of them now: a repository archived or deprecated
+// since the listing leaves the product at the next publish, and one brought back returns to it.
+func (s *Snapshot) retireMembers() {
+	if s.retire == nil {
+		return
+	}
+	for i, g := range s.Groups {
+		all := slices.Concat(g.Members, g.Retired)
+		slices.Sort(all)
+		g.Members, g.Retired = make([]RepoKey, 0, len(all)), nil
+		for _, k := range all {
+			if e := s.Repos[k]; e != nil && s.retire(e) {
+				g.Retired = append(g.Retired, k)
+			} else {
+				g.Members = append(g.Members, k)
+			}
+		}
+		s.Groups[i] = g
+	}
+}
+
 // index builds the derived lookups: group membership, then every feature's index. An index whose builder panics keeps what the
 // snapshot before had (before): that feature shows its last good state while the rest of the batch is published, and the panic is
 // logged on every publish until it is fixed.
@@ -174,6 +197,9 @@ func (s *Snapshot) index(before map[string]any, log *slog.Logger) {
 	s.groupsOf = map[RepoKey][]string{}
 	for _, g := range s.Groups {
 		for _, m := range g.Members {
+			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
+		}
+		for _, m := range g.Retired {
 			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
 		}
 	}
@@ -215,7 +241,7 @@ func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, members boo
 		return s
 	}
 	p := &Snapshot{BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{},
-		indexers: s.indexers}
+		indexers: s.indexers, retire: s.retire}
 	count := map[string]int{}
 	for k, e := range s.Repos {
 		if keep(e) {
@@ -230,7 +256,8 @@ func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, members boo
 	}
 	for _, g := range s.Groups {
 		g.Members = slices.DeleteFunc(slices.Clone(g.Members), func(k RepoKey) bool { return p.Repos[k] == nil })
-		if members && len(g.Members) == 0 {
+		g.Retired = slices.DeleteFunc(slices.Clone(g.Retired), func(k RepoKey) bool { return p.Repos[k] == nil })
+		if members && len(g.Members) == 0 && len(g.Retired) == 0 {
 			continue
 		}
 		if g.DefaultRepo != "" && p.Repos[g.DefaultRepo] == nil {
@@ -283,6 +310,14 @@ func NewPublisher(debounce, maxDelay time.Duration, log *slog.Logger, indexers .
 	p.cur.Store(&Snapshot{Repos: map[RepoKey]*RepoEntry{}, Aliases: map[RepoKey]RepoKey{}, groupsOf: map[RepoKey][]string{},
 		indexers: indexers})
 	return p
+}
+
+// Retire names the group members that are retired (design/archive.md): they leave the groups' Members for their Retired at every
+// publish. Called once, before the first update.
+func (p *Publisher) Retire(fn func(*RepoEntry) bool) {
+	cur := *p.cur.Load()
+	cur.retire = fn
+	p.cur.Store(&cur)
 }
 
 // Current returns the current snapshot. Handlers call it once per request.
