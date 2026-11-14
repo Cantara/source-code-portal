@@ -133,7 +133,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `server.trusted_proxies` | `[]` | CIDRs allowed to set `X-Forwarded-For`; unless `access.proxy_identity` is `false` they are also believed when they name a user and groups (`access.user_header`, `access.groups_header`) |
 | `log.level` | `info` | `debug`, `info`, `warn`, `error` (also `--log-level`) |
 | `log.format` | `json` | `json`, or `text` for local use |
-| `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts and announcements administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version. A store made by a release before 2.2.10 (an earlier schema generation, without the portal's mark) is not migrated: the first start moves it aside as `<store.path>.quarantine-<time>` and reads the catalogue again from GitHub, which takes a minute or two for a few hundred repositories; remove the moved-aside file when the new start has proved itself |
+| `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts, announcements and search engine list administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version. A store made by a release before 2.2.10 (an earlier schema generation, without the portal's mark) is not migrated: the first start moves it aside as `<store.path>.quarantine-<time>` and reads the catalogue again from GitHub, which takes a minute or two for a few hundred repositories; remove the moved-aside file when the new start has proved itself |
 | `sync.concurrency` | `4` | GitHub jobs running at once |
 | `github.sources[]` | required | one entry per GitHub host and credential |
 | `github.sources[].id` | required | short id, `[a-z0-9-]` |
@@ -807,6 +807,24 @@ is not signed in; "I've installed it" finds the tracker after the first page vie
   a portal whose every visitor signs in is not counted at all, which is the point.
 - **Not counted.** Custom events, outbound links, downloads and forms are off. A visitor can opt out with
   `localStorage.plausible_ignore = "true"`.
+
+### 2.11 Keeping pages out of search engines
+
+An administrator can choose which products and repositories search engines such as Google are offered. In **Admin**, the *Search engines*
+card lists the products (a checkbox each) and the repositories (a filter and a checkbox each); *Save* applies the list at once.
+
+- **What changes.** A product or repository kept out leaves `/sitemap.xml`, with its documents, and its pages answer with
+  `X-Robots-Tag: noindex, nofollow`: the page, its documents and history, and the Markdown answers. The portal itself shows everything
+  as before, and the API is unchanged.
+- **Products.** A repository that is only in products kept out is kept out too; one in another product that is not kept out stays,
+  and one in no product is kept out by its own checkbox only.
+- **Search Console.** Submit `/sitemap.xml` as usual. A page a search engine already holds is dropped after it fetches the page again and
+  reads the `noindex` (days, not minutes); there is no `robots.txt` rule on purpose, which would stop it from reading it. The URL
+  removal tool of the search engine makes it quicker for a page that must go now.
+- **Not access control.** The list says what is offered to search engines. A private repository is private by `access.*`, not by
+  this list, and `/llms.txt`, `/llms-full.txt` and `/knowledge.yaml` (for agents) are not changed by it.
+- **Where it lives.** In the store (the document `indexing`, saved before it is acknowledged, part of a backup), so it needs the
+  store like the announcements; a portal without one shows the list read-only.
 
 ## 3. Run
 

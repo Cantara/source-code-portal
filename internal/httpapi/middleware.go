@@ -34,11 +34,14 @@ var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 
 // Options configures what both listeners share.
 type Options struct {
-	Log            *slog.Logger
-	Build          func() string  // the web UI bundle's build, sent as X-SCP-Build on every response, so open pages notice a new one
-	HSTS           bool           // the public URL is https
-	PublicURL      string         // server.public_url: the origin of canonical URLs; empty: the request's
-	WebToken       string         // the secret the web UI server shows on its API calls to name the page's viewer (Pages)
+	Log       *slog.Logger
+	Build     func() string // the web UI bundle's build, sent as X-SCP-Build on every response, so open pages notice a new one
+	HSTS      bool          // the public URL is https
+	PublicURL string        // server.public_url: the origin of canonical URLs; empty: the request's
+	WebToken  string        // the secret the web UI server shows on its API calls to name the page's viewer (Pages)
+	// NoIndex says whether the page at a request's address is kept out of search engines (design/indexing.md): it answers with
+	// X-Robots-Tag: noindex, nofollow. nil: none is.
+	NoIndex        func(*http.Request) bool
 	FormTargets    []string       // origins a page's form may end at beyond the portal: the sign-in provider's end session
 	TrustedProxies []netip.Prefix // peers whose X-Forwarded-For, and the Access headers, are believed
 	Access         Access
@@ -70,6 +73,9 @@ func (o Options) wrap(listener string, next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Content-Security-Policy", cspDefault)
+		if o.NoIndex != nil && o.NoIndex(r) {
+			h.Set("X-Robots-Tag", "noindex, nofollow")
+		}
 		if o.HSTS {
 			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}

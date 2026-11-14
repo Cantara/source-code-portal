@@ -48,6 +48,11 @@ type Options struct {
 	Release func(*snapshot.RepoEntry) (rel Release, ok bool)
 	// Retired says why a repository is retired (archived, deprecated); "" when it is not; nil: not said.
 	Retired func(*snapshot.RepoEntry) string
+	// Indexed says whether a page of the repository (at key, in the view) is offered to search engines in the sitemap; nil: all are.
+	// IndexedGroup says it of a group's page. IndexRevision changes when what they say does, so a built sitemap is built again.
+	Indexed       func(v *snapshot.Snapshot, key snapshot.RepoKey) bool
+	IndexedGroup  func(id string) bool
+	IndexRevision func() string
 	// Origin is the request's public origin, for the sitemap's absolute URLs when there is no server.public_url.
 	Origin func(*http.Request) string
 }

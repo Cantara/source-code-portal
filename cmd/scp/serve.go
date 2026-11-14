@@ -36,6 +36,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/indexing"
 	"github.com/cantara/source-code-portal/internal/insights"
 	"github.com/cantara/source-code-portal/internal/issues"
 	"github.com/cantara/source-code-portal/internal/layout"
@@ -140,6 +141,7 @@ type server struct {
 	web               *webui.Server   // nil without web.dir
 	layouts           *layout.Store
 	notices           *announce.Notices
+	indexing          *indexing.Set
 	prereqs           *prereqs
 	people            *people.People // the enterprise mode's people; nil in the other modes
 	stopping          atomic.Bool
@@ -342,11 +344,14 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 	s.layouts = layout.Open(ctx, s.store, log)
 	s.notices = announce.Open(ctx, cfg.Announcements, s.store, time.Now, log)
+	s.indexing = indexing.Open(ctx, s.store, log)
 	feed := cfg.Webhook.Secret.IsSet() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{mode: string(mode), ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
-		cadence: s.engine.Cadence, webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string { return append(s.layouts.Problems(), s.notices.Problems()...) },
+		cadence: s.engine.Cadence, webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string {
+			return slices.Concat(s.layouts.Problems(), s.notices.Problems(), s.indexing.Problems())
+		},
 		deliveries: map[string]int{}}
 	st.polled = map[string]bool{}
 	for _, id := range polledSources(cfg) {
@@ -362,8 +367,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Access: httpapi.Access{PrivateGroups: cfg.Access.PrivateGroups,
 			AdminEmails: cfg.Auth.AdminEmails, AdminGroups: cfg.Auth.AdminGroups, Vary: private},
 		Observe: m.request, ObservePrivate: m.privateView, RequireAuth: cfg.Access.RequireAuth}
+	opts.NoIndex = func(r *http.Request) bool { return s.indexing.Path(s.pub.Current().Public(), r.URL.Path) } // what search engines see is the public view
 	opts.Access.UserHeader, opts.Access.GroupsHeader = identityHeaders(cfg.Access, mode)
-	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin, f))
+	md := llms.New(view, cfg.Server.PublicURL, llmsOptions(opts.Origin, f, s.indexing))
 	external := d.images
 	if external == nil {
 		external = egress.Guarded(10 * time.Second)
@@ -440,6 +446,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, s.layouts.Routes(cfg.Server.PublicURL)...)
 	routes = append(routes, s.peopleRoutes(cfg)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
+	routes = append(routes, s.indexing.Routes(cfg.Server.PublicURL, assets, log.With("component", "indexing"))...)
 	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, newReleases(view, documents), newInsights(view), docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For, Off: offElements(f)},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{f, s.people != nil}, s.prereqs}
@@ -497,7 +504,7 @@ func newAuth(cfg config.Config, log *slog.Logger, launch *auth.Launch) (*auth.Au
 
 // llmsOptions is what the Markdown surface shows of the other features: documents, the descriptor, the manifests' summary and the
 // commits' freshness.
-func llmsOptions(origin func(*http.Request) string, f config.Features) llms.Options {
+func llmsOptions(origin func(*http.Request) string, f config.Features, ix *indexing.Set) llms.Options {
 	o := llms.Options{
 		Docs: func(e *snapshot.RepoEntry) ([]llms.Doc, snapshot.Freshness) {
 			ds, fresh := docs.Of(e)
@@ -522,9 +529,12 @@ func llmsOptions(origin func(*http.Request) string, f config.Features) llms.Opti
 			}
 			return t
 		},
-		Freshness:  func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
-		LastCommit: func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
-		Origin:     origin,
+		Freshness:     func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
+		Indexed:       func(v *snapshot.Snapshot, k snapshot.RepoKey) bool { return !ix.Repo(v, k) },
+		IndexedGroup:  func(id string) bool { return !ix.Group(id) },
+		IndexRevision: ix.Revision,
+		LastCommit:    func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
+		Origin:        origin,
 		Release: func(e *snapshot.RepoEntry) (llms.Release, bool) {
 			rel, _ := releases.Latest(e)
 			if rel == nil {

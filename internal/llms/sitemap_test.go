@@ -108,3 +108,28 @@ func TestSitemapIndex(t *testing.T) {
 		t.Errorf("first part: %d URLs", n)
 	}
 }
+
+// What an admin keeps out of search engines is not in the sitemap, and a change shows at once (the sitemap is built again when the
+// revision moves), not at the next snapshot.
+func TestSitemapLeavesOutWhatIsKeptOut(t *testing.T) {
+	s := sitemapFixture()
+	o := sitemapOptions()
+	out, rev := map[snapshot.RepoKey]bool{}, "1"
+	o.Indexed = func(_ *snapshot.Snapshot, k snapshot.RepoKey) bool { return !out[k] }
+	o.IndexedGroup = func(string) bool { return true }
+	o.IndexRevision = func() string { return rev }
+	h := New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", o).Sitemap()
+	if b := get(h, "/sitemap.xml").Body.String(); !strings.Contains(b, "/repos/acme/core") || !strings.Contains(b, "/repos/acme/core/docs/docs/a%20b") {
+		t.Fatalf("nothing kept out:\n%s", b)
+	}
+	out["acme/core"], rev = true, "2"
+	b := get(h, "/sitemap.xml").Body.String()
+	if strings.Contains(b, "/repos/acme/core") || !strings.Contains(b, "/commits") || !strings.Contains(b, "/groups/") {
+		t.Errorf("a repository kept out, with its documents, and the rest still in:\n%s", b)
+	}
+	o.IndexedGroup = func(string) bool { return false }
+	h = New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", o).Sitemap()
+	if b := get(h, "/sitemap.xml").Body.String(); strings.Contains(b, "/groups/") {
+		t.Errorf("groups kept out are listed:\n%s", b)
+	}
+}
