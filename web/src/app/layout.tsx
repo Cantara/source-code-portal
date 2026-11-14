@@ -9,6 +9,8 @@ import { origin, privateViewer, renderedAt, serverApi } from "@/lib/api/server"
 import { Providers } from "./providers"
 import { Logo } from "@/components/ui/logo"
 import { look as deployment } from "@/lib/look"
+import { analytics } from "@/lib/analytics"
+import { Tracker } from "@/shared/analytics"
 import { Chrome, FocusOnNavigation, MainNav, PortalNav, ViewerMenu } from "./shell"
 import "@/styles/index.css"
 import "@/styles/docs.css"
@@ -37,6 +39,8 @@ function release(): string {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Without the API the header leaves the viewer out; the page shows the problem.
   const look = deployment()
+  // A viewer who sees private repositories is never counted: their pages carry the names of those repositories.
+  const tracking = (await privateViewer()) ? undefined : analytics()
   const server = await serverApi()
   const [me, assistant, rules] = await Promise.all([
     unwrap(server.GET("/me")).catch(() => undefined),
@@ -56,6 +60,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <Providers now={renderedAt()} rules={rules} look={look}>
           <FocusOnNavigation />
           <WebMCP />
+          {tracking ? <Tracker {...tracking} /> : null}
           <Chrome>
             <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-background focus:p-2">
               Skip to content

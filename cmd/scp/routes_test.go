@@ -28,6 +28,7 @@ var notWalked = map[string]string{ //nolint:gochecknoglobals // test table
 	"GET /auth/callback":                  "the sign-in return: signin_test.go",
 	"GET /theme/{file...}":                "the operator's own files, nothing of the catalogue: theme_test.go",
 	"POST /auth/logout":                   "signin_test.go",
+	"POST /_v/m":                          "the analytics relay takes no data of the catalogue: analytics_test.go",
 }
 
 // Every route the shared site registers is either walked by the leak and twin tests as the public or named in notWalked with the
@@ -38,7 +39,7 @@ func TestEveryRouteIsWalkedOrNamed(t *testing.T) {
 		return "webhook: {secret_file: " + file("hook", strings.Repeat("w", 40)) + "}\n" +
 			"llm: {provider: anthropic, model: claude-test, base_url: \"http://127.0.0.1:1\", api_key_file: " + file("llm", "sk-test") + "}\n" +
 			"assistant: {access: signed-in}\n" +
-			"web: {theme_dir: " + filepath.Dir(file("theme.css", ":root{}")) + "}\n"
+			"web: {theme_dir: " + filepath.Dir(file("theme.css", ":root{}")) + ", plausible_domain: scp.example.org}\n"
 	})
 	s, err := standUp(t, cfg, deps{})
 	if err != nil {

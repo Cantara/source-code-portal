@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/analytics"
 	"github.com/cantara/source-code-portal/internal/theme"
 )
 
@@ -124,6 +125,11 @@ type Web struct {
 	// (design/theme.md); ProductName replaces "Source Code Portal" in the pages. Empty: the built-in look.
 	ThemeDir    string `mapstructure:"theme_dir"`
 	ProductName string `mapstructure:"product_name"`
+	// PlausibleDomain turns on Plausible Analytics for the pages of viewers who see no private repository (design/analytics.md): the site
+	// as Plausible knows it. The portal forwards the tracker's events to PlausibleEndpoint (default Plausible's own service; a
+	// self-hosted one). Empty: no tracker.
+	PlausibleDomain   string `mapstructure:"plausible_domain"`
+	PlausibleEndpoint string `mapstructure:"plausible_endpoint"`
 }
 
 func (w Web) validate() []string {
@@ -136,7 +142,8 @@ func (w Web) validate() []string {
 	if strings.TrimSpace(w.Node) == "" {
 		p = append(p, "web.node: required")
 	}
-	return append(p, theme.Validate(w.ThemeDir, w.ProductName)...)
+	p = append(p, theme.Validate(w.ThemeDir, w.ProductName)...)
+	return append(p, analytics.Validate(w.PlausibleDomain, w.PlausibleEndpoint)...)
 }
 
 // Layout names the directory the layouts and the announcements an admin kept in files (before they lived in the store) are imported

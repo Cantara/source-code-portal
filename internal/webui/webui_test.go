@@ -42,7 +42,8 @@ func fakeServer() {
 	signal.Notify(stop, syscall.SIGTERM)
 	srv := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		wd, _ := os.Getwd()
-		_, _ = fmt.Fprintf(w, "%s %s %s %d %s", os.Getenv("SCP_API"), os.Getenv("SCP_VERSION"), wd, len(os.Environ()), os.Getenv("SCP_THEME"))
+		_, _ = fmt.Fprintf(w, "%s %s %s %d %s %s", os.Getenv("SCP_API"), os.Getenv("SCP_VERSION"), wd, len(os.Environ()), os.Getenv("SCP_THEME"),
+			os.Getenv("SCP_ANALYTICS"))
 	})}
 	go func() { _ = srv.Serve(ln) }()
 	<-stop
@@ -77,7 +78,7 @@ func TestServer(t *testing.T) {
 	}
 	t.Setenv("SCP_SECRET_THING", "must not leak")
 	out := &logs{}
-	s, err := New(dir, os.Args[0], "2.0.1", `{"name":"Acme"}`, slog.New(slog.NewTextHandler(out, nil)))
+	s, err := New(dir, os.Args[0], "2.0.1", `{"name":"Acme"}`, `{"domain":"acme.org"}`, slog.New(slog.NewTextHandler(out, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,8 +111,8 @@ func TestServer(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if got := string(body); !strings.HasPrefix(got, "http://127.0.0.1:9 2.0.1 ") || !strings.Contains(got, dir[strings.LastIndex(dir, "/"):]) ||
-		!strings.HasSuffix(got, ` 8 {"name":"Acme"}`) {
-		t.Errorf("server saw %q: want SCP_API, SCP_VERSION, its directory %s, eight variables and SCP_THEME", got, dir)
+		!strings.HasSuffix(got, ` 9 {"name":"Acme"} {"domain":"acme.org"}`) {
+		t.Errorf("server saw %q: want SCP_API, SCP_VERSION, its directory %s, nine variables, SCP_THEME and SCP_ANALYTICS", got, dir)
 	}
 	if !strings.Contains(out.String(), "restarting") || !strings.Contains(out.String(), "line=listening") {
 		t.Errorf("log:\n%s", out)
