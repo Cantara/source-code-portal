@@ -184,11 +184,15 @@ announcements:
 			}
 		}
 	}
+	who := staff // the identity the readiness check reads with: the proxy's, or a token where the proxy's headers are not believed
+	if strings.Contains(extra, "proxy_identity: false") {
+		who = []string{"Authorization", "Bearer " + botSecret}
+	}
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
 		var d oapi.Dashboard
-		_, b, _ := get("/api/v1/dashboard", staff...)
-		_, docs, _ := get("/api/v1/repos/acme/zq-hidden/docs", staff...)
-		_, mf, _ := get("/api/v1/repos/acme/open/manifests", staff...)
+		_, b, _ := get("/api/v1/dashboard", who...)
+		_, docs, _ := get("/api/v1/repos/acme/zq-hidden/docs", who...)
+		_, mf, _ := get("/api/v1/repos/acme/open/manifests", who...)
 		if !private && json.Unmarshal([]byte(b), &d) == nil && d.Freshness.Fresh == 1 && len(d.Latest) == 1 && strings.Contains(mf, "example.com/lib/q7") {
 			idle()
 			return get, base

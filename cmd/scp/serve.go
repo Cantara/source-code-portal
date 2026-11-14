@@ -207,9 +207,9 @@ func (s *server) ready() bool {
 }
 
 // identityHeaders are the trusted proxy's identity headers; none in the enterprise mode, whose viewer is who OIDC signed in, never a
-// header a proxy may pass on from the client.
+// header a proxy may pass on from the client, and none with access.proxy_identity: false.
 func identityHeaders(a config.Access, mode store.Mode) (user, groups string) {
-	if mode == store.Enterprise {
+	if mode == store.Enterprise || !a.ProxyIdentity {
 		return "", ""
 	}
 	return a.UserHeader, a.GroupsHeader

@@ -71,6 +71,8 @@ webhook:
   # previous_secret_file: /run/secrets/webhook-secret-old
 # Who sees private repositories: the headers a trusted authenticating proxy sets and the permitted groups.
 access:
+  # false: never believe the proxy's identity headers (the proxy is trusted for the client's address only; viewers sign in).
+  # proxy_identity: true
   user_header: X-Forwarded-User
   groups_header: X-Forwarded-Groups
   private_groups: [] # ["*"] admits every authenticated user
