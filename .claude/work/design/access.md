@@ -19,6 +19,7 @@ Status: as built. Binding order: ../plan.md > this note.
   decision is made once per request by the middleware and features never see headers.
 - When no repository is private the public view is the full view (one pointer), so a public-only portal pays nothing.
 - A group's default repository that is private is left out of the public view without a "missing" warning.
+- A group that holds no member a view shows (live or retired) is not in that view (P-112): a product of private repositories does not exist for the public, and a group that matches nothing is in no view. Every view's `Groups` is that list, so listings, counts, `llms`, KCP, the sitemap, filters, tools and badges follow, and a hidden group's page and API answer 404 like an unknown id. The base keeps all groups (`allGroups`) for the next batch. Hidden forks are not visible unless shown.
 - Responses to a private viewer are `Cache-Control: private` (a shared cache never stores them) and every response carries
   `Vary` on the two headers while private repositories are admitted.
 - `/llms.txt` and `/llms-full.txt` are built once per view and snapshot.

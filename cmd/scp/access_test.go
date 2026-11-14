@@ -46,6 +46,8 @@ github:
 catalog:
   groups:
     - {id: all, name: All, default_repo: secret, match: [{catch_all: true}]}
+    - {id: private-only, name: Private only, default_repo: secret, match: [{exact: secret}]}
+    - {id: nothing, name: Nothing, default_repo: absent, match: [{exact: absent}]}
 `
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -129,5 +131,31 @@ catalog:
 	}
 	if _, _, h := get("/api/v1/repos", false); !strings.Contains(h.Get("Vary"), "X-Forwarded-Groups") {
 		t.Errorf("Vary = %q", h.Get("Vary"))
+	}
+
+	// A group holds no repository the viewer can see: it is not listed, counted or found for them (the public does not learn that a
+	// product of private repositories exists); a group that matches nothing is not shown to anyone.
+	for _, path := range []string{"/api/v1/groups", "/api/v1/dashboard", "/llms.txt", "/llms-full.txt", "/knowledge.yaml", "/sitemap.xml"} {
+		code, b, _ := get(path, false)
+		if code != http.StatusOK || strings.Contains(b, "private-only") || strings.Contains(b, "Private only") || strings.Contains(b, "nothing") {
+			t.Errorf("public %s: %d, tells a group without visible repositories:\n%s", path, code, b)
+		}
+		if code, b, _ := get(path, true); code != http.StatusOK || strings.Contains(b, "nothing") ||
+			(path != "/sitemap.xml" && path != "/llms-full.txt" && !strings.Contains(b, "private-only") && !strings.Contains(b, "Private only")) {
+			t.Errorf("staff %s: %d, does not show the group of private repositories (or shows the empty one):\n%s", path, code, b)
+		}
+	}
+	for _, tc := range []string{"/api/v1/groups/private-only", "/badges/groups/private-only/repos.svg", "/api/v1/commits?group=private-only"} {
+		unknown := strings.Replace(tc, "private-only", "unknown", 1)
+		wantCode, _, _ := get(unknown, false)
+		if code, b, _ := get(tc, false); code != wantCode || code == http.StatusOK {
+			t.Errorf("public %s: %d, want %d like a group that does not exist:\n%s", tc, code, wantCode, b)
+		}
+		if code, b, _ := get(tc, true); code != http.StatusOK {
+			t.Errorf("staff %s: %d\n%s", tc, code, b)
+		}
+	}
+	if code, _, _ := get("/api/v1/groups/nothing", true); code != http.StatusNotFound {
+		t.Errorf("staff, a group that matches nothing: %d, want 404", code)
 	}
 }

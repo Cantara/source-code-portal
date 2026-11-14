@@ -13,14 +13,14 @@ func (s *Snapshot) Restrict(allowed map[RepoKey]bool, forks bool, log *slog.Logg
 	if s.fat != nil {
 		s = s.fat
 	}
-	fat := s.cut(func(e *RepoEntry) bool { return allowed[e.Repo.Key()] }, nil, true, log)
+	fat := s.cut(func(e *RepoEntry) bool { return allowed[e.Repo.Key()] }, nil, log)
 	if fat == s { // every repository allowed: the full snapshot's own views are the restricted ones
 		return s.View(true, forks)
 	}
 	lean := fat
 	for k := range fat.Repos {
 		if s.hidden[k] {
-			lean = fat.cut(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, nil, true, log)
+			lean = fat.cut(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, nil, log)
 			break
 		}
 	}

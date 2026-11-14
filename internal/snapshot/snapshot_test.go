@@ -168,7 +168,7 @@ func TestPanickingIndexKeepsItsLastValue(t *testing.T) {
 		t.Fatalf("index before = %d, want 1", got)
 	}
 	broken = true
-	p.Update(func(b *Builder) { b.SetGroups([]Group{{ID: "g"}}) })
+	p.Update(func(b *Builder) { b.SetGroups([]Group{{ID: "g", Members: []RepoKey{"acme/a"}}}) })
 	p.Flush()
 	cur := p.Current()
 	if len(cur.Groups) != 1 {
@@ -178,7 +178,9 @@ func TestPanickingIndexKeepsItsLastValue(t *testing.T) {
 		t.Errorf("index kept = %d, want its last good value 1", got)
 	}
 	broken = false
-	p.Update(func(b *Builder) { b.SetGroups([]Group{{ID: "g"}, {ID: "h"}}) })
+	p.Update(func(b *Builder) {
+		b.SetGroups([]Group{{ID: "g", Members: []RepoKey{"acme/a"}}, {ID: "h", Members: []RepoKey{"acme/a"}}})
+	})
 	p.Flush()
 	if got := flaky.Get(p.Current()); got != 3 {
 		t.Errorf("index after the fix = %d, want 3", got)
@@ -562,5 +564,83 @@ func TestRetiredMembers(t *testing.T) {
 	p.Flush()
 	if g, _ := p.Current().Group("all"); !slices.Equal(g.Members, []RepoKey{"acme/live", "acme/old"}) || len(g.Retired) != 0 {
 		t.Errorf("unarchived: %+v", g)
+	}
+}
+
+// A group that holds no repository a view shows is not in the view: not listed, not counted, not found. The base keeps every group,
+// so a group whose repositories come later, or whose private ones the next reader may see, is back when they do.
+func TestGroupsWithoutVisibleRepositoriesAreHidden(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	open := repo("gh", 1, "acme", "open")
+	open.Repo.Visibility = "public"
+	secret := repo("gh", 2, "acme", "secret")
+	secret.Repo.Visibility = "private"
+	fork := repo("gh", 3, "acme", "fork")
+	fork.Repo.Visibility = "public"
+	groups := []Group{
+		{ID: "mixed", Members: []RepoKey{"acme/open", "acme/secret"}},
+		{ID: "private-only", Members: []RepoKey{"acme/secret"}},
+		{ID: "forks-only", Members: []RepoKey{"acme/fork"}},
+		{ID: "nothing"},
+	}
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{open, secret, fork}, nil, SourceStatus{ID: "gh", Repos: 3})
+		b.SetHidden(map[RepoKey]bool{"acme/fork": true})
+		b.SetGroups(groups)
+	})
+	p.Flush()
+	ids := func(s *Snapshot) []string {
+		out := []string{}
+		for _, g := range s.Groups {
+			out = append(out, g.ID)
+		}
+		return out
+	}
+	for _, c := range []struct {
+		name           string
+		private, forks bool
+		want           []string
+	}{
+		{"anonymous", false, false, []string{"mixed"}},
+		{"anonymous with forks", false, true, []string{"mixed", "forks-only"}},
+		{"signed in", true, false, []string{"mixed", "private-only"}},
+		{"signed in with forks", true, true, []string{"mixed", "private-only", "forks-only"}},
+	} {
+		v := p.Current().View(c.private, c.forks)
+		if got := ids(v); !slices.Equal(got, c.want) {
+			t.Errorf("%s: groups %v, want %v", c.name, got, c.want)
+		}
+		if _, ok := v.Group("nothing"); ok {
+			t.Errorf("%s: a group that matches nothing is found", c.name)
+		}
+		if _, ok := v.Group("private-only"); ok != c.private {
+			t.Errorf("%s: private-only found = %v", c.name, ok)
+		}
+	}
+
+	// The next batch starts from every group, not from the ones a view showed: a private-only group stays, and a group that gained
+	// its first member shows.
+	p.Update(func(b *Builder) { b.UpdateRepo("acme/open", func(e *RepoEntry) { e.Repo.Stars = 1 }) })
+	p.Flush()
+	if got := ids(p.Current().View(true, false)); !slices.Equal(got, []string{"mixed", "private-only"}) {
+		t.Errorf("after an update: %v", got)
+	}
+	groups[3].Members = []RepoKey{"acme/open"}
+	p.Update(func(b *Builder) { b.SetGroups(groups) })
+	p.Flush()
+	if got := ids(p.Current().View(false, false)); !slices.Equal(got, []string{"mixed", "nothing"}) {
+		t.Errorf("a group that gained a member: %v", got)
+	}
+
+	// A group with only retired members is still a group (its repositories are in the Archive).
+	p = NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	p.Retire(func(e *RepoEntry) bool { return e.Repo.Name == "open" })
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{open}, nil, SourceStatus{ID: "gh", Repos: 1})
+		b.SetGroups([]Group{{ID: "old", Members: []RepoKey{"acme/open"}}})
+	})
+	p.Flush()
+	if g, ok := p.Current().Group("old"); !ok || len(g.Members) != 0 || len(g.Retired) != 1 {
+		t.Errorf("a group of retired members: %+v, %v", g, ok)
 	}
 }
