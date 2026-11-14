@@ -97,8 +97,9 @@ type Snapshot struct {
 	Catalogued bool
 	Repos      map[RepoKey]*RepoEntry
 	Aliases    map[RepoKey]RepoKey // old address -> current address
-	Groups     []Group             // config order
+	Groups     []Group             // config order; only the groups that hold a member in this view, live or retired (see Builder.finish)
 	Sources    []SourceStatus      // sorted by id
+	allGroups  []Group             // config order, every group the catalogue resolved, empty ones too: what the next Builder starts from (the base snapshot only)
 	groupsOf   map[RepoKey][]string
 	indexers   []Indexer             // what the features derive from every repository, run at publish
 	retire     func(*RepoEntry) bool // a group member it says yes to is retired (Publisher.Retire); nil: none

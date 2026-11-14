@@ -258,7 +258,7 @@ github:
    `access.user_header` and `access.groups_header`).
 
 A request whose user is in one of `access.private_groups` sees everything; any other request sees the public repositories only, on
-every page, in the API, badges, `/llms.txt` and the Markdown answers. The two headers are believed only from an address in
+every page, in the API, badges, `/llms.txt` and the Markdown answers. A group (a product) with no repository a viewer can see is not shown to them at all: a product of private repositories is absent for the public (its page answers 404 like an unknown group) and appears for those who see them; a group that matches nothing is shown to nobody (`scp config groups` lists what each matcher takes). The two headers are believed only from an address in
 `server.trusted_proxies` and dropped from any other. Answers to a permitted user are marked `Cache-Control: private`, and every answer
 varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and a way to know the viewer: `server.trusted_proxies`,
 `auth.oidc` or `auth.tokens`. `serve` and `config check` warn when a range in `server.trusted_proxies` is wider than /24 (IPv4) or /64

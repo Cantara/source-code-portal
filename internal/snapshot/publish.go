@@ -25,7 +25,7 @@ func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
 		sum:        cur.sum,
 		Repos:      maps.Clone(cur.Repos),
 		Aliases:    maps.Clone(cur.Aliases),
-		Groups:     slices.Clone(cur.Groups),
+		Groups:     slices.Clone(cur.groupList()),
 		Sources:    slices.Clone(cur.Sources),
 		hidden:     cur.hidden,
 		indexers:   cur.indexers,
@@ -133,6 +133,7 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 		}
 	}
 	s.retireMembers()
+	s.hideEmptyGroups()
 	s.index(b.prev.indexes, b.log)
 	s.views(b.prev, b.log)
 	return s
@@ -167,6 +168,23 @@ func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
 	// the failure is towards less, never towards a leak.
 	s.fat, b.fat, c.fat, d.fat = s, b, s, b
 	b.hidden, c.hidden, d.hidden = s.hidden, s.hidden, s.hidden
+}
+
+// groupList is every group the catalogue resolved, the empty ones too: the base snapshot keeps them, so a group that gains a member
+// at the next listing is still there to gain it. Snapshots made some other way hold only Groups.
+func (s *Snapshot) groupList() []Group {
+	if s.allGroups != nil {
+		return s.allGroups
+	}
+	return s.Groups
+}
+
+// hideEmptyGroups keeps in Groups only the groups that hold a member, live or retired: a group that matches nothing, or whose
+// repositories this view does not show, is not in it, so nothing that lists groups, counts them or serves one tells that it exists.
+// The complete list stays in allGroups.
+func (s *Snapshot) hideEmptyGroups() {
+	s.allGroups = s.Groups
+	s.Groups = slices.DeleteFunc(slices.Clone(s.Groups), func(g Group) bool { return len(g.Members) == 0 && len(g.Retired) == 0 })
 }
 
 // retireMembers sorts every group's members, live and retired, by what retire says of them now: a repository archived or deprecated
@@ -231,12 +249,12 @@ func buildIndex(ix Indexer, s *Snapshot) (v any, err error) {
 // derive is s with the repositories keep refuses taken out, or s itself when it refuses none. before is the sibling view of the
 // snapshot before, whose indexes are kept when one cannot be built.
 func (s *Snapshot) derive(keep func(*RepoEntry) bool, before *Snapshot, log *slog.Logger) *Snapshot {
-	return s.cut(keep, before, false, log)
+	return s.cut(keep, before, log)
 }
 
-// cut is derive, and with members only the groups that keep one of their members (a restricted view does not tell the groups it
+// cut is derive; a view holds only the groups that keep one of their members, live or retired (a view does not tell the groups it
 // holds nothing of).
-func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, members bool, log *slog.Logger) *Snapshot {
+func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, log *slog.Logger) *Snapshot {
 	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !keep(e) }) {
 		return s
 	}
@@ -257,7 +275,7 @@ func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, members boo
 	for _, g := range s.Groups {
 		g.Members = slices.DeleteFunc(slices.Clone(g.Members), func(k RepoKey) bool { return p.Repos[k] == nil })
 		g.Retired = slices.DeleteFunc(slices.Clone(g.Retired), func(k RepoKey) bool { return p.Repos[k] == nil })
-		if members && len(g.Members) == 0 && len(g.Retired) == 0 {
+		if len(g.Members) == 0 && len(g.Retired) == 0 {
 			continue
 		}
 		if g.DefaultRepo != "" && p.Repos[g.DefaultRepo] == nil {
