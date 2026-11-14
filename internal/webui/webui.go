@@ -36,6 +36,7 @@ type Server struct {
 	dir, node string
 	version   string // the portal's release, shown by the pages (SCP_VERSION)
 	theme     string // the deployment's theme as JSON (SCP_THEME); empty: the built-in look
+	analytics string // the analytics site and endpoint as JSON (SCP_ANALYTICS); empty: no tracker
 	log       *slog.Logger
 	addr      string // 127.0.0.1:port the child listens on
 	ready     atomic.Bool
@@ -46,15 +47,15 @@ type Server struct {
 }
 
 // New picks a free loopback port for the server in dir (server.js), run with node; version is the portal's release the pages show and
-// theme the deployment's theme as JSON (empty: none).
-func New(dir, node, version, theme string, log *slog.Logger) (*Server, error) {
+// theme the deployment's theme and analytics its analytics site, each as JSON (empty: none).
+func New(dir, node, version, theme, analytics string, log *slog.Logger) (*Server, error) {
 	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("web UI port: %w", err)
 	}
 	addr := ln.Addr().String()
 	_ = ln.Close()
-	return &Server{dir: dir, node: node, version: version, theme: theme, log: log.With("component", "web"), addr: addr,
+	return &Server{dir: dir, node: node, version: version, theme: theme, analytics: analytics, log: log.With("component", "web"), addr: addr,
 		minBackoff: minBackoff, buildEvery: buildEvery, probeEvery: probeEvery}, nil
 }
 
@@ -126,6 +127,9 @@ func (s *Server) once(ctx context.Context, api string) error {
 		"SCP_VERSION=" + s.version, "PATH=" + os.Getenv("PATH")}
 	if s.theme != "" {
 		cmd.Env = append(cmd.Env, "SCP_THEME="+s.theme)
+	}
+	if s.analytics != "" {
+		cmd.Env = append(cmd.Env, "SCP_ANALYTICS="+s.analytics)
 	}
 	cmd.Stdout, cmd.Stderr = out, out
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }

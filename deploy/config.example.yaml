@@ -119,6 +119,10 @@ web:
   # pages use instead of "Source Code Portal". Both are read at the start; empty: the built-in look.
   theme_dir: ""
   product_name: ""
+  # Visit counting with Plausible Analytics (operator guide 2.10): the site as Plausible knows it; empty: nothing is counted. The portal
+  # forwards the events itself; plausible_endpoint is only for a self-hosted Plausible.
+  plausible_domain: ""
+  # plausible_endpoint: https://plausible.example.org/api/event
 # The pages' layouts an administrator designs on the dashboard (Design this page), one JSON file per page, and the announcements
 # administrators write in /admin (announcements.json). Empty: the built-in layouts and the configured announcements, nothing saved.
 layout:

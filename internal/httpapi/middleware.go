@@ -152,6 +152,9 @@ func (o Options) fromTrusted(r *http.Request) bool {
 	return err == nil && o.trusted(ip)
 }
 
+// ClientIP is the address of the client of r: see clientIP.
+func (o Options) ClientIP(r *http.Request) string { return o.clientIP(r) }
+
 // clientIP is the peer address, or when the peer is a trusted proxy the right-most X-Forwarded-For entry that is not one.
 func (o Options) clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -343,7 +346,7 @@ func (w *gzipWriter) Flush() {
 
 // openPaths answer an anonymous request under access.require_auth: signing in, the sign-in page with its assets and the sign-in
 // methods it reads (/api/v1/me), GitHub's deliveries (signed) and robots.txt.
-var openPaths = []string{"/auth/", "/signin", "/_next/static/", "/favicon.svg", "/theme-init.js", "/theme/", "/api/v1/me", "/webhooks/", "/robots.txt"} //nolint:gochecknoglobals // lookup table
+var openPaths = []string{"/auth/", "/signin", "/_next/static/", "/favicon.svg", "/theme-init.js", "/theme/", "/_v/m", "/api/v1/me", "/webhooks/", "/robots.txt"} //nolint:gochecknoglobals // lookup table
 
 func openPath(p string) bool {
 	return slices.ContainsFunc(openPaths, func(o string) bool {

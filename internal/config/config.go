@@ -121,6 +121,8 @@ func defaults() map[string]any {
 		"web.node":                         "node",
 		"web.theme_dir":                    "",
 		"web.product_name":                 "",
+		"web.plausible_domain":             "",
+		"web.plausible_endpoint":           "",
 		"layout.dir":                       "",
 		"packages.public":                  true,
 		"features.pulls":                   true,

@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 
 	contract "github.com/cantara/source-code-portal/api"
+	"github.com/cantara/source-code-portal/internal/analytics"
 	"github.com/cantara/source-code-portal/internal/announce"
 	"github.com/cantara/source-code-portal/internal/assistant"
 	"github.com/cantara/source-code-portal/internal/auth"
@@ -154,6 +155,7 @@ type deps struct {
 	// ecosystem in its place (the providers' own when empty): the tests' loopback registries.
 	registries http.RoundTripper
 	public     map[string]string
+	analytics  http.RoundTripper                              // transport to the analytics endpoint (the default when nil): a test's loopback
 	cluster    func(context.Context) (cluster.Backend, error) // dial for the cluster when cluster.addresses is set
 	launch     *auth.Launch                                   // the personal edition's one-use sign-in link
 	// mode is what this process is, set by the command that starts it and by nothing in a configuration: the zero value is the shared
@@ -325,7 +327,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 	var upstream *url.URL
 	if cfg.Web.Dir != "" {
-		if s.web, err = webui.New(cfg.Web.Dir, cfg.Web.Node, readBuildInfo().Version, look.Env(), log); err != nil {
+		if s.web, err = webui.New(cfg.Web.Dir, cfg.Web.Node, readBuildInfo().Version, look.Env(), analytics.Env(cfg.Web.PlausibleDomain), log); err != nil {
 			return nil, err
 		}
 		upstream = s.web.URL()
@@ -381,6 +383,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, catalog.Legacy(view)...)
 	routes = append(routes, s.eventRoutes(cfg, gh, m, st, feed, log)...)
 	routes = append(routes, httpapi.Route{Pattern: "GET /api/v1/admin/status", Handler: httpapi.AdminOnly(st)})
+	if cfg.Web.PlausibleDomain != "" { // the tracker posts to the portal, which forwards each event to Plausible's endpoint
+		routes = append(routes, httpapi.Route{Pattern: "POST " + analytics.Path, MaxBody: 16 << 10,
+			Handler: analytics.New(cfg.Web.PlausibleEndpoint, opts.ClientIP, d.analytics).Handler()})
+	}
 	me := httpapi.MeAPI{}
 	if cfg.Auth.SignIn() || len(cfg.Auth.Tokens) > 0 {
 		a, err := newAuth(cfg, log, d.launch)

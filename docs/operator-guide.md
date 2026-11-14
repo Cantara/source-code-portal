@@ -194,6 +194,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `web.node` | `node` | the Node.js executable that runs the bundle (26, the current LTS; 24 also runs it) |
 | `web.theme_dir` | empty | a directory with the deployment's `theme.css`, `logo.svg` and `favicon.svg` (each optional), served under `/theme/` and read at the start (section 2.7); empty: the built-in look |
 | `web.product_name` | empty | what the pages call the portal instead of "Source Code Portal": titles, the header, the presentation page, link previews and the app manifest (at most 60 characters); empty: the built-in name |
+| `web.plausible_domain` | empty | turns on Plausible Analytics: the site as Plausible knows it (section 2.10); empty: nothing is counted |
+| `web.plausible_endpoint` | Plausible's service | where the portal forwards the events: a self-hosted Plausible's event address (`https`; needs `web.plausible_domain`) |
 | `layout.dir` | empty | only for an upgrade: a directory with the `dashboard.json`, `present.json` and `announcements.json` an administrator saved before they lived in the store. Each one the store does not hold yet is imported once at the start (the log says which); after that the store is the truth and the files are not read. Remove the key afterwards |
 | `announcements[]` | `[]` | the deployment's announcements (section 2.4.1): `id`, `title`, `text`, `tone`, `starts`, `ends`, `place`, `link` (`label`, `url`), `lang`, `pages`, `audience`, `from`, `until`, `published`; at most 20 |
 | `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy, `nuget` the feed whose `index.json` is the service index, `rubygems` a gem server, `packagist` a Composer repository |
@@ -775,6 +777,32 @@ the portal's outbound address must be allowed, or every token is refused (`unaut
 **Rate limits.** Each person's token has GitHub's 5,000 requests an hour, shared with whatever else they run. The portal spreads a
 repository's reads over the people who can read it, choosing the token with the most left, and polls (`sync.*` cadences, section 2):
 with few people and many repositories the first read takes longer.
+
+### 2.10 Counting visits with Plausible
+
+The portal can count its visits in Plausible Analytics, its service or one you host. One key turns it on, and nothing is counted
+without it:
+
+```yaml
+web:
+  plausible_domain: scp.example.org   # the site as you added it in Plausible
+  # plausible_endpoint: https://plausible.example.org/api/event   # only for a self-hosted Plausible
+```
+
+In Plausible add the site, choose **NPM** as the installation method (the tracker is `@plausible-analytics/tracker`, already part of the
+portal's scripts: there is nothing to install or paste), set the key and restart the portal, and open the portal as a visitor who
+is not signed in; "I've installed it" finds the tracker after the first page view.
+
+- **First party.** The tracker posts to the portal itself (`/_v/m`), and the portal forwards each event to Plausible with the
+  visitor's browser and address and nothing else, no cookie or token. The pages load no script from another host and the page policy
+  is unchanged; the portal needs to reach the endpoint (`https://plausible.io/api/event` by default). A reverse proxy must send the
+  visitor's address (`server.trusted_proxies` names the proxies whose `X-Forwarded-For` is believed), or every visit is the proxy's.
+- **What is counted.** Pages, by their address without the query (a search or a filter's login stays with the portal; the campaign's
+  `utm_*`, `ref`, `source` and `via` stay), for visitors who see no private repository. A signed-in viewer who sees private
+  repositories is never counted, so no private repository's name goes to Plausible, and nor is the presentation page. So
+  a portal whose every visitor signs in is not counted at all, which is the point.
+- **Not counted.** Custom events, outbound links, downloads and forms are off. A visitor can opt out with
+  `localStorage.plausible_ignore = "true"`.
 
 ## 3. Run
 
