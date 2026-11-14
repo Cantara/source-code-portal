@@ -4,6 +4,23 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.16
+
+An administrator can keep chosen products and repositories out of search engines, and a portal behind a proxy that passes a client's
+headers on can stop believing the identity headers. Nothing new is asked of GitHub, and the store gains no tables (the new list is a
+document in the existing one).
+
+- **Search engines card in Admin**: products and repositories kept out of search engines such as Google leave `/sitemap.xml` (with their
+  documents) and their pages answer `X-Robots-Tag: noindex, nofollow`, Markdown answers included. The portal itself and the API show
+  everything as before. A repository only in products that are all kept out follows them. It is not access control, and
+  `/llms.txt`, `/llms-full.txt` and `/knowledge.yaml` are unchanged. Operator guide, section 2.11.
+- **`access.proxy_identity`** (default `true`, nothing changes): `false` never believes `access.user_header` and
+  `access.groups_header`, so `server.trusted_proxies` only tells the visitor's address (Plausible needs it) and viewers sign in or show
+  a token. `serve` and `config check` warn when private repositories, a trusted proxy, believed headers and sign-in meet: a proxy that
+  passes a client's headers on lets anyone claim a user and groups, so strip them there or set the key to `false`. Operator guide, 2.1.
+- **Plausible's site check** may show "an issue with your site's cache" until the first page view, because the tracker is part of the
+  portal's scripts; the operator guide says so (2.10).
+
 ## 2.2.15
 
 A portal can count its visits in Plausible Analytics, its service or one you host, with one key. Nothing is counted without it, and
