@@ -28,6 +28,7 @@ type entry struct {
 // builds again.
 type sitemap struct {
 	view   *snapshot.Snapshot
+	rev    string   // Options.IndexRevision when it was built
 	raw    [][]byte // [0] is /sitemap.xml
 	origin string
 	files  [][]byte // raw with origin filled in
@@ -108,8 +109,12 @@ func (l *LLMs) sitemaps(r *http.Request) [][]byte {
 	}
 	l.mu.Lock()
 	m := l.maps[slot]
-	if m.view != s {
-		m = sitemap{view: s, raw: l.buildSitemap(s, originMark, maxURLs)}
+	rev := ""
+	if l.opts.IndexRevision != nil {
+		rev = l.opts.IndexRevision()
+	}
+	if m.view != s || m.rev != rev {
+		m = sitemap{view: s, rev: rev, raw: l.buildSitemap(s, originMark, maxURLs)}
 	}
 	if m.origin != origin || m.files == nil { // the portal's own address: once per view; a request's: until another host asks
 		m.origin, m.files = origin, fill(m.raw, origin)
@@ -140,6 +145,9 @@ func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
 		out = append(out, entry{"/issues", newest})
 	}
 	for _, g := range s.Groups {
+		if l.opts.IndexedGroup != nil && !l.opts.IndexedGroup(g.ID) {
+			continue
+		}
 		var t time.Time
 		for _, k := range g.Members {
 			if last[k].After(t) {
@@ -149,6 +157,9 @@ func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
 		out = append(out, entry{snapshot.GroupPage(g.ID), t})
 	}
 	for _, k := range keys {
+		if l.opts.Indexed != nil && !l.opts.Indexed(s, k) {
+			continue
+		}
 		out = append(out, entry{snapshot.RepoPage(k), last[k]})
 		docs, _ := l.opts.Docs(s.Repos[k])
 		for _, d := range docs {

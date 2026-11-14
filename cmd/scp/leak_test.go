@@ -137,15 +137,19 @@ announcements:
 		defer stop()
 		req, _ := http.NewRequestWithContext(rctx, http.MethodGet, base+path, nil)
 		for i := 0; i+1 < len(headers); i += 2 {
-			if headers[i] == ":post" {
-				req, _ = http.NewRequestWithContext(rctx, http.MethodPost, base+path, strings.NewReader(headers[i+1]))
+			if headers[i] == ":post" || headers[i] == ":put" {
+				method := http.MethodPost
+				if headers[i] == ":put" {
+					method = http.MethodPut
+				}
+				req, _ = http.NewRequestWithContext(rctx, method, base+path, strings.NewReader(headers[i+1]))
 				req.Header.Set("Content-Type", "application/json")
 			}
 		}
 		events := 0
 		for i := 0; i+1 < len(headers); i += 2 {
 			switch headers[i] {
-			case ":post":
+			case ":post", ":put":
 			case ":events":
 				events, _ = strconv.Atoi(headers[i+1])
 			default:
