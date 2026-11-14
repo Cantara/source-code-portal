@@ -4,6 +4,18 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.14
+
+A product that holds no repository a viewer can see is no longer shown to them. A product made only of private repositories is gone
+for the public, instead of appearing as an empty card with "0 repositories", and it appears for the people who see those repositories.
+Nothing to configure, and nothing new is asked of GitHub.
+
+- **Groups without visible repositories are hidden**: the dashboard's cards, the groups API, `/llms.txt`, `/knowledge.yaml`, the
+  sitemap, the group filters, the assistant's tools and the counts of repositories and groups leave out a group the viewer sees no
+  repository of, live or retired. Its page, its API answer and its badges answer 404, as for a group that never existed.
+- **A group that matches nothing** is shown to nobody, administrators included; `scp config groups` lists what each matcher takes.
+- **Forks** hidden by default count as not visible until the reader shows forks.
+
 ## 2.2.13
 
 A retired repository, archived on GitHub or marked `lifecycle: deprecated` in its `scp.yaml`, is no longer one of its product's
