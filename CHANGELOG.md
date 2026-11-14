@@ -4,6 +4,19 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.15
+
+A portal can count its visits in Plausible Analytics, its service or one you host, with one key. Nothing is counted without it, and
+nothing new is asked of GitHub. The tracker is part of the portal's own scripts: the browser talks only to the portal, the pages'
+policy is unchanged, and there is no third-party script for a filter list to block.
+
+- **Optional Plausible Analytics**: `web.plausible_domain` (the site as Plausible knows it) turns it on; `web.plausible_endpoint` is
+  only for a self-hosted Plausible. The tracker (`@plausible-analytics/tracker`) loads as a chunk of its own when configured and
+  posts to the portal's `/_v/m`, which forwards each event with only the visitor's browser and address. Operator guide, section 2.10.
+- **Privacy**: a viewer who sees private repositories is never counted, a page's address goes without its query (the campaign's
+  `utm_*`, `ref`, `source` and `via` stay), and the presentation page is not counted.
+- **The JavaScript budget** of the build is 430 KB (it was 420).
+
 ## 2.2.14
 
 A product that holds no repository a viewer can see is no longer shown to them. A product made only of private repositories is gone
