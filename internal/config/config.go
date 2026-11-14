@@ -88,6 +88,7 @@ func defaults() map[string]any {
 		"webhook.secret_file":              "",
 		"webhook.previous_secret_file":     "",
 		"webhook.catch_up":                 false,
+		"access.proxy_identity":            true,
 		"access.user_header":               "X-Forwarded-User",
 		"access.groups_header":             "X-Forwarded-Groups",
 		"access.private_groups":            []string{},
@@ -263,7 +264,7 @@ func (c Config) validate() []string {
 	if c.Webhook.PreviousSecretFile != "" && c.Webhook.SecretFile == "" {
 		p = append(p, "webhook.previous_secret_file: needs webhook.secret_file")
 	}
-	identified := len(c.Server.TrustedProxies) > 0 || c.Auth.SignIn() || len(c.Auth.Tokens) > 0
+	identified := len(c.Server.TrustedProxies) > 0 && c.Access.ProxyIdentity || c.Auth.SignIn() || len(c.Auth.Tokens) > 0
 	p = append(p, c.Access.validate(c.GitHub, identified)...)
 	p = append(p, c.LLM.validate(c.Assistant, identified)...)
 	p = append(p, c.Auth.validate(c.Server.PublicURL)...)

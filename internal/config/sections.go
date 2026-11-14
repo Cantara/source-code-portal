@@ -101,6 +101,9 @@ type Webhook struct {
 
 // Access names the headers a trusted authenticating proxy sets and the groups whose members see private repositories.
 type Access struct {
+	// ProxyIdentity: the trusted proxies' identity headers are believed (default). False: never; server.trusted_proxies then only
+	// tells the client's address, and a viewer is who signs in or shows a token.
+	ProxyIdentity bool     `mapstructure:"proxy_identity"`
 	UserHeader    string   `mapstructure:"user_header"`
 	GroupsHeader  string   `mapstructure:"groups_header"`  // comma-separated group names
 	PrivateGroups []string `mapstructure:"private_groups"` // "*" admits every authenticated user

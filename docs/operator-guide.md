@@ -130,7 +130,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `server.admin_addr` | `:9091` | admin listener (also `--admin-addr`) |
 | `server.shutdown_grace` | `20s` | time in-flight requests and jobs get after SIGTERM |
 | `server.public_url` | empty | absolute base URL of the public listener, without query; empty gives root-relative links |
-| `server.trusted_proxies` | `[]` | CIDRs allowed to set `X-Forwarded-For` |
+| `server.trusted_proxies` | `[]` | CIDRs allowed to set `X-Forwarded-For`; unless `access.proxy_identity` is `false` they are also believed when they name a user and groups (`access.user_header`, `access.groups_header`) |
 | `log.level` | `info` | `debug`, `info`, `warn`, `error` (also `--log-level`) |
 | `log.format` | `json` | `json`, or `text` for local use |
 | `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts and announcements administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version. A store made by a release before 2.2.10 (an earlier schema generation, without the portal's mark) is not migrated: the first start moves it aside as `<store.path>.quarantine-<time>` and reads the catalogue again from GitHub, which takes a minute or two for a few hundred repositories; remove the moved-aside file when the new start has proved itself |
@@ -157,6 +157,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `catalog.groups[].default_repo` | required | the group's main repository name; a missing one is shown on the group, the group stays |
 | `catalog.groups[].sources` | all | source ids the group draws from |
 | `catalog.groups[].match[]` | required | 1 to 64 matchers; a repository in any matcher is a member |
+| `access.proxy_identity` | `true` | `false`: the trusted proxies' identity headers (`access.user_header`, `access.groups_header`) are never believed, and `server.trusted_proxies` then only tells the client's address; a viewer is who signs in or shows a token. Set it when viewers sign in and a proxy in front passes a client's headers on (a container platform's proxy, say), or anyone could claim a user and groups |
 | `access.user_header` | `X-Forwarded-User` | header in which the authenticating proxy names the user |
 | `access.groups_header` | `X-Forwarded-Groups` | header with the user's groups, comma-separated |
 | `access.private_groups` | `[]` | groups whose members see private repositories; `"*"` is every authenticated user |
@@ -261,7 +262,7 @@ github:
 
 A request whose user is in one of `access.private_groups` sees everything; any other request sees the public repositories only, on
 every page, in the API, badges, `/llms.txt` and the Markdown answers. A group (a product) with no repository a viewer can see is not shown to them at all: a product of private repositories is absent for the public (its page answers 404 like an unknown group) and appears for those who see them; a group that matches nothing is shown to nobody (`scp config groups` lists what each matcher takes). The two headers are believed only from an address in
-`server.trusted_proxies` and dropped from any other. Answers to a permitted user are marked `Cache-Control: private`, and every answer
+`server.trusted_proxies` and dropped from any other, so **the proxy must remove them from the client's request** before it sets its own: a proxy that passes them on lets anyone claim a user and groups. Where viewers sign in with the portal and the proxy is trusted only for the client's address (Plausible, section 2.10, needs it), set `access.proxy_identity: false`; `serve` and `config check` warn about the combination. Answers to a permitted user are marked `Cache-Control: private`, and every answer
 varies on the two headers. `config check` refuses `include_private` without `access.private_groups` and a way to know the viewer: `server.trusted_proxies`,
 `auth.oidc` or `auth.tokens`. `serve` and `config check` warn when a range in `server.trusted_proxies` is wider than /24 (IPv4) or /64
 (IPv6) while private repositories are served on an address other than loopback: any host in it could claim any user.
@@ -793,10 +794,13 @@ In Plausible add the site, choose **NPM** as the installation method (the tracke
 portal's scripts: there is nothing to install or paste), set the key and restart the portal, and open the portal as a visitor who
 is not signed in; "I've installed it" finds the tracker after the first page view.
 
+- **The site check.** Plausible's installation check looks for a script tag, and the tracker is part of the portal's scripts, so it can
+  show "we detected an issue with your site's cache" until the first page view arrives; it clears then.
 - **First party.** The tracker posts to the portal itself (`/_v/m`), and the portal forwards each event to Plausible with the
   visitor's browser and address and nothing else, no cookie or token. The pages load no script from another host and the page policy
   is unchanged; the portal needs to reach the endpoint (`https://plausible.io/api/event` by default). A reverse proxy must send the
   visitor's address (`server.trusted_proxies` names the proxies whose `X-Forwarded-For` is believed), or every visit is the proxy's.
+  Trusting a proxy also makes the portal believe its identity headers: see `access.proxy_identity` in section 2.1.
 - **What is counted.** Pages, by their address without the query (a search or a filter's login stays with the portal; the campaign's
   `utm_*`, `ref`, `source` and `via` stay), for visitors who see no private repository. A signed-in viewer who sees private
   repositories is never counted, so no private repository's name goes to Plausible, and nor is the presentation page. So

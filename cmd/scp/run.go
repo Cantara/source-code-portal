@@ -79,7 +79,7 @@ func loadConfig(cmd *cobra.Command, opts *options) (config.Config, map[string]an
 		}
 		return cfg, settings, err
 	}
-	for _, w := range slices.Concat(trustWarnings(cfg), emailWarnings(cfg)) {
+	for _, w := range slices.Concat(trustWarnings(cfg), identityWarnings(cfg), emailWarnings(cfg)) {
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "scp: warning:", w)
 	}
 	_, findings := catalog.Compile(cfg.Catalog.Groups)
@@ -179,6 +179,19 @@ func emailWarnings(cfg config.Config) []string {
 	}
 	return []string{"auth.admin_emails: a provider that does not send email_verified is trusted for these addresses while private " +
 		"repositories are served; set auth.oidc.require_verified_email: true if yours sends the claim, or use auth.admin_groups"}
+}
+
+// identityWarnings names a configuration that serves private repositories to people who sign in, trusts a proxy (for the client's
+// address, say) and still believes that proxy's identity headers: a proxy that passes a client's headers on lets anyone claim a
+// user and groups.
+func identityWarnings(cfg config.Config) []string {
+	private := slices.ContainsFunc(cfg.GitHub.Sources, func(s config.Source) bool { return s.IncludePrivate && !s.People })
+	if !private || len(cfg.Server.TrustedProxies) == 0 || !cfg.Access.ProxyIdentity || !cfg.Auth.SignIn() && len(cfg.Auth.Tokens) == 0 {
+		return nil
+	}
+	return []string{"access.proxy_identity: server.trusted_proxies also makes the portal believe " + cfg.Access.UserHeader + " and " +
+		cfg.Access.GroupsHeader + " from those proxies while private repositories are served; a proxy that passes a client's headers on lets " +
+		"anyone claim a user and groups. Strip them at the proxy, or set access.proxy_identity: false, since viewers sign in"}
 }
 
 // trustWarnings names the trusted proxy ranges wider than one proxy network (/24, /64) while private repositories are served on
