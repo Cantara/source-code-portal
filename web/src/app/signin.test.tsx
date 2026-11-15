@@ -19,7 +19,7 @@ function show(view: ReactNode, path = "/") {
 const status: AdminStatus = {
   ready: true,
   alive: true,
-  snapshot: { version: 42, builtAt: "2026-10-13T10:00:00Z", ageSeconds: 3, catalogued: true, repos: 7 },
+  snapshot: { version: 42, builtAt: "2026-10-13T10:00:00Z", ageSeconds: 3, catalogued: true, repos: 7, signedIn: 2, parked: 1 },
   queue: { waiting: 2, running: 1 },
   sources: [
     {
@@ -123,8 +123,35 @@ describe("admin", () => {
     show(<AdminView />, "/admin")
     expect(await screen.findByText("42")).toBeInTheDocument()
     expect(screen.getByText("1 warning")).toBeInTheDocument()
-    expect(screen.getByText("93%")).toBeInTheDocument()
+    expect(screen.getByText("2 signed in only, 1 no one.")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Choose who sees what" })).toHaveAttribute("href", "#visibility")
     expect(screen.getByText(/Signed in as Ada through single sign-on, an administrator/)).toBeInTheDocument()
+  })
+
+  it("shows one section at a time from the side menu, the overview first", async () => {
+    server.use(
+      http.get("/me", ({ response }) => response(200).json(me({ signedIn: true, name: "Ada", via: "oidc", admin: true }))),
+      raw.get("*/api/v1/admin/status", () => HttpResponse.json(status)),
+    )
+    show(<AdminView />, "/admin")
+    const nav = await screen.findByRole("navigation", { name: "Admin sections" })
+    expect(within(nav).getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page")
+    expect(screen.getByRole("heading", { name: "Snapshot" })).toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Sources" })).not.toBeInTheDocument()
+
+    globalThis.location.hash = "#github"
+    globalThis.dispatchEvent(new HashChangeEvent("hashchange"))
+    expect(await screen.findByRole("heading", { name: "Sources" })).toBeInTheDocument()
+    expect(within(nav).getByRole("link", { name: "GitHub" })).toHaveAttribute("aria-current", "page")
+    expect(screen.queryByRole("heading", { name: "Snapshot" })).not.toBeInTheDocument()
+    // The source's id and its count are cells of their own, the count right-aligned.
+    const row = screen.getByRole("row", { name: /^gh 7/ })
+    expect(within(row).getByRole("cell", { name: "7" })).toHaveClass("text-right")
+    expect(within(row).getByText("93%")).toBeInTheDocument()
+
+    fireEvent.click(within(nav).getByRole("link", { name: /^Overview/ }))
+    expect(await screen.findByRole("heading", { name: "Snapshot" })).toBeInTheDocument()
+    expect(globalThis.location.hash).toBe("")
   })
 
   it.each([

@@ -164,7 +164,7 @@ The first start reads every repository (with the App, a few minutes for a few hu
 - `curl -s localhost:9091/readyz` answers 200, and `curl -s localhost:9091/api/v1/status | jq .warnings` is empty.
 - `https://scp.example.org` shows the dashboard with the groups; a private repository is absent while signed out.
 - *Sign in*, then the private repositories show, and an administrator sees *Admin* in the header with the portal's status.
-- On *Admin*, *Test the provider* answers with the time it took; *Ask* in the header answers a question with links into the portal.
+- On *Admin*, section *Assistant*, *Test the provider* answers with the time it took; *Ask* in the header answers a question with links into the portal.
 - Push to a repository: the commit shows within seconds; GitHub's App settings, *Advanced*, list the deliveries with status 202.
 - A badge, for example `https://scp.example.org/badges/groups/identity/health.svg`, renders in a README.
 
