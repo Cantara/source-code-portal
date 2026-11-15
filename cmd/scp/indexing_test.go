@@ -60,4 +60,23 @@ func TestSearchEnginesAreOnlyOfferedWhatIsNotKeptOut(t *testing.T) {
 	if got := robots("/repos/acme/open"); got != "noindex, nofollow" {
 		t.Errorf("a repository whose every group is kept out: %q", got)
 	}
+
+	// A private repository is never offered to search engines, so the card does not list it either; only how many there are.
+	_, b, _ := get("/api/v1/admin/indexing", admin...)
+	if strings.Contains(b, "zq-hidden") || !strings.Contains(b, `"private":1`) {
+		t.Errorf("the card lists a private repository, or does not count it: %s", b)
+	}
+
+	// A pattern keeps out what arrives later; an include pattern is the exception.
+	save(`{"groups":[],"repos":[],"exclude":["^acme/"],"include":["^acme/open$"]}`)
+	if b := sitemap(); !strings.Contains(b, "/repos/acme/open") {
+		t.Errorf("an include pattern did not except the repository:\n%s", b)
+	}
+	save(`{"groups":[],"repos":[],"exclude":["^acme/o"],"include":[]}`)
+	if b := sitemap(); strings.Contains(b, "/repos/acme/open") {
+		t.Errorf("an exclude pattern left the repository in the sitemap:\n%s", b)
+	}
+	if got := robots("/repos/acme/open/docs/guide"); got != "noindex, nofollow" {
+		t.Errorf("a repository kept out by a pattern: %q", got)
+	}
 }
