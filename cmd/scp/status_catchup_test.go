@@ -34,3 +34,22 @@ func TestStatusWarnsOfALogNotRead(t *testing.T) {
 		}
 	}
 }
+
+// The receiver's answer times are counted against GitHub's 10 seconds, and the failed deliveries a log showed are listed by the status
+// they got.
+func TestStatusCountsAnswersAndFailures(t *testing.T) {
+	st := &status{}
+	for _, d := range []time.Duration{time.Millisecond, 6 * time.Second, 12 * time.Second} {
+		st.answered(d)
+	}
+	if want := (statusAnswers{Count: 3, Slowest: 12, Slow: 2, Late: 1}); st.answers != want {
+		t.Errorf("answers %+v, want %+v", st.answers, want)
+	}
+	got, _ := catchUpStatus([]webhook.CatchUpState{{Source: "a", Failed: map[int]int{0: 2, 401: 1}}}, time.Now())
+	if f := got[0].Failed; len(f) != 2 || f["0"] != 2 || f["401"] != 1 {
+		t.Errorf("failed %v", f)
+	}
+	if got, _ := catchUpStatus([]webhook.CatchUpState{{Source: "a"}}, time.Now()); got[0].Failed == nil {
+		t.Error("no failures: null, want {}")
+	}
+}

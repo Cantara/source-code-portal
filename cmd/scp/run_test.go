@@ -441,9 +441,11 @@ catalog:
 		Webhook struct {
 			Receiver   bool
 			Deliveries map[string]int
+			Answers    statusAnswers
 		}
 	}
-	if code := fetch(admin+"/api/v1/status", &st); code != 200 || !st.Ready || len(st.Sources) != 1 || st.Webhook.Deliveries["accepted"] != 4 {
+	if code := fetch(admin+"/api/v1/status", &st); code != 200 || !st.Ready || len(st.Sources) != 1 || st.Webhook.Deliveries["accepted"] != 4 ||
+		st.Webhook.Answers.Count < 4 || st.Webhook.Answers.Late != 0 {
 		t.Errorf("status: %d %+v", code, st)
 	}
 	// a receiver is configured: the source is kept fresh by events; it has no App, so no delivery log to recover a missed delivery from,

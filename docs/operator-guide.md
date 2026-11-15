@@ -72,13 +72,17 @@ the most recently updated first, as conditional requests (an unchanged page is f
 pull requests in that listing are left out. No GraphQL.
 
 **What happens to a webhook.** GitHub sends a delivery once and does not send it again. The portal writes every event to its store before
-it answers GitHub (an event it cannot keep is answered 503, so GitHub's delivery log shows it failed), passes it on, and after a
+it answers GitHub (an event it cannot keep within 5 seconds is answered 503, inside GitHub's 10, so GitHub's delivery log shows it
+failed), passes it on, and after a
 restart passes on what was still parked (an update restarts the portal). With an App it also reads the App's webhook delivery log
 every two minutes (a read, with the App's own token; no permission needed) and acts on every delivery from the last days that it did
 not answer with a success: one that arrived while the portal was down, full or restarting is found within minutes of its return. The log is read in
 pages of 100, back to the last complete read, up to 10,000 deliveries (about GitHub's three days of a busy organisation); if it is
 longer, the newest are passed on, the oldest are left to the polls below, and the status and the log say so. `/api/v1/status` lists
-under `webhook.catchUps` each App's log with when it was last read and why not, and warns when one has not been read for 10 minutes.
+under `webhook.catchUps` each App's log with when it was last read and why not, and the failed deliveries it found since the start by
+the answer they got (`failed`: `401` a wrong secret, `502` the portal restarting, `0` no answer in time), and warns when one has not
+been read for 10 minutes. `webhook.answers` says how long the portal took to answer GitHub (`count`, `slowestSeconds`, `slow` over
+5 seconds, `late` over GitHub's 10, which GitHub shows failed although the portal took them; a warning when any was late).
 A webhook on an organisation or a repository has no such log: there a delivery sent while the portal is down is lost, and the
 polls below are the net (releases every 30 minutes for such a source, as for one nothing tells). A push to another branch, and a
 deleted tag or branch, make the portal read that repository's history or tags again; a new repository's own event reaches the portal
