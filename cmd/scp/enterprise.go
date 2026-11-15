@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	gosync "sync"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/github"
@@ -46,10 +48,11 @@ type peopleViews struct {
 	allowed allowedFunc
 	log     *slog.Logger
 
-	mu    gosync.Mutex
+	mu    gosync.Mutex // guards cache, keyed and keys; never held while a view is built
 	cache *lru.Cache[viewKey, *snapshot.Snapshot]
 	keyed *snapshot.Snapshot                   // the snapshot keys is of
-	keys  map[snapshot.RepoID]snapshot.RepoKey // its repositories' addresses by GitHub id
+	keys  map[snapshot.RepoID]snapshot.RepoKey // its repositories' addresses by GitHub id, replaced whole, never changed
+	build singleflight.Group                   // one build of a view at a time, shared by the requests that wait for it
 }
 
 type viewKey struct {
@@ -65,7 +68,8 @@ func newPeopleViews(current func() *snapshot.Snapshot, allowed allowedFunc, log 
 	return &peopleViews{current: current, allowed: allowed, log: log, cache: lru.New[viewKey, *snapshot.Snapshot](viewsKept, nil)}
 }
 
-// of is the view the request's viewer reads, with the hidden forks when forks is true.
+// of is the view the request's viewer reads, with the hidden forks when forks is true. Views of different sets are built at the same
+// time; the requests for one view wait for its one build.
 func (p *peopleViews) of(ctx context.Context, forks bool) *snapshot.Snapshot {
 	s := p.current()
 	key, ids := p.allowed(ctx)
@@ -74,25 +78,43 @@ func (p *peopleViews) of(ctx context.Context, forks bool) *snapshot.Snapshot {
 	}
 	k := viewKey{of: s, set: key, forks: forks}
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if v, ok := p.cache.Get(k); ok {
+		p.mu.Unlock()
 		return v
 	}
+	keys := p.keysOf(s)
+	p.mu.Unlock()
+	v, _, _ := p.build.Do(fmt.Sprintf("%p\x00%s\x00%t", s, key, forks), func() (any, error) {
+		p.mu.Lock()
+		v, ok := p.cache.Get(k) // built by a flight that ended after this request looked
+		p.mu.Unlock()
+		if ok {
+			return v, nil
+		}
+		allowed := make(map[snapshot.RepoKey]bool, len(ids))
+		for id := range ids {
+			if k, ok := keys[id]; ok {
+				allowed[k] = true
+			}
+		}
+		v = s.Restrict(allowed, forks, p.log)
+		p.mu.Lock()
+		p.cache.Put(k, v)
+		p.mu.Unlock()
+		return v, nil
+	})
+	return v.(*snapshot.Snapshot) //nolint:forcetypeassert // the one type the build returns
+}
+
+// keysOf is s's repositories' addresses by GitHub id, made once per snapshot; p.mu is held.
+func (p *peopleViews) keysOf(s *snapshot.Snapshot) map[snapshot.RepoID]snapshot.RepoKey {
 	if p.keyed != s {
 		p.keyed, p.keys = s, make(map[snapshot.RepoID]snapshot.RepoKey, len(s.Repos))
 		for k, e := range s.Repos {
 			p.keys[e.Repo.ID] = k
 		}
 	}
-	allowed := make(map[snapshot.RepoKey]bool, len(ids))
-	for id := range ids {
-		if k, ok := p.keys[id]; ok {
-			allowed[k] = true
-		}
-	}
-	v := s.Restrict(allowed, forks, p.log)
-	p.cache.Put(k, v)
-	return v
+	return p.keys
 }
 
 // nobody is the access of every viewer when there are no people to ask: nothing.
@@ -124,7 +146,8 @@ func (s *server) open(ctx context.Context, cfg config.Config, gh *github.Client)
 	var sources []people.Source
 	for _, src := range cfg.GitHub.Sources {
 		g := gh.Source(src.ID)
-		sources = append(sources, people.Source{ID: src.ID, WebURL: g.WebURL(), Owners: src.Orgs, Login: src.Login, Check: g.CheckToken, List: g.ListWith})
+		sources = append(sources, people.Source{ID: src.ID, WebURL: g.WebURL(), Owners: src.Orgs, Login: src.Login, Check: g.CheckToken, List: g.ListWith,
+			Forget: g.Forget})
 	}
 	s.people, err = people.Open(ctx, people.Options{Store: s.store, Key: cfg.Enterprise.TokenKey.Reveal(), Issuer: cfg.Auth.OIDC.Issuer,
 		Sources: sources, Portal: cfg.Server.PublicURL, Refresh: cfg.Enterprise.Access.Refresh, MaxAge: cfg.Enterprise.Access.MaxAge,

@@ -26,6 +26,8 @@ type Source struct {
 	Check func(ctx context.Context, owner string, token []byte) (github.TokenCheck, error)
 	// List lists the repositories of owner a person's token reads (github.Source.ListWith).
 	List func(ctx context.Context, owner string, h github.Holder) ([]snapshot.Repo, error)
+	// Forget drops the credentials made for the holders whose keys keep refuses (github.Source.Forget); nil: nothing is kept.
+	Forget func(keep func(key string) bool)
 }
 
 // Options are what People needs.
@@ -62,7 +64,12 @@ type person struct {
 	access map[slot][]int64
 	listed map[slot][]snapshot.Repo // the last listing of each token since the start
 	retry  map[slot]time.Time       // a listing that failed for a while is tried again then
+	gen    uint64                   // counts the changes of tokens and access, so Allowed knows when its answer still holds
+	known  *allowance               // Allowed's last answer
 }
+
+// touch records a change of the person's tokens or access.
+func (pp *person) touch() { pp.gen++ }
 
 func newPerson(sp store.Person) *person {
 	return &person{Person: sp, tokens: map[slot]store.PersonToken{}, access: map[slot][]int64{}, listed: map[slot][]snapshot.Repo{},
@@ -200,6 +207,7 @@ func (p *People) Link(ctx context.Context, w Who, source, owner, token string) (
 	delete(pp.access, sl)
 	delete(pp.listed, sl)
 	delete(pp.retry, sl)
+	pp.touch()
 	p.wake()
 	return view(t), nil
 }
@@ -235,8 +243,10 @@ func (p *People) Unlink(ctx context.Context, w Who, source, owner string) error 
 		delete(pp.tokens, sl)
 		delete(pp.access, sl)
 		delete(pp.listed, sl)
+		pp.touch()
 	}
 	p.mu.Unlock()
+	p.wake() // the token's credential is forgotten at the next round
 	p.changed(source)
 	return nil
 }

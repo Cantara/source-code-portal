@@ -257,6 +257,26 @@ func restrictLoad(t *testing.T, current func() *snapshot.Snapshot, log *slog.Log
 	if p99, bound := reads[len(reads)*99/100], time.Millisecond*slack(); p99 > bound {
 		t.Errorf("a kept view took %v (p99), over %v", p99, bound)
 	}
+
+	// The same people at once on a fresh cache: the sets' views are built side by side, each once, its people sharing it.
+	pv = newPeopleViews(current, pv.allowed, log)
+	views := make([]*snapshot.Snapshot, 200)
+	var wg gosync.WaitGroup
+	t0 := time.Now()
+	for person := range views {
+		wg.Go(func() { views[person] = pv.of(context.WithValue(t.Context(), personKey{}, person), false) })
+	}
+	wg.Wait()
+	all := time.Since(t0)
+	t.Logf("restricted views at once: 200 people of %d sets in %v", len(sets), all)
+	for person, v := range views {
+		if v != views[person%len(sets)] {
+			t.Fatalf("person %d's view was built again for their set", person)
+		}
+	}
+	if bound := time.Duration(len(sets)) * 100 * time.Millisecond * slack(); all > bound {
+		t.Errorf("200 people at once took %v, over %v", all, bound)
+	}
 }
 
 // complete reports whether every repository is catalogued with fresh commits, documents, descriptor and release.

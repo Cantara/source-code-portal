@@ -124,7 +124,8 @@ enterprise:
   (`github.Source.client`), so GitHub is never asked anything anonymously.
 - `snapshot.Restrict(allowed, forks)`: the published snapshot cut to a set, with only the groups that keep a member, its own indexes
   (built with no fallback to the full snapshot's), its own public view. `peopleViews` keeps the restricted views per snapshot, set key and
-  choice of forks (LRU, 64). Until EN5 every viewer's set is empty (`nobody`).
+  choice of forks (LRU, 64); its lock guards only the cache, a view is built outside it, once for the requests that ask for it at the
+  same time (a single flight per view), so one set's build never holds up another's view (P-126). Until EN5 every viewer's set is empty (`nobody`).
 - Readiness does not wait for a catalogue in the mode: it has none until a person links a token.
 
 Acceptance: `TestEnterpriseModeKeepsApart` (each command refuses the other's configuration and store; the mode's routes are the shared
@@ -184,7 +185,9 @@ Built as `github.Broker` (`Listed`: the union of the fresh listings of an owner,
 listing holds a repository), implemented by `People` and given to each source by `SetBroker`. `Source.ListRepos` of a people source
 reads the broker, not GitHub (the people's listings are the GitHub calls); every call about a repository takes its holder
 (`client(ctx, owner, name)`, so `REST` names the repository too). A source without a fresh listing, or a repository without a holder,
-is the new error kind `Waiting` (`no_person`): the engine neither pauses the source nor backs off (`classWaiting`), keeps what it held,
+is the new error kind `Waiting` (`no_person`). The source keeps a client and rate book per holder, named by `holderKey` from the sealed
+token; after each round of listings `People` hands each source the keys of the tokens still linked and not refused (`Source.Forget`),
+so a removed or replaced token's client goes too (P-126). A source without a holder is `Waiting`: the engine neither pauses the source nor backs off (`classWaiting`), keeps what it held,
 and runs the job again at an event or within 5 minutes. Each listing tells the engine (`EventSourceChanged`), so the catalogue follows
 the people. A repository no linked person lists any longer leaves after the catalogue's two misses.
 
