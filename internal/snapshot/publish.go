@@ -18,7 +18,8 @@ type Builder struct {
 	log  *slog.Logger
 }
 
-func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
+// newBuilder copies cur for a publish with the publisher's settings: which members are retired and who sees each repository.
+func newBuilder(cur *Snapshot, set settings, log *slog.Logger) *Builder {
 	return &Builder{prev: cur, log: log, s: &Snapshot{
 		Catalogued: cur.Catalogued,
 		marks:      maps.Clone(cur.marks),
@@ -29,8 +30,8 @@ func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
 		Sources:    slices.Clone(cur.Sources),
 		hidden:     cur.hidden,
 		indexers:   cur.indexers,
-		retire:     cur.retire,
-		audience:   cur.audience,
+		retire:     set.retire,
+		audience:   set.audience,
 	}}
 }
 
@@ -162,17 +163,17 @@ func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
 		if pa == prev {
 			pa = nil
 		}
-		a = s.derive(func(e *RepoEntry) bool { return !s.parked[e.Repo.Key()] }, pa, log)
+		a = s.cut(func(e *RepoEntry) bool { return !s.parked[e.Repo.Key()] }, pa, log)
 	}
 	public := func(e *RepoEntry) bool { return e.Repo.Public() && !s.restricted[e.Repo.Key()] }
-	b := a.derive(public, pb, log)
+	b := a.cut(public, pb, log)
 	c := a
 	if slices.ContainsFunc(slices.Collect(maps.Values(a.Repos)), func(e *RepoEntry) bool { return s.hidden[e.Repo.Key()] }) {
-		c = a.derive(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, pc, log)
+		c = a.cut(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, pc, log)
 	}
 	d := b
 	if c != a {
-		d = c.derive(public, pd, log)
+		d = c.cut(public, pd, log)
 	}
 	a.public, a.lean = b, c
 	b.public, b.lean = b, d
@@ -253,11 +254,10 @@ func (s *Snapshot) retireMembers() {
 	}
 }
 
-// index builds the derived lookups: group membership, then every feature's index. An index whose builder panics keeps what the
+// index builds every feature's index over the memberships already built. An index whose builder panics keeps what the
 // snapshot before had (before): that feature shows its last good state while the rest of the batch is published, and the panic is
 // logged on every publish until it is fixed.
 func (s *Snapshot) index(before map[string]any, log *slog.Logger) {
-	s.memberships()
 	s.indexes = make(map[string]any, len(s.indexers))
 	for _, ix := range s.indexers {
 		v, err := buildIndex(ix, s)
@@ -296,14 +296,9 @@ func buildIndex(ix Indexer, s *Snapshot) (v any, err error) {
 	return ix.build(s), nil
 }
 
-// derive is s with the repositories keep refuses taken out, or s itself when it refuses none. before is the sibling view of the
-// snapshot before, whose indexes are kept when one cannot be built.
-func (s *Snapshot) derive(keep func(*RepoEntry) bool, before *Snapshot, log *slog.Logger) *Snapshot {
-	return s.cut(keep, before, log)
-}
-
-// cut is derive; a view holds only the groups that keep one of their members, live or retired (a view does not tell the groups it
-// holds nothing of).
+// cut is s with the repositories keep refuses taken out, or s itself when it refuses none. before is the sibling view of the snapshot
+// before, whose indexes are kept when one cannot be built. A view holds only the groups that keep one of their members, live or
+// retired (a view does not tell the groups it holds nothing of).
 func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, log *slog.Logger) *Snapshot {
 	if !slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return !keep(e) }) {
 		return s
@@ -351,6 +346,7 @@ func (s *Snapshot) cut(keep func(*RepoEntry) bool, before *Snapshot, log *slog.L
 	if before != nil {
 		prior = before.indexes
 	}
+	p.memberships()
 	p.index(prior, log)
 	return p
 }
@@ -363,6 +359,7 @@ type Publisher struct {
 	indexers           []Indexer
 	cur                atomic.Pointer[Snapshot]
 	building           sync.Mutex // one build at a time: a build starts from the snapshot the previous one stored
+	set                settings   // under building
 
 	mu        sync.Mutex
 	pending   []func(*Builder)
@@ -380,21 +377,27 @@ func NewPublisher(debounce, maxDelay time.Duration, log *slog.Logger, indexers .
 	return p
 }
 
-// Retire names the group members that are retired (design/archive.md): they leave the groups' Members for their Retired at every
-// publish. Called once, before the first update.
+// settings are what every publish applies besides the updates.
+type settings struct {
+	retire   func(*RepoEntry) bool
+	audience func(e *RepoEntry, groups []string) Audience
+}
+
+// Retire names the group members that are retired (design/archive.md): they leave the groups' Members for their Retired from the
+// next publish on.
 func (p *Publisher) Retire(fn func(*RepoEntry) bool) {
-	cur := *p.cur.Load()
-	cur.retire = fn
-	p.cur.Store(&cur)
+	p.building.Lock()
+	defer p.building.Unlock()
+	p.set.retire = fn
 }
 
 // Audience says who sees each repository, given the ids of the groups it is in (design/visibility.md): no view holds one no one sees, and the base snapshot keeps it for the
 // jobs and the webhook's lookups; no public view holds one only signed-in viewers see. fn is asked again at each publish, so a changed
-// choice shows at the next one (Update with no change publishes). Called once, before the first update.
+// choice shows at the next one (Update with no change publishes). It applies from the next publish on.
 func (p *Publisher) Audience(fn func(e *RepoEntry, groups []string) Audience) {
-	cur := *p.cur.Load()
-	cur.audience = fn
-	p.cur.Store(&cur)
+	p.building.Lock()
+	defer p.building.Unlock()
+	p.set.audience = fn
 }
 
 // Current returns the current snapshot. Handlers call it once per request.
@@ -451,7 +454,7 @@ func (p *Publisher) publish() {
 	if len(batch) == 0 {
 		return
 	}
-	next, err := build(p.cur.Load(), batch, p.log)
+	next, err := build(p.cur.Load(), p.set, batch, p.log)
 	if err != nil {
 		p.log.Error("snapshot build failed; keeping the current snapshot", "err", err)
 		return
@@ -465,13 +468,13 @@ func (p *Publisher) publish() {
 
 // build applies the batch to a copy of cur. An update that panics is dropped alone (what it changed before the panic stays), an
 // index that panics keeps its last good value; a panic elsewhere while finishing fails the build.
-func build(cur *Snapshot, batch []func(*Builder), log *slog.Logger) (s *Snapshot, err error) {
+func build(cur *Snapshot, set settings, batch []func(*Builder), log *slog.Logger) (s *Snapshot, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic while indexing the snapshot: %v", r)
 		}
 	}()
-	b := newBuilder(cur, log)
+	b := newBuilder(cur, set, log)
 	for _, fn := range batch {
 		apply(b, fn, log)
 	}

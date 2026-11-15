@@ -356,6 +356,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{mode: string(mode), ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
+		config: func() statusConfig {
+			return statusConfig{File: cfg.Baseline.File != nil, Changes: configChanges{Visibility: s.visibility.Changes(),
+				Announcements: s.notices.Changes(), Layouts: s.layouts.Changes()}}
+		},
 		cadence: s.engine.Cadence, webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string {
 			return slices.Concat(s.layouts.Problems(), s.notices.Problems(), s.visibility.Problems())
 		},

@@ -75,18 +75,9 @@ func Import(ctx context.Context, db docstore.Backend) error {
 	if err != nil {
 		return err
 	}
-	b, err := encode(d)
+	b, err := docstore.Encode(Diff(Empty(), d)) // changes to an empty configuration: what the admins chose then
 	if err != nil {
 		return err
 	}
 	return db.PutDocument(ctx, Name, b, docstore.Digest(b), "")
-}
-
-// encode is the stored text of d.
-func encode(d Doc) ([]byte, error) {
-	b, err := json.MarshalIndent(d, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append(b, '\n'), nil
 }

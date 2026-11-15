@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/cantara/source-code-portal/internal/docstore"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -167,9 +168,9 @@ func (h admin) reset(w http.ResponseWriter, r *http.Request) {
 // finish runs a write and answers the stored layout, or why the write was refused.
 func (h admin) finish(w http.ResponseWriter, page string, write func() error) {
 	switch err := write(); {
-	case errors.Is(err, ErrConflict):
+	case errors.Is(err, docstore.ErrConflict):
 		httpapi.WriteProblem(w, http.StatusPreconditionFailed, "conflict", "Someone saved this layout since you opened it; reload to see theirs.")
-	case errors.Is(err, ErrReadOnly):
+	case errors.Is(err, docstore.ErrReadOnly):
 		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "This portal has no store to save layouts in.")
 	case errors.As(err, new(Invalid)):
 		httpapi.WriteProblem(w, http.StatusUnprocessableEntity, "validation-failed", err.Error())

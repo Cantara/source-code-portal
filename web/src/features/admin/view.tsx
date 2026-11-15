@@ -124,7 +124,7 @@ export function Overview({ s }: { s: AdminStatus }) {
         />
         <Tile label="Jobs" value={s.queue.running} note={`running, ${s.queue.waiting} waiting.`} attention={!s.alive} />
       </div>
-      <Configuration pending={s.warnings.some((w) => w.includes("kept only in the store"))} />
+      <Configuration c={s.config} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Instance</CardTitle>
@@ -170,19 +170,36 @@ export function Overview({ s }: { s: AdminStatus }) {
  * Configuration offers scp.yaml with the changes made here written into it (design/config-baseline.md): who sees what, the
  * announcements and the layouts start from the file, and the store keeps only what admins changed.
  */
-function Configuration({ pending }: { pending: boolean }) {
+function Configuration({ c }: { c: AdminStatus["config"] }) {
+  const pending = c.changes.visibility + c.changes.announcements + c.changes.layouts
   return (
-    <Card aria-labelledby="configuration" className={cn(pending && "border-amber-700/60")}>
+    <Card aria-labelledby="configuration" className={cn(pending > 0 && "border-amber-700/60")}>
       <CardTitle id="configuration">Configuration</CardTitle>
       <p className="mt-1 text-sm">
         scp.yaml is the base of who sees what, the announcements and the layouts; what is changed here is kept in the store.{" "}
-        {pending
-          ? "Some changes are kept only in the store: download scp.yaml with them written in and deploy it, so a new store keeps them."
-          : "The store holds no changes of its own: scp.yaml has everything."}
+        {pending === 0
+          ? "The store holds no changes of its own: scp.yaml has everything."
+          : `${plural(pending, "change is", "changes are")} kept only in the store (who sees what ${c.changes.visibility}, announcements ${c.changes.announcements}, layouts ${c.changes.layouts}).`}
       </p>
-      <a href="/api/v1/admin/config.yaml" download="scp.yaml" className={buttonClass(pending ? "default" : "outline", "mt-3")}>
-        Download scp.yaml
-      </a>
+      {c.file ? (
+        <>
+          {pending > 0 && (
+            <p className="mt-1 text-sm">Download scp.yaml with them written in and deploy it, so a new store keeps them.</p>
+          )}
+          <a
+            href="/api/v1/admin/config.yaml"
+            download="scp.yaml"
+            className={buttonClass(pending > 0 ? "default" : "outline", "mt-3")}
+          >
+            Download scp.yaml
+          </a>
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          This portal was started without a configuration file, so there is no scp.yaml to download: start it from one to keep the
+          changes in it.
+        </p>
+      )}
     </Card>
   )
 }

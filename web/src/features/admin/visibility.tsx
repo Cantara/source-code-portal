@@ -9,39 +9,26 @@ import { Card, CardTitle } from "@/components/ui/card"
 import { get, ProblemError, send } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
 import { plural } from "@/lib/format"
-
-/** Audience is who sees an item (design/visibility.md). */
-export type Audience = "everyone" | "signed-in" | "no-one"
-export type Setting = { audience: Audience; search: boolean }
-export type Rule = Setting & { pattern: string }
-/** Doc is the stored choices: on products by id, on repositories by address, and the rules. */
-export type Doc = { groups: Record<string, Setting>; repos: Record<string, Setting>; rules: Rule[] }
-export type Effective = {
-  audience: Audience
-  search: boolean
-  why: "repository" | "rule" | "product" | "default"
-  rule: number
-  product: string
-  /** GitHub's private flag lowered everyone to signed in. */
-  capped: boolean
-}
-export type Item = Effective & { address: string; private: boolean; fork: boolean; setting: Setting | null }
-export type Node = Effective & { id: string; name: string; setting: Setting | null; repos: Item[] }
-
-/** Visibility is what `GET /api/v1/admin/visibility` answers, outside the contract (design/visibility.md). */
-export type Visibility = Doc & {
-  /** scp.yaml's `visibility:`: what the store's changes are made against (design/config-baseline.md). */
-  configured: Doc
-  tree: Node[]
-  ungrouped: Item[]
-  /** Addresses the choices name that the catalogue does not hold: renamed, deleted or not listed yet. */
-  missing: string[]
-  ruleMatches: number[]
-  counts: { everyone: number; signedIn: number; noOne: number; searchOff: number; private: number }
-  revision: string
-  writable: boolean
-  problem: string
-}
+import {
+  audiences,
+  changes,
+  clone,
+  describe,
+  matches,
+  sameRules,
+  warnAt,
+  whyOf,
+  type Audience,
+  type Change,
+  type Doc,
+  type Effective,
+  type Filter,
+  type Item,
+  type Rule,
+  type Setting,
+  type Visibility,
+} from "./visibility-model"
+import { ItemRow } from "./visibility-row"
 
 const path = "/admin/visibility"
 
@@ -51,140 +38,6 @@ export const visibilityQuery = () =>
     queryFn: ({ signal }) => get<Visibility>(path, signal),
     staleTime: 0,
   })
-
-const audiences: { value: Audience; label: string; on: string }[] = [
-  { value: "everyone", label: "Everyone", on: "bg-sky-100 text-sky-950 dark:bg-sky-950 dark:text-sky-100" },
-  { value: "signed-in", label: "Signed in", on: "bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-100" },
-  { value: "no-one", label: "No one", on: "bg-rose-100 text-rose-950 dark:bg-rose-950 dark:text-rose-100" },
-]
-
-/** describe is an effective state in words. */
-export function describe(e: { audience: Audience; search: boolean }): string {
-  if (e.audience === "everyone") return e.search ? "Everyone, offered to search engines" : "Everyone, kept from search engines"
-  return e.audience === "signed-in" ? "Signed in only" : "No one"
-}
-
-const alike = (a: Setting | undefined | null, b: Setting | undefined | null) =>
-  !!a && !!b && a.audience === b.audience && a.search === b.search
-
-/** differs reports whether an item's own choice is not what scp.yaml has for it. */
-export function differs(own: Setting | null, file: Setting | undefined): boolean {
-  return own ? !alike(own, file) : !!file
-}
-
-/** sameRules reports whether two lists of rules are the same. */
-export function sameRules(a: Rule[], b: Rule[]): boolean {
-  return a.length === b.length && a.every((r, i) => r.pattern === b[i]?.pattern && alike(r, b[i]))
-}
-
-/** origin says where an item's choice is kept: scp.yaml, or changed here (kept in the store until the file has it). */
-export function origin(own: Setting | null, file: Setting | undefined, why: string): string {
-  if (!differs(own, file)) return own ? "set in scp.yaml" : why
-  if (!file) return own ? "set here" : why
-  return `changed here; scp.yaml: ${describe(file)}`
-}
-
-/** whyOf says where an item's audience comes from. */
-export function whyOf(e: Effective, rules: Rule[]): string {
-  const base = (() => {
-    switch (e.why) {
-      case "repository":
-        return "set here"
-      case "rule":
-        return `rule ${rules[e.rule]?.pattern ?? ""}`.trim()
-      case "product":
-        return e.product ? "from its product" : "set here"
-      default:
-        return "default"
-    }
-  })()
-  return e.capped ? `${base}; private on GitHub` : base
-}
-
-/** matches says whether a text contains the filter's words, each of them. */
-export function matches(text: string, filter: string): boolean {
-  const hay = text.toLowerCase()
-  return filter
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((w) => hay.includes(w))
-}
-
-/** Change is one item whose result a save changes. */
-export type Change = {
-  key: string
-  name: string
-  product: boolean
-  from: Effective
-  to: Effective
-  effect: string
-  back: boolean
-}
-
-const same = (a: Effective, b: Effective) => a.audience === b.audience && a.search === b.search
-
-/** effect says what a change does, in the reader's words. */
-function effect(from: Effective, to: Effective): string {
-  if (to.audience === "no-one") return "Hidden from everyone, you included. The portal still reads it from GitHub."
-  if (to.audience === "signed-in")
-    return from.audience === "everyone"
-      ? "Visitors no longer see it, and it leaves the sitemap. Signed-in viewers still do."
-      : "Signed-in viewers see it again; visitors do not."
-  if (from.audience !== "everyone")
-    return to.search
-      ? "Visitors see it again, and search engines are offered it."
-      : "Visitors see it again; search engines are not offered it."
-  return to.search ? "Back in the sitemap: search engines are offered it." : "Leaves the sitemap; its pages say noindex."
-}
-
-/** changes lists what a save of the preview changes against what is saved: products first, then repositories, each once. */
-export function changes(saved: Visibility, preview: Visibility): Change[] {
-  const out: Change[] = []
-  const savedGroups = new Map(saved.tree.map((g) => [g.id, g]))
-  for (const g of preview.tree) {
-    const before = savedGroups.get(g.id)
-    if (before && !same(before, g)) {
-      out.push({
-        key: "g:" + g.id,
-        name: g.name,
-        product: true,
-        from: before,
-        to: g,
-        effect: effect(before, g),
-        back: comesBack(before, g),
-      })
-    }
-  }
-  const all = (v: Visibility) => new Map([...v.tree.flatMap((g) => g.repos), ...v.ungrouped].map((r) => [r.address, r]))
-  const before = all(saved)
-  for (const [address, r] of [...all(preview)].sort(([a], [b]) => a.localeCompare(b))) {
-    const b = before.get(address)
-    if (b && !same(b, r)) {
-      out.push({
-        key: "r:" + address,
-        name: address,
-        product: false,
-        from: b,
-        to: r,
-        effect: effect(b, r),
-        back: comesBack(b, r),
-      })
-    }
-  }
-  return out
-}
-
-/** comesBack is whether a change brings an item back into the public view or the sitemap. */
-const comesBack = (from: Effective, to: Effective) =>
-  to.audience === "everyone" && (from.audience !== "everyone" || (to.search && !from.search))
-
-/** The number of items coming back at once that the review warns about in words. */
-export const warnAt = 5
-
-type Filter = "all" | "everyone" | "signed-in" | "no-one" | "private" | "search-off" | "changed"
-
-const clone = (d: Doc): Doc => ({ groups: { ...d.groups }, repos: { ...d.repos }, rules: d.rules.map((r) => ({ ...r })) })
 
 /**
  * VisibilityCard is who sees what (design/visibility.md): every product and repository with its audience (everyone, signed in, no
@@ -362,89 +215,25 @@ export function VisibilityCard() {
     priv: boolean,
     meta: string,
   ) => (
-    <li
+    <ItemRow
       key={key}
-      className={cn(
-        "grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1 border-t border-border py-2 md:grid-cols-[2rem_minmax(0,1fr)_auto_11rem_12rem]",
-        product && "bg-muted/40",
-        selected.has(key) && "bg-accent/40",
-      )}
-    >
-      <span className="flex justify-center">
-        <input
-          type="checkbox"
-          aria-label={`Select ${name}`}
-          checked={selected.has(key)}
-          onChange={(ev) => toggle(key, ev.target.checked)}
-        />
-      </span>
-      <span className={cn("flex min-w-0 flex-wrap items-center gap-2", !product && "pl-4")}>
-        <span className={product ? "text-sm font-semibold" : "font-mono text-xs break-all"}>{name}</span>
-        {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
-        {changed.has(key) && (
-          <span className="rounded-full bg-amber-100 px-2 text-xs font-medium text-amber-950 dark:bg-amber-950 dark:text-amber-100">
-            changed
-          </span>
-        )}
-      </span>
-      <span
-        role="radiogroup"
-        aria-label={`Who sees ${name}`}
-        className="col-start-2 inline-flex w-fit overflow-hidden rounded-md border border-border md:col-start-auto"
-      >
-        {audiences.map((a) => {
-          const on = e.audience === a.value
-          const locked = priv && a.value === "everyone"
-          return (
-            <button
-              key={a.value}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              disabled={disabled || locked}
-              title={locked ? "Private on GitHub: never shown to everyone" : undefined}
-              onClick={() => choose(key, a.value, e)}
-              className={cn(
-                "min-h-9 border-r border-border px-3 text-xs last:border-r-0 disabled:cursor-not-allowed",
-                on ? cn(a.on, "font-semibold") : "text-muted-foreground hover:bg-accent",
-                locked && "line-through opacity-60",
-              )}
-            >
-              {a.label}
-            </button>
-          )
-        })}
-      </span>
-      <span className="col-start-2 flex items-center gap-2 text-xs md:col-start-auto">
-        {e.audience === "everyone" ? (
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              role="switch"
-              checked={e.search}
-              disabled={disabled}
-              onChange={(ev) => searchOn(key, ev.target.checked)}
-            />
-            {e.search ? "offered to search engines" : "kept from search engines"}
-          </label>
-        ) : (
-          <span className="text-muted-foreground">never offered to search engines</span>
-        )}
-      </span>
-      <span className="col-start-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground md:col-start-auto">
-        {origin(setting, fileOf(key), whyOf(e, doc.rules))}
-        {differs(setting, fileOf(key)) && fileOf(key) && (
-          <button type="button" className="underline" disabled={disabled} onClick={() => toFile(key)}>
-            reset to scp.yaml
-          </button>
-        )}
-        {setting && !fileOf(key) && (
-          <button type="button" className="underline" disabled={disabled} onClick={() => inherit(key)}>
-            {product ? "use the default" : "inherit"}
-          </button>
-        )}
-      </span>
-    </li>
+      name={name}
+      effective={e}
+      setting={setting}
+      file={fileOf(key)}
+      why={whyOf(e, doc.rules)}
+      product={product}
+      locked={priv}
+      meta={meta}
+      selected={selected.has(key)}
+      changed={changed.has(key)}
+      disabled={disabled}
+      onSelect={(on) => toggle(key, on)}
+      onChoose={(audience) => choose(key, audience, e)}
+      onSearch={(on) => searchOn(key, on)}
+      onReset={() => toFile(key)}
+      onInherit={() => inherit(key)}
+    />
   )
   const products = view.tree
     .map((g) => ({ g, repos: g.repos.filter(passes) }))
@@ -487,7 +276,7 @@ export function VisibilityCard() {
       )}
       {undo && (
         <Alert className="mt-3" role="status">
-          Saved {undo.count} {undo.count === 1 ? "change" : "changes"}.{" "}
+          Saved {plural(undo.count, "change", "changes")}.{" "}
           <button type="button" className="underline" disabled={busy} onClick={() => void undoSave()}>
             Undo
           </button>
@@ -567,15 +356,7 @@ export function VisibilityCard() {
           <li className="py-2 text-sm text-muted-foreground">Nothing matches.</li>
         )}
         {products.map(({ g, repos }) => [
-          row(
-            "g:" + g.id,
-            g.name,
-            g,
-            g.setting,
-            true,
-            false,
-            `${g.repos.length} ${g.repos.length === 1 ? "repository" : "repositories"}`,
-          ),
+          row("g:" + g.id, g.name, g, g.setting, true, false, plural(g.repos.length, "repository", "repositories")),
           ...repos.map((r) =>
             row(
               "r:" + r.address,
@@ -626,9 +407,7 @@ export function VisibilityCard() {
       {draft && (
         <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center gap-2 border-t border-border bg-background py-3">
           <span className="text-sm">
-            <strong>
-              {pending.length} unsaved {pending.length === 1 ? "change" : "changes"}
-            </strong>
+            <strong>{plural(pending.length, "unsaved change", "unsaved changes")}</strong>
           </span>
           <span className="ml-auto flex gap-2">
             <Button variant="ghost" onClick={reset} disabled={busy}>
@@ -722,7 +501,7 @@ function Rules({
               <option value="no-one">No one</option>
             </select>
             <span className="text-xs text-muted-foreground">
-              matches {counts[i] ?? 0} {counts[i] === 1 ? "repository" : "repositories"} today
+              matches {plural(counts[i] ?? 0, "repository", "repositories")} today
             </span>
             <Button variant="ghost" disabled={disabled} onClick={() => edit((d) => void d.rules.splice(i, 1))}>
               Remove
@@ -790,7 +569,7 @@ function Review({
         className="mt-8 w-full max-w-xl rounded-lg border border-border bg-background p-5 shadow-xl"
       >
         <h2 id={titleId} ref={heading} tabIndex={-1} className="text-lg font-semibold outline-none">
-          Review {list.length} {list.length === 1 ? "change" : "changes"}
+          Review {plural(list.length, "change", "changes")}
         </h2>
         <p className="text-sm text-muted-foreground">Nothing changes on the portal until you save.</p>
         {back >= warnAt && (
@@ -823,7 +602,7 @@ function Review({
             Back to editing
           </Button>
           <Button onClick={onSave} disabled={busy}>
-            Save {list.length} {list.length === 1 ? "change" : "changes"}
+            Save {plural(list.length, "change", "changes")}
           </Button>
         </div>
       </div>

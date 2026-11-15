@@ -35,6 +35,8 @@ export interface AdminStatus {
     lastDelivery: string | null
   }
   cluster: { enabled: boolean; connected: boolean; leader: boolean }
+  /** scp.yaml as the base of what admins change (design/config-baseline.md): a file to write into, and the changes kept only in the store. */
+  config: { file: boolean; changes: { visibility: number; announcements: number; layouts: number } }
   warnings: string[]
 }
 

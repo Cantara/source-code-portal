@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { http, HttpResponse } from "msw"
 import { describe, expect, it } from "vitest"
 import { server } from "@/test/server"
-import { changes, type Doc, type Effective, type Item, VisibilityCard, type Visibility } from "./visibility"
+import { VisibilityCard } from "./visibility"
+import { changes, type Doc, type Effective, type Item, type Visibility } from "./visibility-model"
 
 const eff = (over: Partial<Effective> = {}): Effective => ({
   audience: "everyone",
