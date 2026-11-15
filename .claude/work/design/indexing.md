@@ -20,7 +20,8 @@ offered. Those pages leave the sitemap and say `noindex`. The portal's own pages
   compiled when the document is saved or loaded; RE2 cannot take long on an address.
 - **Private repositories** are never offered to search engines (the sitemap and the header follow the public view) and are neither
   listed nor named by the card or its routes: it says how many there are.
-- **The sitemap** (`internal/llms`) leaves out a kept-out group's page and a kept-out repository's page with its documents
+- **The sitemap** (`internal/llms`) is the public view for every reader, a signed-in one included: search engines never sign in, and the
+  list shows what they are offered (a signed-in viewer saw private repositories and products in it until P-117). It leaves out a kept-out group's page and a kept-out repository's page with its documents
   (`Options.Indexed`, `IndexedGroup`); the listing pages and the other products stay. It is built again when the list changes
   (`IndexRevision`), not at the next snapshot.
 - **noindex** is the header `X-Robots-Tag: noindex, nofollow` on every answer for `/repos/{owner}/{name}...` (the page, its documents and
