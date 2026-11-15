@@ -18,6 +18,7 @@ subjects.
 - **Parked repositories**: an admin parks a repository from the *Parked repositories* card. It is shown nowhere, to anyone, while the
   portal keeps reading it from GitHub, webhook events included; unticked, it is back with everything that happened meanwhile. For
   repositories that should have been archived on GitHub.
+- **The sitemap opens as an XML tree in the browser**: its CSP now lets the browser's own XML viewer draw it; Chrome showed the bare text.
 
 ## 2.2.18
 

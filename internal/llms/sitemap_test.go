@@ -42,7 +42,8 @@ func TestSitemap(t *testing.T) {
 	mux.Handle("GET /opensearch.xml", l.OpenSearch())
 
 	rec := get(mux, "/sitemap.xml")
-	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/xml; charset=utf-8" || rec.Header().Get("Cache-Control") != machineCache {
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/xml; charset=utf-8" || rec.Header().Get("Cache-Control") != machineCache ||
+		rec.Header().Get("Content-Security-Policy") != sitemapCSP {
 		t.Fatalf("sitemap: %d %v", rec.Code, rec.Header())
 	}
 	// The home page, the groups and the repositories with the newest commit as lastmod; no listing page and no document (P-118).

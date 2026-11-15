@@ -46,8 +46,13 @@ func fill(raw [][]byte, origin string) [][]byte {
 }
 
 // Sitemap serves /sitemap.xml, and /sitemaps/{n}.xml (the pattern's {file}) when the pages pass maxURLs.
+// sitemapCSP is the portal's CSP for an answer that is not a page (no script, no fetch, sandboxed) with what the browser's own XML viewer
+// needs to draw the tree: its inline styles and its disclosure triangles (data: images). Without them Chrome shows the bare text.
+const sitemapCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'; sandbox"
+
 func (l *LLMs) Sitemap() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", sitemapCSP)
 		files := l.sitemaps(r)
 		i := 0
 		if file := r.PathValue("file"); file != "" {

@@ -1,3 +1,4 @@
+import { test as plain } from "@playwright/test"
 import { expect, test } from "./fixtures"
 
 // Every page as a search engine reads it: without JavaScript, with its h1, title, description and canonical URL in the HTML.
@@ -98,6 +99,21 @@ test("the sitemap lists the home page, the groups and the repositories, and robo
   const robots = await (await request.get("/robots.txt")).text()
   expect(robots).toContain(`Sitemap: ${baseURL}/sitemap.xml`)
   expect(robots).toContain("Disallow: /api/")
+})
+
+// Not the fixtures' test: their guard injects a script into every page, which the sitemap's sandbox refuses, as it should.
+plain("a browser draws the sitemap as an XML tree, nothing in it blocked", async ({ page }) => {
+  const blocked: string[] = []
+  // What the CSP refuses the browser's XML viewer.
+  page.on("console", (m) => {
+    if (m.type() === "error" && m.text().includes("Content Security Policy")) blocked.push(m.text())
+  })
+  await page.goto("/sitemap.xml")
+  // Chrome's XML viewer puts its notice above the tree; when the CSP blocks its styles the bare text comes first instead.
+  expect(await page.evaluate(() => document.body.innerText)).toMatch(
+    /^This XML file does not appear to have any style information/,
+  )
+  expect(blocked).toEqual([])
 })
 
 type Node = Record<string, unknown> & { "@type": string }
