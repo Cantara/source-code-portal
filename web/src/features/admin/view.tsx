@@ -14,8 +14,7 @@ import { PrerequisiteDetails, setupDocs } from "@/shared/prerequisites"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { AnnouncementsCard } from "./announcements"
-import { IndexingCard } from "./indexing"
-import { ParkedCard } from "./parked"
+import { VisibilityCard } from "./visibility"
 import { adminStatusQuery, testProvider, type AdminStatus } from "./api"
 
 const via: Record<string, string> = { proxy: "the proxy", oidc: "single sign-on", token: "a token" }
@@ -280,8 +279,7 @@ export function AdminView() {
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <PrerequisitesCard />
               <AnnouncementsCard />
-              <IndexingCard />
-              <ParkedCard />
+              <VisibilityCard />
               <AssistantCard />
             </div>
           </>

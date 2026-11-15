@@ -30,7 +30,7 @@ func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
 		hidden:     cur.hidden,
 		indexers:   cur.indexers,
 		retire:     cur.retire,
-		park:       cur.park,
+		audience:   cur.audience,
 	}}
 }
 
@@ -135,17 +135,19 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 	}
 	s.retireMembers()
 	s.hideEmptyGroups()
-	s.markParked()
+	s.memberships()
+	s.markAudience()
 	s.index(b.prev.indexes, b.log)
 	s.views(b.prev, b.log)
 	return s
 }
 
-// views derives the other three views from the complete one A (s): B without the private repositories, C without the hidden forks,
+// views derives the other three views from the complete one A (s): B without the private repositories and the ones only signed-in
+// viewers see (restricted), C without the hidden forks,
 // D without both. A view that would hold what another holds is that view, so a portal without private repositories or hidden forks
 // builds nothing more. Every view knows its siblings: public (private left out, forks as it has them) and lean (forks left out).
 //
-// The parked repositories (Publisher.Park, design/parked.md) are in none of the views: A is s without them (s itself when none is
+// The repositories no one sees (Publisher.Audience, design/visibility.md) are in none of the views: A is s without them (s itself when none is
 // parked), and s, the base the next build starts from and the jobs and the webhook's lookups read, keeps them.
 func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
 	var pa, pb, pc, pd *Snapshot // the views of the snapshot before, whose indexes are kept when one cannot be built
@@ -162,14 +164,15 @@ func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
 		}
 		a = s.derive(func(e *RepoEntry) bool { return !s.parked[e.Repo.Key()] }, pa, log)
 	}
-	b := a.derive(func(e *RepoEntry) bool { return e.Repo.Public() }, pb, log)
+	public := func(e *RepoEntry) bool { return e.Repo.Public() && !s.restricted[e.Repo.Key()] }
+	b := a.derive(public, pb, log)
 	c := a
 	if slices.ContainsFunc(slices.Collect(maps.Values(a.Repos)), func(e *RepoEntry) bool { return s.hidden[e.Repo.Key()] }) {
 		c = a.derive(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, pc, log)
 	}
 	d := b
 	if c != a {
-		d = c.derive(func(e *RepoEntry) bool { return e.Repo.Public() }, pd, log)
+		d = c.derive(public, pd, log)
 	}
 	a.public, a.lean = b, c
 	b.public, b.lean = b, d
@@ -180,23 +183,34 @@ func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
 	// the failure is towards less, never towards a leak.
 	a.fat, b.fat, c.fat, d.fat = a, b, a, b
 	a.hidden, b.hidden, c.hidden, d.hidden = s.hidden, s.hidden, s.hidden, s.hidden
+	a.restricted, c.restricted = s.restricted, s.restricted // the public views hold none of them
 	if a != s {
 		s.public, s.lean, s.fat = b, c, a
 	}
 }
 
-// markParked names the repositories park says are parked: every view leaves them out.
-func (s *Snapshot) markParked() {
-	s.parked = nil
-	if s.park == nil {
+// markAudience names the repositories no one sees (every view leaves them out) and the public ones only signed-in viewers see (the
+// public views leave them out), as audience says at this build.
+func (s *Snapshot) markAudience() {
+	s.parked, s.restricted = nil, nil
+	if s.audience == nil {
 		return
 	}
 	for k, e := range s.Repos {
-		if s.park(e) {
+		switch s.audience(e, s.groupsOf[k]) {
+		case NoOne:
 			if s.parked == nil {
 				s.parked = map[RepoKey]bool{}
 			}
 			s.parked[k] = true
+		case SignedIn:
+			if !e.Repo.Public() {
+				continue // GitHub keeps it out of the public views already
+			}
+			if s.restricted == nil {
+				s.restricted = map[RepoKey]bool{}
+			}
+			s.restricted[k] = true
 		}
 	}
 }
@@ -243,15 +257,7 @@ func (s *Snapshot) retireMembers() {
 // snapshot before had (before): that feature shows its last good state while the rest of the batch is published, and the panic is
 // logged on every publish until it is fixed.
 func (s *Snapshot) index(before map[string]any, log *slog.Logger) {
-	s.groupsOf = map[RepoKey][]string{}
-	for _, g := range s.Groups {
-		for _, m := range g.Members {
-			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
-		}
-		for _, m := range g.Retired {
-			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
-		}
-	}
+	s.memberships()
 	s.indexes = make(map[string]any, len(s.indexers))
 	for _, ix := range s.indexers {
 		v, err := buildIndex(ix, s)
@@ -264,6 +270,19 @@ func (s *Snapshot) index(before map[string]any, log *slog.Logger) {
 			v = prev
 		}
 		s.indexes[ix.name] = v
+	}
+}
+
+// memberships builds the lookup of the groups each repository is in, live or retired.
+func (s *Snapshot) memberships() {
+	s.groupsOf = map[RepoKey][]string{}
+	for _, g := range s.Groups {
+		for _, m := range g.Members {
+			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
+		}
+		for _, m := range g.Retired {
+			s.groupsOf[m] = append(s.groupsOf[m], g.ID)
+		}
 	}
 }
 
@@ -369,12 +388,12 @@ func (p *Publisher) Retire(fn func(*RepoEntry) bool) {
 	p.cur.Store(&cur)
 }
 
-// Park names the parked repositories (design/parked.md): every view leaves them out at every publish, and the base snapshot keeps them
-// for the jobs and the webhook's lookups. fn is asked again at each publish, so a changed list shows at the next one (Update with no
-// change publishes). Called once, before the first update.
-func (p *Publisher) Park(fn func(*RepoEntry) bool) {
+// Audience says who sees each repository, given the ids of the groups it is in (design/visibility.md): no view holds one no one sees, and the base snapshot keeps it for the
+// jobs and the webhook's lookups; no public view holds one only signed-in viewers see. fn is asked again at each publish, so a changed
+// choice shows at the next one (Update with no change publishes). Called once, before the first update.
+func (p *Publisher) Audience(fn func(e *RepoEntry, groups []string) Audience) {
 	cur := *p.cur.Load()
-	cur.park = fn
+	cur.audience = fn
 	p.cur.Store(&cur)
 }
 

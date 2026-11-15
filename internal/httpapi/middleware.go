@@ -39,7 +39,7 @@ type Options struct {
 	HSTS      bool          // the public URL is https
 	PublicURL string        // server.public_url: the origin of canonical URLs; empty: the request's
 	WebToken  string        // the secret the web UI server shows on its API calls to name the page's viewer (Pages)
-	// NoIndex says whether the page at a request's address is kept out of search engines (design/indexing.md): it answers with
+	// NoIndex says whether the page at a request's address is kept out of search engines (design/visibility.md): it answers with
 	// X-Robots-Tag: noindex, nofollow. nil: none is.
 	NoIndex        func(*http.Request) bool
 	FormTargets    []string       // origins a page's form may end at beyond the portal: the sign-in provider's end session

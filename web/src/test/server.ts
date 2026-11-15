@@ -119,6 +119,7 @@ export function repo(name: string, over: Partial<S["Repo"]> = {}): S["Repo"] {
     defaultBranch: "main",
     license: "Apache-2.0",
     visibility: "public",
+    notPublic: false,
     topics: [],
     archived: false,
     fork: false,

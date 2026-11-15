@@ -685,7 +685,7 @@ components:
         checkedAt: { type: [string, "null"], format: date-time, description: Last time the content was confirmed }
     Repo:
       type: object
-      required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, topics, archived, fork,
+      required: [address, owner, name, description, htmlUrl, homepage, defaultBranch, license, visibility, notPublic, topics, archived, fork,
                  stars, openIssues, openIssuesWithPulls, openPulls, pushedAt, lastCommitAt, lastAuthoredAt, release, packages, language, groups, health, freshness]
       properties:
         address: { type: string, description: "Lower-case owner/name, used in URLs" }
@@ -697,6 +697,7 @@ components:
         defaultBranch: { type: string }
         license: { type: string, description: SPDX id; empty when unknown }
         visibility: { type: string }
+        notPublic: { type: boolean, description: "Public on GitHub, but an administrator chose that only signed-in viewers see it here (Admin › Who sees what); only such a viewer reads it" }
         topics: { type: array, items: { type: string } }
         archived: { type: boolean }
         fork: { type: boolean }

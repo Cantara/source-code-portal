@@ -137,7 +137,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `server.trusted_proxies` | `[]` | CIDRs allowed to set `X-Forwarded-For`; unless `access.proxy_identity` is `false` they are also believed when they name a user and groups (`access.user_header`, `access.groups_header`) |
 | `log.level` | `info` | `debug`, `info`, `warn`, `error` (also `--log-level`) |
 | `log.format` | `json` | `json`, or `text` for local use |
-| `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts, announcements and search engine list administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version. A store made by a release before 2.2.10 (an earlier schema generation, without the portal's mark) is not migrated: the first start moves it aside as `<store.path>.quarantine-<time>` and reads the catalogue again from GitHub, which takes a minute or two for a few hundred repositories; remove the moved-aside file when the new start has proved itself |
+| `store.path` | `/data/scp.db` | the SQLite file, where everything the portal keeps is (the catalogue, parked webhook events, sealed credentials, the layouts, announcements and the choices of who sees what that administrators save): a process that dies or is killed comes back with all of it, and what was acknowledged is synced to disk first; before a version changes its schema the portal copies it to `<store.path>.pre-NNNN` (mode 0600, once), the way back to the previous version. A store made by a release before 2.2.10 (an earlier schema generation, without the portal's mark) is not migrated: the first start moves it aside as `<store.path>.quarantine-<time>` and reads the catalogue again from GitHub, which takes a minute or two for a few hundred repositories; remove the moved-aside file when the new start has proved itself |
 | `sync.concurrency` | `4` | GitHub jobs running at once |
 | `github.sources[]` | required | one entry per GitHub host and credential |
 | `github.sources[].id` | required | short id, `[a-z0-9-]` |
@@ -812,52 +812,49 @@ is not signed in; "I've installed it" finds the tracker after the first page vie
 - **Not counted.** Custom events, outbound links, downloads and forms are off. A visitor can opt out with
   `localStorage.plausible_ignore = "true"`.
 
-### 2.11 Keeping pages out of search engines
+### 2.11 Who sees what
 
-An administrator can choose which products and repositories search engines such as Google are offered. In **Admin**, the *Search engines*
-card lists the public products with their repositories nested under them. **A ticked box keeps that product or repository out of the
-sitemap** (and its pages say noindex) once you press *Save*; an unticked one stays in. Each repository says whether it is *in the
-sitemap* or *kept out* (ticked, with its product, or by a rule), and a count at the top sums them. Two boxes of rules, folded under
-*Rules for repositories that arrive later*, are for advanced use; *Save* applies the list at once. Private repositories are never offered to search engines, so the card does not list them (it says how many there are).
+An administrator chooses, in **Admin**, card *Who sees what*, who sees each product and repository in the portal, and whether search
+engines such as Google are offered what everyone sees. The card lists every catalogued repository under its products, private ones
+included, with three choices each:
 
-- **Rules.** New repositories arrive, so the rules are the main tool. *Keep out the repositories whose address matches* takes one regular
-  expression per line (RE2, matched against `owner/name`, not anchored, not case-sensitive: `^acme/legacy-` keeps out every repository
-  of `acme` that starts with `legacy-`, `-internal$` those that end so). A repository that arrives later is kept out the day it matches.
-  *Except the repositories whose address matches* are the exceptions to those rules. Under each line the card says how many public
-  repositories it matches now, and previews a change before it is saved. A rule that is not a regular expression is refused.
-- **The sitemap is public.** `/sitemap.xml` lists the public view for every reader, you signed in as an administrator included, so it never
-  names a private repository or a product of private repositories.
-- **What changes.** A product or repository kept out leaves `/sitemap.xml` (which lists only the home page, the products and the
-  repositories), and its pages answer with
-  `X-Robots-Tag: noindex, nofollow`: the page, its documents and history, and the Markdown answers. The portal itself shows everything
-  as before, and the API is unchanged.
-- **Products and repositories.** A repository ticked is kept out. A product ticked keeps out its page and the repositories that are only
-  in products kept out; one in another product that is not kept out stays, and one in no product is kept out by its own checkbox or
-  a rule only. A repository ticked or in a product kept out stays out whatever the exceptions say.
-- **Search Console.** Submit `/sitemap.xml` as usual. A page a search engine already holds is dropped after it fetches the page again and
-  reads the `noindex` (days, not minutes); there is no `robots.txt` rule on purpose, which would stop it from reading it. The URL
-  removal tool of the search engine makes it quicker for a page that must go now.
-- **Not access control.** The list says what is offered to search engines. A private repository is private by `access.*`, not by
-  this list, and `/llms.txt`, `/llms-full.txt` and `/knowledge.yaml` (for agents) are not changed by it.
-- **Where it lives.** In the store (the document `indexing`, saved before it is acknowledged, part of a backup), so it needs the
-  store like the announcements; a portal without one shows the list read-only.
+- **Everyone.** The public sees it. Its switch says whether search engines are offered it: on, it is in `/sitemap.xml`; off, it is
+  left out and its pages answer `X-Robots-Tag: noindex, nofollow` (the page, its documents and history, the Markdown answers), while
+  the portal still shows it to everyone.
+- **Signed in.** Only viewers who see private repositories (by `access.*`) see it: for work too early to promote. To everyone else it
+  does not exist: its address answers 404 and no page, list, feed, search hit, badge, `llms.txt`, sitemap entry or answer to an agent
+  names it. A signed-in viewer sees it marked *Not public*.
+- **No one.** Nobody sees it, you included: for repositories that should have been archived on GitHub.
 
-### 2.12 Parked repositories
+Whatever you choose, the portal keeps reading every repository from GitHub, webhook events included, so a repository you show again is
+back at once with everything that happened meanwhile.
 
-A repository that should have been archived on GitHub and was not can be parked from *Admin*, card *Parked repositories*: tick it and
-press *Save*. From the next publish (a second or so) it is shown nowhere, to anyone, you included: no page (its address answers 404),
-product, list, feed, search hit, badge, `llms.txt`, sitemap entry or answer to an agent. The portal keeps reading it from GitHub, webhook
-events included, and keeps what it reads, so when you untick it, it is back at once with everything that happened while it was parked.
-
-- **Products.** A product whose repositories are all parked is not shown; one whose default repository is parked says its default is
-  missing. Parking wins over a group's `default_repo` and `exact` matchers.
-- **By address.** A repository is parked by its `owner/name`. Renamed on GitHub, it shows again under its new name, and the card lists
-  the old address as *not in the catalogue now* until you untick it.
+- **Where a choice comes from.** A repository's own choice wins; then the first rule whose pattern matches its address; then its
+  products (a repository in two products takes the wider audience; a product with no choice counts as everyone); then the default,
+  everyone and offered to search engines. Each row says where its audience comes from, and a choice made on a repository can be
+  undone with *inherit*.
+- **Private on GitHub.** A repository private or internal on GitHub is never shown to everyone: it is *Signed in* unless you choose
+  *No one*. Private by `access.*` is the access control; this card only narrows who sees a repository.
+- **Rules.** New repositories arrive, so rules, folded under *Rules for repositories that arrive later*, set the audience of every
+  repository whose address matches (RE2, matched against `owner/name`, not anchored, not case-sensitive: `^acme/mcp-` takes every
+  repository of `acme` that starts with `mcp-`). Each rule says how many repositories it matches now. A rule wins over a product, a
+  repository's own choice over a rule.
+- **Several at once.** Tick the rows and choose for all of them in the bar that appears; the chips above the list show only one
+  audience, the private ones, the ones kept from search engines or the changed ones.
+- **Saving.** A change is a draft that the card previews; the bar at the bottom counts the changes. *Review and save* lists them by
+  what they do (hidden from everyone, leaving the public view, back in view, search engines) and says in words when five or more items
+  come back into the public view or the sitemap. After a save, *Undo* puts the choices back as they were.
+- **Search Console.** Submit `/sitemap.xml` as usual. `/sitemap.xml` lists the public view for every reader, you signed in included.
+  A page a search engine already holds is dropped after it fetches the page again and reads the `noindex` (days, not minutes); there
+  is no `robots.txt` rule on purpose, which would stop it from reading it.
+- **By address.** A choice is kept by `owner/name`. Renamed on GitHub, a repository takes its audience from rules and products again,
+  and the card lists the old address as *not in the catalogue now* until you forget it.
 - **Not `exclude`.** `github.sources[].exclude` keeps a repository out of the catalogue: it is never read and its events are dropped.
-  Parking keeps it read and hidden.
-- **Not access control.** A private repository is private by `access.*`; parking hides it from those who may see it too.
-- **Where it lives.** In the store (the document `parked`), like the search engine list; `/api/v1/status` says how many repositories
-  are parked (`snapshot.parked`).
+  *No one* keeps it read and hidden.
+- **Where it lives.** In the store (the document `visibility`, saved before it is acknowledged, part of a backup); a portal without a
+  store shows the card read-only. `/api/v1/status` counts the repositories no one sees (`snapshot.parked`) and the public ones only
+  signed-in viewers see (`snapshot.signedIn`). Upgrading from 2.2.19, the parked repositories become *No one* and the search engine
+  list becomes *Everyone* with search engines off; the old lists stay in the store, so 2.2.19 still reads them after a rollback.
 
 ## 3. Run
 
