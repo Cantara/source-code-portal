@@ -62,6 +62,9 @@ describe("what the admin keeps out of search engines", () => {
     expect(screen.getByRole("checkbox", { name: /acme\/legacy-pay/ })).toBeDisabled()
     expect(screen.getByRole("checkbox", { name: /acme\/old/ })).toBeChecked()
     expect(screen.getByText(/2 on this portal/)).toBeInTheDocument()
+    expect(screen.getByText("1 of 3 public repositories are in the sitemap, 2 kept out.")).toBeInTheDocument()
+    expect(screen.getByText("in the sitemap")).toBeInTheDocument()
+    expect(screen.getByText("kept out by a rule")).toBeInTheDocument()
     expect(screen.getByText(/: 1 public repository/)).toBeInTheDocument()
   })
 
@@ -86,7 +89,7 @@ describe("what the admin keeps out of search engines", () => {
     expect(save).toBeDisabled()
     await userEvent.click(screen.getByRole("checkbox", { name: /Payments/ }))
     expect(save).toBeEnabled()
-    await userEvent.type(screen.getByLabelText(/Keep out the repositories whose address matches/), "\ntmp$")
+    await userEvent.type(screen.getByLabelText(/Keep out repositories whose address matches/), "\ntmp$")
     await waitFor(() => expect(screen.getByText(/: 3 public repositories/)).toBeInTheDocument())
     await userEvent.click(save)
     await waitFor(() =>
@@ -118,7 +121,7 @@ describe("what the admin keeps out of search engines", () => {
       </QueryClientProvider>,
     )
     await screen.findByRole("button", { name: "Save" })
-    await userEvent.type(screen.getByLabelText(/Keep out the repositories whose address matches/), "\na(b")
+    await userEvent.type(screen.getByLabelText(/Keep out repositories whose address matches/), "\na(b")
     expect(await screen.findByText(/is not a regular expression/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled()
   })

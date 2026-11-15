@@ -65,7 +65,7 @@ export function matches(address: string, filter: string): boolean {
     .every((w) => hay.includes(w))
 }
 
-const reasons = { named: "", product: "with its product", pattern: "by a pattern" } as const
+const reasons = { named: "", product: "with its product", pattern: "by a rule" } as const
 
 /**
  * IndexingCard is what the admin keeps out of search engines (design/indexing.md): public products with their repositories to tick
@@ -138,8 +138,14 @@ export function IndexingCard() {
       setBusy(false)
     }
   }
-  /** kept is whether the repository's box is ticked: named in the draft, or kept out some other way the portal's preview tells. */
+  /** kept is whether the repository is kept out: ticked in the draft, or kept out some other way the portal's preview tells. */
   const kept = (r: RepoItem) => now.repos.includes(r.address) || (r.why !== "" && r.why !== "named")
+  const status = (r: RepoItem) =>
+    now.repos.includes(r.address) || r.why === "named"
+      ? "kept out"
+      : r.why === ""
+        ? "in the sitemap"
+        : `kept out ${reasons[r.why]}`
   const repoRow = (r: RepoItem, key: string) => (
     <li key={key}>
       <label className="flex flex-wrap items-center gap-2 py-1 text-sm">
@@ -150,12 +156,22 @@ export function IndexingCard() {
           onChange={(e) => edit({ repos: toggled(now.repos, r.address, e.target.checked) })}
         />
         <span className="font-mono text-xs">{r.address}</span>
-        {r.why !== "" && r.why !== "named" && <span className="text-xs text-muted-foreground">kept out {reasons[r.why]}</span>}
+        <span className={kept(r) ? "text-xs font-medium text-foreground" : "text-xs text-muted-foreground"}>{status(r)}</span>
       </label>
     </li>
   )
   const matched = (r: RepoItem) => matches(r.address, filter)
-  const rule = (id: string, label: string, hint: string, value: string, counts: number[], on: (v: string) => void) => (
+  const everyRepo = new Map([...view.tree.flatMap((g) => g.repos), ...view.ungrouped].map((r) => [r.address, r]))
+  const keptOut = [...everyRepo.values()].filter(kept).length
+  const rule = (
+    id: string,
+    label: string,
+    hint: string,
+    value: string,
+    counts: number[],
+    example: string,
+    on: (v: string) => void,
+  ) => (
     <div className="mt-3">
       <label htmlFor={id} className="block text-sm font-medium">
         {label}
@@ -167,7 +183,7 @@ export function IndexingCard() {
         value={value}
         onChange={(e) => on(e.target.value)}
         spellCheck={false}
-        placeholder="^acme/legacy-"
+        placeholder={example}
         className="mt-1 w-full max-w-xl rounded-md border border-border bg-background px-2 py-1 font-mono text-xs"
       />
       <ul className="text-xs text-muted-foreground">
@@ -184,8 +200,9 @@ export function IndexingCard() {
     <Card className="lg:col-span-2" aria-labelledby={titleId}>
       <CardTitle id={titleId}>Search engines</CardTitle>
       <p className="mt-1 text-sm text-muted-foreground">
-        Keep products and repositories out of search engines such as Google: they are left out of the sitemap and their pages say
-        noindex. The portal itself still shows them. Private repositories are never offered to search engines and are not listed
+        Tick a product or repository to keep it out of search engines such as Google. When you press Save, a ticked item is
+        removed from <code>sitemap.xml</code> and its pages say noindex; an unticked one stays in the sitemap. The portal itself
+        still shows everything. Private repositories are never offered to search engines and are not listed
         {data.private > 0 ? ` (${data.private} on this portal)` : ""}. A search engine needs a few days to drop a page it already
         holds.
       </p>
@@ -215,26 +232,10 @@ export function IndexingCard() {
         </Alert>
       )}
       <fieldset className="mt-4" disabled={!data.writable || busy}>
-        <legend className="text-sm font-medium">Rules for repositories now and later</legend>
-        {rule(
-          excludeId,
-          "Keep out the repositories whose address matches",
-          "One regular expression per line, matched against owner/name, not case-sensitive. A repository that arrives later is kept out the day it matches.",
-          now.exclude,
-          view.excludeMatches,
-          (v) => edit({ exclude: v }),
-        )}
-        {rule(
-          includeId,
-          "Except the repositories whose address matches",
-          "One per line. An exception wins over a rule above, not over a product or repository ticked below.",
-          now.include,
-          view.includeMatches,
-          (v) => edit({ include: v }),
-        )}
-      </fieldset>
-      <fieldset className="mt-4" disabled={!data.writable || busy}>
-        <legend className="text-sm font-medium">Public products and their repositories</legend>
+        <legend className="text-sm font-medium">Public products and their repositories: tick to keep out of the sitemap</legend>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {everyRepo.size - keptOut} of {everyRepo.size} public repositories are in the sitemap, {keptOut} kept out.
+        </p>
         <label htmlFor={filterId} className="sr-only">
           Find a repository
         </label>
@@ -263,7 +264,7 @@ export function IndexingCard() {
                   />
                   <span>{g.name}</span>
                   <span className="text-xs font-normal text-muted-foreground">
-                    keep the product out · {g.repos.length} {g.repos.length === 1 ? "repository" : "repositories"}
+                    whole product ({g.repos.length} {g.repos.length === 1 ? "repository" : "repositories"}): tick to keep all out
                   </span>
                 </label>
                 <ul className="ml-6">{repos.map((r) => repoRow(r, g.id + ":" + r.address))}</ul>
@@ -278,6 +279,37 @@ export function IndexingCard() {
           )}
         </div>
       </fieldset>
+      <details
+        className="mt-4"
+        open={data.exclude.length > 0 || data.include.length > 0 || now.exclude !== "" || now.include !== ""}
+      >
+        <summary className="cursor-pointer text-sm font-medium">Rules for repositories that arrive later (advanced)</summary>
+        <fieldset disabled={!data.writable || busy}>
+          <p className="mt-2 text-xs text-muted-foreground">
+            A rule keeps out every repository whose address (owner/name) matches, now and the day a new one arrives. Regular
+            expressions, one per line, not case-sensitive. A product or repository you ticked stays out whatever the exceptions
+            say.
+          </p>
+          {rule(
+            excludeId,
+            "Keep out repositories whose address matches",
+            "For example ^acme/legacy- keeps out every repository of acme that starts with legacy-.",
+            now.exclude,
+            view.excludeMatches,
+            "^acme/legacy-",
+            (v) => edit({ exclude: v }),
+          )}
+          {rule(
+            includeId,
+            "…except repositories whose address matches",
+            "Exceptions to the rules above, for example ^acme/legacy-keep$.",
+            now.include,
+            view.includeMatches,
+            "^acme/legacy-keep$",
+            (v) => edit({ include: v }),
+          )}
+        </fieldset>
+      </details>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button onClick={() => void save()} disabled={!dirty || busy || !data.writable || problem !== ""}>
           Save
