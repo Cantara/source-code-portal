@@ -117,6 +117,7 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
 | Symptom | Look at |
 |---|---|
 | `config check` exits 2 | each problem names its key; unknown keys and unknown `SCP_*` variables are errors |
+| A repository should vanish from the portal but keep being read (it should have been archived on GitHub) | *Admin*, *Parked repositories*: tick it and Save; it is shown nowhere, to anyone, and its events and data are kept, so unticking brings it back whole (`docs/operator-guide.md` 2.12). `github.sources[].exclude` instead stops reading it |
 | `/pulls` or `/issues` says the feature is off, or stays empty | *Admin*, *GitHub prerequisites* (or `/api/v1/status` warnings, the log's `prerequisites unmet`): the missing permissions and events and the installation; grant them in the App's *Permissions & events*, accept them on the installation, then check with `gh api /orgs/<org>/installations --jq '.installations[] \| {app_slug, permissions, events}'` |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for 401/403 (credential, App not installed, missing permission) |
 | A repository is missing | public (or `include_private` with access), not a fork, not in `exclude`, in a listed account; `scp config groups` |

@@ -477,6 +477,79 @@ func TestViewsByPrivateAndByHiddenForks(t *testing.T) {
 	}
 }
 
+// A parked repository is in none of the four views, nor in a restricted one; the base snapshot keeps it (the jobs and the webhook's
+// lookups read it), a group of parked repositories only is in no view, and a parked repository's change moves no view's version.
+func TestParkedRepositoriesAreInNoView(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
+	parked := map[RepoKey]bool{}
+	p.Park(func(e *RepoEntry) bool { return parked[e.Repo.Key()] })
+	open := repo("gh", 1, "acme", "open")
+	open.Repo.Visibility = "public"
+	old := repo("gh", 2, "acme", "old")
+	old.Repo.Visibility = "public"
+	secret := repo("gh", 3, "acme", "secret")
+	secret.Repo.Visibility = "private"
+	copyOf := repo("gh", 4, "acme", "copy")
+	copyOf.Repo.Visibility, copyOf.Repo.Fork = "public", true
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{open, old, secret, copyOf}, map[RepoKey]RepoKey{"acme/older": "acme/old"}, SourceStatus{ID: "gh", Repos: 4})
+		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/old", Members: []RepoKey{"acme/copy", "acme/old", "acme/open", "acme/secret"}},
+			{ID: "legacy", DefaultRepo: "acme/old", Members: []RepoKey{"acme/old"}}})
+		b.SetHidden(map[RepoKey]bool{"acme/copy": true})
+	})
+	p.Flush()
+	before := p.Current()
+	if before.ParkedCount() != 0 || before.View(true, true) != before {
+		t.Fatal("nothing parked: the base is its own full view")
+	}
+
+	parked["acme/old"], parked["acme/secret"] = true, true
+	p.Update(func(*Builder) {}) // the list changed: publish again
+	p.Flush()
+	s := p.Current()
+	if len(s.Repos) != 4 || !s.Parked("acme/old") || s.Parked("acme/open") || s.ParkedCount() != 2 {
+		t.Fatalf("the base keeps every repository and names the parked ones: %d repos, parked %d", len(s.Repos), s.ParkedCount())
+	}
+	for _, tc := range []struct {
+		private, forks bool
+		repos          []RepoKey
+	}{
+		{true, true, []RepoKey{"acme/copy", "acme/open"}},
+		{true, false, []RepoKey{"acme/open"}},
+		{false, true, []RepoKey{"acme/copy", "acme/open"}},
+		{false, false, []RepoKey{"acme/open"}},
+	} {
+		v := s.View(tc.private, tc.forks)
+		got := slices.Sorted(maps.Keys(v.Repos))
+		g, _ := v.Group("all")
+		_, legacy := v.Group("legacy")
+		if e, _ := v.Repo("acme/older"); !slices.Equal(got, tc.repos) || legacy || e != nil || g.DefaultRepo != "" || !g.DefaultMissing ||
+			v.Sources[0].Repos != len(tc.repos) {
+			t.Errorf("private %v forks %v: repos %v, group legacy %v, alias %v, default %q", tc.private, tc.forks, got, legacy, e, g.DefaultRepo)
+		}
+	}
+	if s.Public() != s.View(false, true) || s.HiddenForks() != 1 {
+		t.Errorf("public view %p, hidden forks %d", s.Public(), s.HiddenForks())
+	}
+	if r := s.Restrict(map[RepoKey]bool{"acme/old": true, "acme/open": true}, true, slog.New(slog.DiscardHandler)); r.Repos["acme/old"] != nil ||
+		r.Repos["acme/open"] == nil {
+		t.Errorf("a restricted view holds a parked repository: %v", slices.Sorted(maps.Keys(r.Repos)))
+	}
+	// A parked repository's items move no view's version.
+	p.Update(func(b *Builder) { b.Mark("notes/acme/old", "acme/old", 9, 9) })
+	p.Flush()
+	if next := p.Current(); next.View(true, true).Version != s.View(true, true).Version || next.Public().Version != s.Public().Version {
+		t.Error("a parked repository's change moved a view")
+	}
+	// Taken off the list, it is back at the next publish.
+	delete(parked, "acme/old")
+	p.Update(func(*Builder) {})
+	p.Flush()
+	if v := p.Current().Public(); v.Repos["acme/old"] == nil {
+		t.Error("a repository taken off the list is not back")
+	}
+}
+
 func TestRestrict(t *testing.T) {
 	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
 	mine := repo("gh", 1, "acme", "mine")

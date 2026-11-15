@@ -4,6 +4,12 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## Unreleased
+
+- **Parked repositories**: an admin parks a repository from the *Parked repositories* card. It is shown nowhere, to anyone, while the
+  portal keeps reading it from GitHub, webhook events included; unticked, it is back with everything that happened meanwhile. For
+  repositories that should have been archived on GitHub.
+
 ## 2.2.18
 
 A fix for what the sitemap shows a signed-in viewer. Nothing new is asked of GitHub, and the store is unchanged.

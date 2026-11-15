@@ -62,6 +62,7 @@ type statusSnapshot struct {
 	AgeSeconds float64   `json:"ageSeconds"`
 	Catalogued bool      `json:"catalogued"`
 	Repos      int       `json:"repos"`
+	Parked     int       `json:"parked"` // of Repos, the parked ones: read and kept, shown nowhere (design/parked.md)
 }
 
 type statusQueue struct {
@@ -146,7 +147,7 @@ func (st *status) delivery(_, result string) {
 func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	s, now := st.current(), time.Now()
 	b := statusBody{Mode: st.mode, Ready: st.ready(), Alive: st.alive(), Warnings: []string{}, Sources: []statusSource{},
-		Snapshot: statusSnapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: len(s.Repos)}}
+		Snapshot: statusSnapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: len(s.Repos), Parked: s.ParkedCount()}}
 	if !s.BuiltAt.IsZero() {
 		b.Snapshot.AgeSeconds = now.Sub(s.BuiltAt).Seconds()
 	}

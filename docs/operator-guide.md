@@ -837,6 +837,23 @@ sitemap* or *kept out* (ticked, with its product, or by a rule), and a count at 
 - **Where it lives.** In the store (the document `indexing`, saved before it is acknowledged, part of a backup), so it needs the
   store like the announcements; a portal without one shows the list read-only.
 
+### 2.12 Parked repositories
+
+A repository that should have been archived on GitHub and was not can be parked from *Admin*, card *Parked repositories*: tick it and
+press *Save*. From the next publish (a second or so) it is shown nowhere, to anyone, you included: no page (its address answers 404),
+product, list, feed, search hit, badge, `llms.txt`, sitemap entry or answer to an agent. The portal keeps reading it from GitHub, webhook
+events included, and keeps what it reads, so when you untick it, it is back at once with everything that happened while it was parked.
+
+- **Products.** A product whose repositories are all parked is not shown; one whose default repository is parked says its default is
+  missing. Parking wins over a group's `default_repo` and `exact` matchers.
+- **By address.** A repository is parked by its `owner/name`. Renamed on GitHub, it shows again under its new name, and the card lists
+  the old address as *not in the catalogue now* until you untick it.
+- **Not `exclude`.** `github.sources[].exclude` keeps a repository out of the catalogue: it is never read and its events are dropped.
+  Parking keeps it read and hidden.
+- **Not access control.** A private repository is private by `access.*`; parking hides it from those who may see it too.
+- **Where it lives.** In the store (the document `parked`), like the search engine list; `/api/v1/status` says how many repositories
+  are parked (`snapshot.parked`).
+
 ## 3. Run
 
 For yourself alone on your own computer, [`scp personal`](personal-edition.md) (experimental) signs you in to GitHub and needs no configuration.
