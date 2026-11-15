@@ -15,6 +15,7 @@ rehearsal_init() {
 rehearsal_cleanup() {
 	for p in "${pids[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null || true; done
 	git -C "$root" worktree remove --force "$work/old" 2>/dev/null || true
+	git -C "$root" worktree prune 2>/dev/null || true # the script's own rm -rf of $work runs first and leaves the registration behind
 }
 fail() {
 	echo "FAIL: $*" >&2
