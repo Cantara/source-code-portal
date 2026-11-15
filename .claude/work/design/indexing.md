@@ -28,9 +28,10 @@ offered. Those pages leave the sitemap and say `noindex`. The portal's own pages
   history, the Markdown) and `/groups/{id}...` of a kept-out item (`httpapi.Options.NoIndex`, from the public view: what a search
   engine sees). A header works for the Markdown answers a meta tag cannot reach. No `robots.txt` rule is written, because a search
   engine must be able to fetch a page to read its noindex.
-- **The Admin card** "Search engines" (`web/src/features/admin/indexing.tsx`): the two boxes of rules, one pattern a line, each with
-  the count of public repositories it matches; the public products with their repositories nested, a checkbox each, the reason shown
-  for a repository kept out by its product or a pattern; Save with the revision it was read at (someone else's save in between is
+- **The Admin card** "Search engines" (`web/src/features/admin/indexing.tsx`): the public products with their repositories nested, a
+  checkbox each (a tick keeps it out of the sitemap), each repository saying "in the sitemap" or "kept out" with its reason (ticked, with
+  its product, by a rule) and a count of both; below, folded as advanced, the two boxes of rules, one pattern a line, each with the
+  count of public repositories it matches; Save with the revision it was read at (someone else's save in between is
   refused and offered to load). A change is previewed by a dry run (`PUT` with `dryRun`) a moment after it is typed.
 - **The routes** `GET`/`PUT /api/v1/admin/indexing` (admin only, same origin, outside the contract); the body is the list, the tree
   of public products with their repositories and why each is kept out, the ungrouped public repositories, the matches of each

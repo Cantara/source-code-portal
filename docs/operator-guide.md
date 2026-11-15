@@ -811,8 +811,10 @@ is not signed in; "I've installed it" finds the tracker after the first page vie
 ### 2.11 Keeping pages out of search engines
 
 An administrator can choose which products and repositories search engines such as Google are offered. In **Admin**, the *Search engines*
-card lists the public products with their repositories nested under them, a checkbox each, and two boxes of rules; *Save* applies the
-list at once. Private repositories are never offered to search engines, so the card does not list them (it says how many there are).
+card lists the public products with their repositories nested under them. **A ticked box keeps that product or repository out of the
+sitemap** (and its pages say noindex) once you press *Save*; an unticked one stays in. Each repository says whether it is *in the
+sitemap* or *kept out* (ticked, with its product, or by a rule), and a count at the top sums them. Two boxes of rules, folded under
+*Rules for repositories that arrive later*, are for advanced use; *Save* applies the list at once. Private repositories are never offered to search engines, so the card does not list them (it says how many there are).
 
 - **Rules.** New repositories arrive, so the rules are the main tool. *Keep out the repositories whose address matches* takes one regular
   expression per line (RE2, matched against `owner/name`, not anchored, not case-sensitive: `^acme/legacy-` keeps out every repository
