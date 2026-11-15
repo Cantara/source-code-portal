@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"go.yaml.in/yaml/v4"
@@ -157,46 +158,94 @@ func announcementsValue(list []config.Announcement) []byte {
 }
 
 // configYAML is file with each section's key set to its value, added at the end when the file lacks it, removed when the value is
-// nil; comments and every other key are kept as written.
+// nil. Only the lines of a replaced section are written anew: every other line of the file, its comments, blank lines and long values
+// included, comes back byte for byte, so the download differs from the file only where a section does.
 func configYAML(file []byte, sections []section) ([]byte, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(file, &doc); err != nil {
 		return nil, err
 	}
-	if doc.Kind == 0 {
-		doc = yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.MappingNode, Tag: "!!map"}}}
-	}
-	top := doc.Content[0]
-	if top.Kind != yaml.MappingNode {
-		return nil, errors.New("the configuration is not a mapping")
-	}
-	for _, s := range sections {
-		at := -1
+	var keys []*yaml.Node // the top-level keys, in the file's order
+	if doc.Kind != 0 {
+		top := doc.Content[0]
+		if top.Kind != yaml.MappingNode {
+			return nil, errors.New("the configuration is not a mapping")
+		}
 		for i := 0; i+1 < len(top.Content); i += 2 {
-			if top.Content[i].Value == s.key {
-				at = i
+			if top.Content[i].Line < 1 || top.Content[i].Column != 1 {
+				return nil, errors.New("the configuration's keys are not each at the start of a line")
+			}
+			keys = append(keys, top.Content[i])
+		}
+	}
+	lines := bytes.SplitAfter(file, []byte("\n"))
+	if len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
+		lines = lines[:len(lines)-1]
+	}
+	replace := map[int][]byte{} // by the key's first line (0-based): what its lines become
+	ends := map[int]int{}       // and the line after its section
+	var added []byte
+	for _, sc := range sections {
+		var text []byte
+		if sc.value != nil {
+			v, err := nodeOf(sc.value)
+			if err != nil {
+				return nil, err
+			}
+			if text, err = encodeSection(sc.key, v); err != nil {
+				return nil, err
 			}
 		}
-		if s.value == nil {
-			if at >= 0 {
-				top.Content = append(top.Content[:at], top.Content[at+2:]...)
-			}
+		at := slices.IndexFunc(keys, func(k *yaml.Node) bool { return k.Value == sc.key })
+		if at < 0 {
+			added = append(added, text...)
 			continue
 		}
-		v, err := nodeOf(s.value)
-		if err != nil {
-			return nil, err
+		first := keys[at].Line - 1
+		end := len(lines)
+		if at+1 < len(keys) {
+			end = keys[at+1].Line - 1
 		}
-		if at >= 0 {
-			top.Content[at+1] = v
-		} else {
-			top.Content = append(top.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: s.key}, v)
+		for end > first+1 && belowSection(lines[end-1]) { // the next key's comment and the blank lines above it stay
+			end--
 		}
+		replace[first], ends[first] = text, end
 	}
+	var out bytes.Buffer
+	for i := 0; i < len(lines); {
+		if text, ok := replace[i]; ok {
+			out.Write(text)
+			i = ends[i]
+			continue
+		}
+		out.Write(lines[i])
+		i++
+	}
+	if len(added) > 0 {
+		if b := out.Bytes(); len(b) > 0 && b[len(b)-1] != '\n' {
+			out.WriteByte('\n')
+		}
+		out.Write(added)
+	}
+	return out.Bytes(), nil
+}
+
+// belowSection reports whether line, at the end of a top-level section, belongs to what follows it: a blank line or a comment at the
+// start of the line.
+func belowSection(line []byte) bool {
+	t := bytes.TrimRight(line, "\r\n")
+	return len(bytes.TrimSpace(t)) == 0 || t[0] == '#'
+}
+
+// encodeSection is the YAML of key set to v, two spaces a level, lists indented under their key, long values on one line.
+func encodeSection(key string, v *yaml.Node) ([]byte, error) {
+	m := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, v}}
 	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	if err := enc.Encode(&doc); err != nil {
+	enc, err := yaml.NewDumper(&buf, yaml.WithV3Defaults(), yaml.WithIndent(2), yaml.WithLineWidth(-1))
+	if err != nil {
+		return nil, err
+	}
+	if err := enc.Dump(m); err != nil {
 		return nil, err
 	}
 	if err := enc.Close(); err != nil {

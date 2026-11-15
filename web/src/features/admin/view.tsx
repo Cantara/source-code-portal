@@ -112,9 +112,13 @@ export function Overview({ s }: { s: AdminStatus }) {
           value={s.webhook.enabled ? "On" : "Polling"}
           note={
             s.webhook.enabled ? (
-              <>
-                Last delivery <RelativeTime at={s.webhook.lastDelivery} />.
-              </>
+              s.webhook.lastDelivery ? (
+                <>
+                  Last delivery <RelativeTime at={s.webhook.lastDelivery} />.
+                </>
+              ) : (
+                "No delivery since the portal started."
+              )
             ) : (
               "Pushes show at the next scheduled read."
             )
@@ -259,7 +263,10 @@ export function GitHub({ s }: { s: AdminStatus }) {
               ["Events reach the portal", yes(s.webhook.enabled)],
               ["Receiver", yes(s.webhook.receiver)],
               ["Delivery log read", yes(s.webhook.catchUp)],
-              ["Last delivery", <RelativeTime key="l" at={s.webhook.lastDelivery} />],
+              [
+                "Last delivery",
+                s.webhook.lastDelivery ? <RelativeTime key="l" at={s.webhook.lastDelivery} /> : "none since the portal started",
+              ],
               ...Object.entries(s.webhook.deliveries)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([result, n]): [string, ReactNode] => [`Deliveries ${result}`, n]),

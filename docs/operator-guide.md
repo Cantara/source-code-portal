@@ -888,8 +888,9 @@ announcements:
 ```
 
 - **Download.** *Admin*, *Overview*, *Download scp.yaml* (`GET /api/v1/admin/config.yaml`, administrators only) gives the file the
-  portal started with, with `visibility:`, `layouts:` and `announcements:` as they are in force: comments and every other key as you
-  wrote them. Put it in your repository and deploy it; the configuration holds no secret, only the files that do. A portal started
+  portal started with, with `visibility:`, `layouts:` and `announcements:` as they are in force. Only those
+  sections are written anew; every other line comes back byte for byte (comments, blank lines, long values), so a diff against your
+  file shows only what Admin changed. Put it in your repository and deploy it; the configuration holds no secret, only the files that do. A portal started
   without a configuration file (`SCP_*` variables alone) has no file to write into and says so instead.
 - **After a deploy.** A change in the store equal to the file is dropped at the start, so once the downloaded file is deployed the store
   holds no changes of its own, and the next change made in git takes effect.

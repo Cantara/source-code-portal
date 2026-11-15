@@ -148,6 +148,17 @@ describe("admin", () => {
     expect(screen.queryByRole("link", { name: "Download scp.yaml" })).not.toBeInTheDocument()
   })
 
+  it("says the last delivery is counted from the start, not that there never was one", async () => {
+    const hooked = { ...status, webhook: { ...status.webhook, enabled: true, receiver: true } }
+    server.use(
+      http.get("/me", ({ response }) => response(200).json(me({ signedIn: true, name: "Ada", via: "oidc", admin: true }))),
+      raw.get("*/api/v1/admin/status", () => HttpResponse.json(hooked)),
+    )
+    show(<AdminView />, "/admin")
+    expect(await screen.findByText("No delivery since the portal started.")).toBeInTheDocument()
+    expect(screen.queryByText(/never/)).not.toBeInTheDocument()
+  })
+
   it("shows one section at a time from the side menu, the overview first", async () => {
     server.use(
       http.get("/me", ({ response }) => response(200).json(me({ signedIn: true, name: "Ada", via: "oidc", admin: true }))),
