@@ -15,6 +15,9 @@ subjects.
   delivery as failed and the catch-up passes it on again, instead of an answer GitHub had stopped waiting for.
 - **The status shows how webhooks fare**: `webhook.answers` (how long the portal took to answer GitHub, with a warning past 10 seconds)
   and, for each App, the failed deliveries its log showed, by the answer they got (`401`, `502`, `0` for none in time).
+- **Parked repositories**: an admin parks a repository from the *Parked repositories* card. It is shown nowhere, to anyone, while the
+  portal keeps reading it from GitHub, webhook events included; unticked, it is back with everything that happened meanwhile. For
+  repositories that should have been archived on GitHub.
 
 ## 2.2.18
 

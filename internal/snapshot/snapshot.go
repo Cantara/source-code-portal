@@ -103,10 +103,12 @@ type Snapshot struct {
 	groupsOf   map[RepoKey][]string
 	indexers   []Indexer             // what the features derive from every repository, run at publish
 	retire     func(*RepoEntry) bool // a group member it says yes to is retired (Publisher.Retire); nil: none
+	park       func(*RepoEntry) bool // a repository it says yes to is parked (Publisher.Park); nil: none
+	parked     map[RepoKey]bool      // the repositories park named at this build: in the base snapshot only, in no view
 	indexes    map[string]any        // index name -> what its indexer built
 	public     *Snapshot             // this view without its private and internal repositories; s itself when there are none
 	lean       *Snapshot             // this view without the hidden forks; s itself when there are none
-	fat        *Snapshot             // this view with the hidden forks; s itself when it has them or there are none
+	fat        *Snapshot             // this view with the hidden forks; s itself when it has them or there are none; the base's is its view without the parked repositories
 	hidden     map[RepoKey]bool      // the forks no source shows and no group pins (Builder.SetHidden)
 	marks      map[string]mark
 	sum        uint64
@@ -133,6 +135,9 @@ func (s *Snapshot) Public() *Snapshot {
 // that changes nothing.
 func (s *Snapshot) View(private, forks bool) *Snapshot {
 	v := s
+	if s.fat != nil {
+		v = s.fat // the base snapshot's is its view without the parked repositories
+	}
 	if !forks && s.lean != nil {
 		v = s.lean
 	}
@@ -141,6 +146,12 @@ func (s *Snapshot) View(private, forks bool) *Snapshot {
 	}
 	return v
 }
+
+// Parked reports whether key is a parked repository: in the base snapshot, which keeps it, never in a view.
+func (s *Snapshot) Parked(key RepoKey) bool { return s.parked[key] }
+
+// ParkedCount is how many repositories the base snapshot holds that no view shows.
+func (s *Snapshot) ParkedCount() int { return len(s.parked) }
 
 // Hidden reports whether key is a fork the default views leave out.
 func (s *Snapshot) Hidden(key RepoKey) bool { return s.hidden[key] }

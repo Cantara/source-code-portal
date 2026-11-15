@@ -44,6 +44,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/manifests"
 	"github.com/cantara/source-code-portal/internal/mcpserver"
 	"github.com/cantara/source-code-portal/internal/packages"
+	"github.com/cantara/source-code-portal/internal/parked"
 	"github.com/cantara/source-code-portal/internal/people"
 	"github.com/cantara/source-code-portal/internal/pulls"
 	"github.com/cantara/source-code-portal/internal/releases"
@@ -142,6 +143,7 @@ type server struct {
 	layouts           *layout.Store
 	notices           *announce.Notices
 	indexing          *indexing.Set
+	parked            *parked.Set
 	prereqs           *prereqs
 	people            *people.People // the enterprise mode's people; nil in the other modes
 	stopping          atomic.Bool
@@ -345,12 +347,15 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	s.layouts = layout.Open(ctx, s.store, log)
 	s.notices = announce.Open(ctx, cfg.Announcements, s.store, time.Now, log)
 	s.indexing = indexing.Open(ctx, s.store, log)
+	// A save of the parked list publishes again: the views are rebuilt without the newly parked repositories (design/parked.md).
+	s.parked = parked.Open(ctx, s.store, func() { s.pub.Update(func(*snapshot.Builder) {}) }, log)
+	s.pub.Park(s.parked.Repo)
 	feed := cfg.Webhook.Secret.IsSet() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{mode: string(mode), ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		cadence: s.engine.Cadence, webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string {
-			return slices.Concat(s.layouts.Problems(), s.notices.Problems(), s.indexing.Problems())
+			return slices.Concat(s.layouts.Problems(), s.notices.Problems(), s.indexing.Problems(), s.parked.Problems())
 		},
 		deliveries: map[string]int{}}
 	st.polled = map[string]bool{}
@@ -447,6 +452,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, s.peopleRoutes(cfg)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
 	routes = append(routes, s.indexing.Routes(cfg.Server.PublicURL, assets, log.With("component", "indexing"))...)
+	routes = append(routes, s.parked.Routes(cfg.Server.PublicURL, s.pub.Current, log.With("component", "parked"))...)
 	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, newReleases(view, documents), newInsights(view), docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For, Off: offElements(f)},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{f, s.people != nil}, s.prereqs}
