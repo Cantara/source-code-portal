@@ -89,8 +89,8 @@ type LLMs struct {
 	opts    Options
 
 	mu    gosync.Mutex
-	built [2]files   // the last views the files were built for: the public one and the full one
-	maps  [2]sitemap // the same for the sitemap
+	built [2]files // the last views the files were built for: the public one and the full one
+	maps  sitemap  // the sitemap, of the public view only
 }
 
 // files are /llms.txt and /llms-full.txt of one view of a snapshot.

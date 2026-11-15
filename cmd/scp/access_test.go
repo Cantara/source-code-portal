@@ -145,6 +145,10 @@ catalog:
 			t.Errorf("staff %s: %d, does not show the group of private repositories (or shows the empty one):\n%s", path, code, b)
 		}
 	}
+	// The sitemap is what search engines are offered: the public view for a signed-in viewer too, so no private repository is in it.
+	if code, b, _ := get("/sitemap.xml", true); code != http.StatusOK || strings.Contains(b, "/repos/acme/secret") || strings.Contains(b, "private-only") {
+		t.Errorf("staff sitemap shows a private repository or group: %d\n%s", code, b)
+	}
 	for _, tc := range []string{"/api/v1/groups/private-only", "/badges/groups/private-only/repos.svg", "/api/v1/commits?group=private-only"} {
 		unknown := strings.Replace(tc, "private-only", "unknown", 1)
 		wantCode, _, _ := get(unknown, false)

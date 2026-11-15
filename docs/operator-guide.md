@@ -819,6 +819,8 @@ list at once. Private repositories are never offered to search engines, so the c
   of `acme` that starts with `legacy-`, `-internal$` those that end so). A repository that arrives later is kept out the day it matches.
   *Except the repositories whose address matches* are the exceptions to those rules. Under each line the card says how many public
   repositories it matches now, and previews a change before it is saved. A rule that is not a regular expression is refused.
+- **The sitemap is public.** `/sitemap.xml` lists the public view for every reader, you signed in as an administrator included, so it never
+  names a private repository or a product of private repositories.
 - **What changes.** A product or repository kept out leaves `/sitemap.xml`, with its documents, and its pages answer with
   `X-Robots-Tag: noindex, nofollow`: the page, its documents and history, and the Markdown answers. The portal itself shows everything
   as before, and the API is unchanged.

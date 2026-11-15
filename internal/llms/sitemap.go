@@ -102,13 +102,11 @@ func (l *LLMs) originOf(r *http.Request) string {
 }
 
 func (l *LLMs) sitemaps(r *http.Request) [][]byte {
-	s, origin := l.current(r.Context()), l.originOf(r)
-	slot := 0
-	if s != s.Public() {
-		slot = 1
-	}
+	// The sitemap is what search engines are offered, and they never sign in: it is the public view for every reader, a signed-in one
+	// included (a private repository is not offered, nor shown to someone who asks for the list).
+	s, origin := l.current(r.Context()).Public(), l.originOf(r)
 	l.mu.Lock()
-	m := l.maps[slot]
+	m := l.maps
 	rev := ""
 	if l.opts.IndexRevision != nil {
 		rev = l.opts.IndexRevision()
@@ -119,7 +117,7 @@ func (l *LLMs) sitemaps(r *http.Request) [][]byte {
 	if m.origin != origin || m.files == nil { // the portal's own address: once per view; a request's: until another host asks
 		m.origin, m.files = origin, fill(m.raw, origin)
 	}
-	l.maps[slot] = m
+	l.maps = m
 	l.mu.Unlock()
 	return m.files
 }
