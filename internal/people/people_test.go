@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -302,3 +303,52 @@ func TestAccessLists(t *testing.T) {
 }
 
 func sorted(ids ...int64) []int64 { slices.Sort(ids); return ids }
+
+// Allowed answers from memory while nothing changed, and anew after a listing even at the same instant; the sources forget the
+// credential of a token once it is removed.
+func TestAllowanceAndForgetting(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	secret := f.gh.AddRepo("acme", gh.Repository{Name: new("secret"), Visibility: new("private")})
+	inner := f.gh.ID("acme", "inner")
+	var keep func(string) bool
+	f.src.Forget = func(k func(string) bool) { keep = k }
+	c := &clock{time.Now()}
+	p, err := Open(ctx, Options{Store: f.db, Key: f.key, Issuer: "iss", Sources: []Source{f.src}, Now: c.now, Log: slog.New(slog.DiscardHandler)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Link(ctx, ann, "ghe", "acme", "github_pat_ann"); err != nil {
+		t.Fatal(err)
+	}
+	p.listDue(ctx)
+	k1, a := p.Allowed(ann.Subject)
+	_, b := p.Allowed(ann.Subject)
+	if len(a) != 1 || reflect.ValueOf(a).Pointer() != reflect.ValueOf(b).Pointer() {
+		t.Errorf("the second answer was made again: %v %v", a, b)
+	}
+
+	f.gh.Reach("github_pat_ann", inner, secret)
+	p.mu.Lock()
+	sl := slot{"ghe", "acme"}
+	token := p.people[p.id(ann.Subject)].tokens[sl]
+	p.mu.Unlock()
+	if p.list(ctx, due{p.id(ann.Subject), sl, token}) { // listed again at the same instant
+		t.Fatal("the listing failed")
+	}
+	if k2, set := p.Allowed(ann.Subject); k2 == k1 || len(set) != 2 {
+		t.Errorf("after a new listing: %q %v", k2, set)
+	}
+
+	key := holderKey(p.id(ann.Subject), sl, token.Sealed)
+	if keep == nil || !keep(key) {
+		t.Fatal("a linked token's credential is not kept")
+	}
+	if err := p.Unlink(ctx, ann, "ghe", "acme"); err != nil {
+		t.Fatal(err)
+	}
+	p.listDue(ctx)
+	if keep(key) {
+		t.Error("a removed token's credential is kept")
+	}
+}

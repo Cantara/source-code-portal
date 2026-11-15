@@ -1,6 +1,7 @@
 package people
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -91,7 +92,28 @@ func (p *People) listDue(ctx context.Context) time.Duration {
 			next = min(next, retryAfter)
 		}
 	}
+	p.forget()
 	return max(next, time.Second)
+}
+
+// forget drops the sources' credentials of tokens no longer linked or refused by GitHub, so a removed token's client and rate book
+// do not stay in memory for the life of the process.
+func (p *People) forget() {
+	keep := map[string]bool{}
+	p.mu.Lock()
+	for id, pp := range p.people {
+		for sl, t := range pp.tokens {
+			if t.State == "ok" {
+				keep[holderKey(id, sl, t.Sealed)] = true
+			}
+		}
+	}
+	p.mu.Unlock()
+	for _, src := range p.sources {
+		if src.Forget != nil {
+			src.Forget(func(key string) bool { return keep[key] })
+		}
+	}
 }
 
 // list lists one token's repositories and records what it read; it reports whether the listing is to be tried again soon.
@@ -103,7 +125,7 @@ func (p *People) list(ctx context.Context, d due) (again bool) {
 		p.refused(ctx, d, "sealed")
 		return false
 	}
-	repos, err := src.List(ctx, d.slot.owner, github.Holder{Key: holderKey(d.person, d.slot, token), Token: token})
+	repos, err := src.List(ctx, d.slot.owner, github.Holder{Key: holderKey(d.person, d.slot, d.token.Sealed), Token: token})
 	var e *github.Error
 	switch {
 	case err == nil:
@@ -143,6 +165,7 @@ func (p *People) list(ctx context.Context, d due) (again bool) {
 		pp.access[d.slot] = ids
 		pp.listed[d.slot] = repos
 		delete(pp.retry, d.slot)
+		pp.touch()
 	}
 	p.mu.Unlock()
 	p.changed(d.slot.source)
@@ -161,20 +184,31 @@ func (p *People) refused(ctx context.Context, d due, state string) {
 			pp.tokens[d.slot] = t
 			delete(pp.access, d.slot)
 			delete(pp.listed, d.slot)
+			pp.touch()
 		}
 	}
 	p.mu.Unlock()
 	p.changed(d.slot.source)
 }
 
-// holderKey names a person's token for one owner, and changes with the token.
-func holderKey(person string, sl slot, token []byte) string {
-	sum := sha256.Sum256(append([]byte(person+"\x00"+sl.source+"\x00"+sl.owner+"\x00"), token...))
+// holderKey names a person's token for one owner, and changes with the token: it is made from the sealed token, so the credentials to
+// keep are known without opening every token.
+func holderKey(person string, sl slot, sealed []byte) string {
+	sum := sha256.Sum256(append([]byte(person+"\x00"+sl.source+"\x00"+sl.owner+"\x00"), sealed...))
 	return hex.EncodeToString(sum[:12])
 }
 
+// allowance is Allowed's answer for a person, held while their tokens, their access and the listings that count are unchanged.
+type allowance struct {
+	gen   uint64
+	slots []slot // the tokens whose listings counted
+	key   string
+	repos map[snapshot.RepoID]bool
+}
+
 // Allowed is what the person with subject may read: the repositories their tokens listed within Options.MaxAge, and a key equal for
-// equal sets. Nothing for a person unknown, without a token or whose listings are all older (fail closed).
+// equal sets. Nothing for a person unknown, without a token or whose listings are all older (fail closed). The answer is shared
+// between calls while nothing changed: callers do not change repos.
 func (p *People) Allowed(subject string) (key string, repos map[snapshot.RepoID]bool) {
 	now := p.o.Now()
 	p.mu.Lock()
@@ -183,11 +217,27 @@ func (p *People) Allowed(subject string) (key string, repos map[snapshot.RepoID]
 	if pp == nil {
 		return "", nil
 	}
-	var ids []snapshot.RepoID
+	var slots []slot
 	for sl, t := range pp.tokens {
-		if t.State != "ok" || t.ListedAt.IsZero() || now.Sub(t.ListedAt) > p.o.MaxAge {
-			continue
+		if p.fresh(t, now) {
+			slots = append(slots, sl)
 		}
+	}
+	slices.SortFunc(slots, func(a, b slot) int {
+		return cmp.Or(strings.Compare(a.source, b.source), strings.Compare(a.owner, b.owner))
+	})
+	if k := pp.known; k != nil && k.gen == pp.gen && slices.Equal(k.slots, slots) {
+		return k.key, k.repos
+	}
+	key, repos = allowedOf(pp, slots)
+	pp.known = &allowance{gen: pp.gen, slots: slots, key: key, repos: repos}
+	return key, repos
+}
+
+// allowedOf is the set the listings of slots hold and its key.
+func allowedOf(pp *person, slots []slot) (string, map[snapshot.RepoID]bool) {
+	var ids []snapshot.RepoID
+	for _, sl := range slots {
 		for _, id := range pp.access[sl] {
 			ids = append(ids, snapshot.RepoID{Source: sl.source, GitHubID: id})
 		}
@@ -196,17 +246,11 @@ func (p *People) Allowed(subject string) (key string, repos map[snapshot.RepoID]
 		return "", nil
 	}
 	slices.SortFunc(ids, func(a, b snapshot.RepoID) int {
-		if a.Source != b.Source {
-			if a.Source < b.Source {
-				return -1
-			}
-			return 1
-		}
-		return int(min(max(a.GitHubID-b.GitHubID, -1), 1))
+		return cmp.Or(strings.Compare(a.Source, b.Source), cmp.Compare(a.GitHubID, b.GitHubID))
 	})
 	ids = slices.Compact(ids)
 	h := sha256.New()
-	repos = make(map[snapshot.RepoID]bool, len(ids))
+	repos := make(map[snapshot.RepoID]bool, len(ids))
 	var n [8]byte
 	for _, id := range ids {
 		repos[id] = true
@@ -263,7 +307,7 @@ func (p *People) Holders(source, owner, name string) []github.Holder {
 		if err != nil {
 			continue
 		}
-		out = append(out, github.Holder{Key: holderKey(id, sl, token), Token: token})
+		out = append(out, github.Holder{Key: holderKey(id, sl, t.Sealed), Token: token})
 	}
 	slices.SortFunc(out, func(a, b github.Holder) int { return strings.Compare(a.Key, b.Key) })
 	return out
