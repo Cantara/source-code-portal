@@ -45,16 +45,16 @@ type admin struct {
 }
 
 func (h admin) get(w http.ResponseWriter, _ *http.Request) {
-	st := h.n.file.Get()
-	list := h.n.all()
-	configured := h.n.configured
+	st := h.n.overlay.State()
+	list := h.n.List()
+	configured := h.n.overlay.Base()
 	if configured == nil {
 		configured = []config.Announcement{}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	json.NewEncoder(w).Encode(adminBody{Announcements: list, Configured: configured, Revision: st.Revision, //nolint:errcheck,gosec // the client went away
-		Writable: h.n.file.Writable(), Problem: st.Problem})
+		Writable: h.n.overlay.Writable(), Problem: st.Problem})
 }
 
 func (h admin) put(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,7 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 	case !httpapi.SameOrigin(r, h.publicURL):
 		httpapi.WriteProblem(w, http.StatusForbidden, "cross-origin", "Change the announcements from the portal's own pages.")
 		return
-	case !h.n.file.Writable():
+	case !h.n.overlay.Writable():
 		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "This portal has no store to save announcements in.")
 		return
 	}
@@ -73,12 +73,12 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 	if !httpapi.DecodeStrict(w, r, &body, "The body is not a list of announcements.") {
 		return
 	}
-	b, err := h.n.check(body.Announcements)
+	list, err := h.n.check(body.Announcements)
 	if err != nil {
 		httpapi.WriteProblem(w, http.StatusUnprocessableEntity, "validation-failed", err.Error())
 		return
 	}
-	switch _, err := h.n.file.Save(r.Context(), b, body.Revision); {
+	switch _, err := h.n.overlay.Save(r.Context(), list, body.Revision); {
 	case errors.Is(err, docstore.ErrConflict):
 		httpapi.WriteProblem(w, http.StatusPreconditionFailed, "conflict", "Someone saved the announcements since you opened them; reload to see theirs.")
 	case err != nil:
@@ -89,21 +89,20 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// check cleans and checks the list in force an admin saves and returns what the store keeps of it: its difference from the
-// configuration.
-func (n *Notices) check(list []config.Announcement) ([]byte, error) {
+// check cleans and checks the list in force an admin saves, as the store will read what is kept of it.
+func (n *Notices) check(list []config.Announcement) ([]config.Announcement, error) {
 	if list == nil {
 		list = []config.Announcement{}
 	}
 	if p := config.CheckAnnouncements("announcements", list); len(p) > 0 {
 		return nil, errors.New(p[0])
 	}
-	b, err := encode(n.diff(explicit(list)))
+	b, err := docstore.Encode(diff(n.overlay.Base(), list))
 	if err != nil {
 		return nil, err
 	}
 	if _, err := Parse(b); err != nil {
 		return nil, err
 	}
-	return b, nil
+	return list, nil
 }

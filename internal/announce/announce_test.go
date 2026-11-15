@@ -131,7 +131,7 @@ func TestAdminRoutes(t *testing.T) {
 		t.Errorf("saved, published explicitly: %+v", saved)
 	}
 	// Only the added one is stored: the configuration's is as the file has it.
-	if st := n.file.Get().Value; len(st.Announcements) != 1 || st.Announcements[0].ID != "juleol" || len(st.Removed) != 0 {
+	if st := n.overlay.State().Value; len(st.Announcements) != 1 || st.Announcements[0].ID != "juleol" || len(st.Removed) != 0 {
 		t.Errorf("stored %+v", st)
 	}
 	if got := ids(n.For(context.Background(), "dashboard")); !slices.Equal(got, []string{"juleol", "configured"}) {
@@ -160,19 +160,19 @@ func TestAdminRoutes(t *testing.T) {
 	}
 	w = do(admin, "PUT", `{"revision":"`+changed.Revision+`","announcements":[]}`)
 	removed := read(w)
-	if st := n.file.Get().Value; w.Code != http.StatusOK || len(removed.Announcements) != 0 || !slices.Equal(st.Removed, []string{"configured"}) {
+	if st := n.overlay.State().Value; w.Code != http.StatusOK || len(removed.Announcements) != 0 || !slices.Equal(st.Removed, []string{"configured"}) {
 		t.Fatalf("remove: %d %+v %+v", w.Code, removed, st)
 	}
 	if got := ids(n.For(context.Background(), "dashboard")); len(got) != 0 {
 		t.Errorf("served after the removal: %v", got)
 	}
 	// A restart with a configuration that no longer has it: the removal means nothing and is dropped.
-	if n = Open(context.Background(), nil, d, func() time.Time { return now }, quiet()); n.file.Get().Value.Count() != 0 || len(n.Problems()) != 0 {
-		t.Errorf("after the start, stored %+v %v", n.file.Get().Value, n.Problems())
+	if n = Open(context.Background(), nil, d, func() time.Time { return now }, quiet()); n.overlay.State().Value.Count() != 0 || len(n.Problems()) != 0 {
+		t.Errorf("after the start, stored %+v %v", n.overlay.State().Value, n.Problems())
 	}
 	// A stored document that no longer parses (a later version tightened what it accepts) is not served after a restart: only the
 	// configured announcements show, and the status carries the problem until an admin saves over it.
-	if err := d.PutDocument(context.Background(), Name, []byte(`{"announcements":[{"id":"x"}]}`), "broken", n.file.Get().Revision); err != nil {
+	if err := d.PutDocument(context.Background(), Name, []byte(`{"announcements":[{"id":"x"}]}`), "broken", n.overlay.State().Revision); err != nil {
 		t.Fatal(err)
 	}
 	n = Open(context.Background(), configured, d, func() time.Time { return now }, quiet())

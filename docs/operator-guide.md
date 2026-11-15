@@ -889,11 +889,12 @@ announcements:
 
 - **Download.** *Admin*, *Overview*, *Download scp.yaml* (`GET /api/v1/admin/config.yaml`, administrators only) gives the file the
   portal started with, with `visibility:`, `layouts:` and `announcements:` as they are in force: comments and every other key as you
-  wrote them. Put it in your repository and deploy it; the configuration holds no secret, only the files that do.
+  wrote them. Put it in your repository and deploy it; the configuration holds no secret, only the files that do. A portal started
+  without a configuration file (`SCP_*` variables alone) has no file to write into and says so instead.
 - **After a deploy.** A change in the store equal to the file is dropped at the start, so once the downloaded file is deployed the store
   holds no changes of its own, and the next change made in git takes effect.
-- **Until then.** `/api/v1/status` warns while the store holds changes the file does not (*kept only in the store*): a store reset or
-  lost would lose them. Admin marks each one *changed here* with a way back to scp.yaml.
+- **Until then.** `/api/v1/status` warns while the store holds changes the file does not (*kept only in the store*; `config.changes`
+  counts them per document): a store reset or lost would lose them. Admin marks each one *changed here* with a way back to scp.yaml.
 - **Checked.** `scp config check` and the start refuse a `visibility:` or `layouts:` that does not parse, with its path. The other keys
   (sources, sign-in, access) are only in the file.
 

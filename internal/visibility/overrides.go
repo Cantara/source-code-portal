@@ -13,12 +13,17 @@ import (
 
 // Overrides is the stored document (design/config-baseline.md, CF1): the admins' changes to the configuration's `visibility:`. A
 // product or repository with a setting overrides the file's choice; one with null drops it, so the item inherits again. Rules, when
-// present, replace the file's list. A store of 2.2.19 and 2.2.20 holds a whole document, read as overrides of an empty file.
+// present, replace the file's list. A store of 2.2.19 and 2.2.20 holds a whole document without a version, read as overrides of an
+// empty file whose empty rules mean no change: those releases wrote `"rules": []` for "no rules", not for "none of the file's".
 type Overrides struct {
-	Groups map[string]*Setting `json:"groups,omitempty"`
-	Repos  map[string]*Setting `json:"repos,omitempty"`
-	Rules  *[]Rule             `json:"rules,omitempty"`
+	Version int                 `json:"version,omitempty"` // overridesVersion; 0: a whole document of 2.2.20 or before
+	Groups  map[string]*Setting `json:"groups,omitempty"`
+	Repos   map[string]*Setting `json:"repos,omitempty"`
+	Rules   *[]Rule             `json:"rules,omitempty"`
 }
+
+// overridesVersion marks a document written as overrides, whose rules, even empty, replace the file's.
+const overridesVersion = 2
 
 // Count is how many changes o holds: one per product and repository, one for the rules.
 func (o Overrides) Count() int {
@@ -51,6 +56,9 @@ func ParseOverrides(b []byte) (Overrides, error) {
 			}
 		}
 	}
+	if o.Version == 0 && o.Rules != nil && len(*o.Rules) == 0 {
+		o.Rules = nil // a whole document's "no rules": no change to the file's
+	}
 	d := Doc{Groups: set(o.Groups), Repos: set(o.Repos)}
 	if o.Rules != nil {
 		d.Rules = *o.Rules
@@ -59,7 +67,7 @@ func ParseOverrides(b []byte) (Overrides, error) {
 	if err != nil {
 		return Overrides{}, err
 	}
-	out := Overrides{Groups: unset(o.Groups, c.Groups), Repos: unset(o.Repos, c.Repos)}
+	out := Overrides{Version: o.Version, Groups: unset(o.Groups, c.Groups), Repos: unset(o.Repos, c.Repos)}
 	if o.Rules != nil {
 		out.Rules = &c.Rules
 	}
@@ -133,7 +141,7 @@ func Diff(base, d Doc) Overrides {
 		}
 		return out
 	}
-	o := Overrides{Groups: diff(base.Groups, d.Groups), Repos: diff(base.Repos, d.Repos)}
+	o := Overrides{Version: overridesVersion, Groups: diff(base.Groups, d.Groups), Repos: diff(base.Repos, d.Repos)}
 	if !slices.EqualFunc(base.Rules, d.Rules, func(a, b Rule) bool { return a.Pattern == b.Pattern && a.Setting == b.Setting }) {
 		rules := slices.Clone(d.Rules)
 		if rules == nil {
@@ -142,15 +150,6 @@ func Diff(base, d Doc) Overrides {
 		o.Rules = &rules
 	}
 	return o
-}
-
-// encodeOverrides is o as stored: indented JSON with a final newline.
-func encodeOverrides(o Overrides) ([]byte, error) {
-	b, err := json.MarshalIndent(o, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append(b, '\n'), nil
 }
 
 func lower(s string) string { return strings.ToLower(strings.TrimSpace(s)) }

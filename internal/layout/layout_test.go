@@ -16,6 +16,7 @@ import (
 
 	"go.uber.org/goleak"
 
+	"github.com/cantara/source-code-portal/internal/docstore"
 	"github.com/cantara/source-code-portal/internal/httpapi"
 	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -106,7 +107,7 @@ func TestStoreSaveConflictReset(t *testing.T) {
 	if p := s.Get("dashboard"); !p.Stored || p.Revision != rev || len(p.Layout.Elements) != 1 {
 		t.Errorf("after a save: %+v", p)
 	}
-	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindFleetMap), ""); !errors.Is(err, ErrConflict) {
+	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindFleetMap), ""); !errors.Is(err, docstore.ErrConflict) {
 		t.Errorf("a save on a stale revision: %v", err)
 	}
 	if _, err := s.Save(ctx, "dashboard", Layout{}, rev); !errors.As(err, new(Invalid)) {
@@ -115,7 +116,7 @@ func TestStoreSaveConflictReset(t *testing.T) {
 	if again := Open(ctx, d, nil, quiet()).Get("dashboard"); again.Revision != rev || !again.Stored {
 		t.Errorf("reopened: %+v", again)
 	}
-	if err := s.Reset(ctx, "dashboard", "stale"); !errors.Is(err, ErrConflict) {
+	if err := s.Reset(ctx, "dashboard", "stale"); !errors.Is(err, docstore.ErrConflict) {
 		t.Errorf("a reset on a stale revision: %v", err)
 	}
 	if err := s.Reset(ctx, "dashboard", rev); err != nil {
@@ -124,7 +125,7 @@ func TestStoreSaveConflictReset(t *testing.T) {
 	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 7 {
 		t.Errorf("after a reset: %+v", p)
 	}
-	if _, err := Open(ctx, nil, nil, quiet()).Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); !errors.Is(err, ErrReadOnly) {
+	if _, err := Open(ctx, nil, nil, quiet()).Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); !errors.Is(err, docstore.ErrReadOnly) {
 		t.Errorf("without a store: %v", err)
 	}
 }
@@ -260,15 +261,15 @@ func TestConfigurationIsTheBaseline(t *testing.T) {
 	ctx := t.Context()
 	base := map[string]Layout{"dashboard": layoutOf(oapi.LayoutElementKindFleetMap)}
 	s := Open(ctx, d, base, quiet())
-	if p := s.Get("dashboard"); p.Stored || !p.Configured || len(p.Layout.Elements) != 1 || len(s.Problems()) != 0 {
-		t.Fatalf("from the file: %+v %v", p, s.Problems())
+	if p := s.Get("dashboard"); p.Stored || !p.Configured || len(p.Layout.Elements) != 1 || s.Changes() != 0 {
+		t.Fatalf("from the file: %+v %d", p, s.Changes())
 	}
 	rev, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p := s.Get("dashboard"); !p.Stored || p.Layout.Elements[0].Kind != oapi.LayoutElementKindTelemetry || len(s.Problems()) != 1 {
-		t.Errorf("a change: %+v %v", p, s.Problems())
+	if p := s.Get("dashboard"); !p.Stored || p.Layout.Elements[0].Kind != oapi.LayoutElementKindTelemetry || s.Changes() != 1 {
+		t.Errorf("a change: %+v %d", p, s.Changes())
 	}
 	if err := s.Reset(ctx, "dashboard", rev); err != nil {
 		t.Fatal(err)
@@ -276,11 +277,11 @@ func TestConfigurationIsTheBaseline(t *testing.T) {
 	if p := s.Get("dashboard"); p.Stored || p.Layout.Elements[0].Kind != oapi.LayoutElementKindFleetMap {
 		t.Errorf("after a reset: %+v", p)
 	}
-	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindFleetMap), ""); err != nil || s.Get("dashboard").Stored {
+	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindFleetMap), s.Get("dashboard").Revision); err != nil || s.Get("dashboard").Stored {
 		t.Errorf("the configuration's layout saved: %v %+v", err, s.Get("dashboard"))
 	}
 	// A change stored, then the file takes it over: the next start drops it.
-	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); err != nil {
+	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), s.Get("dashboard").Revision); err != nil {
 		t.Fatal(err)
 	}
 	base["dashboard"] = layoutOf(oapi.LayoutElementKindTelemetry)

@@ -34,6 +34,7 @@ const status: AdminStatus = {
   ],
   webhook: { enabled: false, receiver: false, catchUp: false, deliveries: {}, lastDelivery: null },
   cluster: { enabled: false, connected: false, leader: true },
+  config: { file: true, changes: { visibility: 0, announcements: 0, layouts: 0 } },
   warnings: ["webhook: not configured; pushes show after the next scheduled listing"],
 }
 
@@ -131,6 +132,20 @@ describe("admin", () => {
     expect(screen.getByText(/Signed in as Ada through single sign-on, an administrator/)).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Download scp.yaml" })).toHaveAttribute("href", "/api/v1/admin/config.yaml")
     expect(screen.getByText(/The store holds no changes of its own/)).toBeInTheDocument()
+  })
+
+  it("counts the changes kept only in the store, and offers no download without a configuration file", async () => {
+    const pending = { ...status, config: { file: false, changes: { visibility: 2, announcements: 1, layouts: 0 } } }
+    server.use(
+      http.get("/me", ({ response }) => response(200).json(me({ signedIn: true, name: "Ada", via: "oidc", admin: true }))),
+      raw.get("*/api/v1/admin/status", () => HttpResponse.json(pending)),
+    )
+    show(<AdminView />, "/admin")
+    expect(
+      await screen.findByText(/3 changes are kept only in the store \(who sees what 2, announcements 1, layouts 0\)/),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/started without a configuration file/)).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "Download scp.yaml" })).not.toBeInTheDocument()
   })
 
   it("shows one section at a time from the side menu, the overview first", async () => {

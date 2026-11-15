@@ -148,15 +148,15 @@ func compose(d Doc, s *snapshot.Snapshot) adminBody {
 
 func (h admin) answer(w http.ResponseWriter, d Doc, revision, problem string) {
 	body := compose(d, h.base())
-	body.Configured = h.s.base
-	body.Revision, body.Writable, body.Problem = revision, h.s.file.Writable(), problem
+	body.Configured = h.s.Base()
+	body.Revision, body.Writable, body.Problem = revision, h.s.overlay.Writable(), problem
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	json.NewEncoder(w).Encode(body) //nolint:errcheck,gosec // the client went away
 }
 
 func (h admin) get(w http.ResponseWriter, _ *http.Request) {
-	st := h.s.file.Get()
+	st := h.s.overlay.State()
 	h.answer(w, h.s.Doc(), st.Revision, st.Problem)
 }
 
@@ -188,7 +188,7 @@ func (h admin) preview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	st := h.s.file.Get()
+	st := h.s.overlay.State()
 	h.answer(w, body.Doc, st.Revision, st.Problem)
 }
 
@@ -197,24 +197,18 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !h.s.file.Writable() {
+	if !h.s.overlay.Writable() {
 		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "This portal has no store to save the choices in.")
 		return
 	}
 	// What is stored is the difference from the configuration: a choice equal to the file's is not kept.
-	b, err := encodeOverrides(Diff(h.s.base, body.Doc))
-	if err != nil {
-		httpapi.WriteProblem(w, http.StatusInternalServerError, "internal", "The choices could not be written.")
-		return
-	}
-	switch _, err := h.s.file.Save(context.WithoutCancel(r.Context()), b, body.Revision); {
+	switch _, err := h.s.overlay.Save(context.WithoutCancel(r.Context()), body.Doc, body.Revision); {
 	case errors.Is(err, docstore.ErrConflict):
 		httpapi.WriteProblem(w, http.StatusPreconditionFailed, "conflict", "Someone saved who sees what since you opened it; reload to see theirs.")
 	case err != nil:
 		h.log.Error("visibility not written", "err", err)
 		httpapi.WriteProblem(w, http.StatusInternalServerError, "internal", "The choices could not be written.")
 	default:
-		h.s.refresh()
 		h.s.changed()
 		h.get(w, r)
 	}
