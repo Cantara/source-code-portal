@@ -33,6 +33,7 @@ type status struct {
 	cadence      func(source string) map[string]time.Duration // each subject's refresh for a source
 	catchUps     func() []webhook.CatchUpState                // what each App's delivery log has been doing; nil without catch-up
 	layouts      func() []string                              // why stored layouts are not served
+	config       func() statusConfig                          // what the store holds that scp.yaml does not (design/config-baseline.md)
 	prereqs      func() []prereq.Unmet
 	cluster      interface {
 		Leader() bool
@@ -85,8 +86,24 @@ type statusBody struct {
 	Webhook  statusWebhook  `json:"webhook"`
 	Cluster  statusCluster  `json:"cluster"`
 	Search   search.Stats   `json:"search"`
+	Config   statusConfig   `json:"config"`
 	Warnings []string       `json:"warnings"`
 }
+
+// statusConfig is scp.yaml as the base of what admins change (design/config-baseline.md): whether the portal started from a file the
+// download can write the changes into, and how many changes of each document are kept only in the store.
+type statusConfig struct {
+	File    bool          `json:"file"`
+	Changes configChanges `json:"changes"`
+}
+
+type configChanges struct {
+	Visibility    int `json:"visibility"`
+	Announcements int `json:"announcements"`
+	Layouts       int `json:"layouts"`
+}
+
+func (c configChanges) total() int { return c.Visibility + c.Announcements + c.Layouts }
 
 type statusSnapshot struct {
 	Version    uint64    `json:"version"`
@@ -235,6 +252,12 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		catchUps, w = catchUpStatus(st.catchUps(), now)
 		b.Warnings = append(b.Warnings, w...)
 	}
+	if st.config != nil {
+		b.Config = st.config()
+		if n := b.Config.Changes.total(); n > 0 {
+			b.Warnings = append(b.Warnings, configWarning(b.Config))
+		}
+	}
 	if st.layouts != nil {
 		b.Warnings = append(b.Warnings, st.layouts()...)
 	}
@@ -263,4 +286,18 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(b)
+}
+
+// configWarning says that changes are kept only in the store, which a lost or reset store would lose.
+func configWarning(c statusConfig) string {
+	n, what := c.Changes.total(), "changes are"
+	if n == 1 {
+		what = "change is"
+	}
+	keep := "download scp.yaml from Admin with them written in and deploy it"
+	if !c.File {
+		keep = "start the portal from a configuration file to keep them in it"
+	}
+	return fmt.Sprintf("configuration: %d %s kept only in the store (who sees what %d, announcements %d, layouts %d); %s",
+		n, what, c.Changes.Visibility, c.Changes.Announcements, c.Changes.Layouts, keep)
 }

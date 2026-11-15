@@ -65,37 +65,25 @@ func Parse(b []byte) (List, error) {
 	return l, nil
 }
 
-// Notices are the configured announcements and the stored changes to them.
+// Notices are the configured announcements and the stored changes to them (design/config-baseline.md).
 type Notices struct {
-	configured []config.Announcement // checked by the configuration, drafts and published made explicit
-	file       *docstore.Doc[List]
-	now        func() time.Time
-	qr         *qrCache
+	overlay *docstore.Overlay[[]config.Announcement, List]
+	now     func() time.Time
+	qr      *qrCache
 }
 
 // Name is the stored announcements' document.
 const Name = "announcements"
 
-// Open reads the stored changes from db (nil: the configured ones only, and no saving). Changes equal to the configuration are
-// dropped, so a configuration downloaded and deployed leaves the store without changes of its own. now is the clock (time.Now).
+// Open reads the stored changes to the configured announcements from db (nil: the configured ones only, and no saving). now is the
+// clock (time.Now).
 func Open(ctx context.Context, configured []config.Announcement, db docstore.Backend, now func() time.Time, log *slog.Logger) *Notices {
-	log = log.With("store", "announcements")
-	n := &Notices{
-		configured: explicit(configured),
-		file:       docstore.Open(ctx, db, Name, List{Announcements: []config.Announcement{}}, Parse, log),
-		now:        now,
-		qr:         &qrCache{codes: map[string]*oapi.QRCode{}},
+	ops := docstore.Ops[[]config.Announcement, List]{Merge: merge, Diff: diff, Count: List.Count, Parse: Parse}
+	return &Notices{
+		overlay: docstore.OpenOverlay(ctx, db, Name, explicit(configured), ops, log.With("store", Name)),
+		now:     now,
+		qr:      &qrCache{codes: map[string]*oapi.QRCode{}},
 	}
-	if st := n.file.Get(); st.Stored && st.Problem == "" {
-		if pruned := n.diff(n.all()); pruned.Count() != st.Value.Count() {
-			if b, err := encode(pruned); err == nil {
-				if _, err := n.file.Save(ctx, b, st.Revision); err != nil {
-					log.Error("the changes equal to the configuration were not dropped", "err", err)
-				}
-			}
-		}
-	}
-	return n
 }
 
 // explicit is list with every announcement's published made explicit, so two that mean the same compare equal.
@@ -109,83 +97,70 @@ func explicit(list []config.Announcement) []config.Announcement {
 	return out
 }
 
-// same reports whether a and b are the same announcement, field by field as stored.
-func same(a, b config.Announcement) bool {
-	ja, _ := json.Marshal(a) //nolint:errchkjson // plain strings and slices
-	jb, _ := json.Marshal(b) //nolint:errchkjson // plain strings and slices
-	return bytes.Equal(ja, jb)
+// byID is the index of the announcement id in list, or -1.
+func byID(list []config.Announcement, id string) int {
+	return slices.IndexFunc(list, func(a config.Announcement) bool { return a.ID == id })
 }
 
-// diff is what the store keeps for the list in force: the announcements not as the configuration has them, and the configuration's
+// diff is what the store keeps of the list in force: the announcements not as the configuration has them, and the configuration's
 // ones the list lacks.
-func (n *Notices) diff(list []config.Announcement) List {
+func diff(configured, list []config.Announcement) List {
+	list = explicit(list)
 	out := List{Announcements: []config.Announcement{}}
 	for _, a := range list {
-		if i := slices.IndexFunc(n.configured, func(c config.Announcement) bool { return c.ID == a.ID }); i < 0 || !same(n.configured[i], a) {
+		if i := byID(configured, a.ID); i < 0 || !docstore.Same(configured[i], a) {
 			out.Announcements = append(out.Announcements, a)
 		}
 	}
-	for _, c := range n.configured {
-		if !slices.ContainsFunc(list, func(a config.Announcement) bool { return a.ID == c.ID }) {
+	for _, c := range configured {
+		if byID(list, c.ID) < 0 {
 			out.Removed = append(out.Removed, c.ID)
 		}
 	}
 	return out
 }
 
-func encode(l List) ([]byte, error) {
-	b, err := json.MarshalIndent(l, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append(b, '\n'), nil
-}
-
-// Problems is why the stored document is not served, and that changes are kept only in the store, for the admin status.
-func (n *Notices) Problems() []string {
-	st := n.file.Get()
-	if st.Problem != "" {
-		return []string{"announcements: " + st.Problem + "; serving the last good announcements"}
-	}
-	if c := st.Value.Count(); c > 0 {
-		word, them := "changes", "them"
-		if c == 1 {
-			word, them = "change", "it"
-		}
-		return []string{fmt.Sprintf("announcements: %d %s kept only in the store, not in the configuration; download scp.yaml from Admin to keep %s",
-			c, word, them)}
-	}
-	return nil
-}
-
-// all is the list in force: the configured ones in their order, each replaced by its stored change or left out when removed, then
-// the ones added here.
-func (n *Notices) all() []config.Announcement {
-	l := n.file.Get().Value
-	out := make([]config.Announcement, 0, len(n.configured)+len(l.Announcements))
-	for _, c := range n.configured {
+// merge is the list in force: the configured ones in their order, each replaced by its stored change or left out when removed,
+// then the ones added here.
+func merge(configured []config.Announcement, l List) []config.Announcement {
+	out := make([]config.Announcement, 0, len(configured)+len(l.Announcements))
+	for _, c := range configured {
 		if slices.Contains(l.Removed, c.ID) {
 			continue
 		}
-		if i := slices.IndexFunc(l.Announcements, func(a config.Announcement) bool { return a.ID == c.ID }); i >= 0 {
+		if i := byID(l.Announcements, c.ID); i >= 0 {
 			c = l.Announcements[i]
 		}
 		out = append(out, c)
 	}
 	for _, a := range l.Announcements {
-		if !slices.ContainsFunc(n.configured, func(c config.Announcement) bool { return c.ID == a.ID }) {
+		if byID(configured, a.ID) < 0 {
 			out = append(out, a)
 		}
 	}
 	return out
 }
 
+// Problems is why the stored document is not served, for the admin status.
+func (n *Notices) Problems() []string {
+	if p := n.overlay.State().Problem; p != "" {
+		return []string{"announcements: " + p + "; serving the last good announcements"}
+	}
+	return nil
+}
+
+// Changes is how many announcements are changed, added or removed only in the store, not in the configuration.
+func (n *Notices) Changes() int { return n.overlay.Changes() }
+
+// List is the announcements in force: the configuration's with the admins' changes.
+func (n *Notices) List() []config.Announcement { return n.overlay.Value() }
+
 // For is what the viewer of ctx may see on page now: published, within its dates, for the page and the viewer's audience; the
 // most pressing tone first, then the soonest, at most three.
 func (n *Notices) For(ctx context.Context, page string) []oapi.Announcement {
 	now, private := n.now(), httpapi.Private(ctx)
 	var shown []config.Announcement
-	for _, a := range n.all() {
+	for _, a := range n.List() {
 		if a.Shows(now, page, private) {
 			shown = append(shown, a)
 		}
@@ -259,6 +234,3 @@ func (c *qrCache) of(url string) *oapi.QRCode {
 	c.codes[url] = q
 	return q
 }
-
-// List is the announcements in force: the configuration's with the admins' changes.
-func (n *Notices) List() []config.Announcement { return n.all() }

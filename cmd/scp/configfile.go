@@ -57,6 +57,12 @@ func baseline(b config.Baseline) (visibility.Doc, map[string]layout.Layout, []st
 // line as the operator wrote it.
 func configHandler(file []byte, vis *visibility.Set, notices *announce.Notices, layouts *layout.Store) http.Handler {
 	return httpapi.AdminOnly(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if file == nil {
+			// Configured by SCP_* variables alone: the three sections alone are not a configuration a portal starts from.
+			httpapi.WriteProblem(w, http.StatusConflict, "no-file",
+				"This portal was started without a configuration file, so there is no scp.yaml to write the changes into.")
+			return
+		}
 		out, err := configYAML(file, []section{
 			{"visibility", visibilityValue(vis.Doc())},
 			{"layouts", layoutsValue(layouts)},

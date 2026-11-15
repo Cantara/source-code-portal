@@ -137,12 +137,9 @@ func openStore(t *testing.T) *store.DB {
 
 func save(t *testing.T, s *Set, body string) {
 	t.Helper()
-	d := doc(t, body)
-	b, _ := encode(d)
-	if _, err := s.file.Save(t.Context(), b, s.Revision()); err != nil {
+	if _, err := s.overlay.Save(t.Context(), doc(t, body), s.Revision()); err != nil {
 		t.Fatal(err)
 	}
-	s.refresh()
 }
 
 // The snapshot's views follow the audiences; search engines are offered only what everyone sees with its switch on, and a product's
@@ -307,39 +304,68 @@ func TestConfigurationIsTheBaseline(t *testing.T) {
 	if got := s.Doc().Repo("acme/w", nil, true).Audience; got != NoOne {
 		t.Errorf("acme/w from the file = %s", got)
 	}
-	if n := len(s.Problems()); n != 0 {
-		t.Errorf("nothing stored, yet %v", s.Problems())
+	if n := s.Changes(); n != 0 {
+		t.Errorf("nothing stored, yet %d changes", n)
 	}
 
 	// An admin returns acme/w to inheriting, sets acme/x and leaves the rest as the file has it: only that difference is stored.
 	d := Merge(base, Overrides{})
 	delete(d.Repos, "acme/w")
 	d.Repos["acme/x"] = Setting{Audience: SignedIn, Search: true}
-	b, _ := encodeOverrides(Diff(base, d))
-	if want := `{"repos":{"acme/w":null,"acme/x":{"audience":"signed-in","search":true}}}`; strings.Join(strings.Fields(string(b)), "") != want {
-		t.Errorf("stored %s, want %s", b, want)
-	}
-	if _, err := s.file.Save(t.Context(), b, s.Revision()); err != nil {
+	if _, err := s.overlay.Save(t.Context(), d, s.Revision()); err != nil {
 		t.Fatal(err)
 	}
-	s.refresh()
+	if b, _ := docstore.Encode(s.overlay.State().Value); strings.Join(strings.Fields(string(b)), "") !=
+		`{"version":2,"repos":{"acme/w":null,"acme/x":{"audience":"signed-in","search":true}}}` {
+		t.Errorf("stored %s", b)
+	}
 	if got := s.Doc().Repo("acme/w", nil, true); got.Audience != Everyone || got.Why != FromDefault {
 		t.Errorf("acme/w after null = %+v", got)
 	}
 	if got := s.Doc().Repo("acme/z1", nil, true).Audience; got != SignedIn {
 		t.Errorf("the file's rule = %s", got)
 	}
-	if p := s.Problems(); len(p) != 1 || !strings.Contains(p[0], "2 changes kept only in the store") {
-		t.Errorf("problems %v", p)
+	if n := s.Changes(); n != 2 {
+		t.Errorf("changes kept only in the store: %d", n)
 	}
 
 	// The file now holds acme/x as the admin set it: at the next start that change is dropped, the null kept.
 	base.Repos["acme/x"] = Setting{Audience: SignedIn, Search: true}
 	s = Open(t.Context(), db, base, nil, quiet)
-	if got := s.file.Get().Value; got.Count() != 1 || got.Repos["acme/w"] != nil {
+	if got := s.overlay.State().Value; got.Count() != 1 || got.Repos["acme/w"] != nil {
 		t.Errorf("after the start, stored %+v", got)
 	}
 	if got := s.Doc().Repo("acme/x", nil, true).Audience; got != SignedIn {
 		t.Errorf("acme/x = %s", got)
+	}
+}
+
+// A whole document saved by 2.2.19 or 2.2.20 (or taken over from their parked and search-engine lists) wrote "rules": [] for "no
+// rules": it is no change to the configuration's rules, which apply; at the start it is written again as overrides.
+func TestAWholeDocumentOfAnOlderReleaseKeepsTheFilesRules(t *testing.T) {
+	db := openStore(t)
+	whole := []byte(`{"groups":{},"repos":{"acme/w":{"audience":"no-one","search":true}},"rules":[]}` + "\n")
+	if err := db.PutDocument(t.Context(), Name, whole, docstore.Digest(whole), ""); err != nil {
+		t.Fatal(err)
+	}
+	base := doc(t, `{"rules":[{"pattern":"^acme/z","audience":"signed-in"}]}`)
+	s := Open(t.Context(), db, base, nil, quiet)
+	if got := s.Doc().Repo("acme/z1", nil, true).Audience; got != SignedIn {
+		t.Errorf("the file's rule = %s, want signed-in", got)
+	}
+	if got := s.Doc().Repo("acme/w", nil, true).Audience; got != NoOne {
+		t.Errorf("the stored choice = %s", got)
+	}
+	if st := s.overlay.State().Value; st.Version != overridesVersion || st.Rules != nil || s.Changes() != 1 {
+		t.Errorf("rewritten as %+v", st)
+	}
+	// An admin who removes every rule of the file: an empty list now replaces the file's.
+	d := s.Doc()
+	d.Rules = nil
+	if _, err := s.overlay.Save(t.Context(), d, s.Revision()); err != nil {
+		t.Fatal(err)
+	}
+	if got := Open(t.Context(), db, base, nil, quiet).Doc().Repo("acme/z1", nil, true).Audience; got != Everyone {
+		t.Errorf("after the rules were removed here = %s", got)
 	}
 }

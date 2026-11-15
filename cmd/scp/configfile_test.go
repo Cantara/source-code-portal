@@ -2,12 +2,14 @@ package main
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/httpapi"
 )
 
 // TestConfigurationIsTheBaseline (design/config-baseline.md): scp.yaml's `visibility:` and `layouts:` decide with nothing stored; an
@@ -32,14 +34,15 @@ layouts:
 	if _, b, _ := get("/api/v1/pages/present"); !strings.Contains(b, `"telemetry"`) || strings.Contains(b, `"fleetMap"`) {
 		t.Errorf("the file's layout does not apply: %.300s", b)
 	}
-	if _, b, _ := get("/api/v1/admin/status", adminToken...); strings.Contains(b, "kept only in the store") {
+	if _, b, _ := get("/api/v1/admin/status", adminToken...); strings.Contains(b, "kept only in the store") || !strings.Contains(b, `"file": true`) {
 		t.Errorf("nothing changed, yet the status warns: %.400s", b)
 	}
 
 	// An admin shows acme/open to everyone but keeps it from search engines, and adds a rule.
 	saveVisibility(t, get, `{"repos":{"acme/open":{"audience":"everyone","search":false}},"rules":[{"pattern":"^acme/zq-","audience":"no-one","search":true}]}`)
 	until(t, "the change applies", func() bool { return shown("/api/v1/repos/acme/open") })
-	if _, b, _ := get("/api/v1/admin/status", adminToken...); !strings.Contains(b, "visibility: 2 changes kept only in the store") {
+	if _, b, _ := get("/api/v1/admin/status", adminToken...); !strings.Contains(b, "configuration: 2 changes are kept only in the store") ||
+		!strings.Contains(b, `"visibility": 2`) {
 		t.Errorf("the status does not warn of the changes: %.600s", b)
 	}
 
@@ -103,5 +106,20 @@ announcements:
 	}
 	if out, err := configYAML(nil, []section{{"layouts", []byte(`{"dashboard":{"elements":[]}}`)}}); err != nil || string(out) != "layouts:\n  dashboard:\n    elements: []\n" {
 		t.Errorf("without a file: %q %v", out, err)
+	}
+}
+
+// A portal configured by SCP_* variables alone has no file to write the changes into: the download says so instead of offering the
+// three sections as a configuration, which would not start.
+func TestTheDownloadNeedsAFile(t *testing.T) {
+	r := httptest.NewRequestWithContext(httpapi.WithViewer(t.Context(), httpapi.Viewer{Identity: httpapi.Identity{User: "ada", Via: "oidc"}, Admin: true, Private: true}), "GET", configPath, nil)
+	w := httptest.NewRecorder()
+	configHandler(nil, nil, nil, nil).ServeHTTP(w, r)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "no-file") {
+		t.Errorf("without a file: %d %s", w.Code, w.Body)
+	}
+	if got := configWarning(statusConfig{Changes: configChanges{Visibility: 1}}); !strings.Contains(got, "1 change is kept") ||
+		!strings.Contains(got, "start the portal from a configuration file") {
+		t.Errorf("the warning without a file: %s", got)
 	}
 }
