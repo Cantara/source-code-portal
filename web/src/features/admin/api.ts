@@ -5,7 +5,16 @@ import { unwrap, type Get } from "@/lib/api/client"
 export interface AdminStatus {
   ready: boolean
   alive: boolean
-  snapshot: { version: number; builtAt: string; ageSeconds: number; catalogued: boolean; repos: number }
+  snapshot: {
+    version: number
+    builtAt: string
+    ageSeconds: number
+    catalogued: boolean
+    repos: number
+    /** of repos, the ones only signed-in viewers see and the ones no one sees (design/visibility.md) */
+    signedIn: number
+    parked: number
+  }
   queue: { waiting: number; running: number }
   sources: {
     id: string

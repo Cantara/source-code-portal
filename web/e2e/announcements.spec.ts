@@ -40,7 +40,7 @@ test("an admin writes, previews, publishes and removes an announcement", { tag: 
   await page.goto("/")
   await expect(page.getByRole("region", { name: "Announcements" }).getByText("The vault moves to the new cluster")).toBeVisible()
 
-  await page.goto("/admin")
+  await page.goto("/admin#announcements")
   const card = page.getByRole("region", { name: "Announcements" })
   await expect(card.getByText(title)).toBeVisible()
   await expect(card.getByText("from the configuration").first()).toBeVisible()

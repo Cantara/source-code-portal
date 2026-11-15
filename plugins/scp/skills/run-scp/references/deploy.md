@@ -168,7 +168,7 @@ operator guide's section 2.7). [theme.md](theme.md) has what to ask, the layout,
 ## Announcements
 
 The team's news (an event with a sign-up link, planned maintenance) shows at the top of the dashboard and of `/present` while its
-time lasts. Administrators write them on the Admin page's *Announcements* card, saved in the store; the
+time lasts. Administrators write them in the Admin page's *Announcements* section, saved in the store; the
 deployment can set its own in `announcements[]` (`id`, `title`, `text`, `tone`: `event`, `info` or `notice`, `starts`/`ends` in RFC
 3339 with their offset, `place`, `link` with `label` and an https `url`, `lang`, `pages`: `dashboard` and/or `present`, `audience`:
 `everyone` or `signed-in`, `from`, `until` (required unless `ends`), `published`), which `scp config check` checks and Admin lists

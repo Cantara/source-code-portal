@@ -25,7 +25,7 @@ refreshes on its schedule).
 <!-- /prerequisites -->
 
 **When something is missing, the portal says so.** It reads the App's grants from its installations at every listing and warns where
-it matters: the page of the feature (`/pulls`, `/issues`) says the feature is off, the *Admin* page's *GitHub prerequisites* card and
+it matters: the page of the feature (`/pulls`, `/issues`) says the feature is off, the *Admin* page's *GitHub* section (*GitHub prerequisites*) and
 `/api/v1/status`'s warnings say which permissions and events are missing on which installation and how to fix it, and the log has a
 `prerequisites unmet` line when that changes. With a token, which GitHub does not let the portal ask, the warning comes when GitHub
 refuses a feature's reads (403) for most repositories. `GET /api/v1/prerequisites` gives the same; only an administrator sees the
@@ -318,6 +318,11 @@ failed attempt comes back to `/signin` with what went wrong. *Sign out* ends the
 repositories; an administrator (a verified email in `auth.admin_emails`, a member of `auth.admin_groups`, or a token with `admin: true`)
 sees them too and the *Admin* page with the portal's status. A session keeps only the groups those lists name.
 
+**The Admin page** is in sections, each at its own address, with a menu at the left (a row above on a phone): *Overview* (`/admin`:
+the warnings first, then a tile per area with its next step, the instance and the snapshot), *Who sees what* (`/admin#visibility`),
+*Announcements* (`/admin#announcements`), *GitHub* (`/admin#github`: the sources, the webhook and the prerequisites) and *Assistant*
+(`/admin#assistant`). A dot in the menu marks a section that needs action.
+
 **Tokens** are for API clients and agents: `Authorization: Bearer <token>` on any request reads as the token's groups (`curl -H
 "Authorization: Bearer $(cat token)" https://scp.example.org/llms-full.txt`); a wrong token is refused with 401, never served as
 anonymous. Remove a token from the configuration to revoke it, the sessions it opened included.
@@ -348,7 +353,7 @@ assistant:
   access: signed-in                   # admin, or everyone (also anonymous visitors: mind the provider's bill)
 ```
 
-3. Restart, sign in as an administrator and press *Test the provider* on the *Admin* page: it asks the model for one short completion
+3. Restart, sign in as an administrator and press *Test the provider* in the *Admin* page's *Assistant* section: it asks the model for one short completion
    and shows the time it took or the provider's error.
 
 The header shows *Ask* to the viewers `assistant.access` admits. `signed-in` and `admin` need a way to know the viewer (section 2.2 or
@@ -420,7 +425,7 @@ The portal carries the team's news: an event with a sign-up link, planned mainte
 announcement shows at the top of the dashboard and of `/present` (the `announcements` element in the design mode; move it like any
 other) while its time lasts, and goes away by itself. It is plain text with one link, never HTML or Markdown.
 
-- **Administrators** write them on the *Admin* page's *Announcements* card: the title, a line, when it starts and ends, where, a link
+- **Administrators** write them in the *Admin* page's *Announcements* section: the title, a line, when it starts and ends, where, a link
   and its words, the tone (*Event*, *Announcement* or *Notice*, each in a colour of its own, never a health colour), the language of
   its text, the pages it shows on (the dashboard, `/present` or both), who sees it (everyone, or signed-in viewers only), when it shows
   and until when. *Published* off keeps it as a draft. The preview beside the form is the card the pages draw. They are saved in
@@ -814,7 +819,7 @@ is not signed in; "I've installed it" finds the tracker after the first page vie
 
 ### 2.11 Who sees what
 
-An administrator chooses, in **Admin**, card *Who sees what*, who sees each product and repository in the portal, and whether search
+An administrator chooses, in **Admin**, section *Who sees what* (`/admin#visibility`), who sees each product and repository in the portal, and whether search
 engines such as Google are offered what everyone sees. The card lists every catalogued repository under its products, private ones
 included, with three choices each:
 
@@ -1055,9 +1060,9 @@ steps, and job failures. Secrets are never logged.
 | Symptom | Look at |
 |---|---|
 | `config check` exits 2 | every problem is listed with its key; unknown keys and `SCP_*` variables are errors |
-| `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub prerequisites* card names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation, or switch the feature off with `features.pulls` or `features.issues` (section 1) |
+| `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub* section names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation, or switch the feature off with `features.pulls` or `features.issues` (section 1) |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
 | A repository is missing | it must be public, not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it); a fork is hidden unless `include_forks` is set or a group names it (the dashboard says how many are hidden; `scp config groups` lists them) |
 | Pushes, issues or pull requests show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository (a delivery shown as failed is read from that log within minutes: `scp_webhook_deliveries_total{result="caught_up"}`), `scp_webhook_deliveries_total` by result; the App must subscribe to *Issues*, *Pull request* and *Pull request review* (the *GitHub prerequisites* card) |
-| The assistant answers with an error | *Test the provider* on the *Admin* page; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
+| The assistant answers with an error | *Test the provider* in the *Admin* page's *Assistant* section; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |
