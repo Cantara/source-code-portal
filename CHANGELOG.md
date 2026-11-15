@@ -4,7 +4,11 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
-## Unreleased
+## 2.2.19
+
+Parked repositories, a shorter sitemap that opens as a tree in the browser, and webhook answers bounded and shown in the status. Nothing
+new is asked of GitHub, no configuration key changes, and the store's schema is unchanged (the parked list is a document in it, as the
+search engine list is).
 
 - **The Search engines card says what a tick does**: a ticked product or repository leaves `/sitemap.xml` and says noindex once saved;
   each repository shows whether it is in the sitemap or kept out (ticked, with its product, or by a rule); the rules are folded as
