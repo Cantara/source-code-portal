@@ -96,6 +96,21 @@ test("the sitemap lists every page with its newest commit and robots.txt points 
   expect(robots).toContain("Disallow: /api/")
 })
 
+test("a browser draws the sitemap as an XML tree, nothing in it blocked", async ({ page }) => {
+  const blocked: string[] = []
+  // What the CSP refuses the browser's XML viewer; the fixtures' init scripts are refused by the sandbox, as they should be, and are
+  // not counted.
+  page.on("console", (m) => {
+    if (m.type() === "error" && m.text().includes("Content Security Policy")) blocked.push(m.text())
+  })
+  await page.goto("/sitemap.xml")
+  // Chrome's XML viewer puts its notice above the tree; when the CSP blocks its styles the bare text comes first instead.
+  expect(await page.evaluate(() => document.body.innerText)).toMatch(
+    /^This XML file does not appear to have any style information/,
+  )
+  expect(blocked).toEqual([])
+})
+
 type Node = Record<string, unknown> & { "@type": string }
 
 test.describe("every page of the sitemap, as a crawler reads it", () => {

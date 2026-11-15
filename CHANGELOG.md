@@ -4,6 +4,10 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## Unreleased
+
+- **The sitemap opens as an XML tree in the browser**: its CSP now lets the browser's own XML viewer draw it; Chrome showed the bare text.
+
 ## 2.2.18
 
 A fix for what the sitemap shows a signed-in viewer. Nothing new is asked of GitHub, and the store is unchanged.

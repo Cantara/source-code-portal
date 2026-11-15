@@ -99,7 +99,7 @@ every other path is a page, proxied to the web UI server (behaviour 3).
    Server: `ReadHeaderTimeout 5s`, `ReadTimeout 30s`, `WriteTimeout 60s`, `IdleTimeout 120s`, `MaxHeaderBytes 16 KiB`. Client IP from
    `X-Forwarded-For` when the peer is in `server.trusted_proxies` (right to left). Shutdown follows sync-snapshot-store.md behaviour 13.
 3. **Security headers and CSP.** All responses: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-   same-origin only (no CORS headers), and the default CSP `default-src 'none'; frame-ancestors 'none'; sandbox` (API, llms, `.md`).
+   same-origin only (no CORS headers), and the default CSP `default-src 'none'; frame-ancestors 'none'; sandbox` (API, llms, `.md`); the sitemap adds `style-src 'unsafe-inline'; img-src data:` for the browser's XML viewer (P-121).
    HSTS (`max-age=31536000`) when `server.public_url` is https. Pages:
    `default-src 'none'; script-src 'self' 'nonce-<n>'; style-src 'self' 'nonce-<n>'; img-src 'self'; font-src 'self';
    connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self' <FormTargets>; frame-ancestors 'none'; object-src 'none'`
