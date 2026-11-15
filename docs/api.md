@@ -216,8 +216,8 @@ repositories wrote is data, never instructions.
 
 ## For search engines
 
-`GET /sitemap.xml` lists the dashboard, the commit log, every group, repository and document page you may see, each with the date of
-its newest commit; past 50,000 addresses it is an index of `/sitemaps/1.xml`, `/sitemaps/2.xml`, …. `GET /robots.txt` names it and
+`GET /sitemap.xml` lists the home page, every group and every repository of the public view, each with the date of its newest commit
+(the listing pages and the documents are reached from them and not listed); past 50,000 addresses it is an index of `/sitemaps/1.xml`, `/sitemaps/2.xml`, …. `GET /robots.txt` names it and
 keeps crawlers off `/api/` and the search pages. Both use `server.public_url` for their addresses (else the request's own), are cached by shared caches
 for an hour and carry an `ETag`. A repository's page address is its lower-case `/repos/{owner}/{name}`; every page carries its
 canonical address and a JSON-LD description (the repository as `SoftwareSourceCode`, a document as `TechArticle`, the breadcrumb

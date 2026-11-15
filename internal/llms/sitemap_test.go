@@ -45,16 +45,15 @@ func TestSitemap(t *testing.T) {
 	if rec.Code != 200 || rec.Header().Get("Content-Type") != "application/xml; charset=utf-8" || rec.Header().Get("Cache-Control") != machineCache {
 		t.Fatalf("sitemap: %d %v", rec.Code, rec.Header())
 	}
-	// The pages with the newest commit as lastmod; the README is the repository's page, a hidden document is left out.
+	// The home page, the groups and the repositories with the newest commit as lastmod; no listing page and no document (P-118).
 	golden(t, "sitemap.xml", rec.Body.String())
 	if again := get(mux, "/sitemap.xml", "If-None-Match", rec.Header().Get("ETag")); again.Code != http.StatusNotModified {
 		t.Errorf("If-None-Match: %d", again.Code)
 	}
-	off := sitemapOptions()
-	off.Pulls, off.Issues = nil, nil
-	if b := get(New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", off).Sitemap(), "/sitemap.xml").Body.String(); strings.Contains(b, "/pulls") ||
-		strings.Contains(b, "/issues") || !strings.Contains(b, "/commits") {
-		t.Errorf("switched off, the sitemap names their pages:\n%s", b)
+	for _, p := range []string{"/commits", "/releases", "/archive", "/insights", "/pulls", "/issues", "/docs/"} {
+		if strings.Contains(rec.Body.String(), p) {
+			t.Errorf("the sitemap lists %s:\n%s", p, rec.Body)
+		}
 	}
 	if rec := get(mux, "/sitemaps/1.xml"); rec.Code != http.StatusNotFound {
 		t.Errorf("a part of a sitemap without parts: %d", rec.Code)
@@ -95,10 +94,10 @@ func TestSitemapIndex(t *testing.T) {
 	s := sitemapFixture()
 	l := New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example", sitemapOptions())
 	files := l.buildSitemap(s, "https://scp.example", 3)
-	if len(files) != 5 { // 10 pages: the index and four parts
+	if len(files) != 3 { // 4 pages: the index and two parts
 		t.Fatalf("%d files", len(files))
 	}
-	for _, want := range []string{"<sitemapindex", "<loc>https://scp.example/sitemaps/1.xml</loc>", "<loc>https://scp.example/sitemaps/3.xml</loc>",
+	for _, want := range []string{"<sitemapindex", "<loc>https://scp.example/sitemaps/1.xml</loc>", "<loc>https://scp.example/sitemaps/2.xml</loc>",
 		"<lastmod>2026-10-12T06:30:00Z</lastmod>"} {
 		if !strings.Contains(string(files[0]), want) {
 			t.Errorf("index lacks %s:\n%s", want, files[0])
@@ -119,13 +118,13 @@ func TestSitemapLeavesOutWhatIsKeptOut(t *testing.T) {
 	o.IndexedGroup = func(string) bool { return true }
 	o.IndexRevision = func() string { return rev }
 	h := New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", o).Sitemap()
-	if b := get(h, "/sitemap.xml").Body.String(); !strings.Contains(b, "/repos/acme/core") || !strings.Contains(b, "/repos/acme/core/docs/docs/a%20b") {
+	if b := get(h, "/sitemap.xml").Body.String(); !strings.Contains(b, "/repos/acme/core") {
 		t.Fatalf("nothing kept out:\n%s", b)
 	}
 	out["acme/core"], rev = true, "2"
 	b := get(h, "/sitemap.xml").Body.String()
-	if strings.Contains(b, "/repos/acme/core") || !strings.Contains(b, "/commits") || !strings.Contains(b, "/groups/") {
-		t.Errorf("a repository kept out, with its documents, and the rest still in:\n%s", b)
+	if strings.Contains(b, "/repos/acme/core") || !strings.Contains(b, "/repos/acme/evil") || !strings.Contains(b, "/groups/") {
+		t.Errorf("a repository kept out, and the rest still in:\n%s", b)
 	}
 	o.IndexedGroup = func(string) bool { return false }
 	h = New(func(context.Context) *snapshot.Snapshot { return s }, "https://scp.example/", o).Sitemap()
