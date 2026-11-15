@@ -19,8 +19,10 @@ one long page of cards where the figures run together.
   section that needs action: the overview when the status has warnings, GitHub when a prerequisite is unmet or a source's listing is
   not fresh.
 - **Overview** (`Overview`): the status's warnings first, then four tiles, each with what it means and a link to where it is acted on
-  (repositories with how many only signed-in viewers and no one see, GitHub with what is to fix, events or polling with the last
-  delivery, the jobs running and waiting), then the instance and the snapshot (with `signedIn` and `parked`).
+  (repositories with how many everyone, only signed-in viewers and no one see, private ones included, from the counts of
+  `GET /api/v1/admin/visibility`, GitHub with what is to fix, events or polling with the last
+  delivery, the jobs running and waiting), then the instance and the snapshot (with `parked` and `signedIn`, the public-on-GitHub repositories only signed-in viewers
+  see).
 - **GitHub** (`GitHub`): the sources at full width (padded cells, counts right-aligned, the table scrolls inside its card), the
   webhook and the prerequisites.
 - The other sections are the cards they were: `VisibilityCard`, `AnnouncementsCard`, `AssistantCard`.

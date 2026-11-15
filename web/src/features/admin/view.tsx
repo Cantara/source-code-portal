@@ -15,7 +15,7 @@ import { PrerequisiteDetails, setupDocs } from "@/shared/prerequisites"
 import { ProblemAlert } from "@/shared/problem-alert"
 import { RelativeTime } from "@/shared/relative-time"
 import { AnnouncementsCard } from "./announcements"
-import { VisibilityCard } from "./visibility"
+import { VisibilityCard, visibilityQuery } from "./visibility"
 import { adminStatusQuery, testProvider, type AdminStatus } from "./api"
 
 const via: Record<string, string> = { proxy: "the proxy", oidc: "single sign-on", token: "a token" }
@@ -85,7 +85,9 @@ export function Overview({ s }: { s: AdminStatus }) {
   const { data: pre } = useQuery(prerequisitesQuery(api))
   const unmet = pre?.unmet.length ?? 0
   const stale = s.sources.filter((src) => src.freshness !== "fresh").length
-  const hidden = s.snapshot.signedIn + s.snapshot.parked
+  // Every repository by its audience, private ones included; the status counts only the public-on-GitHub ones signed in only.
+  const { data: vis } = useQuery(visibilityQuery())
+  const c = vis?.counts
   return (
     <div className="flex flex-col gap-4">
       <Warnings s={s} />
@@ -93,11 +95,7 @@ export function Overview({ s }: { s: AdminStatus }) {
         <Tile
           label="Repositories"
           value={s.snapshot.repos}
-          note={
-            hidden === 0
-              ? "Everyone sees every one the access allows."
-              : `${s.snapshot.signedIn} signed in only, ${s.snapshot.parked} no one.`
-          }
+          note={c ? `${c.everyone} everyone, ${c.signedIn} signed in only, ${c.noOne} no one.` : " "}
           href="#visibility"
           action="Choose who sees what"
         />
@@ -157,7 +155,7 @@ export function Overview({ s }: { s: AdminStatus }) {
               ["Built", <RelativeTime key="b" at={s.snapshot.builtAt} />],
               ["Catalogued", yes(s.snapshot.catalogued)],
               ["Repositories", s.snapshot.repos],
-              ["Signed in only", s.snapshot.signedIn],
+              ["Public on GitHub, signed in only", s.snapshot.signedIn],
               ["No one", s.snapshot.parked],
             ]}
           />
