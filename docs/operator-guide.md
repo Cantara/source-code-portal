@@ -811,13 +811,20 @@ is not signed in; "I've installed it" finds the tracker after the first page vie
 ### 2.11 Keeping pages out of search engines
 
 An administrator can choose which products and repositories search engines such as Google are offered. In **Admin**, the *Search engines*
-card lists the products (a checkbox each) and the repositories (a filter and a checkbox each); *Save* applies the list at once.
+card lists the public products with their repositories nested under them, a checkbox each, and two boxes of rules; *Save* applies the
+list at once. Private repositories are never offered to search engines, so the card does not list them (it says how many there are).
 
+- **Rules.** New repositories arrive, so the rules are the main tool. *Keep out the repositories whose address matches* takes one regular
+  expression per line (RE2, matched against `owner/name`, not anchored, not case-sensitive: `^acme/legacy-` keeps out every repository
+  of `acme` that starts with `legacy-`, `-internal$` those that end so). A repository that arrives later is kept out the day it matches.
+  *Except the repositories whose address matches* are the exceptions to those rules. Under each line the card says how many public
+  repositories it matches now, and previews a change before it is saved. A rule that is not a regular expression is refused.
 - **What changes.** A product or repository kept out leaves `/sitemap.xml`, with its documents, and its pages answer with
   `X-Robots-Tag: noindex, nofollow`: the page, its documents and history, and the Markdown answers. The portal itself shows everything
   as before, and the API is unchanged.
-- **Products.** A repository that is only in products kept out is kept out too; one in another product that is not kept out stays,
-  and one in no product is kept out by its own checkbox only.
+- **Products and repositories.** A repository ticked is kept out. A product ticked keeps out its page and the repositories that are only
+  in products kept out; one in another product that is not kept out stays, and one in no product is kept out by its own checkbox or
+  a rule only. A repository ticked or in a product kept out stays out whatever the exceptions say.
 - **Search Console.** Submit `/sitemap.xml` as usual. A page a search engine already holds is dropped after it fetches the page again and
   reads the `noindex` (days, not minutes); there is no `robots.txt` rule on purpose, which would stop it from reading it. The URL
   removal tool of the search engine makes it quicker for a page that must go now.

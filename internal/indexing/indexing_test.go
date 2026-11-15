@@ -28,12 +28,17 @@ func TestParse(t *testing.T) {
 	if err != nil || strings.Join(e.Groups, ",") != "a,b" || strings.Join(e.Repos, ",") != "acme/old,acme/zed" {
 		t.Fatalf("a list is sorted, lower case and without repeats: %+v, %v", e, err)
 	}
-	if e, err = Parse([]byte(`{}`)); err != nil || e.Groups == nil || e.Repos == nil {
+	if e, err = Parse([]byte(`{"exclude":[" ^acme/legacy-","^acme/legacy-","tmp$"],"include":["keep"]}`)); err != nil ||
+		strings.Join(e.Exclude, ",") != "^acme/legacy-,tmp$" || strings.Join(e.Include, ",") != "keep" {
+		t.Errorf("patterns are trimmed and without repeats: %+v, %v", e, err)
+	}
+	if e, err = Parse([]byte(`{}`)); err != nil || e.Groups == nil || e.Repos == nil || e.Exclude == nil || e.Include == nil {
 		t.Errorf("an empty list has empty lists, not null: %+v, %v", e, err)
 	}
 	for name, body := range map[string]string{
 		"an unknown field": `{"groups":[],"repos":[],"x":1}`, "a bad group id": `{"groups":["A b"]}`, "a repository without an owner": `{"repos":["zed"]}`,
-		"two values": `{} {}`, "not an object": `[]`, "a large list": `{"groups":["` + strings.Repeat("a", 200) + `"]}`,
+		"a pattern that is no expression": `{"exclude":["a(b"]}`, "a long pattern": `{"include":["` + strings.Repeat("a", 300) + `"]}`,
+		"too many patterns": `{"exclude":[` + strings.Repeat(`"a",`, 51) + `"b"]}`, "two values": `{} {}`, "not an object": `[]`, "a large list": `{"groups":["` + strings.Repeat("a", 200) + `"]}`,
 	} {
 		if _, err := Parse([]byte(body)); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -107,6 +112,27 @@ func TestWhatIsKeptOut(t *testing.T) {
 	}
 }
 
+// Patterns keep out the repositories that arrive later; an include pattern is the exception; naming a repository or its products
+// come first, and a pattern never reaches a repository that no address matches.
+func TestPatterns(t *testing.T) {
+	v, s := view(t), open(t)
+	save(t, s, Excluded{Exclude: []string{"^acme/[xz]$"}, Include: []string{"^acme/z$"}})
+	for key, want := range map[snapshot.RepoKey]string{"acme/x": ByPattern, "acme/y": "", "acme/z": "", "acme/w": ""} {
+		if got := s.Why(v, key); got != want {
+			t.Errorf("%s: why = %q, want %q", key, got, want)
+		}
+	}
+	save(t, s, Excluded{Groups: []string{"a"}, Repos: []string{"acme/z"}, Exclude: []string{"(?i)ACME/W"}})
+	for key, want := range map[snapshot.RepoKey]string{"acme/x": ByProduct, "acme/y": "", "acme/z": ByName, "acme/w": ByPattern} {
+		if got := s.Why(v, key); got != want {
+			t.Errorf("%s: why = %q, want %q", key, got, want)
+		}
+	}
+	if !s.Path(v, "/repos/acme/w/readme.md") || s.Path(v, "/repos/acme/y") {
+		t.Error("a page follows its repository's pattern")
+	}
+}
+
 func get(h http.Handler, method, body string, admin bool, hdr ...string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, AdminPath, strings.NewReader(body))
 	if admin {
@@ -131,18 +157,18 @@ func TestAdminReadsAndSaves(t *testing.T) {
 		t.Fatalf("an anonymous read: %d", rec.Code)
 	}
 	rec := get(mux, http.MethodGet, "", true)
-	var body struct {
-		Excluded
-		GroupRows []GroupRow `json:"groupRows"`
-		RepoRows  []RepoRow  `json:"repoRows"`
-		Revision  string     `json:"revision"`
-		Writable  bool       `json:"writable"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusOK || !body.Writable || len(body.GroupRows) != 2 || len(body.RepoRows) != 4 {
+	var body adminBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusOK || !body.Writable || len(body.Tree) != 2 || len(body.Ungrouped) != 1 ||
+		len(body.Tree[0].Repos) != 2 || body.Private != 0 {
 		t.Fatalf("read: %d %s", rec.Code, rec.Body)
 	}
+	for _, l := range []string{`"groups":[]`, `"repos":[]`, `"exclude":[]`, `"include":[]`, `"excludeMatches":[]`} {
+		if !strings.Contains(rec.Body.String(), l) {
+			t.Errorf("nothing saved yet: %s is not an empty list in %s", l, rec.Body)
+		}
+	}
 	save := func(excluded, revision string, hdr ...string) *httptest.ResponseRecorder {
-		return get(mux, http.MethodPut, `{"groups":`+excluded+`,"repos":["acme/w"],"revision":"`+revision+`"}`, true, hdr...)
+		return get(mux, http.MethodPut, `{"groups":`+excluded+`,"repos":["acme/w"],"exclude":["^acme/z$","nothing"],"include":[],"revision":"`+revision+`"}`, true, hdr...)
 	}
 	if rec := save(`["a"]`, body.Revision, "Cookie", "s=1", "Origin", "https://evil.example"); rec.Code != http.StatusForbidden {
 		t.Errorf("a save from another origin: %d", rec.Code)
@@ -151,21 +177,35 @@ func TestAdminReadsAndSaves(t *testing.T) {
 	if rec := save(`["A b"]`, body.Revision, origin...); rec.Code != http.StatusUnprocessableEntity {
 		t.Errorf("a bad group id: %d", rec.Code)
 	}
+	if rec := get(mux, http.MethodPut, `{"exclude":["a(b"],"revision":"`+body.Revision+`"}`, true, origin...); rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("a bad pattern: %d", rec.Code)
+	}
+	// A dry run answers as if the list were saved and saves nothing.
+	if rec := get(mux, http.MethodPut, `{"exclude":["^acme/"],"dryRun":true}`, true, origin...); rec.Code != http.StatusOK ||
+		json.Unmarshal(rec.Body.Bytes(), &body) != nil || len(body.ExcludeMatches) != 1 || body.ExcludeMatches[0] != 4 || s.Path(v, "/repos/acme/x") {
+		t.Errorf("a dry run: %d %s", rec.Code, rec.Body)
+	}
 	rec = save(`["a"]`, body.Revision, origin...)
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusOK || len(body.Groups) != 1 {
 		t.Fatalf("save: %d %s", rec.Code, rec.Body)
 	}
-	via := map[string]RepoRow{}
-	for _, r := range body.RepoRows {
-		via[r.Address] = r
+	why := map[string]string{}
+	for _, g := range body.Tree {
+		for _, r := range g.Repos {
+			why[g.ID+":"+r.Address] = r.Why
+		}
 	}
-	if !via["acme/x"].Via || via["acme/x"].Excluded || !via["acme/w"].Excluded || via["acme/y"].Via || via["acme/z"].Excluded {
-		t.Errorf("rows after the save: %+v", via)
+	for _, r := range body.Ungrouped {
+		why[":"+r.Address] = r.Why
+	}
+	if why["a:acme/x"] != ByProduct || why["a:acme/y"] != "" || why["b:acme/z"] != ByPattern || why[":acme/w"] != ByName ||
+		len(body.ExcludeMatches) != 2 || body.ExcludeMatches[0] != 1 || body.ExcludeMatches[1] != 0 {
+		t.Errorf("the tree after the save: %v, matches %v", why, body.ExcludeMatches)
 	}
 	if rec := save(`[]`, "stale", origin...); rec.Code != http.StatusPreconditionFailed {
 		t.Errorf("a save from an old revision: %d", rec.Code)
 	}
-	if !s.Group("a") || !s.Path(v, "/repos/acme/w") {
+	if !s.Group("a") || !s.Path(v, "/repos/acme/w") || !s.Path(v, "/repos/acme/z") {
 		t.Error("the save is in force")
 	}
 }
