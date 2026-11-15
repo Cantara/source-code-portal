@@ -29,6 +29,7 @@ function body(over: Partial<Visibility> = {}): Visibility {
     groups: {},
     repos: { "acme/old": { audience: "no-one", search: true }, "acme/gone": { audience: "signed-in", search: true } },
     rules: [],
+    configured: { groups: {}, repos: {}, rules: [] },
     tree: [
       {
         id: "pay",
@@ -145,6 +146,27 @@ describe("who sees what", () => {
     expect(previews.at(-1)?.repos["acme/pay-vault"]).toBeUndefined()
     await userEvent.click(within(bar).getByRole("button", { name: "Keep from search engines" }))
     await waitFor(() => expect(previews.at(-1)?.repos["acme/pay-api"]).toEqual({ audience: "everyone", search: false }))
+  })
+})
+
+describe("scp.yaml as the base", () => {
+  it("marks what is changed here against scp.yaml and resets it to the file", async () => {
+    const previews: Doc[] = []
+    const configured: Doc = { groups: {}, repos: { "acme/pay-api": { audience: "no-one", search: true } }, rules: [] }
+    server.use(
+      http.get("*/api/v1/admin/visibility", () => HttpResponse.json(body({ configured }))),
+      http.post("*/api/v1/admin/visibility/preview", async ({ request }) => {
+        const d = (await request.json()) as Doc
+        previews.push(d)
+        return HttpResponse.json(previewOf(d))
+      }),
+    )
+    card()
+    // acme/pay-api is no one in scp.yaml and inherits here: changed here, with the way back to the file.
+    expect(await screen.findByText("changed here; scp.yaml: No one")).toBeInTheDocument()
+    expect(screen.getByText("set here")).toBeInTheDocument() // acme/old: kept only in the store
+    await userEvent.click(screen.getByRole("button", { name: "reset to scp.yaml" }))
+    await waitFor(() => expect(previews.at(-1)?.repos["acme/pay-api"]).toEqual({ audience: "no-one", search: true }))
   })
 })
 

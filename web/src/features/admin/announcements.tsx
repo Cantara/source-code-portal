@@ -29,7 +29,10 @@ export type Stored = {
   until?: string
 }
 
-/** Admin is what `GET /api/v1/admin/announcements` answers: the stored ones with their revision, the configured ones, locked. */
+/**
+ * Admin is what `GET /api/v1/admin/announcements` answers: the announcements in force with the stored changes' revision, and scp.yaml's
+ * (design/config-baseline.md), what the changes kept in the store are made against.
+ */
 export type Admin = { announcements: Stored[]; configured: Stored[]; revision: string; writable: boolean; problem: string }
 
 const path = "/admin/announcements"
@@ -300,7 +303,7 @@ function Editor({
 }
 
 /** Row is one announcement in the card's list: its tone, title, where it stands, its pages and audience. */
-function Row({ s, now, locked, children }: { s: Stored; now: number; locked?: boolean; children?: ReactNode }) {
+function Row({ s, now, note, children }: { s: Stored; now: number; note?: string; children?: ReactNode }) {
   const st = state(s, now)
   return (
     <li className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 py-2", `tone-${s.tone ?? "info"}`)}>
@@ -317,17 +320,25 @@ function Row({ s, now, locked, children }: { s: Stored; now: number; locked?: bo
       <span className="text-xs text-muted-foreground">
         {(s.pages ?? ["dashboard", "present"]).join(", ")}
         {s.audience === "signed-in" ? " · signed-in" : ""}
-        {locked ? " · from the configuration" : ""}
+        {note ? ` · ${note}` : ""}
       </span>
       {children}
     </li>
   )
 }
 
+/** noteOf says where an announcement is kept: as scp.yaml has it, changed here, or added here (the store's, until the file has it). */
+export function noteOf(s: Stored, configured: Stored[]): string {
+  const file = configured.find((c) => c.id === s.id)
+  if (!file) return "added here"
+  return JSON.stringify(file) === JSON.stringify(s) ? "from scp.yaml" : "changed here"
+}
+
 /**
- * AnnouncementsCard is the admin's announcements (design/announcements.md): the configured ones, locked, and the stored ones to
- * write, edit, publish or hold and remove, each previewed as the pages draw it. Saving sends the whole list with the revision it
- * was read at; someone else's save in between is refused and offered to load.
+ * AnnouncementsCard is the admin's announcements (design/announcements.md): scp.yaml's and the ones added here, to write, edit,
+ * publish or hold and remove, each previewed as the pages draw it; a change to one of scp.yaml's is kept in the store and can be
+ * reset to the file (design/config-baseline.md). Saving sends the whole list with the revision it was read at; someone else's save in
+ * between is refused and offered to load.
  */
 export function AnnouncementsCard() {
   const qc = useQueryClient()
@@ -342,7 +353,8 @@ export function AnnouncementsCard() {
   if (!data) return null
   const at = editing?.id == null ? -1 : data.announcements.findIndex((s) => s.id === editing.id)
   const gone = editing?.id != null && at < 0 // someone removed it while it was open
-  const taken = [...data.configured, ...data.announcements.filter((_, i) => i !== at)].map((s) => s.id)
+  const taken = data.announcements.filter((_, i) => i !== at).map((s) => s.id)
+  const removed = data.configured.filter((c) => !data.announcements.some((s) => s.id === c.id))
   const write = async (list: Stored[]) => {
     setBusy(true)
     setError(null)
@@ -396,7 +408,7 @@ export function AnnouncementsCard() {
       </p>
       {!data.writable && (
         <Alert variant="warn" className="mt-3">
-          Saving needs a layout directory: set layout.dir in the configuration. Announcements in scp.yaml show meanwhile.
+          This portal has no store to save in; the announcements in scp.yaml show.
         </Alert>
       )}
       {data.problem && (
@@ -414,16 +426,25 @@ export function AnnouncementsCard() {
           )}
         </Alert>
       )}
-      {data.configured.length + data.announcements.length === 0 && !editing ? (
+      {data.announcements.length + removed.length === 0 && !editing ? (
         <p className="mt-3 text-sm text-muted-foreground">No announcements yet.</p>
       ) : (
         <ul className="mt-3 divide-y divide-border">
-          {data.configured.map((s) => (
-            <Row key={`c-${s.id}`} s={s} now={now} locked />
-          ))}
           {data.announcements.map((s, i) => (
-            <Row key={`s-${s.id}`} s={s} now={now}>
+            <Row key={`s-${s.id}`} s={s} now={now} note={noteOf(s, data.configured)}>
               <span className="flex gap-1">
+                {noteOf(s, data.configured) === "changed here" && (
+                  <Button
+                    variant="ghost"
+                    className="min-h-7 px-2 text-xs"
+                    onClick={() =>
+                      void write(data.announcements.map((a) => data.configured.find((c) => c.id === a.id && a.id === s.id) ?? a))
+                    }
+                    disabled={busy || !data.writable}
+                  >
+                    Reset to scp.yaml<span className="sr-only"> {s.title}</span>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="min-h-7 px-2 text-xs"
@@ -441,6 +462,18 @@ export function AnnouncementsCard() {
                   Remove<span className="sr-only"> {s.title}</span>
                 </Button>
               </span>
+            </Row>
+          ))}
+          {removed.map((c) => (
+            <Row key={`r-${c.id}`} s={c} now={now} note="in scp.yaml, removed here">
+              <Button
+                variant="ghost"
+                className="min-h-7 px-2 text-xs"
+                onClick={() => void write([...data.announcements, c])}
+                disabled={busy || !data.writable}
+              >
+                Restore from scp.yaml<span className="sr-only"> {c.title}</span>
+              </Button>
             </Row>
           ))}
         </ul>

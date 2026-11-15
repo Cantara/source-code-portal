@@ -88,7 +88,8 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    [references/essentials.md](references/essentials.md). Set `server.public_url` (absolute links, HSTS on https) and
    `server.trusted_proxies` (only the reverse proxy's network). Add only the sections they asked for: `webhook`, `access` and
    `include_private`, `auth` (OIDC: redirect URI `<public_url>/auth/callback`, sign-out redirect `<public_url>/`), `llm` and
-   `assistant`, `announcements[]` (the deployment's own, locked in Admin), `web.theme_dir` and `web.product_name` (their colours, logo and
+   `assistant`, `announcements[]` and `visibility:` (the base of what admins change in Admin; download it back from Admin with their changes,
+   [references/deploy.md](references/deploy.md)), `web.theme_dir` and `web.product_name` (their colours, logo and
    name: [references/theme.md](references/theme.md), for a release after v2.2.10), `cluster` (several instances through
    Hazelcast). `config check` until it passes.
 6. **Deploy.** Write the files for their target from [references/deploy.md](references/deploy.md): Docker Compose with Caddy (the

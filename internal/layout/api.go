@@ -73,8 +73,10 @@ type adminBody struct {
 	Elements []oapi.LayoutElement `json:"elements"`
 	Revision string               `json:"revision"`
 	Stored   bool                 `json:"stored"`
-	Writable bool                 `json:"writable"`
-	Problem  string               `json:"problem"`
+	// Configured is true when the configuration's `layouts:` has the page: a reset returns to it, else to the built-in one.
+	Configured bool   `json:"configured"`
+	Writable   bool   `json:"writable"`
+	Problem    string `json:"problem"`
 }
 
 type saveBody struct {
@@ -119,7 +121,7 @@ func (h admin) write(w http.ResponseWriter, page string) {
 	p := h.store.Get(page)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(adminBody{Page: page, Elements: p.Layout.Elements, Revision: p.Revision, Stored: p.Stored, //nolint:errcheck,gosec // the client went away
+	json.NewEncoder(w).Encode(adminBody{Page: page, Elements: p.Layout.Elements, Revision: p.Revision, Stored: p.Stored, Configured: p.Configured, //nolint:errcheck,gosec // the client went away
 		Writable: h.store.Writable(), Problem: p.Problem})
 }
 

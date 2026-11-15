@@ -129,6 +129,8 @@ describe("admin", () => {
     expect(await screen.findByText("4 everyone, 2 signed in only, 1 no one.")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Choose who sees what" })).toHaveAttribute("href", "#visibility")
     expect(screen.getByText(/Signed in as Ada through single sign-on, an administrator/)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Download scp.yaml" })).toHaveAttribute("href", "/api/v1/admin/config.yaml")
+    expect(screen.getByText(/The store holds no changes of its own/)).toBeInTheDocument()
   })
 
   it("shows one section at a time from the side menu, the overview first", async () => {

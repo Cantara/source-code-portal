@@ -124,6 +124,7 @@ export function Overview({ s }: { s: AdminStatus }) {
         />
         <Tile label="Jobs" value={s.queue.running} note={`running, ${s.queue.waiting} waiting.`} attention={!s.alive} />
       </div>
+      <Configuration pending={s.warnings.some((w) => w.includes("kept only in the store"))} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardTitle>Instance</CardTitle>
@@ -162,6 +163,27 @@ export function Overview({ s }: { s: AdminStatus }) {
         </Card>
       </div>
     </div>
+  )
+}
+
+/**
+ * Configuration offers scp.yaml with the changes made here written into it (design/config-baseline.md): who sees what, the
+ * announcements and the layouts start from the file, and the store keeps only what admins changed.
+ */
+function Configuration({ pending }: { pending: boolean }) {
+  return (
+    <Card aria-labelledby="configuration" className={cn(pending && "border-amber-700/60")}>
+      <CardTitle id="configuration">Configuration</CardTitle>
+      <p className="mt-1 text-sm">
+        scp.yaml is the base of who sees what, the announcements and the layouts; what is changed here is kept in the store.{" "}
+        {pending
+          ? "Some changes are kept only in the store: download scp.yaml with them written in and deploy it, so a new store keeps them."
+          : "The store holds no changes of its own: scp.yaml has everything."}
+      </p>
+      <a href="/api/v1/admin/config.yaml" download="scp.yaml" className={buttonClass(pending ? "default" : "outline", "mt-3")}>
+        Download scp.yaml
+      </a>
+    </Card>
   )
 }
 

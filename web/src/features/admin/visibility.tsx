@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardTitle } from "@/components/ui/card"
 import { get, ProblemError, send } from "@/lib/api/client"
 import { cn } from "@/lib/cn"
+import { plural } from "@/lib/format"
 
 /** Audience is who sees an item (design/visibility.md). */
 export type Audience = "everyone" | "signed-in" | "no-one"
@@ -29,6 +30,8 @@ export type Node = Effective & { id: string; name: string; setting: Setting | nu
 
 /** Visibility is what `GET /api/v1/admin/visibility` answers, outside the contract (design/visibility.md). */
 export type Visibility = Doc & {
+  /** scp.yaml's `visibility:`: what the store's changes are made against (design/config-baseline.md). */
+  configured: Doc
   tree: Node[]
   ungrouped: Item[]
   /** Addresses the choices name that the catalogue does not hold: renamed, deleted or not listed yet. */
@@ -59,6 +62,26 @@ const audiences: { value: Audience; label: string; on: string }[] = [
 export function describe(e: { audience: Audience; search: boolean }): string {
   if (e.audience === "everyone") return e.search ? "Everyone, offered to search engines" : "Everyone, kept from search engines"
   return e.audience === "signed-in" ? "Signed in only" : "No one"
+}
+
+const alike = (a: Setting | undefined | null, b: Setting | undefined | null) =>
+  !!a && !!b && a.audience === b.audience && a.search === b.search
+
+/** differs reports whether an item's own choice is not what scp.yaml has for it. */
+export function differs(own: Setting | null, file: Setting | undefined): boolean {
+  return own ? !alike(own, file) : !!file
+}
+
+/** sameRules reports whether two lists of rules are the same. */
+export function sameRules(a: Rule[], b: Rule[]): boolean {
+  return a.length === b.length && a.every((r, i) => r.pattern === b[i]?.pattern && alike(r, b[i]))
+}
+
+/** origin says where an item's choice is kept: scp.yaml, or changed here (kept in the store until the file has it). */
+export function origin(own: Setting | null, file: Setting | undefined, why: string): string {
+  if (!differs(own, file)) return own ? "set in scp.yaml" : why
+  if (!file) return own ? "set here" : why
+  return `changed here; scp.yaml: ${describe(file)}`
 }
 
 /** whyOf says where an item's audience comes from. */
@@ -227,6 +250,15 @@ export function VisibilityCard() {
       if (kind === "g") d.groups = Object.fromEntries(Object.entries(d.groups).filter(([k]) => k !== id))
       else d.repos = Object.fromEntries(Object.entries(d.repos).filter(([k]) => k !== id))
     })
+  const configured = data.configured ?? { groups: {}, repos: {}, rules: [] }
+  const fileOf = (key: string): Setting | undefined => (key.startsWith("g:") ? configured.groups : configured.repos)[key.slice(2)]
+  const toFile = (key: string) => {
+    const st = fileOf(key)
+    if (!st) return inherit(key)
+    edit((d) => {
+      ;(key.startsWith("g:") ? d.groups : d.repos)[key.slice(2)] = { ...st }
+    })
+  }
   const effectiveOf = (key: string): (Effective & { private?: boolean }) | undefined => {
     if (key.startsWith("g:")) return view.tree.find((g) => g.id === key.slice(2))
     const a = key.slice(2)
@@ -400,8 +432,13 @@ export function VisibilityCard() {
         )}
       </span>
       <span className="col-start-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground md:col-start-auto">
-        {whyOf(e, doc.rules)}
-        {setting && (
+        {origin(setting, fileOf(key), whyOf(e, doc.rules))}
+        {differs(setting, fileOf(key)) && fileOf(key) && (
+          <button type="button" className="underline" disabled={disabled} onClick={() => toFile(key)}>
+            reset to scp.yaml
+          </button>
+        )}
+        {setting && !fileOf(key) && (
           <button type="button" className="underline" disabled={disabled} onClick={() => inherit(key)}>
             {product ? "use the default" : "inherit"}
           </button>
@@ -584,7 +621,7 @@ export function VisibilityCard() {
         </div>
       )}
 
-      <Rules doc={doc} matches={view.ruleMatches} disabled={disabled} edit={edit} />
+      <Rules doc={doc} configured={configured.rules} matches={view.ruleMatches} disabled={disabled} edit={edit} />
 
       {draft && (
         <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center gap-2 border-t border-border bg-background py-3">
@@ -613,11 +650,13 @@ export function VisibilityCard() {
 /** Rules are the patterns that set the audience of the repositories whose address they match, now and when one arrives. */
 function Rules({
   doc,
+  configured,
   matches: counts,
   disabled,
   edit,
 }: {
   doc: Doc
+  configured: Rule[]
   matches: number[]
   disabled: boolean
   edit: (fn: (d: Doc) => void) => void
@@ -631,6 +670,22 @@ function Rules({
       <summary className="cursor-pointer text-sm font-medium">
         Rules for repositories that arrive later{doc.rules.length > 0 ? ` · ${doc.rules.length}` : ""}
       </summary>
+      {!sameRules(doc.rules, configured) && (
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full bg-muted px-2 font-medium">changed here</span>
+          <span className="text-muted-foreground">
+            scp.yaml has {configured.length === 0 ? "no rules" : plural(configured.length, "rule", "rules")}.
+          </span>
+          <button
+            type="button"
+            className="underline"
+            disabled={disabled}
+            onClick={() => edit((d) => (d.rules = configured.map((r) => ({ ...r }))))}
+          >
+            reset to scp.yaml
+          </button>
+        </p>
+      )}
       <p className="mt-2 text-xs text-muted-foreground">
         A rule sets who sees every repository whose address (owner/name) matches, now and the day a new one arrives. Regular
         expressions, not case-sensitive; the first rule that matches wins. A choice made on a repository wins over a rule, and a

@@ -83,7 +83,7 @@ func loadConfig(cmd *cobra.Command, opts *options) (config.Config, map[string]an
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "scp: warning:", w)
 	}
 	_, findings := catalog.Compile(cfg.Catalog.Groups)
-	var problems []string
+	_, _, problems := baseline(cfg.Baseline)
 	for _, f := range findings {
 		if f.Error {
 			problems = append(problems, f.Message)

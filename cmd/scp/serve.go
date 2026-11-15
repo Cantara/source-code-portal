@@ -342,10 +342,15 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if len(imported) > 0 {
 		log.Info("layouts and announcements from layout.dir are now kept in the store; the files are no longer read", "imported", imported)
 	}
-	s.layouts = layout.Open(ctx, s.store, log)
+	// The configuration is the base of what admins edit in the pages; the store keeps their changes (design/config-baseline.md).
+	baseVisibility, baseLayouts, problems := baseline(cfg.Baseline)
+	if len(problems) > 0 {
+		return nil, &config.Invalid{Problems: problems}
+	}
+	s.layouts = layout.Open(ctx, s.store, baseLayouts, log)
 	s.notices = announce.Open(ctx, cfg.Announcements, s.store, time.Now, log)
 	// A save of who sees what publishes again: the views are rebuilt with the new audiences (design/visibility.md).
-	s.visibility = visibility.Open(ctx, s.store, func() { s.pub.Update(func(*snapshot.Builder) {}) }, log)
+	s.visibility = visibility.Open(ctx, s.store, baseVisibility, func() { s.pub.Update(func(*snapshot.Builder) {}) }, log)
 	s.pub.Audience(s.visibility.Audience)
 	feed := cfg.Webhook.Secret.IsSet() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
@@ -449,6 +454,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, s.peopleRoutes(cfg)...)
 	routes = append(routes, s.notices.Routes(cfg.Server.PublicURL, log.With("component", "announcements"))...)
 	routes = append(routes, s.visibility.Routes(cfg.Server.PublicURL, s.pub.Current, log.With("component", "visibility"))...)
+	routes = append(routes, httpapi.Route{Pattern: "GET " + configPath, Handler: configHandler(cfg.Baseline.File, s.visibility, s.notices, s.layouts)})
 	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, newReleases(view, documents), newInsights(view), docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For, Off: offElements(f)},
 		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{f, s.people != nil}, s.prereqs}

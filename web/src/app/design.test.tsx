@@ -94,15 +94,15 @@ describe("design mode", () => {
     expect(await screen.findByText(/Someone saved this layout/)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Load the saved layout" }))
     expect(await list.findByText("Fleet map", { selector: "span" })).toBeInTheDocument()
-    expect(screen.getByText("The stored layout")).toBeInTheDocument()
+    expect(screen.getByText("Changed here; scp.yaml has no layout for this page")).toBeInTheDocument()
   })
 
-  it("says that saving needs a layout directory", async () => {
+  it("says that saving needs a store", async () => {
     admin()
     server.use(raw.get("*/api/v1/admin/layouts/dashboard", () => HttpResponse.json(stored({ writable: false, stored: false }))))
     const user = userEvent.setup()
     show()
     await user.click(await screen.findByRole("button", { name: "Design this page" }))
-    expect(await screen.findByText(/set layout.dir/)).toBeInTheDocument()
+    expect(await screen.findByText(/no store to save layouts in/)).toBeInTheDocument()
   })
 })

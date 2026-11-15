@@ -42,8 +42,8 @@ test("an admin writes, previews, publishes and removes an announcement", { tag: 
 
   await page.goto("/admin#announcements")
   const card = page.getByRole("region", { name: "Announcements" })
-  await expect(card.getByText(title)).toBeVisible()
-  await expect(card.getByText("from the configuration").first()).toBeVisible()
+  await expect(card.getByText(title, { exact: true }).first()).toBeVisible()
+  await expect(card.getByText("from scp.yaml").first()).toBeVisible()
   await card.getByRole("button", { name: "New announcement" }).click()
   const form = page.getByRole("region", { name: "New announcement" })
   await form.getByLabel("Title", { exact: true }).fill("Hackathon on Friday")

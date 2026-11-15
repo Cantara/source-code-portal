@@ -201,6 +201,8 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `web.product_name` | empty | what the pages call the portal instead of "Source Code Portal": titles, the header, the presentation page, link previews and the app manifest (at most 60 characters); empty: the built-in name |
 | `web.plausible_domain` | empty | turns on Plausible Analytics: the site as Plausible knows it (section 2.10); empty: nothing is counted |
 | `web.plausible_endpoint` | Plausible's service | where the portal forwards the events: a self-hosted Plausible's event address (`https`; needs `web.plausible_domain`) |
+| `visibility` | none | who sees what (section 2.11), the base of what administrators change in Admin (section 2.12): `groups` and `repos` (`audience`: `everyone`, `signed-in`, `no-one`; `search: false` keeps what everyone sees from search engines) and `rules` (`pattern`, `audience`, `search`) |
+| `layouts` | none | the pages' layouts (section 2.4) by page, `dashboard` and `present`, each `elements` as the design mode saves them, the base of what administrators change (section 2.12) |
 | `layout.dir` | empty | only for an upgrade: a directory with the `dashboard.json`, `present.json` and `announcements.json` an administrator saved before they lived in the store. Each one the store does not hold yet is imported once at the start (the log says which); after that the store is the truth and the files are not read. Remove the key afterwards |
 | `announcements[]` | `[]` | the deployment's announcements (section 2.4.1): `id`, `title`, `text`, `tone`, `starts`, `ends`, `place`, `link` (`label`, `url`), `lang`, `pages`, `audience`, `from`, `until`, `published`; at most 20 |
 | `packages.registries[]` | `[]` | package registries asked for what a repository publishes (section 2.5): `id` (`[a-z0-9-]`), `ecosystem` (`maven`, `npm`, `pypi`, `cargo`, `go`, `nuget`, `rubygems`, `packagist`), `url`: `maven` a repository root, `npm` a registry, `pypi` a Simple API root, `cargo` a sparse index, `go` a module proxy, `nuget` the feed whose `index.json` is the service index, `rubygems` a gem server, `packagist` a Composer repository |
@@ -384,13 +386,14 @@ An administrator can arrange the page: *Design this page* on the dashboard opens
 to add, move (the arrows, or drag them), set up and remove, beside a live preview. The elements are the telemetry, the fleet map and the
 products (each for every product or for chosen ones, in your order), the pull requests (how many), the latest commits (how many) and a
 heading with a line of text.
-*Save* keeps the layout for every viewer; *Back to the built-in layout* removes it.
+*Save* keeps the layout for every viewer; *Back to the layout in scp.yaml* (or *to the built-in layout* when the file has none) removes
+the change. A page's layout can also be set in `layouts:` in scp.yaml (section 2.12).
 
 Saved layouts (and announcements) live in the store, the SQLite file at `store.path` (section 4, *The store*): they survive a restart or a
 crash, and a save is synced to disk before it is acknowledged. Two administrators never overwrite each other: a save based on a layout
 someone else changed since is refused with an offer to load theirs. A layout that does not validate is not served: the last good one
-stays, and `/api/v1/status` and the design mode say why. Resetting the store loses the saved layouts (back it up first); *Back to the
-built-in layout* removes one. Only an upgrade from a release that kept them in files uses `layout.dir` (section 2, Keys): it is read once at
+stays, and `/api/v1/status` and the design mode say why. Resetting the store loses the layouts saved there and not yet written into
+scp.yaml (section 2.12). Only an upgrade from a release that kept them in files uses `layout.dir` (section 2, Keys): it is read once at
 the start and then removed from the configuration.
 - A layout names groups, never repositories; a viewer sees only the groups with repositories they may see.
 
@@ -430,7 +433,8 @@ other) while its time lasts, and goes away by itself. It is plain text with one 
   its text, the pages it shows on (the dashboard, `/present` or both), who sees it (everyone, or signed-in viewers only), when it shows
   and until when. *Published* off keeps it as a draft. The preview beside the form is the card the pages draw. They are saved in
   the store (the document `announcements`).
-- **The deployment** sets them in `announcements[]`, checked by `scp config check`; the *Admin* card lists them, locked:
+- **The deployment** sets them in `announcements[]`, checked by `scp config check`; the *Admin* section lists them as *from scp.yaml*,
+  and an administrator may change or remove them there, the change kept in the store until scp.yaml has it (section 2.12):
 
 ```yaml
 announcements:
@@ -856,10 +860,42 @@ back at once with everything that happened meanwhile.
   and the card lists the old address as *not in the catalogue now* until you forget it.
 - **Not `exclude`.** `github.sources[].exclude` keeps a repository out of the catalogue: it is never read and its events are dropped.
   *No one* keeps it read and hidden.
-- **Where it lives.** In the store (the document `visibility`, saved before it is acknowledged, part of a backup); a portal without a
-  store shows the card read-only. `/api/v1/status` counts the repositories no one sees (`snapshot.parked`) and the public ones only
+- **Where it lives.** The choices can be set in `visibility:` in scp.yaml (section 2.12); what is chosen in Admin is kept in the store
+  as changes to it (the document `visibility`, saved before it is acknowledged), and each row says *set in scp.yaml*, *set here* or
+  *changed here* with a way back to the file. A portal without a store shows the card read-only. `/api/v1/status` counts the repositories no one sees (`snapshot.parked`) and the public ones only
   signed-in viewers see (`snapshot.signedIn`). Upgrading from 2.2.19, the parked repositories become *No one* and the search engine
   list becomes *Everyone* with search engines off; the old lists stay in the store, so 2.2.19 still reads them after a rollback.
+
+### 2.12 scp.yaml as the base of what administrators change
+
+Who sees what (section 2.11), the announcements (2.4.1) and the pages' layouts (2.4) can all be set in scp.yaml, and changed in Admin.
+The file is the base; the store keeps only what administrators changed. For each item, a product or repository, the list of rules, an
+announcement by its id, a page's layout, the portal takes the store's change, else the file's, else the built-in default.
+
+```yaml
+visibility:
+  groups:
+    data-collector: {audience: no-one}
+  repos:
+    acme/aipp: {audience: everyone, search: false}   # search is on unless it says false
+  rules:
+    - {pattern: "^acme/mcp-", audience: signed-in}
+layouts:
+  present:
+    elements: [{kind: telemetry}, {kind: products, view: tiles}]
+announcements:
+  - {id: maintenance, title: Planned maintenance, tone: notice, until: "2026-12-01T00:00:00Z"}
+```
+
+- **Download.** *Admin*, *Overview*, *Download scp.yaml* (`GET /api/v1/admin/config.yaml`, administrators only) gives the file the
+  portal started with, with `visibility:`, `layouts:` and `announcements:` as they are in force: comments and every other key as you
+  wrote them. Put it in your repository and deploy it; the configuration holds no secret, only the files that do.
+- **After a deploy.** A change in the store equal to the file is dropped at the start, so once the downloaded file is deployed the store
+  holds no changes of its own, and the next change made in git takes effect.
+- **Until then.** `/api/v1/status` warns while the store holds changes the file does not (*kept only in the store*): a store reset or
+  lost would lose them. Admin marks each one *changed here* with a way back to scp.yaml.
+- **Checked.** `scp config check` and the start refuse a `visibility:` or `layouts:` that does not parse, with its path. The other keys
+  (sources, sign-in, access) are only in the file.
 
 ## 3. Run
 
@@ -980,16 +1016,16 @@ items *Delayed* or *Update failing*, and retries with backoff. `/readyz` stays 2
 stopped, the cache is closed and the process exits 0.
 
 **Upgrade.** Replace the binary and the bundle together (or the image tag) and restart. Most of the store holds only what GitHub can give again: if it is
-lost, deleted or unreadable, the portal rebuilds it like a first start. Back up the configuration, the secrets and the layouts and announcements in the store
-(*The store*, below). A release that replaces the store's schema says so in the changelog; the store of an earlier generation is moved aside and read again from GitHub.
+lost, deleted or unreadable, the portal rebuilds it like a first start. Back up the configuration, the secrets and what administrators changed in the store
+(*The store*, below), or download scp.yaml with their changes written in (section 2.12). A release that replaces the store's schema says so in the changelog; the store of an earlier generation is moved aside and read again from GitHub.
 
 **The store.** The SQLite file at `store.path` (with its `-wal` and `-shm` files beside it while the portal runs) holds:
 
 - what GitHub can give again, and the portal rebuilds on its own: the catalogue, documents, commits, manifests, packages, releases, pull requests, issues and
   their timers;
 - what the portal was told and has not acted on yet: parked webhook events (the poll behind each subject repairs a lost one);
-- what people save in the portal and GitHub cannot give back: the dashboard and presentation layouts and the announcements administrators write, and in the
-  personal edition the sealed GitHub credential.
+- what people save in the portal and GitHub cannot give back: the changes administrators make to who sees what, the layouts and the announcements (until
+  scp.yaml has them, section 2.12), and in the personal edition the sealed GitHub credential.
 
 *Back up* the third group: stop the portal and copy the three files, or copy a consistent file while it runs (`sqlite3 <store.path> ".backup <copy>"`, or
 `VACUUM INTO '<copy>'`); a plain copy of a running portal's file may miss what is still in the `-wal` file. Everything else comes back from GitHub.

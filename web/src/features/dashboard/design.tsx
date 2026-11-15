@@ -214,8 +214,12 @@ export function Designer({
               : saved
                 ? "Saved: every viewer sees this layout"
                 : stored.stored
-                  ? "The stored layout"
-                  : "The built-in layout, for every viewer"}
+                  ? stored.configured
+                    ? "Changed here; scp.yaml has another layout"
+                    : "Changed here; scp.yaml has no layout for this page"
+                  : stored.configured
+                    ? "The layout in scp.yaml, for every viewer"
+                    : "The built-in layout, for every viewer"}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -227,7 +231,7 @@ export function Designer({
           </Button>
           {stored.stored && (
             <Button variant="outline" onClick={reset} disabled={busy || !stored.writable}>
-              Back to the built-in layout
+              {stored.configured ? "Back to the layout in scp.yaml" : "Back to the built-in layout"}
             </Button>
           )}
           <Button variant="ghost" onClick={close}>
@@ -236,9 +240,7 @@ export function Designer({
         </div>
       </section>
       {!stored.writable && (
-        <Alert variant="warn">
-          Saving needs a layout directory: set layout.dir in the configuration. You can try layouts here meanwhile.
-        </Alert>
+        <Alert variant="warn">This portal has no store to save layouts in. You can try layouts here meanwhile.</Alert>
       )}
       {stored.problem && <Alert variant="error">The stored file is not served: {stored.problem}</Alert>}
       {error && (
