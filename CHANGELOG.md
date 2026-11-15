@@ -4,6 +4,20 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.17
+
+The Search engines card in Admin is easier to use and covers repositories that arrive later. Nothing new is asked of GitHub, and the
+store gains no tables (the list is the same document with two more fields).
+
+- **Products with their repositories**: the card lists the public products with their repositories nested under them, a checkbox each,
+  so you can tick off what to leave out of `/sitemap.xml`. Private repositories are never offered to search engines and are no longer
+  listed; the card says how many there are.
+- **Rules**: *Keep out the repositories whose address matches* and *Except the repositories whose address matches* take one regular
+  expression per line (RE2, matched against `owner/name`, not case-sensitive), so a repository that arrives later is kept out the day a
+  rule matches. A repository or product ticked by hand stays out whatever the exceptions say. Each rule shows how many public
+  repositories it matches, a change is previewed before it is saved, and a rule that is not a regular expression is refused. Operator
+  guide, section 2.11.
+
 ## 2.2.16
 
 An administrator can keep chosen products and repositories out of search engines, and a portal behind a proxy that passes a client's
