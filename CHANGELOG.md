@@ -4,6 +4,22 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.20
+
+Who sees what, and the Admin page in sections. Nothing new is asked of GitHub and no configuration key changes; the store's schema is
+unchanged (the choices are one document in it, `visibility`).
+
+- **Who sees what**: every product and repository is shown to everyone, to signed-in viewers only, or to no one, and what everyone
+  sees has a search-engine switch. A repository that is private on GitHub is never shown to everyone. Signed-in viewers see a
+  repository the public does not marked *Not public*. Rules choose for repositories that arrive later. Admin's *Who sees what*
+  section lists every product and repository, filters, sets several at once, reviews the changes before saving (with a warning when
+  five or more come back into public view) and undoes a save. It replaces the *Search engines* and *Parked repositories* cards: a
+  2.2.19 store's lists are taken over once (parked to no one, kept from search engines to everyone with search off) and left as they
+  are, so 2.2.19 still runs on the store after a rollback. The status adds `snapshot.signedIn`. Operator guide, section 2.11.
+- **The Admin page in sections**: Overview, Who sees what, Announcements, GitHub and Assistant, each at its own address
+  (`/admin#github`), from a menu at the left (a row on a phone) that marks what needs action. The overview leads with the warnings and
+  a tile per area; the Sources table no longer runs a source's name and count together.
+
 ## 2.2.19
 
 Parked repositories, a shorter sitemap that opens as a tree in the browser, and webhook answers bounded and shown in the status. Nothing
