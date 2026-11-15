@@ -823,7 +823,8 @@ sitemap* or *kept out* (ticked, with its product, or by a rule), and a count at 
   repositories it matches now, and previews a change before it is saved. A rule that is not a regular expression is refused.
 - **The sitemap is public.** `/sitemap.xml` lists the public view for every reader, you signed in as an administrator included, so it never
   names a private repository or a product of private repositories.
-- **What changes.** A product or repository kept out leaves `/sitemap.xml`, with its documents, and its pages answer with
+- **What changes.** A product or repository kept out leaves `/sitemap.xml` (which lists only the home page, the products and the
+  repositories), and its pages answer with
   `X-Robots-Tag: noindex, nofollow`: the page, its documents and history, and the Markdown answers. The portal itself shows everything
   as before, and the API is unchanged.
 - **Products and repositories.** A repository ticked is kept out. A product ticked keeps out its page and the repositories that are only
