@@ -6,6 +6,18 @@ subjects.
 
 ## Unreleased
 
+- **The Search engines card says what a tick does**: a ticked product or repository leaves `/sitemap.xml` and says noindex once saved;
+  each repository shows whether it is in the sitemap or kept out (ticked, with its product, or by a rule); the rules are folded as
+  advanced.
+- **A shorter sitemap**: `/sitemap.xml` lists the home page, the products and the repositories only. The listing pages and the
+  documents are reached from them and are no longer listed.
+- **Webhook answers within GitHub's 10 seconds**: an event the store cannot take within 5 seconds is answered 503, so GitHub logs the
+  delivery as failed and the catch-up passes it on again, instead of an answer GitHub had stopped waiting for.
+- **The status shows how webhooks fare**: `webhook.answers` (how long the portal took to answer GitHub, with a warning past 10 seconds)
+  and, for each App, the failed deliveries its log showed, by the answer they got (`401`, `502`, `0` for none in time).
+- **Parked repositories**: an admin parks a repository from the *Parked repositories* card. It is shown nowhere, to anyone, while the
+  portal keeps reading it from GitHub, webhook events included; unticked, it is back with everything that happened meanwhile. For
+  repositories that should have been archived on GitHub.
 - **The sitemap opens as an XML tree in the browser**: its CSP now lets the browser's own XML viewer draw it; Chrome showed the bare text.
 
 ## 2.2.18

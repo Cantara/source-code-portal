@@ -30,6 +30,7 @@ func newBuilder(cur *Snapshot, log *slog.Logger) *Builder {
 		hidden:     cur.hidden,
 		indexers:   cur.indexers,
 		retire:     cur.retire,
+		park:       cur.park,
 	}}
 }
 
@@ -134,6 +135,7 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 	}
 	s.retireMembers()
 	s.hideEmptyGroups()
+	s.markParked()
 	s.index(b.prev.indexes, b.log)
 	s.views(b.prev, b.log)
 	return s
@@ -142,32 +144,61 @@ func (b *Builder) finish(now time.Time) *Snapshot {
 // views derives the other three views from the complete one A (s): B without the private repositories, C without the hidden forks,
 // D without both. A view that would hold what another holds is that view, so a portal without private repositories or hidden forks
 // builds nothing more. Every view knows its siblings: public (private left out, forks as it has them) and lean (forks left out).
+//
+// The parked repositories (Publisher.Park, design/parked.md) are in none of the views: A is s without them (s itself when none is
+// parked), and s, the base the next build starts from and the jobs and the webhook's lookups read, keeps them.
 func (s *Snapshot) views(prev *Snapshot, log *slog.Logger) {
-	var pb, pc, pd *Snapshot // the views of the snapshot before, whose indexes are kept when one cannot be built
+	var pa, pb, pc, pd *Snapshot // the views of the snapshot before, whose indexes are kept when one cannot be built
 	if prev != nil {
-		pb, pc = prev.public, prev.lean
+		pa, pb, pc = prev.fat, prev.public, prev.lean
 		if pc != nil {
 			pd = pc.public
 		}
 	}
-	b := s.derive(func(e *RepoEntry) bool { return e.Repo.Public() }, pb, log)
-	c := s
-	if slices.ContainsFunc(slices.Collect(maps.Values(s.Repos)), func(e *RepoEntry) bool { return s.hidden[e.Repo.Key()] }) {
-		c = s.derive(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, pc, log)
+	a := s
+	if len(s.parked) > 0 {
+		if pa == prev {
+			pa = nil
+		}
+		a = s.derive(func(e *RepoEntry) bool { return !s.parked[e.Repo.Key()] }, pa, log)
+	}
+	b := a.derive(func(e *RepoEntry) bool { return e.Repo.Public() }, pb, log)
+	c := a
+	if slices.ContainsFunc(slices.Collect(maps.Values(a.Repos)), func(e *RepoEntry) bool { return s.hidden[e.Repo.Key()] }) {
+		c = a.derive(func(e *RepoEntry) bool { return !s.hidden[e.Repo.Key()] }, pc, log)
 	}
 	d := b
-	if c != s {
+	if c != a {
 		d = c.derive(func(e *RepoEntry) bool { return e.Repo.Public() }, pd, log)
 	}
-	s.public, s.lean = b, c
+	a.public, a.lean = b, c
 	b.public, b.lean = b, d
 	c.public, c.lean = d, c
 	d.public, d.lean = d, d
 	// When d is c (every private repository is a hidden fork) the one view serves the private lean reader and the public lean one, and
 	// has one fat link: b, so the public reader never counts a private fork. The private reader then sees no hidden forks counted;
 	// the failure is towards less, never towards a leak.
-	s.fat, b.fat, c.fat, d.fat = s, b, s, b
-	b.hidden, c.hidden, d.hidden = s.hidden, s.hidden, s.hidden
+	a.fat, b.fat, c.fat, d.fat = a, b, a, b
+	a.hidden, b.hidden, c.hidden, d.hidden = s.hidden, s.hidden, s.hidden, s.hidden
+	if a != s {
+		s.public, s.lean, s.fat = b, c, a
+	}
+}
+
+// markParked names the repositories park says are parked: every view leaves them out.
+func (s *Snapshot) markParked() {
+	s.parked = nil
+	if s.park == nil {
+		return
+	}
+	for k, e := range s.Repos {
+		if s.park(e) {
+			if s.parked == nil {
+				s.parked = map[RepoKey]bool{}
+			}
+			s.parked[k] = true
+		}
+	}
 }
 
 // groupList is every group the catalogue resolved, the empty ones too: the base snapshot keeps them, so a group that gains a member
@@ -335,6 +366,15 @@ func NewPublisher(debounce, maxDelay time.Duration, log *slog.Logger, indexers .
 func (p *Publisher) Retire(fn func(*RepoEntry) bool) {
 	cur := *p.cur.Load()
 	cur.retire = fn
+	p.cur.Store(&cur)
+}
+
+// Park names the parked repositories (design/parked.md): every view leaves them out at every publish, and the base snapshot keeps them
+// for the jobs and the webhook's lookups. fn is asked again at each publish, so a changed list shows at the next one (Update with no
+// change publishes). Called once, before the first update.
+func (p *Publisher) Park(fn func(*RepoEntry) bool) {
+	cur := *p.cur.Load()
+	cur.park = fn
 	p.cur.Store(&cur)
 }
 

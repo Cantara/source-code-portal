@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"maps"
 	"slices"
 	"testing"
 	"time"
@@ -17,8 +18,8 @@ func TestCatchUpPassesOnWhatTheReceiverMissed(t *testing.T) {
 	log := []Delivery{ // newest first, as GitHub lists them
 		{GUID: "g5", Event: "issues", RepositoryID: 1, At: now.Add(-1 * time.Minute)},                 // never answered
 		{GUID: "g4", Event: "pull_request", RepositoryID: 1, At: now.Add(-2 * time.Minute), OK: true}, // received
-		{GUID: "g3", Event: "push", RepositoryID: 2, At: now.Add(-3 * time.Minute)},                   // failed
-		{GUID: "g2", Event: "issues", RepositoryID: 99, At: now.Add(-4 * time.Minute)},                // a repository the portal does not know
+		{GUID: "g3", Event: "push", RepositoryID: 2, At: now.Add(-3 * time.Minute), Status: 401},      // failed
+		{GUID: "g2", Event: "issues", RepositoryID: 99, At: now.Add(-4 * time.Minute), Status: 502},   // a repository the portal does not know
 		{GUID: "g1", Event: "installation", At: now.Add(-5 * time.Minute)},
 	}
 	type got struct {
@@ -64,6 +65,10 @@ func TestCatchUpPassesOnWhatTheReceiverMissed(t *testing.T) {
 	}
 	if n, err := c.Once(t.Context()); err != nil || n != 0 || len(passed) != 0 {
 		t.Errorf("a second read passed on %d %v (err %v)", n, passed, err)
+	}
+	// Each failed delivery is counted once by the answer it got, however often the log is read; the installation one too.
+	if got, want := c.State().Failed, map[int]int{0: 2, 401: 1, 502: 1}; !maps.Equal(got, want) {
+		t.Errorf("failed %v, want %v", got, want)
 	}
 }
 

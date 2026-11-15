@@ -127,8 +127,9 @@ func (l *LLMs) sitemaps(r *http.Request) [][]byte {
 	return m.files
 }
 
-// pages are the indexable pages of a view: the dashboard, the commit log, the groups, the repositories and their documents, each
-// with the time of its newest commit.
+// pages are what a view offers search engines (P-118): the home page, the groups and the repositories, each with the time of its
+// newest commit. The listing pages (commits, releases, archive, insights, pulls, issues) change with every push and say nothing a
+// search should land on, and a repository's documents are reached from its page; neither is listed.
 func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
 	last := map[snapshot.RepoKey]time.Time{}
 	var newest time.Time
@@ -140,13 +141,7 @@ func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
 			newest = t
 		}
 	}
-	out := []entry{{"/", newest}, {"/commits", newest}, {"/releases", newest}, {"/archive", newest}, {"/insights", newest}}
-	if l.opts.Pulls != nil { // the pages of a feature switched off are not there (design/features.md)
-		out = append(out, entry{"/pulls", newest})
-	}
-	if l.opts.Issues != nil {
-		out = append(out, entry{"/issues", newest})
-	}
+	out := []entry{{"/", newest}}
 	for _, g := range s.Groups {
 		if l.opts.IndexedGroup != nil && !l.opts.IndexedGroup(g.ID) {
 			continue
@@ -164,12 +159,6 @@ func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
 			continue
 		}
 		out = append(out, entry{snapshot.RepoPage(k), last[k]})
-		docs, _ := l.opts.Docs(s.Repos[k])
-		for _, d := range docs {
-			if !d.README && !d.Hidden {
-				out = append(out, entry{snapshot.DocPage(k, d.Path), last[k]})
-			}
-		}
 	}
 	return out
 }

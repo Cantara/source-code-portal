@@ -35,7 +35,7 @@ func TestSearchEnginesAreOnlyOfferedWhatIsNotKeptOut(t *testing.T) {
 	}
 
 	save(`{"groups":[],"repos":["acme/open"]}`)
-	if b := sitemap(); strings.Contains(b, "/repos/acme/open") || !strings.Contains(b, "/groups/all") || !strings.Contains(b, "/commits") {
+	if b := sitemap(); strings.Contains(b, "/repos/acme/open") || !strings.Contains(b, "/groups/all") || !strings.Contains(b, "<loc>https://scp.example/</loc>") {
 		t.Errorf("a repository kept out is in the sitemap, or the rest is not:\n%s", b)
 	}
 	for _, p := range []string{"/repos/acme/open", "/repos/acme/open/readme.md", "/repos/acme/open/docs/guide"} {

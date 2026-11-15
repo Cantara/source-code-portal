@@ -117,8 +117,10 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
 | Symptom | Look at |
 |---|---|
 | `config check` exits 2 | each problem names its key; unknown keys and unknown `SCP_*` variables are errors |
+| A repository should vanish from the portal but keep being read (it should have been archived on GitHub) | *Admin*, *Parked repositories*: tick it and Save; it is shown nowhere, to anyone, and its events and data are kept, so unticking brings it back whole (`docs/operator-guide.md` 2.12). `github.sources[].exclude` instead stops reading it |
 | `/pulls` or `/issues` says the feature is off, or stays empty | *Admin*, *GitHub prerequisites* (or `/api/v1/status` warnings, the log's `prerequisites unmet`): the missing permissions and events and the installation; grant them in the App's *Permissions & events*, accept them on the installation, then check with `gh api /orgs/<org>/installations --jq '.installations[] \| {app_slug, permissions, events}'` |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for 401/403 (credential, App not installed, missing permission) |
+| GitHub's *Recent Deliveries* show failed deliveries or redeliveries | `/api/v1/status` `webhook.catchUps[].failed` by answer (`401`: the webhook secret differs, set `webhook.previous_secret_file` to the old one before rotating; `502`: a restart; `0`: no answer in time) and `webhook.answers` (`late`: answered after GitHub's 10 s); the catch-up passes every failed delivery on within about two minutes, so no hand redelivery is needed |
 | A repository is missing | public (or `include_private` with access), not a fork, not in `exclude`, in a listed account; `scp config groups` |
 | Pushes show only after minutes | the webhook: GitHub's delivery log, `scp_webhook_deliveries_total` by result; without one the portal lists every 5 minutes (releases every 30 minutes); a portal GitHub cannot reach can set `webhook.catch_up: true` with an App source to read the App's delivery log |
 | Pages say *Delayed* | `scp_github_rate_remaining_ratio`; with a token, move to a GitHub App |

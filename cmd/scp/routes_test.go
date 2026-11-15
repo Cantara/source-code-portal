@@ -25,6 +25,8 @@ var notWalked = map[string]string{ //nolint:gochecknoglobals // test table
 	"PUT /api/v1/admin/announcements":     "admin and same origin: the announce tests",
 	"GET /api/v1/admin/indexing":          "admin only: the indexing tests and indexing_test.go",
 	"PUT /api/v1/admin/indexing":          "admin and same origin: the indexing tests and indexing_test.go",
+	"GET /api/v1/admin/parked":            "admin only: parked_test.go",
+	"PUT /api/v1/admin/parked":            "admin and same origin: parked_test.go",
 	"GET /api/v1/admin/status":            "admin only, asked on the public listener by edgePaths as /api/v1/status",
 	"GET /auth/login":                     "the sign-in redirect: signin_test.go",
 	"GET /auth/callback":                  "the sign-in return: signin_test.go",

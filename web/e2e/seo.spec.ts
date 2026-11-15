@@ -74,22 +74,26 @@ test.describe("without JavaScript", () => {
   })
 })
 
-test("the sitemap lists every page with its newest commit and robots.txt points to it", async ({ request, baseURL }) => {
+test("the sitemap lists the home page, the groups and the repositories, and robots.txt points to it", async ({
+  request,
+  baseURL,
+}) => {
   const res = await request.get("/sitemap.xml")
   expect(res.headers()["content-type"]).toBe("application/xml; charset=utf-8")
   expect(res.headers()["cache-control"]).toContain("s-maxage=3600")
   const sitemap = await res.text()
   for (const p of [
     "/",
-    "/commits",
     "/groups/whydah",
     "/groups/other",
     "/repos/acme/whydah-core",
-    "/repos/acme/whydah-core/docs/docs/setup",
     "/repos/acme/whydah-sso",
     "/repos/acme/tool",
   ]) {
     expect(sitemap).toContain(`<loc>${baseURL}${p}</loc>`)
+  }
+  for (const p of ["/commits", "/releases", "/docs/"]) {
+    expect(sitemap).not.toContain(p) // listing pages and documents are not offered (P-118)
   }
   expect(sitemap).not.toContain("vault") // private
   const robots = await (await request.get("/robots.txt")).text()

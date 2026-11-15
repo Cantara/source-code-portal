@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	gosync "sync"
 	"time"
 
@@ -41,6 +42,37 @@ type status struct {
 	mu         gosync.Mutex
 	deliveries map[string]int // by result
 	lastAt     time.Time
+	answers    statusAnswers // how long the receiver took to answer GitHub
+}
+
+// statusAnswers is how long the webhook receiver took to answer GitHub since the start. GitHub stops waiting after 10 seconds and
+// records the delivery as failed even when the portal goes on to accept it, so Late counts what GitHub saw fail that the portal did not.
+type statusAnswers struct {
+	Count   int     `json:"count"`
+	Slowest float64 `json:"slowestSeconds"`
+	Slow    int     `json:"slow"` // over 5 seconds
+	Late    int     `json:"late"` // over GitHub's 10 seconds
+}
+
+// Thresholds of statusAnswers.
+const (
+	answerSlow = 5 * time.Second
+	answerLate = 10 * time.Second
+)
+
+// answered records how long the receiver took to answer one delivery.
+func (st *status) answered(d time.Duration) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	a := &st.answers
+	a.Count++
+	a.Slowest = max(a.Slowest, d.Seconds())
+	if d > answerSlow {
+		a.Slow++
+	}
+	if d > answerLate {
+		a.Late++
+	}
 }
 
 type statusBody struct {
@@ -62,6 +94,7 @@ type statusSnapshot struct {
 	AgeSeconds float64   `json:"ageSeconds"`
 	Catalogued bool      `json:"catalogued"`
 	Repos      int       `json:"repos"`
+	Parked     int       `json:"parked"` // of Repos, the parked ones: read and kept, shown nowhere (design/parked.md)
 }
 
 type statusQueue struct {
@@ -93,6 +126,7 @@ type statusWebhook struct {
 	CatchUp      bool           `json:"catchUp"`
 	Deliveries   map[string]int `json:"deliveries"`
 	LastDelivery *time.Time     `json:"lastDelivery"`
+	Answers      statusAnswers  `json:"answers"`
 	// CatchUps is one entry per App whose delivery log is read: when it last was, in full, and why not if it is failing.
 	CatchUps []statusCatchUp `json:"catchUps"`
 }
@@ -102,6 +136,9 @@ type statusCatchUp struct {
 	LastRead  *time.Time `json:"lastRead"`
 	Error     string     `json:"error,omitempty"`
 	Truncated *time.Time `json:"truncated,omitempty"` // the log was longer than a read: its oldest deliveries were left to the polls
+	// Failed counts the deliveries the log showed failed since the start, by the status the portal answered ("0": no answer in time),
+	// each once: what the catch-up passed on again, and why GitHub could not deliver it.
+	Failed map[string]int `json:"failed"`
 }
 
 // staleLog is how long a delivery log may go unread (it is read every 2 minutes) before the status warns.
@@ -110,7 +147,10 @@ const staleLog = 10 * time.Minute
 // catchUpStatus lists the logs and the warnings a log that is not being read calls for.
 func catchUpStatus(states []webhook.CatchUpState, now time.Time) (out []statusCatchUp, warnings []string) {
 	for _, c := range states {
-		e := statusCatchUp{Source: c.Source, Error: c.Error}
+		e := statusCatchUp{Source: c.Source, Error: c.Error, Failed: map[string]int{}}
+		for code, n := range c.Failed {
+			e.Failed[strconv.Itoa(code)] = n
+		}
 		if !c.LastRead.IsZero() {
 			at := c.LastRead
 			e.LastRead = &at
@@ -146,7 +186,7 @@ func (st *status) delivery(_, result string) {
 func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	s, now := st.current(), time.Now()
 	b := statusBody{Mode: st.mode, Ready: st.ready(), Alive: st.alive(), Warnings: []string{}, Sources: []statusSource{},
-		Snapshot: statusSnapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: len(s.Repos)}}
+		Snapshot: statusSnapshot{Version: s.Version, BuiltAt: s.BuiltAt, Catalogued: s.Catalogued, Repos: len(s.Repos), Parked: s.ParkedCount()}}
 	if !s.BuiltAt.IsZero() {
 		b.Snapshot.AgeSeconds = now.Sub(s.BuiltAt).Seconds()
 	}
@@ -209,6 +249,12 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	if !st.lastAt.IsZero() {
 		at := st.lastAt
 		b.Webhook.LastDelivery = &at
+	}
+	b.Webhook.Answers = st.answers
+	if st.answers.Late > 0 {
+		b.Warnings = append(b.Warnings, fmt.Sprintf("webhook: %d deliveries were answered after GitHub's 10 seconds (the slowest in %.1f s); GitHub shows them failed and the catch-up passes them on again",
+			st.answers.Late, st.answers.Slowest))
+		slices.Sort(b.Warnings)
 	}
 	st.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
