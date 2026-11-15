@@ -161,7 +161,7 @@ func (a API) repo(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) oa
 	r := e.Repo
 	out := oapi.Repo{
 		Address: string(r.Key()), Owner: r.Owner, Name: r.Name, Description: r.Description, HtmlUrl: r.HTMLURL, Homepage: r.Homepage,
-		DefaultBranch: r.DefaultBranch, License: r.License, Visibility: r.Visibility, Topics: nonNil(r.Topics), Archived: r.Archived,
+		DefaultBranch: r.DefaultBranch, License: r.License, Visibility: r.Visibility, NotPublic: s.Restricted(r.Key()), Topics: nonNil(r.Topics), Archived: r.Archived,
 		Fork: r.Fork, Stars: r.Stars, OpenIssues: r.OpenIssues, PushedAt: r.PushedAt.UTC(), Groups: nonNil(s.GroupsOf(r.Key())),
 		Freshness: oapi.FreshnessOf(e.Fresh, now), Packages: []oapi.Package{},
 	}

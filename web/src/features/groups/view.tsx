@@ -231,7 +231,7 @@ export function GroupView({ group }: { group: string }) {
                                   {owners.size > 1 && <span className="text-muted-foreground">{r.owner}/</span>}
                                   {r.name}
                                 </Link>
-                                <VisibilityBadge visibility={r.visibility} />
+                                <VisibilityBadge visibility={r.visibility} notPublic={r.notPublic} />
                                 {r.fork && <Badge>Fork</Badge>}
                                 {r.archived && <Badge variant="warn">Archived</Badge>}
                                 {r.freshness.status !== "fresh" && <FreshnessBadge freshness={r.freshness} />}

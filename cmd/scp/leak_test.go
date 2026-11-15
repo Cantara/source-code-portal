@@ -287,6 +287,35 @@ func publicPaths(t *testing.T) []string {
 func TestNoLeak(t *testing.T) {
 	get := privatePortal(t, "access: {private_groups: [staff]}\n")
 	untilListed(t, get)
+	noLeak(t, get)
+}
+
+// TestNoLeakOfSignedInRepositories is TestNoLeak with the hidden repository public on GitHub and set by an admin to be seen by
+// signed-in viewers only (Admin › Who sees what, design/visibility.md): the public reads no more of it than of a private one, and a
+// staff member sees it, marked as not public.
+func TestNoLeakOfSignedInRepositories(t *testing.T) {
+	get, _ := privatePortalAt(t, "access: {private_groups: [staff]}\nauth: {tokens: [{name: bot, secret_file: $DIR/bot, groups: [staff], admin: true}]}\n",
+		func(gh *githubtest.Server) {
+			gh.Update(gh.ID("acme", "zq-hidden"), func(r *gogh.Repository) { r.Visibility, r.Private = new("public"), new(false) })
+		})
+	untilListed(t, get)
+	if code, _, _ := get("/api/v1/repos/acme/zq-hidden"); code != http.StatusOK {
+		t.Fatalf("public on GitHub, the public reads it before the choice: %d", code)
+	}
+	saveVisibility(t, get, `{"repos":{"acme/zq-hidden":{"audience":"signed-in","search":true}}}`)
+	until(t, "the repository leaves the public view", func() bool { code, _, _ := get("/api/v1/repos/acme/zq-hidden"); return code == http.StatusNotFound })
+	noLeak(t, get)
+	if _, b, _ := get("/api/v1/repos/acme/zq-hidden", staff...); !strings.Contains(b, `"notPublic":true`) {
+		t.Errorf("staff reads the repository without its mark:\n%.400s", b)
+	}
+	if _, b, _ := get("/api/v1/repos/acme/open", staff...); !strings.Contains(b, `"notPublic":false`) {
+		t.Errorf("a public repository is marked:\n%.400s", b)
+	}
+}
+
+// noLeak walks every public path of a portal whose acme/zq-hidden the public must not see.
+func noLeak(t *testing.T, get fetch) {
+	t.Helper()
 	clean := regexp.MustCompile(`urn:scp:request:\w+`)
 	for _, p := range publicPaths(t) {
 		for _, accept := range []string{"*/*", "text/markdown"} {

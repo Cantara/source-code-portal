@@ -2340,6 +2340,9 @@ type Repo struct {
 	License string `json:"license"`
 	Name    string `json:"name"`
 
+	// NotPublic Public on GitHub, but an administrator chose that only signed-in viewers see it here (Admin › Who sees what); only such a viewer reads it
+	NotPublic bool `json:"notPublic"`
+
 	// OpenIssues Open issues, the best count held: the issues read, else GitHub's count less the open pull requests read, else GitHub's count of both (openIssuesWithPulls)
 	OpenIssues int `json:"openIssues"`
 

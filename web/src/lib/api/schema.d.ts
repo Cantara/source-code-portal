@@ -679,6 +679,8 @@ export interface components {
       /** @description SPDX id; empty when unknown */
       license: string
       visibility: string
+      /** @description Public on GitHub, but an administrator chose that only signed-in viewers see it here (Admin › Who sees what); only such a viewer reads it */
+      notPublic: boolean
       topics: string[]
       archived: boolean
       fork: boolean

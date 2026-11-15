@@ -101,15 +101,16 @@ type Snapshot struct {
 	Sources    []SourceStatus      // sorted by id
 	allGroups  []Group             // config order, every group the catalogue resolved, empty ones too: what the next Builder starts from (the base snapshot only)
 	groupsOf   map[RepoKey][]string
-	indexers   []Indexer             // what the features derive from every repository, run at publish
-	retire     func(*RepoEntry) bool // a group member it says yes to is retired (Publisher.Retire); nil: none
-	park       func(*RepoEntry) bool // a repository it says yes to is parked (Publisher.Park); nil: none
-	parked     map[RepoKey]bool      // the repositories park named at this build: in the base snapshot only, in no view
-	indexes    map[string]any        // index name -> what its indexer built
-	public     *Snapshot             // this view without its private and internal repositories; s itself when there are none
-	lean       *Snapshot             // this view without the hidden forks; s itself when there are none
-	fat        *Snapshot             // this view with the hidden forks; s itself when it has them or there are none; the base's is its view without the parked repositories
-	hidden     map[RepoKey]bool      // the forks no source shows and no group pins (Builder.SetHidden)
+	indexers   []Indexer                           // what the features derive from every repository, run at publish
+	retire     func(*RepoEntry) bool               // a group member it says yes to is retired (Publisher.Retire); nil: none
+	audience   func(*RepoEntry, []string) Audience // who sees a repository in those groups (Publisher.Audience); nil: everyone sees every one
+	parked     map[RepoKey]bool                    // the repositories no one sees at this build: in the base snapshot only, in no view
+	restricted map[RepoKey]bool                    // the repositories only signed-in viewers see at this build: in no public view
+	indexes    map[string]any                      // index name -> what its indexer built
+	public     *Snapshot                           // this view without its private, internal and signed-in repositories; s itself when there are none
+	lean       *Snapshot                           // this view without the hidden forks; s itself when there are none
+	fat        *Snapshot                           // this view with the hidden forks; s itself when it has them or there are none; the base's is its view without the parked repositories
+	hidden     map[RepoKey]bool                    // the forks no source shows and no group pins (Builder.SetHidden)
 	marks      map[string]mark
 	sum        uint64
 	digests    map[RepoKey]uint64 // per repository: the sum of its items' content digests
@@ -122,7 +123,8 @@ type mark struct {
 	content uint64 // what the item holds, without when it was checked
 }
 
-// Public returns the view of s without its private and internal repositories: s itself when it has none. It keeps s's choice of forks.
+// Public returns the view of s without its private and internal repositories and the ones only signed-in viewers see (Restricted): s
+// itself when it has none. It keeps s's choice of forks.
 func (s *Snapshot) Public() *Snapshot {
 	if s.public == nil {
 		return s
@@ -130,7 +132,7 @@ func (s *Snapshot) Public() *Snapshot {
 	return s.public
 }
 
-// View returns the view a request reads: with or without the private and internal repositories (private), with or without the forks
+// View returns the view a request reads: with or without the private, internal and signed-in repositories (private), with or without the forks
 // no source shows and no group pins (forks). A snapshot without private repositories or hidden forks returns itself for the choice
 // that changes nothing.
 func (s *Snapshot) View(private, forks bool) *Snapshot {
@@ -147,11 +149,27 @@ func (s *Snapshot) View(private, forks bool) *Snapshot {
 	return v
 }
 
-// Parked reports whether key is a parked repository: in the base snapshot, which keeps it, never in a view.
+// Audience is who sees a repository (design/visibility.md): everyone, only signed-in viewers (those who see private repositories),
+// or no one. A repository no one sees is still read and stored, webhook events included.
+type Audience uint8
+
+const (
+	Everyone Audience = iota // the public views hold it, unless GitHub says it is private or internal
+	SignedIn                 // only the views with the private repositories hold it
+	NoOne                    // no view holds it; the base snapshot keeps it
+)
+
+// Parked reports whether key is a repository no one sees: in the base snapshot, which keeps it, never in a view.
 func (s *Snapshot) Parked(key RepoKey) bool { return s.parked[key] }
 
 // ParkedCount is how many repositories the base snapshot holds that no view shows.
 func (s *Snapshot) ParkedCount() int { return len(s.parked) }
+
+// Restricted reports whether key is a repository only signed-in viewers see although GitHub has it public: it is in no public view.
+func (s *Snapshot) Restricted(key RepoKey) bool { return s.restricted[key] }
+
+// RestrictedCount is how many repositories only signed-in viewers see although GitHub has them public.
+func (s *Snapshot) RestrictedCount() int { return len(s.restricted) }
 
 // Hidden reports whether key is a fork the default views leave out.
 func (s *Snapshot) Hidden(key RepoKey) bool { return s.hidden[key] }

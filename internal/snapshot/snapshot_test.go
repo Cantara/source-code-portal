@@ -482,7 +482,12 @@ func TestViewsByPrivateAndByHiddenForks(t *testing.T) {
 func TestParkedRepositoriesAreInNoView(t *testing.T) {
 	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
 	parked := map[RepoKey]bool{}
-	p.Park(func(e *RepoEntry) bool { return parked[e.Repo.Key()] })
+	p.Audience(func(e *RepoEntry, _ []string) Audience {
+		if parked[e.Repo.Key()] {
+			return NoOne
+		}
+		return Everyone
+	})
 	open := repo("gh", 1, "acme", "open")
 	open.Repo.Visibility = "public"
 	old := repo("gh", 2, "acme", "old")
@@ -547,6 +552,73 @@ func TestParkedRepositoriesAreInNoView(t *testing.T) {
 	p.Flush()
 	if v := p.Current().Public(); v.Repos["acme/old"] == nil {
 		t.Error("a repository taken off the list is not back")
+	}
+}
+
+// A repository only signed-in viewers see is in the two private views and in neither public one, marked Restricted there; a private one
+// set so is not counted (GitHub keeps it out already); a group of such repositories only is in no public view; its change moves no
+// public view's version; set back to everyone, it is public at the next publish.
+func TestSignedInRepositoriesAreInNoPublicView(t *testing.T) {
+	p := NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), noteCount.Build(countNotes))
+	who := map[RepoKey]Audience{}
+	var seen []string // the groups the callback is told acme/early is in
+	p.Audience(func(e *RepoEntry, groups []string) Audience {
+		if e.Repo.Key() == "acme/early" {
+			seen = groups
+		}
+		return who[e.Repo.Key()]
+	})
+	open := repo("gh", 1, "acme", "open")
+	open.Repo.Visibility = "public"
+	early := repo("gh", 2, "acme", "early")
+	early.Repo.Visibility = "public"
+	secret := repo("gh", 3, "acme", "secret")
+	secret.Repo.Visibility = "private"
+	p.Update(func(b *Builder) {
+		b.ReplaceSource("gh", []*RepoEntry{open, early, secret}, nil, SourceStatus{ID: "gh", Repos: 3})
+		b.SetGroups([]Group{{ID: "all", DefaultRepo: "acme/early", Members: []RepoKey{"acme/early", "acme/open", "acme/secret"}},
+			{ID: "new", DefaultRepo: "acme/early", Members: []RepoKey{"acme/early"}}})
+	})
+	who["acme/early"], who["acme/secret"] = SignedIn, SignedIn
+	p.Flush()
+	s := p.Current()
+	if !slices.Equal(seen, []string{"all", "new"}) {
+		t.Errorf("the audience is asked with the groups %v", seen)
+	}
+	if s.RestrictedCount() != 1 || !s.Restricted("acme/early") || s.Restricted("acme/secret") || s.ParkedCount() != 0 {
+		t.Fatalf("restricted %d, early %v, secret %v", s.RestrictedCount(), s.Restricted("acme/early"), s.Restricted("acme/secret"))
+	}
+	for _, tc := range []struct {
+		private bool
+		repos   []RepoKey
+		groups  int
+	}{
+		{true, []RepoKey{"acme/early", "acme/open", "acme/secret"}, 2},
+		{false, []RepoKey{"acme/open"}, 1},
+	} {
+		for _, forks := range []bool{true, false} {
+			v := s.View(tc.private, forks)
+			if got := slices.Sorted(maps.Keys(v.Repos)); !slices.Equal(got, tc.repos) || len(v.Groups) != tc.groups {
+				t.Errorf("private %v forks %v: repos %v, %d groups", tc.private, forks, got, len(v.Groups))
+			}
+			if tc.private && !v.Restricted("acme/early") {
+				t.Errorf("private %v forks %v: the repository is not marked as seen by signed-in viewers only", tc.private, forks)
+			}
+		}
+	}
+	if g, _ := s.Public().Group("all"); g.DefaultRepo != "" || !g.DefaultMissing {
+		t.Errorf("the public view tells the default it does not hold: %q", g.DefaultRepo)
+	}
+	p.Update(func(b *Builder) { b.Mark("notes/acme/early", "acme/early", 9, 9) })
+	p.Flush()
+	if next := p.Current(); next.Public().Version != s.Public().Version || next.View(true, true).Version == s.View(true, true).Version {
+		t.Error("a signed-in repository's change moved the public view, or not the private one")
+	}
+	delete(who, "acme/early")
+	p.Update(func(*Builder) {})
+	p.Flush()
+	if v := p.Current(); v.Public().Repos["acme/early"] == nil || v.RestrictedCount() != 0 {
+		t.Error("a repository set back to everyone is not public")
 	}
 }
 

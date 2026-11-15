@@ -54,7 +54,7 @@ export function RepoView({ owner, name, main, side }: { owner: string; name: str
               <span className="text-muted-foreground">
                 Last push <RelativeTime at={repo.pushedAt} />
               </span>
-              <VisibilityBadge visibility={repo.visibility} />
+              <VisibilityBadge visibility={repo.visibility} notPublic={repo.notPublic} />
               {repo.archived && <Badge variant="warn">Archived</Badge>}
               {repo.fork && <Badge>Fork</Badge>}
             </p>

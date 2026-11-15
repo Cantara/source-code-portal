@@ -57,11 +57,13 @@ describe("findings on a repository's page", () => {
 })
 
 describe("VisibilityBadge", () => {
-  it("marks private and internal repositories only", () => {
+  it("marks private and internal repositories, and public ones shown to signed-in viewers only", () => {
     const { rerender, container } = render(<VisibilityBadge visibility="private" />)
     expect(screen.getByText("Private")).toBeInTheDocument()
     rerender(<VisibilityBadge visibility="internal" />)
     expect(screen.getByText("Internal")).toBeInTheDocument()
+    rerender(<VisibilityBadge visibility="public" notPublic />)
+    expect(screen.getByText("Not public")).toBeInTheDocument()
     rerender(<VisibilityBadge visibility="public" />)
     expect(container).toBeEmptyDOMElement()
   })
