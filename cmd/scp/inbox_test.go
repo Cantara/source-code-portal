@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -16,11 +17,16 @@ import (
 )
 
 type memPark struct {
-	rows map[string]string
-	fail error
+	rows  map[string]string
+	fail  error
+	stall bool // the write waits until it is given up on, as behind a stalled disk
 }
 
-func (m *memPark) Park(_ context.Context, id, v string) error {
+func (m *memPark) Park(ctx context.Context, id, v string) error {
+	if m.stall {
+		<-ctx.Done()
+		return ctx.Err()
+	}
 	if m.fail != nil {
 		return m.fail
 	}
@@ -59,6 +65,22 @@ func TestInboxTakesEvents(t *testing.T) {
 	if err := b.take("pull_request", "acme/two", ""); err == nil || len(out) != 2 || out[1].ev != "pull_request" {
 		t.Errorf("an event that could not be parked: err %v, delivered %v", err, out)
 	}
+}
+
+// A parking write that does not finish is given up after parkWait, well inside GitHub's 10 seconds, so the delivery is answered 503 (and
+// the catch-up passes it on again) rather than answered after GitHub stopped waiting; the event is passed on all the same.
+func TestInboxGivesUpAStalledPark(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := &memPark{rows: map[string]string{}, stall: true}
+		now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+		var out []got
+		b := newInbox(p, &now, &out)
+		start := time.Now()
+		err := b.take("push", "acme/one", "")
+		if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) != parkWait || len(out) != 1 {
+			t.Errorf("a stalled park: err %v after %v, delivered %v", err, time.Since(start), out)
+		}
+	})
 }
 
 // What a process left parked is passed on after its restart, once for identical events, unless the engine has acted on it already. The

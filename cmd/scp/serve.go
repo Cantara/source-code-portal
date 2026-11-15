@@ -802,7 +802,7 @@ func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, s
 		rc.Dedupe(s.member.First)
 	}
 	rc.Observe(observe)
-	return []httpapi.Route{{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: rc}}
+	return []httpapi.Route{{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: timed(rc, st.answered)}}
 }
 
 // unloggedSources are the sources a receiver tells about changes but whose missed deliveries nothing can recover: no App, so no
@@ -841,4 +841,13 @@ func themed(w config.Web) (*theme.Theme, []httpapi.Route, error) {
 		return look, nil, nil
 	}
 	return look, []httpapi.Route{{Pattern: "GET " + theme.Prefix + "{file...}", Handler: look.Handler()}}, nil
+}
+
+// timed passes h on and tells took how long each answer took: the webhook receiver's, against GitHub's 10 seconds.
+func timed(h http.Handler, took func(time.Duration)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		h.ServeHTTP(w, r)
+		took(time.Since(start))
+	})
 }

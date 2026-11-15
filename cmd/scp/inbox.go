@@ -22,6 +22,11 @@ import (
 // only bounds the rows of an event nothing can act on (a job that fails for days).
 const inboxKeep = 72 * time.Hour
 
+// parkWait bounds the wait for the parking write. GitHub gives a delivery 10 seconds; a store that cannot take the row in 5 (a stalled
+// disk, a long write ahead of it) is answered 503 in time, so GitHub's log shows the delivery failed and the catch-up passes it on again,
+// instead of an answer GitHub stopped waiting for and requests piling up on the one connection.
+const parkWait = 5 * time.Second
+
 // parking is the part of the store the inbox keeps its events in.
 type parking interface {
 	Park(ctx context.Context, id, value string) error
@@ -58,8 +63,9 @@ func (b *inbox) take(ev sync.Event, repo snapshot.RepoKey, source string) error 
 	if err == nil {
 		var salt [6]byte
 		_, _ = rand.Read(salt[:])
-		err = b.park.Park(context.WithoutCancel(context.Background()), strconv.FormatInt(at.UnixNano(), 36)+"-"+hex.EncodeToString(salt[:]),
-			string(value))
+		ctx, cancel := context.WithTimeout(context.Background(), parkWait)
+		err = b.park.Park(ctx, strconv.FormatInt(at.UnixNano(), 36)+"-"+hex.EncodeToString(salt[:]), string(value))
+		cancel()
 	}
 	b.deliver(ev, repo, source)
 	return err
@@ -153,7 +159,7 @@ func catchUp(src *github.Source, id string, st interface {
 			got, err := src.Deliveries(ctx, since)
 			out := make([]webhook.Delivery, 0, len(got))
 			for _, d := range got {
-				out = append(out, webhook.Delivery{GUID: d.GUID, Event: d.Event, Action: d.Action, RepositoryID: d.RepositoryID, At: d.At, OK: d.OK()})
+				out = append(out, webhook.Delivery{GUID: d.GUID, Event: d.Event, Action: d.Action, RepositoryID: d.RepositoryID, At: d.At, OK: d.OK(), Status: d.Status})
 			}
 			if errors.Is(err, github.ErrLogTruncated) {
 				err = webhook.ErrTruncated

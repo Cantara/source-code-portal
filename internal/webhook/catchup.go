@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"maps"
 	gosync "sync"
 	"time"
 
@@ -18,6 +19,7 @@ type Delivery struct {
 	RepositoryID int64
 	At           time.Time
 	OK           bool
+	Status       int // the portal's answer; 0 when none came in time
 }
 
 // ErrTruncated is what Read returns with the deliveries it did read when the log reaches back further than it reads: the newest
@@ -54,7 +56,8 @@ type CatchUp struct {
 	Now     func() time.Time
 	Every   time.Duration // 0: catchUpEvery
 
-	done map[string]time.Time // delivery ids acted on, by when they were logged
+	done  map[string]time.Time // delivery ids acted on, by when they were logged
+	noted map[string]time.Time // failed delivery ids counted in the state's Failed, by when they were logged
 
 	mu    gosync.Mutex
 	state CatchUpState
@@ -70,6 +73,9 @@ type CatchUpState struct {
 	// Truncated is when a read last found the log longer than it reads: deliveries older than the newest ones were not passed on,
 	// and the polls repair what they told.
 	Truncated time.Time
+	// Failed counts the failed deliveries the log showed since the start, by the status the portal answered (0: none in time), each
+	// once however often it is read.
+	Failed map[int]int
 }
 
 // State returns what the last reads did.
@@ -78,6 +84,7 @@ func (c *CatchUp) State() CatchUpState {
 	defer c.mu.Unlock()
 	st := c.state
 	st.Source = c.Source
+	st.Failed = maps.Clone(c.state.Failed)
 	return st
 }
 
@@ -132,13 +139,22 @@ func (c *CatchUp) Once(ctx context.Context) (int, error) {
 		c.Logger.Warn("webhook delivery log longer than was read; the oldest deliveries are left to the polls", "read", len(log), "since", since)
 	}
 	if c.done == nil {
-		c.done = map[string]time.Time{}
+		c.done, c.noted = map[string]time.Time{}, map[string]time.Time{}
 	}
 	passed, incomplete := 0, false
 	for i := len(log) - 1; i >= 0; i-- { // oldest first
 		d := log[i]
 		if d.OK || d.GUID == "" || d.At.Before(since) {
 			continue
+		}
+		if _, counted := c.noted[d.GUID]; !counted {
+			c.noted[d.GUID] = d.At
+			c.note(func(st *CatchUpState) {
+				if st.Failed == nil {
+					st.Failed = map[int]int{}
+				}
+				st.Failed[d.Status]++
+			})
 		}
 		if _, seen := c.done[d.GUID]; seen {
 			continue
@@ -165,9 +181,11 @@ func (c *CatchUp) Once(ctx context.Context) (int, error) {
 		passed++
 		c.Observe(d.Event, "caught_up")
 	}
-	for id, at := range c.done {
-		if now.Sub(at) > catchUpMemory {
-			delete(c.done, id)
+	for _, m := range []map[string]time.Time{c.done, c.noted} {
+		for id, at := range m {
+			if now.Sub(at) > catchUpMemory {
+				delete(m, id)
+			}
 		}
 	}
 	if incomplete {

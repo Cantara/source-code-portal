@@ -45,7 +45,7 @@ offered. Those pages leave the sitemap and say `noindex`. The portal's own pages
 
 ## Acceptance
 
-1. A repository kept out is not in `/sitemap.xml` (nor its documents) and its page, documents and Markdown answer with
+1. A repository kept out is not in `/sitemap.xml` and its page, documents and Markdown answer with
    `X-Robots-Tag: noindex, nofollow`; its API answer and the rest of the portal are unchanged (`cmd/scp/indexing_test.go`).
 2. A group kept out is not in the sitemap and says noindex; a repository only in kept-out groups follows it, one in another group does
    not (`internal/indexing`).

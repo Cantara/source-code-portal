@@ -19,9 +19,9 @@ for a private viewer; a 404 status for unknown pages; `/llms.txt`, `/llms-full.t
    part of its repository's code; every page but the dashboard a `BreadcrumbList` from `lib/crumbs.ts`, the trail the page header
    shows (`shared/breadcrumbs.tsx`): the pages above it, never the way the reader came. A repository sits under the first of its
    groups in configuration order (`RepoDetail.group`), under the dashboard when it is in none; its commits and documents under it.
-3. Sitemap (built, Go's `llms`): the dashboard, the commit log, groups, repositories and their documents (not the README, which is
-   the repository's page, nor hidden ones) for the viewer's view; `lastmod` a repository's newest commit, a group's newest member
-   commit, a document's repository's (per-file history is not read), the dashboard's and commit log's the newest of all; an index of
+3. Sitemap (built, Go's `llms`): the home page, the groups and the repositories of the public view (P-117, P-118: no listing page and
+   no document; they are reached from these); `lastmod` a repository's newest commit, a group's newest member commit, the home
+   page's the newest of all; an index of
    `/sitemaps/{n}.xml` past 50,000 URLs; absolute URLs from `server.public_url`, else the request's origin. Served with
    `public, max-age=300, s-maxage=3600, stale-while-revalidate=86400` and a strong ETag, as `robots.txt` (Go's too).
 4. Shared links (built): every page's Open Graph and X `summary` metadata (`social` in `lib/seo.tsx`, applied by `page()`): its title,
