@@ -4,6 +4,16 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.22
+
+Two fixes to 2.2.21. Nothing new is asked of GitHub; no configuration key or store schema changes.
+
+- **The scp.yaml download changes only what Admin changed**: the three sections it writes are spliced into the file as loaded, and
+  every other line comes back byte for byte. 2.2.21 encoded the whole file again, folding long values (a group's `description:`)
+  onto continuation lines and dropping blank lines, so a straight copy showed changes that were none.
+- **The Events tile counts from the start**: the last delivery is held per process, so after a restart the overview says *No delivery
+  since the portal started* instead of *Last delivery never*.
+
 ## 2.2.21
 
 scp.yaml is the base of everything Admin edits, and Admin downloads it with the changes written in. Nothing new is asked of GitHub; the

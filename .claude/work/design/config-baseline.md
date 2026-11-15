@@ -33,7 +33,9 @@ a store reset or lost loses nothing.
   `cmd/scp` `configWarning`. Admin's overview *Configuration* card reads them and offers the download.
 - **The download.** `GET /api/v1/admin/config.yaml` (admin only, `cmd/scp/configfile.go`): the file as read at the start, its
   `visibility`, `layouts` and `announcements` keys replaced by the values in force (added at the end when missing, removed when empty),
-  every other node with its comments kept (`yaml.Node`); the values written from JSON in their fields' order (`nodeOf`). A portal started
+  every other line of the file kept byte for byte: the sections' lines (from the key to the blank lines and column-one comments above
+  the next key) are spliced with their new text, encoded with no line width (owner, 2.2.22: re-encoding the whole file folded long
+  values and dropped blank lines, noise in a diff); the values written from JSON in their fields' order (`nodeOf`). A portal started
   without a file (`SCP_*` variables alone) answers 409 `no-file`: the three sections alone are not a configuration that starts.
 - **The marks.** Who sees what says per row *set in scp.yaml*, *set here* or *changed here; scp.yaml: …* with *reset to scp.yaml*, and
   for the rules; the announcements are *from scp.yaml*, *changed here* (*Reset to scp.yaml*), *added here*, or *in scp.yaml, removed

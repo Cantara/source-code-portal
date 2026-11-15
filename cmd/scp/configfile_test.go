@@ -109,6 +109,36 @@ announcements:
 	}
 }
 
+// The download writes only the replaced sections anew: every other line comes back as written, a long value on its line, blank
+// lines, comments and a list's indentation included.
+func TestConfigYAMLKeepsTheFile(t *testing.T) {
+	long := strings.Repeat("A description longer than eighty columns, ", 4) + "kept on one line."
+	head := "# The portal.\n\ncatalog:\n  groups:\n  - id: portal\n    description: " + long + "\n    match: ['scp-*']\n\n"
+	tail := "# Who sees what, edited in Admin.\nlayouts: {}\n\nstore:\n  path: /data/scp.db   # the store\n"
+	file := head + "visibility:\n  repos:\n    a/b: {audience: no-one}\n\n" + tail
+	out, err := configYAML([]byte(file), []section{
+		{"visibility", []byte(`{"repos":{"a/b":{"audience":"no-one"},"a/c":{"audience":"signed-in","search":false}}}`)},
+		{"layouts", nil},
+		{"announcements", []byte(`[{"id":"x","title":"` + long + `"}]`)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := head + "visibility:\n  repos:\n    a/b:\n      audience: no-one\n    a/c:\n      audience: signed-in\n      search: false\n\n" +
+		"# Who sees what, edited in Admin.\n\nstore:\n  path: /data/scp.db   # the store\n" +
+		"announcements:\n  - id: x\n    title: " + long + "\n"
+	if string(out) != want {
+		t.Errorf("got\n%s\nwant\n%s", out, want)
+	}
+	if out, err := configYAML([]byte("store: {path: x}"), []section{{"layouts", []byte(`{}`)}}); err != nil || string(out) != "store: {path: x}\nlayouts: {}\n" {
+		t.Errorf("a file without its last newline: %q %v", out, err)
+	}
+	same, err := configYAML([]byte(file), []section{{"announcements", nil}})
+	if err != nil || string(same) != file {
+		t.Errorf("nothing to replace changed the file:\n%s", same)
+	}
+}
+
 // A portal configured by SCP_* variables alone has no file to write the changes into: the download says so instead of offering the
 // three sections as a configuration, which would not start.
 func TestTheDownloadNeedsAFile(t *testing.T) {
