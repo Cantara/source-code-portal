@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/cantara/source-code-portal/internal/docstore"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -236,16 +237,20 @@ func (d Doc) resolve(key snapshot.RepoKey, groups []string) Effective {
 	return best
 }
 
-// Set is the admins' choices.
+// Set is who sees what: the configuration's `visibility:` (the base) with the admins' changes, the stored overrides
+// (design/config-baseline.md).
 type Set struct {
-	file    *docstore.Doc[Doc]
+	base    Doc
+	file    *docstore.Doc[Overrides]
 	changed func()
+	doc     atomic.Pointer[Doc] // the document in force: base with the stored overrides
 }
 
-// Open reads the stored document from db (nil: the defaults, and nothing can be saved). A store that has no `visibility` document is
-// given one made from the `parked` and `indexing` documents it holds (Import), which are left as they are. changed is called after
-// every save, so the snapshot is published again with the new audiences.
-func Open(ctx context.Context, db docstore.Backend, changed func(), log *slog.Logger) *Set {
+// Open reads the stored overrides of base from db (nil: base alone, and nothing can be saved). A store that has no `visibility`
+// document is given one made from the `parked` and `indexing` documents it holds (Import), which are left as they are. Overrides that
+// equal the file are dropped, so a configuration downloaded and deployed leaves the store without changes of its own. changed is
+// called after every save, so the snapshot is published again with the new audiences.
+func Open(ctx context.Context, db docstore.Backend, base Doc, changed func(), log *slog.Logger) *Set {
 	if changed == nil {
 		changed = func() {}
 	}
@@ -255,19 +260,52 @@ func Open(ctx context.Context, db docstore.Backend, changed func(), log *slog.Lo
 			log.Error("the parked and search-engine lists were not taken over; they are still stored", "err", err)
 		}
 	}
-	return &Set{file: docstore.Open(ctx, db, Name, Empty(), Parse, log), changed: changed}
+	s := &Set{base: base, file: docstore.Open(ctx, db, Name, Overrides{}, ParseOverrides, log), changed: changed}
+	st := s.file.Get()
+	if pruned := Diff(base, Merge(base, st.Value)); st.Stored && st.Problem == "" && pruned.Count() != st.Value.Count() {
+		if b, err := encodeOverrides(pruned); err == nil {
+			if _, err := s.file.Save(ctx, b, st.Revision); err != nil {
+				log.Error("the changes equal to the configuration were not dropped", "err", err)
+			} else {
+				log.Info("changes equal to the configuration dropped from the store", "kept", pruned.Count())
+			}
+		}
+	}
+	s.refresh()
+	return s
 }
 
-// Problems is why the stored document is not served, for the admin status.
+// refresh recomputes the document in force from the base and the stored overrides.
+func (s *Set) refresh() {
+	d := Merge(s.base, s.file.Get().Value)
+	s.doc.Store(&d)
+}
+
+// Problems is why the stored document is not served, and that changes are kept only in the store, for the admin status.
 func (s *Set) Problems() []string {
-	if p := s.file.Get().Problem; p != "" {
-		return []string{Name + ": " + p + "; everyone sees every public repository until it is saved again"}
+	st := s.file.Get()
+	if st.Problem != "" {
+		return []string{Name + ": " + st.Problem + "; the configuration's choices apply until it is saved again"}
+	}
+	if n := st.Value.Count(); n > 0 {
+		return []string{fmt.Sprintf("visibility: %d %s kept only in the store, not in the configuration; download scp.yaml from Admin to keep %s",
+			n, plural(n, "change", "changes"), plural(n, "it", "them"))}
 	}
 	return nil
 }
 
-// Doc is the document served now.
-func (s *Set) Doc() Doc { return s.file.Get().Value }
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
+// Doc is the document in force.
+func (s *Set) Doc() Doc { return *s.doc.Load() }
+
+// Base is the configuration's `visibility:`.
+func (s *Set) Base() Doc { return s.base }
 
 // Revision identifies the stored content: a sitemap built from it is built again when it changes.
 func (s *Set) Revision() string { return s.file.Get().Revision }

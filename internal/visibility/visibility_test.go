@@ -142,12 +142,13 @@ func save(t *testing.T, s *Set, body string) {
 	if _, err := s.file.Save(t.Context(), b, s.Revision()); err != nil {
 		t.Fatal(err)
 	}
+	s.refresh()
 }
 
 // The snapshot's views follow the audiences; search engines are offered only what everyone sees with its switch on, and a product's
 // page follows the product's own choice.
 func TestAudiencesAndSearchEngines(t *testing.T) {
-	s := Open(t.Context(), openStore(t), nil, quiet)
+	s := Open(t.Context(), openStore(t), Empty(), nil, quiet)
 	save(t, s, `{"groups":{"b":{"audience":"everyone","search":false}},"repos":{"acme/x":{"audience":"signed-in"},"acme/w":{"audience":"no-one"}}}`)
 	v := view(t, s)
 	pub := v.Public()
@@ -192,7 +193,7 @@ func TestImport(t *testing.T) {
 	indexing := `{"groups":["b"],"repos":["acme/w","acme/x"],"exclude":["^acme/tmp-"],"include":["^acme/tmp-keep$"]}`
 	put(oldParked, parked)
 	put(oldIndexing, indexing)
-	s := Open(t.Context(), db, nil, quiet)
+	s := Open(t.Context(), db, Empty(), nil, quiet)
 	d := s.Doc()
 	if d.Repos["acme/old"].Audience != NoOne || d.Repos["acme/w"].Audience != NoOne || d.Repos["acme/x"] != (Setting{Audience: Everyone}) ||
 		d.Groups["b"] != (Setting{Audience: Everyone}) || len(d.Rules) != 2 || d.Rules[0].Pattern != "^acme/tmp-keep$" || !d.Rules[0].Search ||
@@ -207,7 +208,7 @@ func TestImport(t *testing.T) {
 	// Taken over once: a later parked list does not come back over the saved choices.
 	save(t, s, `{}`)
 	put(oldParked, `{"repos":["acme/new"]}`)
-	if d := Open(t.Context(), db, nil, quiet).Doc(); len(d.Repos) != 0 {
+	if d := Open(t.Context(), db, Empty(), nil, quiet).Doc(); len(d.Repos) != 0 {
 		t.Errorf("taken over again: %+v", d.Repos)
 	}
 }
@@ -228,7 +229,7 @@ func call(h http.Handler, method, path, body string, admin bool, hdr ...string) 
 
 func TestAdminReadsPreviewsAndSaves(t *testing.T) {
 	changed := 0
-	s := Open(t.Context(), openStore(t), func() { changed++ }, quiet)
+	s := Open(t.Context(), openStore(t), Empty(), func() { changed++ }, quiet)
 	v := view(t, s)
 	mux := http.NewServeMux()
 	for _, r := range s.Routes("https://scp.example", func() *snapshot.Snapshot { return v }, quiet) {
@@ -293,5 +294,52 @@ func TestAdminReadsPreviewsAndSaves(t *testing.T) {
 	}
 	if s.Doc().Repos["acme/w"].Audience != NoOne {
 		t.Error("the save is in force")
+	}
+}
+
+// The configuration's `visibility:` is the base: it decides with nothing stored; a stored change wins; a null returns an item to
+// inheriting; a save stores only the difference from the file; at the next start a change equal to the file is dropped.
+func TestConfigurationIsTheBaseline(t *testing.T) {
+	base := doc(t, `{"groups":{"b":{"audience":"signed-in"}},"repos":{"acme/w":{"audience":"no-one"},"acme/y":{"audience":"everyone","search":false}},`+
+		`"rules":[{"pattern":"^acme/z","audience":"signed-in"}]}`)
+	db := openStore(t)
+	s := Open(t.Context(), db, base, nil, quiet)
+	if got := s.Doc().Repo("acme/w", nil, true).Audience; got != NoOne {
+		t.Errorf("acme/w from the file = %s", got)
+	}
+	if n := len(s.Problems()); n != 0 {
+		t.Errorf("nothing stored, yet %v", s.Problems())
+	}
+
+	// An admin returns acme/w to inheriting, sets acme/x and leaves the rest as the file has it: only that difference is stored.
+	d := Merge(base, Overrides{})
+	delete(d.Repos, "acme/w")
+	d.Repos["acme/x"] = Setting{Audience: SignedIn, Search: true}
+	b, _ := encodeOverrides(Diff(base, d))
+	if want := `{"repos":{"acme/w":null,"acme/x":{"audience":"signed-in","search":true}}}`; strings.Join(strings.Fields(string(b)), "") != want {
+		t.Errorf("stored %s, want %s", b, want)
+	}
+	if _, err := s.file.Save(t.Context(), b, s.Revision()); err != nil {
+		t.Fatal(err)
+	}
+	s.refresh()
+	if got := s.Doc().Repo("acme/w", nil, true); got.Audience != Everyone || got.Why != FromDefault {
+		t.Errorf("acme/w after null = %+v", got)
+	}
+	if got := s.Doc().Repo("acme/z1", nil, true).Audience; got != SignedIn {
+		t.Errorf("the file's rule = %s", got)
+	}
+	if p := s.Problems(); len(p) != 1 || !strings.Contains(p[0], "2 changes kept only in the store") {
+		t.Errorf("problems %v", p)
+	}
+
+	// The file now holds acme/x as the admin set it: at the next start that change is dropped, the null kept.
+	base.Repos["acme/x"] = Setting{Audience: SignedIn, Search: true}
+	s = Open(t.Context(), db, base, nil, quiet)
+	if got := s.file.Get().Value; got.Count() != 1 || got.Repos["acme/w"] != nil {
+		t.Errorf("after the start, stored %+v", got)
+	}
+	if got := s.Doc().Repo("acme/x", nil, true).Audience; got != SignedIn {
+		t.Errorf("acme/x = %s", got)
 	}
 }

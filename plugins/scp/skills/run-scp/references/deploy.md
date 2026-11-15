@@ -171,8 +171,17 @@ The team's news (an event with a sign-up link, planned maintenance) shows at the
 time lasts. Administrators write them in the Admin page's *Announcements* section, saved in the store; the
 deployment can set its own in `announcements[]` (`id`, `title`, `text`, `tone`: `event`, `info` or `notice`, `starts`/`ends` in RFC
 3339 with their offset, `place`, `link` with `label` and an https `url`, `lang`, `pages`: `dashboard` and/or `present`, `audience`:
-`everyone` or `signed-in`, `from`, `until` (required unless `ends`), `published`), which `scp config check` checks and Admin lists
-locked. A wall shows the link as a QR code.
+`everyone` or `signed-in`, `from`, `until` (required unless `ends`), `published`), which `scp config check` checks. A wall shows the
+link as a QR code.
+
+## scp.yaml as the base of what admins change
+
+From the release after 2.2.20, `visibility:` (who sees what: `groups`, `repos` and `rules`, each `audience` `everyone`, `signed-in` or `no-one`,
+`search: false` to keep what everyone sees from search engines), `layouts:` (the pages' layouts by page) and `announcements[]` in
+scp.yaml are the base; what admins change in Admin is kept in the store as changes to it. Admin, Overview, *Download scp.yaml*
+(`GET /api/v1/admin/config.yaml`) gives the file with those sections as in force and every other line as written: commit it to the
+deployment's repository and deploy it, so a lost or reset store loses nothing. At the start, a stored change equal to the file is
+dropped; until the file has them, `/api/v1/status` warns of changes *kept only in the store*.
 
 ## Search
 

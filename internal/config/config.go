@@ -38,8 +38,14 @@ type Config struct {
 	Features  Features  `mapstructure:"features"`
 	// Enterprise holds what GitHub Enterprise and Entra ID need (design/enterprise.md), off by default.
 	Enterprise Enterprise `mapstructure:"enterprise"`
-	// Announcements are the deployment's announcements (design/announcements.md), locked in the admin's card.
+	// Announcements are the deployment's announcements (design/announcements.md); an admin's change is kept in the store as an
+	// override (design/config-baseline.md).
 	Announcements []Announcement `mapstructure:"announcements"`
+	// Visibility and Layouts are accepted here and read as written into Baseline: viper would lowercase their keys.
+	Visibility any            `mapstructure:"visibility"`
+	Layouts    map[string]any `mapstructure:"layouts"`
+	// Baseline is the file's part of what admins edit in the pages (design/config-baseline.md).
+	Baseline Baseline `mapstructure:"-"`
 }
 
 // Server configures the two listeners.
@@ -193,6 +199,9 @@ func Load(path string, flags *pflag.FlagSet) (Config, map[string]any, error) {
 	if err := v.UnmarshalExact(&cfg); err != nil {
 		problems = append(problems, err.Error())
 	} else {
+		var bp []string
+		cfg.Baseline, bp = readBaseline(path)
+		problems = append(problems, bp...)
 		cfg.normalise()
 		problems = append(problems, cfg.validate()...)
 		problems = append(problems, cfg.readSecrets()...)

@@ -57,6 +57,7 @@ func TestDefaults(t *testing.T) {
 		Packages:   Packages{Public: true},
 		Features:   Features{Pulls: true, Issues: true},
 		Enterprise: Enterprise{Access: EnterpriseAccess{Refresh: 15 * time.Minute, MaxAge: time.Hour}},
+		Baseline:   Baseline{File: cfg.Baseline.File, Layouts: map[string][]byte{}},
 	}
 	if diff := cmp.Diff(want, cfg, cmp.Comparer(func(a, b Secret) bool { return string(a.v) == string(b.v) })); diff != "" {
 		t.Errorf("defaults (-want +got):\n%s", diff)
@@ -322,5 +323,32 @@ func TestLayoutDirMayBeGone(t *testing.T) {
 	notDir := write(t, "layouts", "x")
 	if _, _, err := Load(file(t, "layout: {dir: "+notDir+"}\n"), nil); err == nil || !strings.Contains(err.Error(), "layout.dir") {
 		t.Errorf("a file as the directory: %v", err)
+	}
+}
+
+func TestBaselineIsReadAsWritten(t *testing.T) {
+	cfg, _, err := Load(file(t, `
+visibility:
+  repos:
+    Acme/MixedCase: {audience: no-one}
+    acme/open: {audience: everyone, search: false}
+  rules:
+    - {pattern: "^acme/mcp-", audience: signed-in}
+layouts:
+  dashboard: {version: 1, elements: [{type: heading, text: Hi}]}
+`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"repos":{"Acme/MixedCase":{"audience":"no-one","search":true},"acme/open":{"audience":"everyone","search":false}},` +
+		`"rules":[{"audience":"signed-in","pattern":"^acme/mcp-","search":true}]}`
+	if got := string(cfg.Baseline.Visibility); got != want {
+		t.Errorf("visibility =\n%s\nwant\n%s", got, want)
+	}
+	if got := string(cfg.Baseline.Layouts["dashboard"]); got != `{"elements":[{"text":"Hi","type":"heading"}],"version":1}` {
+		t.Errorf("layouts.dashboard = %s", got)
+	}
+	if !strings.Contains(string(cfg.Baseline.File), "Acme/MixedCase") {
+		t.Error("the file is not kept as written")
 	}
 }

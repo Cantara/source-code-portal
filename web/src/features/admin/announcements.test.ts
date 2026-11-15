@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { now } from "@/entities/announcement/fixture"
-import { local, preview, slug, state, written } from "./announcements"
+import { local, noteOf, preview, slug, state, written } from "./announcements"
 
 describe("the admin's announcements", () => {
   it("edit times as written and save them with the browser's offset", () => {
@@ -16,5 +16,11 @@ describe("the admin's announcements", () => {
     expect(state({ ...base, from: "2026-11-25T00:00:00Z" }, now)).toBe("Scheduled")
     expect(state({ ...base, until: "2026-11-01T00:00:00Z" }, now)).toBe("Ended")
     expect(preview({ id: "", title: "", ends: "2026-11-26T23:00:00+01:00" }).until).toBe("2026-11-26T23:00:00+01:00")
+  })
+  it("say where each is kept: as scp.yaml has it, changed here or added here", () => {
+    const file = { id: "a", title: "From the file", until: "2099-01-01T00:00:00Z" }
+    expect(noteOf(file, [file])).toBe("from scp.yaml")
+    expect(noteOf({ ...file, title: "Mine" }, [file])).toBe("changed here")
+    expect(noteOf({ ...file, id: "b" }, [file])).toBe("added here")
   })
 })

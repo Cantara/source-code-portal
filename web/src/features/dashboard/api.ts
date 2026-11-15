@@ -84,6 +84,8 @@ export type StoredLayout = {
   elements: Element[]
   revision: string
   stored: boolean
+  /** scp.yaml's `layouts:` has the page: a reset returns to it, else to the built-in layout (design/config-baseline.md). */
+  configured?: boolean
   writable: boolean
   problem: string
 }

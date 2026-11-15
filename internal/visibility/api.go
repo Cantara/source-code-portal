@@ -49,9 +49,11 @@ type Counts struct {
 
 // adminBody is what the admins' list needs: the document, every catalogued repository by product (the ones no one sees too: they
 // are in the base snapshot), the addresses the document names that the catalogue does not hold (renamed, deleted, not listed yet),
-// how many repositories each rule matches, the counts and the revision.
+// how many repositories each rule matches, the counts and the revision. Configured is the configuration's `visibility:`, so the list
+// can tell what is changed here (design/config-baseline.md).
 type adminBody struct {
 	Doc
+	Configured  Doc         `json:"configured"`
 	Tree        []GroupNode `json:"tree"`
 	Ungrouped   []Item      `json:"ungrouped"`
 	Missing     []string    `json:"missing"`
@@ -146,6 +148,7 @@ func compose(d Doc, s *snapshot.Snapshot) adminBody {
 
 func (h admin) answer(w http.ResponseWriter, d Doc, revision, problem string) {
 	body := compose(d, h.base())
+	body.Configured = h.s.base
 	body.Revision, body.Writable, body.Problem = revision, h.s.file.Writable(), problem
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -154,7 +157,7 @@ func (h admin) answer(w http.ResponseWriter, d Doc, revision, problem string) {
 
 func (h admin) get(w http.ResponseWriter, _ *http.Request) {
 	st := h.s.file.Get()
-	h.answer(w, st.Value, st.Revision, st.Problem)
+	h.answer(w, h.s.Doc(), st.Revision, st.Problem)
 }
 
 // read checks a preview's or a save's request and returns its body, cleaned; false when it answered with a problem.
@@ -198,7 +201,8 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteProblem(w, http.StatusConflict, "read-only", "This portal has no store to save the choices in.")
 		return
 	}
-	b, err := encode(body.Doc)
+	// What is stored is the difference from the configuration: a choice equal to the file's is not kept.
+	b, err := encodeOverrides(Diff(h.s.base, body.Doc))
 	if err != nil {
 		httpapi.WriteProblem(w, http.StatusInternalServerError, "internal", "The choices could not be written.")
 		return
@@ -210,6 +214,7 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 		h.log.Error("visibility not written", "err", err)
 		httpapi.WriteProblem(w, http.StatusInternalServerError, "internal", "The choices could not be written.")
 	default:
+		h.s.refresh()
 		h.s.changed()
 		h.get(w, r)
 	}

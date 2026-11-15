@@ -62,5 +62,16 @@ test(
       .poll(async () => (await anonymous.goto("/repos/acme/tool"))?.status(), { message: "the public has it again" })
       .toBe(200)
     await anonymous.close()
+
+    // The overview offers scp.yaml with what is in force written into it; only an admin may download it.
+    await nav.getByRole("link", { name: /^Overview/ }).click()
+    await expect(page.getByRole("link", { name: "Download scp.yaml" })).toBeVisible()
+    const file = await page.request.get("/api/v1/admin/config.yaml")
+    expect(file.status()).toBe(200)
+    expect(file.headers()["content-disposition"]).toContain('filename="scp.yaml"')
+    expect(await file.text()).toContain("announcements:")
+    const outsider = await browser.newContext()
+    expect((await outsider.request.get("/api/v1/admin/config.yaml")).status()).toBe(401)
+    await outsider.close()
   },
 )

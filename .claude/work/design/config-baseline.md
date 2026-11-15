@@ -1,0 +1,54 @@
+# scp.yaml as the base of what admins change (CF1)
+
+Status: built (plan.md section 4, P-124). Binding order: ../plan.md > this note > `visibility.md`, `announcements.md`, `layout.md`,
+`documents.md`.
+
+## Goal
+
+The configuration file holds every setting an admin can change in the pages, and the precedence is deterministic: the file is the base,
+the store keeps the admins' changes, and the admin can download the file with those changes written into it, to commit and deploy, so
+a store reset or lost loses nothing.
+
+## What it is
+
+- **The sections.** `visibility:` (the shape of the document `visibility`: `groups`, `repos`, `rules`; `search` is on unless it says
+  `false`), `layouts:` (a page's layout by page, as the design mode saves it) and `announcements:` (as before). `config.Baseline`
+  holds the first two as JSON, read from the file with go.yaml.in/yaml/v4 (viper lowercases map keys, which would change addresses and
+  the layouts' field names), and the file itself. `cmd/scp` `baseline` parses them with the features' own parsers at `config check`
+  and at the start.
+- **Precedence, per item.** A repository, a product, the rules list, an announcement by id, a page's layout: the store's change, else
+  the file's, else the built-in default.
+- **What the store keeps.** The difference from the file: `visibility.Overrides` (a setting, or `null` that drops the file's choice so
+  the item inherits; `rules` present replaces the file's list), `announce.List` (the announcements changed or added here, `removed` the
+  file's ids taken away), a page's layout (a reset removes it). The admin pages edit the whole value in force; the server stores
+  `Diff(base, value)`, so a value equal to the file's is never stored.
+- **At the start** a stored change equal to the file is dropped (`Open` of each), so after the downloaded file is deployed the store
+  holds no changes and the next change made in git takes effect. A store of 2.2.20 or earlier holds whole documents: read as changes
+  to an empty file, nothing changes at the upgrade.
+- **Warnings.** `Problems` of each says how many changes are kept only in the store; they reach `/api/v1/status`'s warnings and
+  Admin's overview, whose *Configuration* card offers the download.
+- **The download.** `GET /api/v1/admin/config.yaml` (admin only, `cmd/scp/configfile.go`): the file as read at the start, its
+  `visibility`, `layouts` and `announcements` keys replaced by the values in force (added at the end when missing, removed when empty),
+  every other node with its comments kept (`yaml.Node`); the values written from JSON in their fields' order (`nodeOf`).
+- **The marks.** Who sees what says per row *set in scp.yaml*, *set here* or *changed here; scp.yaml: …* with *reset to scp.yaml*, and
+  for the rules; the announcements are *from scp.yaml*, *changed here* (*Reset to scp.yaml*), *added here*, or *in scp.yaml, removed
+  here* (*Restore from scp.yaml*); the design mode says whether the page shows scp.yaml's layout and resets to it.
+
+## What it does not do
+
+- The other keys (sources, sign-in, access, the rest) are only in the file; nothing writes the file on the server.
+- `layout.dir` stays (a key removed would refuse a running deployment's file); it imports only into an empty store.
+
+## Acceptance
+
+1. The file's `visibility:` decides with nothing stored; a stored change wins; `null` returns an item to inheriting; a change equal to
+   the file is dropped at the start (`internal/visibility` `TestConfigurationIsTheBaseline`).
+2. The file's announcements can be changed and removed, kept as changes; a removal the file no longer needs is dropped
+   (`internal/announce` `TestAdminRoutes`).
+3. The file's layout renders a page; a change wins and is warned about; a reset returns to the file's (`internal/layout`
+   `TestConfigurationIsTheBaseline`).
+4. The download keeps the operator's comments and keys and holds what is in force; loaded as the configuration, its base is that
+   (`cmd/scp` `TestConfigurationIsTheBaseline`, `TestConfigYAML`); the sections are read as written (`internal/config`
+   `TestBaselineIsReadAsWritten`).
+5. Admin marks and resets changes against the file (`visibility.test.tsx`, `announcements.test.ts`, `design.test.tsx`); the overview
+   offers the download, which only an admin gets (`signin.test.tsx`, `web/e2e/visibility.spec.ts`).

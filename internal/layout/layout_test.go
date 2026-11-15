@@ -95,7 +95,7 @@ func db(t *testing.T) *store.DB {
 func TestStoreSaveConflictReset(t *testing.T) {
 	d := db(t)
 	ctx := t.Context()
-	s := Open(ctx, d, quiet())
+	s := Open(ctx, d, nil, quiet())
 	if p := s.Get("dashboard"); p.Stored || p.Revision != "" || len(p.Layout.Elements) != 7 {
 		t.Fatalf("before a save: %+v", p)
 	}
@@ -112,7 +112,7 @@ func TestStoreSaveConflictReset(t *testing.T) {
 	if _, err := s.Save(ctx, "dashboard", Layout{}, rev); !errors.As(err, new(Invalid)) {
 		t.Errorf("an empty layout: %v", err)
 	}
-	if again := Open(ctx, d, quiet()).Get("dashboard"); again.Revision != rev || !again.Stored {
+	if again := Open(ctx, d, nil, quiet()).Get("dashboard"); again.Revision != rev || !again.Stored {
 		t.Errorf("reopened: %+v", again)
 	}
 	if err := s.Reset(ctx, "dashboard", "stale"); !errors.Is(err, ErrConflict) {
@@ -124,7 +124,7 @@ func TestStoreSaveConflictReset(t *testing.T) {
 	if p := s.Get("dashboard"); p.Stored || len(p.Layout.Elements) != 7 {
 		t.Errorf("after a reset: %+v", p)
 	}
-	if _, err := Open(ctx, nil, quiet()).Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); !errors.Is(err, ErrReadOnly) {
+	if _, err := Open(ctx, nil, nil, quiet()).Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); !errors.Is(err, ErrReadOnly) {
 		t.Errorf("without a store: %v", err)
 	}
 }
@@ -136,7 +136,7 @@ func TestStoreBrokenDocument(t *testing.T) {
 	if err := d.PutDocument(ctx, "dashboard", []byte(`{"elements":[{"kind":"chart"}]}`), "r0", ""); err != nil {
 		t.Fatal(err)
 	}
-	s := Open(ctx, d, quiet())
+	s := Open(ctx, d, nil, quiet())
 	p := s.Get("dashboard")
 	if p.Stored || len(p.Layout.Elements) != 7 || !strings.Contains(p.Problem, "unknown kind") || len(s.Problems()) != 1 {
 		t.Fatalf("broken: %+v %v", p, s.Problems())
@@ -175,7 +175,7 @@ func TestResolve(t *testing.T) {
 }
 
 func TestAdminRoutes(t *testing.T) {
-	s := Open(t.Context(), db(t), quiet())
+	s := Open(t.Context(), db(t), nil, quiet())
 	mux := http.NewServeMux()
 	for _, r := range s.Routes("https://scp.example") {
 		mux.Handle(r.Pattern, r.Handler)
@@ -241,7 +241,7 @@ func TestAdminRoutes(t *testing.T) {
 		t.Errorf("reset: %d", w.Code)
 	}
 	ro := http.NewServeMux()
-	for _, r := range Open(t.Context(), nil, quiet()).Routes("") {
+	for _, r := range Open(t.Context(), nil, nil, quiet()).Routes("") {
 		ro.Handle(r.Pattern, r.Handler)
 	}
 	r := httptest.NewRequestWithContext(httpapi.WithViewer(context.Background(), admin), "PUT", at, strings.NewReader(save))
@@ -250,5 +250,41 @@ func TestAdminRoutes(t *testing.T) {
 	ro.ServeHTTP(rw, r)
 	if rw.Code != http.StatusConflict {
 		t.Errorf("without a store: %d", rw.Code)
+	}
+}
+
+// TestConfigurationIsTheBaseline: the configuration's layout renders without a change; a change wins and is warned about; a reset
+// returns to the configuration's; a change equal to it is not kept, and one stored before is dropped at the next start.
+func TestConfigurationIsTheBaseline(t *testing.T) {
+	d := db(t)
+	ctx := t.Context()
+	base := map[string]Layout{"dashboard": layoutOf(oapi.LayoutElementKindFleetMap)}
+	s := Open(ctx, d, base, quiet())
+	if p := s.Get("dashboard"); p.Stored || !p.Configured || len(p.Layout.Elements) != 1 || len(s.Problems()) != 0 {
+		t.Fatalf("from the file: %+v %v", p, s.Problems())
+	}
+	rev, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := s.Get("dashboard"); !p.Stored || p.Layout.Elements[0].Kind != oapi.LayoutElementKindTelemetry || len(s.Problems()) != 1 {
+		t.Errorf("a change: %+v %v", p, s.Problems())
+	}
+	if err := s.Reset(ctx, "dashboard", rev); err != nil {
+		t.Fatal(err)
+	}
+	if p := s.Get("dashboard"); p.Stored || p.Layout.Elements[0].Kind != oapi.LayoutElementKindFleetMap {
+		t.Errorf("after a reset: %+v", p)
+	}
+	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindFleetMap), ""); err != nil || s.Get("dashboard").Stored {
+		t.Errorf("the configuration's layout saved: %v %+v", err, s.Get("dashboard"))
+	}
+	// A change stored, then the file takes it over: the next start drops it.
+	if _, err := s.Save(ctx, "dashboard", layoutOf(oapi.LayoutElementKindTelemetry), ""); err != nil {
+		t.Fatal(err)
+	}
+	base["dashboard"] = layoutOf(oapi.LayoutElementKindTelemetry)
+	if p := Open(ctx, d, base, quiet()).Get("dashboard"); p.Stored || p.Layout.Elements[0].Kind != oapi.LayoutElementKindTelemetry {
+		t.Errorf("after the start: %+v", p)
 	}
 }

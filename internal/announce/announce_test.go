@@ -113,10 +113,12 @@ func TestAdminRoutes(t *testing.T) {
 		t.Errorf("anonymous: %d", w.Code)
 	}
 	b := read(do(admin, "GET", ""))
-	if len(b.Announcements) != 0 || len(b.Configured) != 1 || !b.Writable || b.Revision != "" {
+	// The list in force holds the configuration's announcement; nothing is stored yet.
+	if len(b.Announcements) != 1 || len(b.Configured) != 1 || !b.Writable || b.Revision != "" {
 		t.Fatalf("first read: %+v", b)
 	}
-	save := `{"revision":"","announcements":[{"id":"juleol","title":"Juleøl","tone":"event","ends":"2026-11-26T23:00:00+01:00"}]}`
+	const mine = `{"id":"configured","title":"From the deployment","until":"2026-12-01T00:00:00Z"}`
+	save := `{"revision":"","announcements":[` + mine + `,{"id":"juleol","title":"Juleøl","tone":"event","ends":"2026-11-26T23:00:00+01:00"}]}`
 	if w := do(admin, "PUT", save, "Cookie", "s=1", "Sec-Fetch-Site", "cross-site"); w.Code != http.StatusForbidden {
 		t.Errorf("cross-origin: %d", w.Code)
 	}
@@ -125,8 +127,12 @@ func TestAdminRoutes(t *testing.T) {
 		t.Fatalf("save: %d %s", w.Code, w.Body)
 	}
 	saved := read(w)
-	if len(saved.Announcements) != 1 || saved.Revision == "" || !saved.Announcements[0].IsPublished() || saved.Announcements[0].Published == nil {
+	if len(saved.Announcements) != 2 || saved.Revision == "" || !saved.Announcements[1].IsPublished() || saved.Announcements[1].Published == nil {
 		t.Errorf("saved, published explicitly: %+v", saved)
+	}
+	// Only the added one is stored: the configuration's is as the file has it.
+	if st := n.file.Get().Value; len(st.Announcements) != 1 || st.Announcements[0].ID != "juleol" || len(st.Removed) != 0 {
+		t.Errorf("stored %+v", st)
 	}
 	if got := ids(n.For(context.Background(), "dashboard")); !slices.Equal(got, []string{"juleol", "configured"}) {
 		t.Errorf("served after the save: %v", got)
@@ -135,7 +141,6 @@ func TestAdminRoutes(t *testing.T) {
 		t.Errorf("a save on the old revision: %d", w.Code)
 	}
 	for body, want := range map[string]string{
-		`{"revision":"` + saved.Revision + `","announcements":[{"id":"configured","title":"Mine","until":"2026-12-01T00:00:00Z"}]}`:                                       "a configured announcement's",
 		`{"revision":"` + saved.Revision + `","announcements":[{"id":"x","title":"No end"}]}`:                                                                             "until: required",
 		`{"revision":"` + saved.Revision + `","announcements":[{"id":"x","title":"T","until":"2026-12-01T00:00:00Z","link":{"label":"Go","url":"javascript:alert(1)"}}]}`: "link.url",
 	} {
@@ -146,6 +151,24 @@ func TestAdminRoutes(t *testing.T) {
 	}
 	if w := do(admin, "PUT", `{"announcements":[],"colour":1}`); w.Code != http.StatusBadRequest {
 		t.Errorf("unknown field: %d", w.Code)
+	}
+	// An admin changes the configuration's announcement, then removes it: the store keeps the change, then its removal.
+	w = do(admin, "PUT", `{"revision":"`+saved.Revision+`","announcements":[{"id":"configured","title":"Mine","until":"2026-12-01T00:00:00Z"}]}`)
+	changed := read(w)
+	if w.Code != http.StatusOK || len(changed.Announcements) != 1 || changed.Announcements[0].Title != "Mine" {
+		t.Fatalf("change: %d %+v", w.Code, changed)
+	}
+	w = do(admin, "PUT", `{"revision":"`+changed.Revision+`","announcements":[]}`)
+	removed := read(w)
+	if st := n.file.Get().Value; w.Code != http.StatusOK || len(removed.Announcements) != 0 || !slices.Equal(st.Removed, []string{"configured"}) {
+		t.Fatalf("remove: %d %+v %+v", w.Code, removed, st)
+	}
+	if got := ids(n.For(context.Background(), "dashboard")); len(got) != 0 {
+		t.Errorf("served after the removal: %v", got)
+	}
+	// A restart with a configuration that no longer has it: the removal means nothing and is dropped.
+	if n = Open(context.Background(), nil, d, func() time.Time { return now }, quiet()); n.file.Get().Value.Count() != 0 || len(n.Problems()) != 0 {
+		t.Errorf("after the start, stored %+v %v", n.file.Get().Value, n.Problems())
 	}
 	// A stored document that no longer parses (a later version tightened what it accepts) is not served after a restart: only the
 	// configured announcements show, and the status carries the problem until an admin saves over it.

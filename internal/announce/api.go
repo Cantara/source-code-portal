@@ -3,10 +3,8 @@ package announce
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
-	"slices"
 
 	"github.com/cantara/source-code-portal/internal/config"
 	"github.com/cantara/source-code-portal/internal/docstore"
@@ -16,8 +14,8 @@ import (
 // AdminPath is the address of the admin's announcements.
 const AdminPath = "/api/v1/admin/announcements"
 
-// adminBody is what the admin's card needs: the stored announcements with their revision, the configured ones (locked), whether
-// the store can save, and why the stored file is not served.
+// adminBody is what the admin's card needs: the announcements in force with the stored document's revision, the configuration's
+// (so the card can tell what is changed here), whether the store can save, and why the stored document is not served.
 type adminBody struct {
 	Announcements []config.Announcement `json:"announcements"`
 	Configured    []config.Announcement `json:"configured"`
@@ -48,13 +46,14 @@ type admin struct {
 
 func (h admin) get(w http.ResponseWriter, _ *http.Request) {
 	st := h.n.file.Get()
+	list := h.n.all()
 	configured := h.n.configured
 	if configured == nil {
 		configured = []config.Announcement{}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	json.NewEncoder(w).Encode(adminBody{Announcements: st.Value.Announcements, Configured: configured, Revision: st.Revision, //nolint:errcheck,gosec // the client went away
+	json.NewEncoder(w).Encode(adminBody{Announcements: list, Configured: configured, Revision: st.Revision, //nolint:errcheck,gosec // the client went away
 		Writable: h.n.file.Writable(), Problem: st.Problem})
 }
 
@@ -90,7 +89,8 @@ func (h admin) put(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// check cleans and checks list as the store will read it, refuses an id a configured announcement has, and returns the file.
+// check cleans and checks the list in force an admin saves and returns what the store keeps of it: its difference from the
+// configuration.
 func (n *Notices) check(list []config.Announcement) ([]byte, error) {
 	if list == nil {
 		list = []config.Announcement{}
@@ -98,19 +98,10 @@ func (n *Notices) check(list []config.Announcement) ([]byte, error) {
 	if p := config.CheckAnnouncements("announcements", list); len(p) > 0 {
 		return nil, errors.New(p[0])
 	}
-	for i, a := range list {
-		if slices.ContainsFunc(n.configured, func(c config.Announcement) bool { return c.ID == a.ID }) {
-			return nil, fmt.Errorf("announcements[%d].id: %q is a configured announcement's", i, a.ID)
-		}
-		if a.Published == nil {
-			list[i].Published = new(true) // stored explicitly: an admin's draft is a choice, never a default
-		}
-	}
-	b, err := json.MarshalIndent(List{Announcements: list}, "", "  ")
+	b, err := encode(n.diff(explicit(list)))
 	if err != nil {
 		return nil, err
 	}
-	b = append(b, '\n')
 	if _, err := Parse(b); err != nil {
 		return nil, err
 	}

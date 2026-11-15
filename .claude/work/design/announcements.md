@@ -10,8 +10,8 @@ announcement that stands out on the pages it is meant for, and goes away by itse
 ## The choice
 
 **An announcement is a small structured notice, not free text: a title, an optional line, when and where, one link and a tone,
-shown between two dates on the pages it names, to everyone or to signed-in viewers only. It comes from `scp.yaml` (locked) or from
-an admin in `/admin` (the layout store's directory, beside the layouts), and a layout element, `announcements`, places it.**
+shown between two dates on the pages it names, to everyone or to signed-in viewers only. It comes from `scp.yaml` or from
+an admin in `/admin` (the store; a change to one of `scp.yaml`'s kept as a change to it, `config-baseline.md`), and a layout element, `announcements`, places it.**
 
 - Structure is what lets it stand out without looking like a problem: a calendar tile for the date, the title one step larger, the
   link as a button, a tone in colours of its own. Free text would be a paragraph nobody reads, and HTML or Markdown would be a way
@@ -51,8 +51,8 @@ time as written (18:00 in Oslo's winter offset is 18:00 on every screen), never 
 
 ## Where it comes from
 
-- **Configuration**: `announcements[]` in `scp.yaml`, checked by `scp config check` with every other key. The admin card lists
-  them, locked: they change with the deployment.
+- **Configuration**: `announcements[]` in `scp.yaml`, checked by `scp config check` with every other key. The admin section lists
+  them as *from scp.yaml*; an admin may change or remove one, the change kept in the store (`config-baseline.md`).
 - **Admins**: `/admin` has an Announcements card: new, edit, publish or hold, remove, and a preview drawn by the same component the
   pages use. Saved as the store's document `announcements` (`{"announcements": [...]}`) through the same document store as the layouts
   (`internal/docstore`: synced to disk, a content-digest revision refusing a stale save, a document that no longer parses served as
