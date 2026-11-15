@@ -16,8 +16,10 @@ rehearsal_init
 prev=${1:-$(git -C "$root" describe --tags --abbrev=0)}
 
 echo "building $prev and this tree"
+git -C "$root" worktree prune # registrations a run left when its temporary directory went away
 git -C "$root" worktree add --detach "$work/old" "$prev" >/dev/null 2>&1
 build_tree "$work/old" "$work/scp-old"
+git -C "$root" worktree remove --force "$work/old" # the binary is built: the checkout and its registration go, whatever happens next
 build_tree "$root" "$work/scp-new"
 
 echo "starting the fake GitHub"
