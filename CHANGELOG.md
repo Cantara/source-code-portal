@@ -11,6 +11,10 @@ subjects.
   advanced.
 - **A shorter sitemap**: `/sitemap.xml` lists the home page, the products and the repositories only. The listing pages and the
   documents are reached from them and are no longer listed.
+- **Webhook answers within GitHub's 10 seconds**: an event the store cannot take within 5 seconds is answered 503, so GitHub logs the
+  delivery as failed and the catch-up passes it on again, instead of an answer GitHub had stopped waiting for.
+- **The status shows how webhooks fare**: `webhook.answers` (how long the portal took to answer GitHub, with a warning past 10 seconds)
+  and, for each App, the failed deliveries its log showed, by the answer they got (`401`, `502`, `0` for none in time).
 
 ## 2.2.18
 
