@@ -4,6 +4,15 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.18
+
+A fix for what the sitemap shows a signed-in viewer. Nothing new is asked of GitHub, and the store is unchanged.
+
+- **`/sitemap.xml` is the public view for everyone**: a signed-in viewer was given the full catalogue in it, naming private repositories
+  and products of private repositories. Search engines never sign in, so the sitemap and `/sitemaps/{n}.xml` now list only what they
+  are offered, for every reader. `/llms.txt`, `/llms-full.txt` and `/knowledge.yaml` still follow the viewer, for agents with a token.
+  Operator guide, section 2.11.
+
 ## 2.2.17
 
 The Search engines card in Admin is easier to use and covers repositories that arrive later. Nothing new is asked of GitHub, and the
