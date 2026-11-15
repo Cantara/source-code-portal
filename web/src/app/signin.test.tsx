@@ -119,11 +119,14 @@ describe("admin", () => {
     server.use(
       http.get("/me", ({ response }) => response(200).json(me({ signedIn: true, name: "Ada", via: "oidc", admin: true }))),
       raw.get("*/api/v1/admin/status", () => HttpResponse.json(status)),
+      raw.get("*/api/v1/admin/visibility", () =>
+        HttpResponse.json({ counts: { everyone: 4, signedIn: 2, noOne: 1, searchOff: 0, private: 1 } }),
+      ),
     )
     show(<AdminView />, "/admin")
     expect(await screen.findByText("42")).toBeInTheDocument()
     expect(screen.getByText("1 warning")).toBeInTheDocument()
-    expect(screen.getByText("2 signed in only, 1 no one.")).toBeInTheDocument()
+    expect(await screen.findByText("4 everyone, 2 signed in only, 1 no one.")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Choose who sees what" })).toHaveAttribute("href", "#visibility")
     expect(screen.getByText(/Signed in as Ada through single sign-on, an administrator/)).toBeInTheDocument()
   })
