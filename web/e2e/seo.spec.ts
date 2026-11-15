@@ -1,3 +1,4 @@
+import { test as plain } from "@playwright/test"
 import { expect, test } from "./fixtures"
 
 // Every page as a search engine reads it: without JavaScript, with its h1, title, description and canonical URL in the HTML.
@@ -96,10 +97,10 @@ test("the sitemap lists every page with its newest commit and robots.txt points 
   expect(robots).toContain("Disallow: /api/")
 })
 
-test("a browser draws the sitemap as an XML tree, nothing in it blocked", async ({ page }) => {
+// Not the fixtures' test: their guard injects a script into every page, which the sitemap's sandbox refuses, as it should.
+plain("a browser draws the sitemap as an XML tree, nothing in it blocked", async ({ page }) => {
   const blocked: string[] = []
-  // What the CSP refuses the browser's XML viewer; the fixtures' init scripts are refused by the sandbox, as they should be, and are
-  // not counted.
+  // What the CSP refuses the browser's XML viewer.
   page.on("console", (m) => {
     if (m.type() === "error" && m.text().includes("Content Security Policy")) blocked.push(m.text())
   })
