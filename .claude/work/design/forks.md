@@ -1,6 +1,6 @@
 # Forks on demand (FK1 to FK3)
 
-Status: in progress (plan.md section 4, P-105; issue 9). Binding order: ../plan.md > this note > `catalog.md`, `layout.md`.
+Status: built (plan.md section 4, P-105; issue 9). Binding order: ../plan.md > this note > `catalog.md`, `layout.md`.
 
 ## Goal
 

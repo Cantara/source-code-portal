@@ -4,6 +4,30 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.21
+
+scp.yaml is the base of everything Admin edits, and Admin downloads it with the changes written in. Nothing new is asked of GitHub; the
+configuration gains the keys `visibility` and `layouts`; the store's schema is unchanged (its documents now hold only the admins'
+changes from the file).
+
+- **scp.yaml is the base, the store keeps the changes**: `visibility:` (who sees what) and `layouts:` (the pages' layouts) join
+  `announcements:` in the file. For each repository, product, rules list, announcement and page, an admin's change wins, else the
+  file's, else the built-in default. A change equal to the file is dropped at the start, so after deploying a downloaded file the store
+  holds no changes of its own and the next change in git takes effect. The announcements from the file are no longer locked: they can
+  be changed or removed, and the page says which come from scp.yaml and which were changed here. `scp config check` checks both new
+  sections. Operator guide, section 2.12.
+- **Download scp.yaml**: Admin's overview downloads the configuration file in force (`GET /api/v1/admin/config.yaml`): the file as
+  loaded, comments and every other section kept, with the three sections replaced by what is in force. A portal started without a
+  file answers 409. While the store holds changes the file lacks, the status warns (`config.changes`) and the overview offers the
+  download, so a store that is reset loses nothing.
+- **The overview's Repositories tile counts every repository by who sees it**: private ones shown to signed-in viewers included; it
+  read "0 signed in only" on a portal with private repositories.
+- **A store of 2.2.20 keeps the file's rules**: its whole *Who sees what* document wrote an empty rules list for none, which no longer
+  replaces the rules in scp.yaml.
+- **The enterprise mode under load**: each person's view is built once, outside the lock, for all who ask for it at the same time;
+  a person's access set is kept between requests; the GitHub client of a removed, replaced or refused token is dropped at the next
+  round of listings.
+
 ## 2.2.20
 
 Who sees what, and the Admin page in sections. Nothing new is asked of GitHub and no configuration key changes; the store's schema is
