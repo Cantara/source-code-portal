@@ -30,6 +30,10 @@ const status: AdminStatus = {
       rateRemaining: 0.93,
       mode: "poll",
       cadenceSeconds: { releases: 1800, pulls: 900, commits: 7200 },
+      accounts: [
+        { account: "acme", selection: "selected" },
+        { account: "beta", selection: "all" },
+      ],
     },
   ],
   webhook: { enabled: false, receiver: false, catchUp: false, deliveries: {}, lastDelivery: null },
@@ -176,9 +180,12 @@ describe("admin", () => {
     expect(within(nav).getByRole("link", { name: "GitHub" })).toHaveAttribute("aria-current", "page")
     expect(screen.queryByRole("heading", { name: "Snapshot" })).not.toBeInTheDocument()
     // The source's id and its count are cells of their own, the count right-aligned.
-    const row = screen.getByRole("row", { name: /^gh 7/ })
+    const row = screen.getByRole("row", { name: /^gh\s*acme/ })
     expect(within(row).getByRole("cell", { name: "7" })).toHaveClass("text-right")
     expect(within(row).getByText("93%")).toBeInTheDocument()
+    // An App source says, per account, what it reads: the repositories selected on GitHub or all of them.
+    expect(within(row).getByText("acme: the repositories selected on the App")).toBeInTheDocument()
+    expect(within(row).getByText("beta: all repositories")).toBeInTheDocument()
 
     fireEvent.click(within(nav).getByRole("link", { name: /^Overview/ }))
     expect(await screen.findByRole("heading", { name: "Snapshot" })).toBeInTheDocument()

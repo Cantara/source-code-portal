@@ -10,6 +10,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/github"
 	"github.com/cantara/source-code-portal/internal/prereq"
 	"github.com/cantara/source-code-portal/internal/search"
 	"github.com/cantara/source-code-portal/internal/snapshot"
@@ -35,6 +36,7 @@ type status struct {
 	layouts      func() []string                              // why stored layouts are not served
 	config       func() statusConfig                          // what the store holds that scp.yaml does not (design/config-baseline.md)
 	prereqs      func() []prereq.Unmet
+	accounts     func(source string) []statusAccount // an App source's installations and what each was given; nil for a token source
 	cluster      interface {
 		Leader() bool
 		Connected() bool
@@ -130,6 +132,13 @@ type statusSource struct {
 	// is each subject's refresh in seconds: under events it is the safety net, under poll how often it is asked.
 	Mode    string             `json:"mode"`
 	Cadence map[string]float64 `json:"cadenceSeconds"`
+	// Accounts are an App source's installations: what each reads, the repositories selected on GitHub or all of them.
+	Accounts []statusAccount `json:"accounts,omitempty"`
+}
+
+type statusAccount struct {
+	Account   string `json:"account"`
+	Selection string `json:"selection"` // "selected" or "all", as GitHub says
 }
 
 type statusCluster struct {
@@ -157,6 +166,22 @@ type statusCatchUp struct {
 	// Failed counts the deliveries the log showed failed since the start, by the status the portal answered ("0": no answer in time),
 	// each once: what the catch-up passed on again, and why GitHub could not deliver it.
 	Failed map[string]int `json:"failed"`
+}
+
+// appAccounts gives, per source, an App's installations and what each was given (the selected repositories or all); none for a token.
+func appAccounts(gh *github.Client) func(source string) []statusAccount {
+	return func(id string) []statusAccount {
+		src := gh.Source(id)
+		if src == nil {
+			return nil
+		}
+		grants, _ := src.Grants()
+		out := make([]statusAccount, 0, len(grants))
+		for _, g := range grants {
+			out = append(out, statusAccount{Account: g.Owner, Selection: g.Selection})
+		}
+		return out
+	}
 }
 
 // staleLog is how long a delivery log may go unread (it is read every 2 minutes) before the status warns.
@@ -219,6 +244,9 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		if st.polled[src.ID] {
 			ss.Mode = "poll"
 		}
+		if st.accounts != nil {
+			ss.Accounts = st.accounts(src.ID)
+		}
 		for kind, d := range st.cadence(src.ID) {
 			ss.Cadence[kind] = d.Seconds()
 		}
@@ -244,7 +272,7 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	if !st.webhook {
-		b.Warnings = append(b.Warnings, "webhook: not configured; pushes show after the next scheduled listing (webhook.secret_file, or webhook.catch_up with a GitHub App)")
+		b.Warnings = append(b.Warnings, "webhook: not configured; pushes show after the next scheduled listing (webhook.secret_file or a GitHub App's app.webhook_secret_file, or webhook.catch_up with a GitHub App)")
 	}
 	var catchUps []statusCatchUp
 	if st.catchUps != nil {

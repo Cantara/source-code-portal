@@ -62,8 +62,13 @@ func ParseDescriptor(b []byte) Descriptor                                  // pu
 
 ## Behaviour
 1. Reconcile (sync job `catalog.reconcile/<source>`, TTL `catalog.reconcile_interval`, and on `EventSourceChanged`): refresh the App
-   installations, then list every org of the source, all pages, with ETags; any page failure, or more than 100 pages, fails the run and
-   the last good catalogue stays published.
+   installations, then list every org of the source, all pages, with ETags. An account GitHub says the App is not installed on
+   (`github.NotInstalled`) lists nothing: its repositories leave as any the listing misses. An account that fails to list (any page
+   failure, or more than 100 pages) keeps its last repositories while the others are listed, and the run asks to run again in a
+   minute (`retryAccount`); only when every account fails does the run fail and the last good catalogue stay published (AS1, P-128).
+   An event of a repository the portal does not know (`cmd/scp` `webhookSink`) lists its source, at most once every 15 s per source
+   (`discoverEvery`), so a stream of them from repositories the source leaves out costs one listing; the App's own events
+   (`installation`, `installation_repositories`, `repository`) list at once.
 2. Normalise each item: zero id, owner/name outside `[A-Za-z0-9._-]{1,100}`, `.`/`..` are invalid; the description is cleaned with
    `untrusted.Text` (1,000 runes), at most 20 topics matching `^[a-z0-9][a-z0-9-]{0,49}$` are kept, `html_url` and `homepage` only as
    `https` URLs without credentials.
@@ -71,10 +76,12 @@ func ParseDescriptor(b []byte) Descriptor                                  // pu
 4. Tracked repositories of the source: listed and admitted -> `Misses = 0`, facts updated, and when `pushed_at` changed
    `Notify(EventPush, key)` (commits, docs, descriptor, manifests jobs); listed but not admitted -> removed at once; absent -> `Misses++`,
    removed at 2.
-5. A complete listing with zero repositories for a source that tracked some fails the run (token or scope problem).
+5. A complete listing with zero repositories for a token source that tracked some fails the run (token or scope problem). An App's
+   listing is GitHub's word on what the installations were given (nothing selected, the App removed), so it may empty the source.
 6. Addresses: a repository whose owner/name changed (same id) pushes the old address onto `Aliases` (newest first, max 8, never the
    current address nor another listed repository's). Aliases of removed repositories go with them, so a deleted repository is a real 404.
-7. Membership: a repository is in a group when the group's `sources` (empty = all) contain its source and any matcher selects it.
+7. Membership: a repository is in a group when the group's `sources` (empty = all) contain its source and any matcher selects it; a
+   group with `sources` and no `match` takes every repository of those sources (an account's own group, P-128).
    Matchers see the repository name; `topic` sees topics. Repositories in no group are counted (`ungroupedCount`) and shown in their own
    dashboard section.
 8. `default_repo` is a GitHub repository name, matched case-insensitively among the group's members (the lowest address when several);
@@ -102,7 +109,7 @@ func ParseDescriptor(b []byte) Descriptor                                  // pu
 ## Config
 `catalog.reconcile_interval` (5m, 1m..24h),
 `catalog.groups[]` (`id` `^[a-z0-9]+(-[a-z0-9]+)*$` max 63, unique; `name` required max 120; `description` max 500; `default_repo`
-required; `sources` (ids from `github.sources[]`); `match` 1..64 entries of exactly one of `exact`, `prefix`, `glob`, `regexp`, `topic`,
+required; `sources` (ids from `github.sources[]`); `match` 1..64 entries (none with `sources`: every repository of those sources) of exactly one of `exact`, `prefix`, `glob`, `regexp`, `topic`,
 `catch_all: true`, `unclaimed: true` (at most one group)); at most 500 groups. Sources and admission filters are `github.sources[]` (github.md Config). Startup errors: a bad or
 duplicate id, a matcher that does not compile, an unknown source, a `default_repo` that is not a legal name or not selected by its own
 matchers (a warning when the group has a `topic` matcher). Warnings: more than one `catch_all`, a matcher that matches the empty name.

@@ -75,6 +75,10 @@ type App struct {
 	Credential    bool     `mapstructure:"credential"`
 	Installations []string `mapstructure:"installations"` // account logins to use; empty means all
 	PrivateKey    Secret   `mapstructure:"-"`             // read from PrivateKeyFile
+	// WebhookSecretFile is the App's own webhook secret, for an App whose secret is not webhook.secret_file: a delivery signed with
+	// any configured secret is accepted.
+	WebhookSecretFile string `mapstructure:"webhook_secret_file"`
+	WebhookSecret     Secret `mapstructure:"-"`
 }
 
 // DefaultBaseURL is the REST base of github.com.
@@ -84,6 +88,33 @@ const DefaultBaseURL = "https://api.github.com/"
 type Catalog struct {
 	ReconcileInterval time.Duration `mapstructure:"reconcile_interval"`
 	Groups            []Group       `mapstructure:"groups"`
+}
+
+// Receiver reports whether the portal serves the webhook receiver: a webhook secret is set, the shared one or an App's own.
+func (c Config) Receiver() bool {
+	return c.Webhook.Secret.IsSet() || slices.ContainsFunc(c.GitHub.Sources, func(s Source) bool { return s.App != nil && s.App.WebhookSecret.IsSet() })
+}
+
+// Receives reports whether GitHub's webhook deliveries for src reach the receiver: with the shared secret, which the operator sets on
+// every webhook, or with the App's own.
+func (c Config) Receives(src Source) bool {
+	return c.Webhook.Secret.IsSet() || src.App != nil && src.App.WebhookSecret.IsSet()
+}
+
+// WebhookSecrets are the secrets a delivery may be signed with: the shared one, the previous one during its rotation, each App's own.
+func (c Config) WebhookSecrets() [][]byte {
+	var out [][]byte
+	for _, s := range []Secret{c.Webhook.Secret, c.Webhook.PreviousSecret} {
+		if s.IsSet() {
+			out = append(out, s.Reveal())
+		}
+	}
+	for _, src := range c.GitHub.Sources {
+		if src.App != nil && src.App.WebhookSecret.IsSet() {
+			out = append(out, src.App.WebhookSecret.Reveal())
+		}
+	}
+	return out
 }
 
 // Webhook configures the GitHub webhook receiver; it is served when SecretFile is set. PreviousSecretFile is accepted too while the
@@ -223,7 +254,8 @@ type Group struct {
 	Description string   `mapstructure:"description"`
 	DefaultRepo string   `mapstructure:"default_repo"`
 	Sources     []string `mapstructure:"sources"` // source ids; empty means all
-	Match       []Match  `mapstructure:"match"`
+	// Match selects the group's repositories within its sources; none (with sources set) takes every repository of those sources.
+	Match []Match `mapstructure:"match"`
 }
 
 // Match is one matcher; exactly one field is set.
@@ -383,8 +415,11 @@ func (c Catalog) validate(g GitHub) []string {
 				p = append(p, fmt.Sprintf("%s.sources: unknown source %q", at, s))
 			}
 		}
-		if len(gr.Match) == 0 || len(gr.Match) > 64 {
-			p = append(p, at+".match: 1..64 matchers")
+		switch {
+		case len(gr.Match) > 64:
+			p = append(p, at+".match: at most 64 matchers")
+		case len(gr.Match) == 0 && len(gr.Sources) == 0:
+			p = append(p, at+".match: 1..64 matchers, or sources: to take every repository of those sources")
 		}
 		for j, m := range gr.Match {
 			kind, _, ok := m.Kind()
@@ -424,6 +459,9 @@ func (c *Config) readSecrets() []string {
 		}
 		if s.App != nil && s.App.PrivateKeyFile != "" {
 			read(at+".app.private_key_file", s.App.PrivateKeyFile, &s.App.PrivateKey)
+		}
+		if s.App != nil && s.App.WebhookSecretFile != "" {
+			read(at+".app.webhook_secret_file", s.App.WebhookSecretFile, &s.App.WebhookSecret)
 		}
 	}
 	if c.Webhook.SecretFile != "" {

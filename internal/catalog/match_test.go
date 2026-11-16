@@ -139,6 +139,35 @@ func TestResolveUnclaimed(t *testing.T) {
 	}
 }
 
+// A group with sources and no matchers takes every repository of those sources: an account's own group needs no names, and what
+// it takes is claimed, so the unclaimed group gets only the rest.
+func TestResolveWholeSource(t *testing.T) {
+	gs, fs := Compile([]config.Group{
+		{ID: "me", Name: "Ove Ranheim", DefaultRepo: "dossier", Sources: []string{"me"}},
+		{ID: "w", Name: "W", DefaultRepo: "whydah-core", Match: []config.Match{{Prefix: "whydah-"}}},
+		{ID: "other", Name: "Other", DefaultRepo: "tools", Match: []config.Match{{Unclaimed: true}}},
+	})
+	if gs == nil {
+		t.Fatal(fs)
+	}
+	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
+	for _, r := range []snapshot.Repo{
+		{ID: snapshot.RepoID{Source: "me"}, Owner: "me", Name: "dossier"}, {ID: snapshot.RepoID{Source: "me"}, Owner: "me", Name: "whydah-notes"},
+		{ID: snapshot.RepoID{Source: "gh"}, Owner: "acme", Name: "whydah-core"}, {ID: snapshot.RepoID{Source: "gh"}, Owner: "acme", Name: "lone"},
+	} {
+		repos[r.Key()] = &snapshot.RepoEntry{Repo: r}
+	}
+	got := gs.Resolve(repos)
+	for i, want := range []string{"me/dossier,me/whydah-notes", "acme/whydah-core,me/whydah-notes", "acme/lone"} {
+		if m := strings.Join(keys(got[i].Members), ","); m != want {
+			t.Errorf("%s = %s, want %s", got[i].ID, m, want)
+		}
+	}
+	if got[0].DefaultRepo != "me/dossier" {
+		t.Errorf("default = %q", got[0].DefaultRepo)
+	}
+}
+
 func keys(ks []snapshot.RepoKey) []string {
 	out := make([]string, len(ks))
 	for i, k := range ks {

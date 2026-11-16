@@ -111,6 +111,55 @@ func TestAppMode(t *testing.T) {
 	}
 }
 
+// An App installed on an organisation with "Only select repositories" reads exactly those, not the organisation's other public
+// repositories; one with all repositories reads them all; GitHub's word that the App left an account is told apart from a failure.
+func TestAppFollowsTheSelection(t *testing.T) {
+	srv := githubtest.New(t)
+	srv.Install("acme")
+	srv.Install("wide")
+	chosen := srv.AddRepo("acme", gh.Repository{Name: new("chosen"), Visibility: new("public")})
+	srv.AddRepo("acme", gh.Repository{Name: new("left-out"), Visibility: new("public")})
+	srv.AddRepo("wide", gh.Repository{Name: new("a")})
+	srv.AddRepo("wide", gh.Repository{Name: new("b")})
+	srv.Select("acme", chosen)
+	c, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme", "wide"},
+		App: &config.App{ID: srv.AppID, PrivateKey: config.NewSecret(srv.PrivateKeyPEM())},
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("gh")
+	repos, err := s.ListRepos(t.Context(), "acme")
+	if err != nil || len(repos) != 1 || repos[0].Name != "chosen" {
+		t.Fatalf("selected installation = %v, %v; want only chosen", repos, err)
+	}
+	if srv.Count("GET /orgs/acme/repos") != 0 {
+		t.Error("an App source listed the organisation's repositories, not the installation's")
+	}
+	if repos, err := s.ListRepos(t.Context(), "wide"); err != nil || len(repos) != 2 {
+		t.Errorf("installation with all repositories = %v, %v; want both", repos, err)
+	}
+	g, _ := s.Grants()
+	sel := map[string]string{}
+	for _, gr := range g {
+		sel[gr.Owner] = gr.Selection
+	}
+	if sel["acme"] != "selected" || sel["wide"] != "all" {
+		t.Errorf("selections = %v, want acme selected and wide all", sel)
+	}
+	srv.Uninstall("acme")
+	if err := s.RefreshInstallations(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ListRepos(t.Context(), "acme"); !NotInstalled(err) {
+		t.Errorf("after the App was removed: err = %v, want NotInstalled", err)
+	}
+	if NotInstalled(&Error{Kind: Transient, Code: "server_error"}) || NotInstalled(errors.New("x")) {
+		t.Error("NotInstalled holds for another failure")
+	}
+}
+
 func TestUserAccounts(t *testing.T) {
 	srv := githubtest.New(t)
 	for _, u := range []string{"me", "friend"} {

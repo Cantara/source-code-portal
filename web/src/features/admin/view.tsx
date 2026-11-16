@@ -239,7 +239,14 @@ export function GitHub({ s }: { s: AdminStatus }) {
             <tbody>
               {s.sources.map((src) => (
                 <tr key={src.id} className="border-t border-border align-top">
-                  <td className={cn(cell, "font-mono")}>{src.id}</td>
+                  <td className={cell}>
+                    <span className="font-mono">{src.id}</span>
+                    {src.accounts?.map((a) => (
+                      <span key={a.account} className="block text-xs text-muted-foreground">
+                        {a.account}: {a.selection === "selected" ? "the repositories selected on the App" : "all repositories"}
+                      </span>
+                    ))}
+                  </td>
                   <td className={cn(cell, "text-right tabular-nums")}>{src.repos}</td>
                   <td className={cell}>
                     {src.freshness}, <RelativeTime at={src.checkedAt} />
