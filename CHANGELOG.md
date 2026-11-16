@@ -4,6 +4,17 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.23
+
+A deployment can name its own AI assistants, so their commits count as work with AI. The new key `commits.assistants` is optional;
+without it nothing changes. Nothing new is asked of GitHub, and the store's schema does not change. Every commit the portal holds is
+classified again at the first start, so the counts are right at once, with nothing read again from GitHub.
+
+- **Your own assistants** (operator guide 2.4.7): each has a `name`, the `authors` that are it as a coding agent (a login or name),
+  and the `co_authors` that mark a person's commit as made with it (a `Co-authored-by` name, address, or the local part of a
+  noreply address on any host, GitHub Enterprise's `users.noreply.<host>` included). A configured `[bot]` co-author counts as AI,
+  not automation. Entries match without regard to case; `scp config check` refuses an assistant without a name or entries.
+
 ## 2.2.22
 
 Two fixes to 2.2.21. Nothing new is asked of GitHub; no configuration key or store schema changes.
