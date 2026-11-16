@@ -13,10 +13,10 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/auth"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/store"
+	"github.com/cantara/source-code-portal/internal/platform/auth"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/store"
 )
 
 // modeConfig is a configuration with sign-in by a token named owner, the store at storePath and loopback listeners.

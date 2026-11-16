@@ -55,7 +55,7 @@ its public members.
 Not indexed: other branches' commits (they rotate, and the default branch is where work lands), the commit list beyond what
 `commits` keeps (500 a repository), images, binary files and source code.
 
-## Q1: the index (`internal/search`)
+## Q1: the index (`internal/feature/search`)
 
 A feature, as `llms`: it never imports another feature; `cmd/scp/search.go` hands it each repository's documents through
 `search.Options` (functions, as `llms.Options`), mapping the facets of `catalog`, `docs`, `manifests`, `packages`, `commits` and
@@ -73,7 +73,7 @@ front-coded in blocks of 16, each term followed by its postings (document distan
 the common case, is one byte), one offset kept per block; and a Bloom filter of the terms (10 bits a term), so a word a segment
 lacks costs a few bit tests, not a lookup: a correction tries hundreds of variants in every segment. No positions: a phrase
 (`"session timeout"`) is the terms' intersection checked against the documents' text, which `Read` gives again, for the
-candidates alone. Budgets at 1,000 repositories of a heavy synthetic corpus (`internal/search/size_test.go`: three documents of four
+candidates alone. Budgets at 1,000 repositories of a heavy synthetic corpus (`internal/feature/search/size_test.go`: three documents of four
 sections, two manifests of 30 dependencies, two packages and 500 commits each, a vocabulary of 5,000 words with a long tail, an
 issue number per commit): under 96 MB (measured 84 MB), a cold build under 3 s (0.3 s), a publish that changed one repository
 under 20 ms, a query's p99 under 50 ms (30 ms, a correction).

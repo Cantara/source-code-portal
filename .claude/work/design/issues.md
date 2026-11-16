@@ -46,7 +46,7 @@ Each issue gets one **state**, the first that holds:
 
 Its **kind** is GitHub's issue type when set, else read from its labels: `bug` (bug, defect, regression, crash), `feature`
 (enhancement, feature, improvement), `question` (question, support), else `other`. **Who opened it** is a person or automation by
-`internal/actor` (Renovate's dependency dashboard is automation), and the reader's work lens counts automation's only when it holds
+`internal/lib/actor` (Renovate's dependency dashboard is automation), and the reader's work lens counts automation's only when it holds
 automation, as for pull requests. The lists sort by "waiting": people's before automation's, needing triage first, then
 unassigned, then assigned, the longest idle first.
 
@@ -69,7 +69,7 @@ API and the tool.
 
 ## Shape
 
-- `internal/issues` (feature, facet `issues`, `Of`): `Issue`, `Set` (`Total`, `Exact`, `Issues`), `StateOf`, `KindOf`; the job
+- `internal/feature/issues` (feature, facet `issues`, `Of`): `Issue`, `Set` (`Total`, `Exact`, `Issues`), `StateOf`, `KindOf`; the job
   `issues` (`github.go`: the listing streamed through `jsonstream`); `Feeds()` (fleet, group, repository, waiting first); `Counts`;
   `api.go`: `GET /api/v1/issues`.
 - Contract: `GET /api/v1/issues` (paged; `group`, `repo`, `state`, `kind`, `by`, `author`, `assignee` (GitHub logins: PE2), `sort`), `Issue`, `IssueState`, `IssueKind`,

@@ -54,7 +54,7 @@ a session refused.
 
 ## As built
 
-- `internal/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (baseline `0001`), `internal/ghlogin` (hosts, device flow,
+- `internal/platform/vault` (sealing, `OpenKey`, `Keychain`), `store.credential` (baseline `0001`), `internal/platform/ghlogin` (hosts, device flow,
   `Whoami` with the token's end from `github-authentication-token-expiration`, `Orgs`, `Newest`; the device flow is `x/oauth2`'s, every other GitHub call goes through go-github and the App's JWT through `ghinstallation`, GL1), `auth.Launch` (`GET /auth/launch`),
   `cmd/scp/personal.go`.
 - A source says `credential: true`; `scp personal` opens the vault and puts the token in the source before `newServer`; `newServer`
@@ -74,7 +74,7 @@ a session refused.
   outside `Personal`, logs the mode when it listens and reports it in the admin status. `server.routes` holds the patterns of the routes
   the features and sign-in add; `TestEachModeRegistersItsOwnRoutes` runs one configuration in both modes and fails unless they differ by
   `GET /auth/launch` alone and the shared site has no `/setup` route (the setup page is its own loopback server in `scp personal`).
-- **A store belongs to one mode** (`internal/store/mode.go`, `OpenAs`): the first open as a mode writes `meta.mode`; a store of the other
+- **A store belongs to one mode** (`internal/platform/store/mode.go`, `OpenAs`): the first open as a mode writes `meta.mode`; a store of the other
   mode is refused with a `ModeError` before it is read, migrated, copied or moved aside (a read-only look first, so the file is not even
   switched to WAL; the refusal is not an "unusable store", which would quarantine it). A store from before the mode was written is taken by
   what it holds: a shared site's has a catalogue and no sealed credential, a personal one has a credential or is empty. `store.Open`, which
@@ -84,7 +84,7 @@ a session refused.
   lists the dependencies of both builds; the vault's key-derivation label is absent from the server binary). `make server` builds it, `make lint`
   and `make test` cover it, the image (`deploy/Dockerfile` and the release's `dockers_v2`) is it, and the release adds `scp-server_<version>_linux_<arch>`
   archives; the `scp_<version>_<os>_<arch>` archives are unchanged. What stays in the server build: `auth.Launch` (a few lines of generic sign-in code
-  in `internal/auth`, reachable only through an option that `newServer` refuses outside `Personal`).
+  in `internal/platform/auth`, reachable only through an option that `newServer` refuses outside `Personal`).
 
 ## My work (PE2)
 
@@ -101,7 +101,7 @@ a session refused.
 ## The first run in the browser (PE3)
 
 The terminal wizard asked what a person cannot be expected to know (a host, a client id, account numbers), and gave one group. The
-default first run is a page (`internal/setup`, `cmd/scp/personal_setup.go`); `--terminal` keeps the wizard.
+default first run is a page (`internal/platform/setup`, `cmd/scp/personal_setup.go`); `--terminal` keeps the wizard.
 
 - **Flow.** `scp personal` (no `personal.yaml`, or `--reset`) listens on `127.0.0.1:<port>` (the portal's own port, so the page and
   the portal share an address), prints `http://127.0.0.1:<port>/setup/?code=<entry>` and opens it (`--no-browser`: only prints). Steps:
@@ -123,7 +123,7 @@ default first run is a page (`internal/setup`, `cmd/scp/personal_setup.go`); `--
 - **Client id.** `defaultClientID` in `personal_setup.go` is empty until a GitHub App with device flow and read-only permissions is
   registered; until then github.com signs in by pasted token or `--client-id`.
 - **Not done.** A credential that has ended signs in again through the terminal wizard, not the page.
-- **Tests.** `internal/setup` (the entry, refusals, a token, a code, a code for another host, `Suggest`); `TestPersonalBrowserSetup`
+- **Tests.** `internal/platform/setup` (the entry, refusals, a token, a code, a code for another host, `Suggest`); `TestPersonalBrowserSetup`
   drives the page's API against the fake host and checks `personal.yaml`, the sealed credential, file modes and the freed port; the
   flow was also walked in a real browser against a fake GitHub.
 
@@ -135,7 +135,7 @@ filters are *calculated* so a repository created later that belongs to a product
 - **What a group can say.** Matchers are `exact`, `prefix`, `glob`, `regexp`, `topic` (and the unclaimed group), by repository name
   or topic only, at most 64 per group. A group cannot say "in account X" (the matchers do not see the owner); a product is a name
   pattern across the chosen accounts. Accounts as separate sources would allow it; not built.
-- **Rules from members (`Derive`, `internal/setup/rules.go`).** The members a person drags in are the *intent*; the rules written to
+- **Rules from members (`Derive`, `internal/platform/setup/rules.go`).** The members a person drags in are the *intent*; the rules written to
   `personal.yaml` are what makes it last. For a product with members M, among all listed repositories R, the page proposes the
   smallest set of open rules that cover M without catching a repository another product holds: `prefix` candidates at each name
   boundary (`-`, `_`, `.`, a lower-to-upper case change; at least 3 characters), and a `topic` every member shares. A rule is accepted
@@ -157,7 +157,7 @@ filters are *calculated* so a repository created later that belongs to a product
 - **Stages.** PE4a (built): the listing job, topics and progress (a cancel or a failure ends the job; nothing partial is kept). PE4b: `Derive`, the rules in `personal.yaml`, the drag-and-drop editor.
   PE4c: progress after Start. Re-opening the editor on an existing `personal.yaml` is not built (`--reset` starts over).
 
-- **As built (PE4).** The page's two lists and its product cards are in `internal/setup/assets/app.js`; the server derives (`POST
+- **As built (PE4).** The page's two lists and its product cards are in `internal/platform/setup/assets/app.js`; the server derives (`POST
   /setup/api/rules` previews, `/setup/api/rule-test` counts one rule) and `finish` derives again, so what was shown is what is written.
   A product in a catch-all bucket of more than eight repositories needs three that start alike for a rule (two is a coincidence
   there). `Hint`s name unassigned repositories that start like a member's, as a one-click rule. Pinned entries past the group's 64

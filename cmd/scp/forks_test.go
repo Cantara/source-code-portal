@@ -15,8 +15,8 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
 )
 
 // Forks are listed always and hidden unless a source shows them or a group names one: in every view, the counts, the groups, the

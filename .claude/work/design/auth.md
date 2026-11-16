@@ -81,7 +81,7 @@ are exempt.
 ## Tests
 - Sealing: round trip, tampering, a cookie of another name, expiry, key rotation.
 - Middleware: the order of the four sources, a wrong bearer is 401, roles from the lists, cache headers, the CSRF rule.
-- OIDC against a fake provider (`internal/auth/oidctest`: discovery, JWKS, authorize, token, userinfo, end session) on loopback:
+- OIDC against a fake provider (`internal/platform/auth/oidctest`: discovery, JWKS, authorize, token, userinfo, end session) on loopback:
   login, callback, a forged state, a wrong nonce, an expired ID token, groups from userinfo, logout to the end-session URL.
 - End to end (`cmd/scp`): signed in through the fake provider a member of a private group sees a private repository; an admin reads
   `/api/v1/admin/status`; a token reads `/llms.txt` with its groups.

@@ -12,11 +12,11 @@ import (
 
 	"go.yaml.in/yaml/v4"
 
-	"github.com/cantara/source-code-portal/internal/announce"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/httpapi"
-	"github.com/cantara/source-code-portal/internal/layout"
-	"github.com/cantara/source-code-portal/internal/visibility"
+	"github.com/cantara/source-code-portal/internal/feature/announce"
+	"github.com/cantara/source-code-portal/internal/feature/layout"
+	"github.com/cantara/source-code-portal/internal/feature/visibility"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi"
 )
 
 // The configuration as the base of what admins edit in the pages (design/config-baseline.md, CF1): `visibility:`, `layouts:` and

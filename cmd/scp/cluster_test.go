@@ -18,11 +18,11 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/cluster"
-	"github.com/cantara/source-code-portal/internal/cluster/clustertest"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/cluster"
+	"github.com/cantara/source-code-portal/internal/platform/cluster/clustertest"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 )
 
 // TestCluster is the M9 acceptance test: two instances on one cluster make each GitHub call once, share webhook de-duplication and

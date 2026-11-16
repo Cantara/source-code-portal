@@ -1,6 +1,6 @@
 # Feature switches (FT1)
 
-An operator can turn off the open pull requests (`internal/pulls`) and the open issues (`internal/issues`), together or apart,
+An operator can turn off the open pull requests (`internal/feature/pulls`) and the open issues (`internal/feature/issues`), together or apart,
 for a GitHub App without those permissions or a portal that should not show them. Everything else keeps working and says
 only what it still knows: best effort (owner, 2026-11-06, P-77).
 
@@ -55,11 +55,11 @@ The findings judge only what the portal reads:
 
 ## Tests
 
-- `internal/config`: the keys, their defaults, an unknown key refused.
+- `internal/platform/config`: the keys, their defaults, an unknown key refused.
 - `cmd/scp`: a portal with each switch off and both off against the fake GitHub: no request of a switched-off kind reaches it
   (the ledger), the routes, tools, search kinds, badges, sitemap and rules as above; over MCP (`mcpHolds`) the tools listed, the
   search's kinds and a switched-off tool's call refused; the Backlog count in each of the three cases.
-- `internal/health`: `Describe` without the pull request rules.
+- `internal/platform/health`: `Describe` without the pull request rules.
 - `web`: Vitest for the header and the repository page without each feature; one Playwright run of the e2e server with
   `features.pulls: false` is not added (the Go test covers the answers; the web reads one flag).
 - `TestPrerequisitesDocumented` keeps the docs' table equal to `prereq.Needs`; the docs say which rows a switch removes.

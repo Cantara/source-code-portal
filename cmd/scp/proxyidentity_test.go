@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/platform/config"
 )
 
 // TestProxyIdentityOff: access.proxy_identity: false never believes the trusted proxy's identity headers, so a proxy that passes a

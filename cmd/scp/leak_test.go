@@ -20,9 +20,9 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	contract "github.com/cantara/source-code-portal/api"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 )
 
 // The private repository's traces: its name, its commit subject, its README and its description. None may reach a public viewer.

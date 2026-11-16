@@ -19,11 +19,11 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/commits"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/docs"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/commits"
+	"github.com/cantara/source-code-portal/internal/feature/docs"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 const loadRepos = 1000

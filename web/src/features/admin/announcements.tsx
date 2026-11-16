@@ -11,7 +11,7 @@ import { keys } from "@/lib/api/queries"
 import { useNow } from "@/lib/clock"
 import { cn } from "@/lib/cn"
 
-/** Stored is an announcement as the configuration and the store keep it (internal/config/announce.go), outside the contract. */
+/** Stored is an announcement as the configuration and the store keep it (internal/platform/config/announce.go), outside the contract. */
 export type Stored = {
   id: string
   published?: boolean

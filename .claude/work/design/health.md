@@ -7,7 +7,7 @@ score with the findings that cost it points, and weighs the members into one sco
 score loses is a finding the reader can see: the score summarises, the findings say what to do.
 
 ## Model
-`internal/health` is pure (no feature, no snapshot): `Assess(Signals, now)` for a repository, `Weigh([]Member)` for a group.
+`internal/platform/health` is pure (no feature, no snapshot): `Assess(Signals, now)` for a repository, `Weigh([]Member)` for a group.
 
 Signals of a repository: archived, lifecycle (`scp.yaml`), visibility, the last change by a person, the newest commit, the latest
 release (tag and time), the licence, open issues and pull requests, and whether SCP keeps failing to read it.

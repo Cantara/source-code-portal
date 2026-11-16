@@ -7,7 +7,7 @@ formats for six providers, streaming chat with tools, budgets, framing of untrus
 "what changed in Whydah this week", "who uses no.acme:lib") by calling read-only tools over the viewer's view of the snapshot, and
 links to the pages it read. It writes nothing and calls nothing but the configured provider.
 
-## Providers (`internal/llm`, core)
+## Providers (`internal/platform/llm`, core)
 | Provider | Wire format | Default model | Auth |
 |---|---|---|---|
 | `anthropic` | Anthropic Messages | `claude-haiku-5-5` | `x-api-key` |
@@ -26,7 +26,7 @@ links to the pages it read. It writes nothing and calls nothing but the configur
   `reasoning_details`) is carried opaquely on the assistant message and sent back unchanged.
 - Keys come only from files (`llm.api_key_file`); SCP stores no secret. One provider is configured; changing it is a config change.
 
-## Assistant (`internal/assistant`, feature)
+## Assistant (`internal/feature/assistant`, feature)
 - `POST /api/v1/assistant/chat` (`application/json`, CSRF rule of auth.md): `{messages: [{role, content}]}`, at most
   `assistant.max_history` messages and `assistant.max_input_chars` characters. The answer is `text/event-stream`: `text`, `tool`
   (name and a short label, for "Reading acme/core…"), `done{usage}`, `error{code, message}`; `: ping` every 15 s.

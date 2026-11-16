@@ -4,12 +4,12 @@ import (
 	"context"
 	"sync"
 
-	"github.com/cantara/source-code-portal/internal/docs"
-	"github.com/cantara/source-code-portal/internal/lru"
-	"github.com/cantara/source-code-portal/internal/packages"
-	"github.com/cantara/source-code-portal/internal/releases"
-	"github.com/cantara/source-code-portal/internal/safehtml"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/docs"
+	"github.com/cantara/source-code-portal/internal/feature/packages"
+	"github.com/cantara/source-code-portal/internal/feature/releases"
+	"github.com/cantara/source-code-portal/internal/lib/lru"
+	"github.com/cantara/source-code-portal/internal/lib/safehtml"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // publishedOf hands the releases what a repository publishes to package registries (design/releases.md, RL4): each package's newest

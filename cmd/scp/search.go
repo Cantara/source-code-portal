@@ -5,16 +5,16 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cantara/source-code-portal/internal/catalog"
-	"github.com/cantara/source-code-portal/internal/commits"
-	"github.com/cantara/source-code-portal/internal/docs"
-	"github.com/cantara/source-code-portal/internal/issues"
-	"github.com/cantara/source-code-portal/internal/manifests"
-	"github.com/cantara/source-code-portal/internal/packages"
-	"github.com/cantara/source-code-portal/internal/pulls"
-	"github.com/cantara/source-code-portal/internal/releases"
-	"github.com/cantara/source-code-portal/internal/search"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/catalog"
+	"github.com/cantara/source-code-portal/internal/feature/commits"
+	"github.com/cantara/source-code-portal/internal/feature/docs"
+	"github.com/cantara/source-code-portal/internal/feature/issues"
+	"github.com/cantara/source-code-portal/internal/feature/manifests"
+	"github.com/cantara/source-code-portal/internal/feature/packages"
+	"github.com/cantara/source-code-portal/internal/feature/pulls"
+	"github.com/cantara/source-code-portal/internal/feature/releases"
+	"github.com/cantara/source-code-portal/internal/feature/search"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 const commitBody = 4 << 10 // bytes of a commit's body the index reads

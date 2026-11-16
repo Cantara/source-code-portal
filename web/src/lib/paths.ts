@@ -4,7 +4,7 @@ const seg = encodeURIComponent
 
 /**
  * The page addresses of the UI, each segment encoded: the one builder of page paths (links, canonicals, JSON-LD, breadcrumbs).
- * A repository's is its lower-case address, as Go writes it (internal/snapshot/pages.go; both are held to paths.cases.json).
+ * A repository's is its lower-case address, as Go writes it (internal/platform/snapshot/pages.go; both are held to paths.cases.json).
  */
 export const groupPath = (group: string) => `/groups/${seg(group)}`
 export const groupCommitsPath = (group: string) => `${groupPath(group)}/commits`

@@ -6,7 +6,7 @@ export interface Turn {
   content: string
 }
 
-/** AskEvent is one event of the answer's stream (internal/assistant/loop.go). */
+/** AskEvent is one event of the answer's stream (internal/feature/assistant/loop.go). */
 export type AskEvent =
   | { kind: "text"; text: string }
   | { kind: "tool"; name: string; label: string }

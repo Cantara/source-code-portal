@@ -16,9 +16,9 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 )
 
 // fakeAnthropic is a loopback Messages API: a question gets a call of get_repository for the repository it names, and a tool result

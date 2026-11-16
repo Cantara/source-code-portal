@@ -17,8 +17,8 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
 )
 
 // TestServeForGuide serves a made-up catalogue for the screenshots of the guide page (`.claude/skills/guide-page`): three products of

@@ -6,9 +6,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/sync"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/sync"
 )
 
 type took struct {

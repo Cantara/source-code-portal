@@ -26,7 +26,7 @@ repository holds `scp.yaml`, `theme/theme.css`, a logo and a favicon, and starts
 
 ## Design
 
-- `internal/theme` (core): `Load(dir, name)` validates and hashes the three known files and returns a `Theme`; `Theme.Env()` is the JSON
+- `internal/platform/theme` (core): `Load(dir, name)` validates and hashes the three known files and returns a `Theme`; `Theme.Env()` is the JSON
   the web UI server receives as `SCP_THEME` (`{"name","css","logo","favicon"}`, the URLs `/theme/<file>?v=<hash>`); `Theme.Handler()` is
   `GET /theme/{file...}`: `fs.ValidPath` and `os.OpenRoot` (a path or a symbolic link cannot leave the directory), regular files only, the extension allowlist, `Cache-Control: no-cache`
   with `Last-Modified` and conditional requests (`http.ServeContent`), `X-Content-Type-Options: nosniff` (the middleware's), and the

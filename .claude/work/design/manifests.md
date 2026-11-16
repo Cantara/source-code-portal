@@ -2,7 +2,7 @@
 Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
-- `internal/manifests` (feature): per repository, the `go.mod`, `package.json` and `pom.xml` files read as untrusted input, the
+- `internal/feature/manifests` (feature): per repository, the `go.mod`, `package.json` and `pom.xml` files read as untrusted input, the
   technology they state (languages, build tools, toolchain versions) and their declared dependencies.
 - Internal dependencies: which catalogued repositories a repository uses and is used by, matched on the names manifests declare.
 - `GET /api/v1/repos/{owner}/{name}/manifests`, a technology and dependency panel on the repository page, a section in the
@@ -35,7 +35,7 @@ Status: as built. Binding order: ../plan.md > this note.
 
 ## Shapes
 ```go
-// internal/snapshot
+// internal/platform/snapshot
 type Manifest struct {
     Path, Ecosystem, Name, Version string // ecosystem: go | npm | maven
     Language, BuildTool                    string
@@ -54,8 +54,8 @@ API `GET /api/v1/repos/{owner}/{name}/manifests`: `technology` (languages, build
 `freshness`. Weak ETag as every API response; an old address answers 308.
 
 ## Tests
-- `internal/manifests`: `TestGoMod`, `TestPackageJSON`, `TestPOM` (inheritance, interpolation, scopes), `TestPOMHostile` (deep nesting,
+- `internal/feature/manifests`: `TestGoMod`, `TestPackageJSON`, `TestPOM` (inheritance, interpolation, scopes), `TestPOMHostile` (deep nesting,
   entity declarations, token counts, invalid encodings), `FuzzParsers` (no panic, bounds hold), `TestJob` (discovery rules, blob reuse by
   SHA, too-large files, empty repositories), `TestAPI`.
-- `internal/snapshot` `TestDependencyIndex` (both directions, several providers, self-reference ignored); end to end in
+- `internal/platform/snapshot` `TestDependencyIndex` (both directions, several providers, self-reference ignored); end to end in
   `cmd/scp/run_test.go`; the panel in `web/src/app/views.test.tsx` and the Playwright smoke.

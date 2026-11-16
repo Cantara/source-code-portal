@@ -8,7 +8,7 @@ How SCP is built. Every change keeps these; each names how it is checked.
 2. **Built on demand.** A package, interface, config key or metric arrives with the code that uses it; names say what a value is.
    Check: lint `unused`; `scp config check` prints the effective config from the code.
 3. **One strict configuration.** Defaults < file < `SCP_*` env < flags; typed, validated at startup, all problems reported at once.
-   Check: `internal/config` tests for defaults, precedence, refused input and all problems at once.
+   Check: `internal/platform/config` tests for defaults, precedence, refused input and all problems at once.
 4. **Secrets are a redacting type**, sent only in headers. Commits store author name and login.
    Check: `TestSecretRedacted`.
 5. **Value-typed identities.** Repositories are `{source, id}`, addressed as `{owner}/{name}`, commits `{repo, sha}`, groups by id; membership is an index and

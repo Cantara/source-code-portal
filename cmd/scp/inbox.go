@@ -12,10 +12,10 @@ import (
 	gosync "sync"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/github"
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/sync"
-	"github.com/cantara/source-code-portal/internal/webhook"
+	"github.com/cantara/source-code-portal/internal/feature/webhook"
+	"github.com/cantara/source-code-portal/internal/platform/github"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/sync"
 )
 
 // inboxKeep is the longest a webhook event stays parked. It is dropped earlier, as soon as the jobs it asked for have run (handled); this
@@ -44,7 +44,7 @@ type inbox struct {
 	handled func(ev sync.Event, repo snapshot.RepoKey, source string, at time.Time) bool
 	log     *slog.Logger
 	now     func() time.Time
-	// catchUps read the delivery logs of the Apps (internal/webhook): what GitHub sent while the portal could not take it.
+	// catchUps read the delivery logs of the Apps (internal/feature/webhook): what GitHub sent while the portal could not take it.
 	catchUps []*webhook.CatchUp
 }
 

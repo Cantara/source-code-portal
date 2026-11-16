@@ -15,12 +15,12 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/ghlogin"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/setup"
-	"github.com/cantara/source-code-portal/internal/store"
-	"github.com/cantara/source-code-portal/internal/vault"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/ghlogin"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/setup"
+	"github.com/cantara/source-code-portal/internal/platform/store"
+	"github.com/cantara/source-code-portal/internal/platform/vault"
 )
 
 // TestPersonalWithAnApp: the account whose GitHub App the person installed is read with the App (its key sealed in the vault, the

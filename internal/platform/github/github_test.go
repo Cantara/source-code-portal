@@ -1,0 +1,483 @@
+package github
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	gh "github.com/google/go-github/v93/github"
+
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+)
+
+func tokenSource(t *testing.T, srv *githubtest.Server, orgs ...string) *Source {
+	t.Helper()
+	srv.AddToken("ghp_test")
+	c, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: orgs, TokenFile: "x", Token: config.NewSecret([]byte("ghp_test")),
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c.Source("gh")
+}
+
+func TestListReposPaginatesAndConverts(t *testing.T) {
+	srv := githubtest.New(t)
+	for i := range 250 {
+		srv.AddRepo("acme", gh.Repository{Name: new(fmt.Sprintf("repo-%03d", i)), Topics: []string{"t"}})
+	}
+	s := tokenSource(t, srv, "acme")
+	repos, err := s.ListRepos(t.Context(), "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(repos) != 250 || srv.Count("GET /orgs/acme/repos") != 3 {
+		t.Fatalf("got %d repos in %d requests, want 250 in 3", len(repos), srv.Count("GET /orgs/acme/repos"))
+	}
+	if r := repos[0]; r.Name != "repo-249" || r.Owner != "acme" || r.ID.Source != "gh" || r.DefaultBranch != "main" || len(r.Topics) != 1 {
+		t.Errorf("first repo = %+v, want repo-249 (most recently pushed) converted", r)
+	}
+}
+
+func TestConditionalRequestsAreFree(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("one")})
+	s := tokenSource(t, srv, "acme")
+	ctx := t.Context()
+	if _, err := s.ListRepos(ctx, "acme"); err != nil {
+		t.Fatal(err)
+	}
+	before := s.token.rate.left
+	repos, err := s.ListRepos(ctx, "acme")
+	if err != nil || len(repos) != 1 {
+		t.Fatalf("repeat listing = %v, %v", repos, err)
+	}
+	if got := srv.Ledger(); !strings.HasSuffix(got[len(got)-1], " 304") {
+		t.Errorf("repeat listing was not conditional: %v", got)
+	}
+	if s.token.rate.left != before {
+		t.Errorf("a 304 was charged: %d -> %d", before, s.token.rate.left)
+	}
+	srv.Update(id, func(r *gh.Repository) { r.Description = new("changed") })
+	repos, err = s.ListRepos(ctx, "acme")
+	if err != nil || repos[0].Description != "changed" {
+		t.Fatalf("after a change = %v, %v", repos, err)
+	}
+	if frac, _ := s.token.rate.remaining(); frac >= 1 {
+		t.Errorf("remaining = %v, want below 1", frac)
+	}
+}
+
+func TestAppMode(t *testing.T) {
+	srv := githubtest.New(t)
+	srv.Install("acme")
+	srv.Install("other")
+	srv.SetGrants("acme", map[string]string{"contents": "read", "metadata": "read"}, []string{"push"})
+	srv.AddRepo("acme", gh.Repository{Name: new("one")})
+	c, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme", "missing"},
+		App: &config.App{ID: srv.AppID, Installations: []string{"acme", "missing"}, PrivateKey: config.NewSecret(srv.PrivateKeyPEM())},
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("gh")
+	repos, err := s.ListRepos(t.Context(), "ACME")
+	if err != nil || len(repos) != 1 {
+		t.Fatalf("ListRepos = %v, %v", repos, err)
+	}
+	if frac, _ := c.Remaining("gh", "acme"); frac >= 1 {
+		t.Errorf("installation rate not observed: %v", frac)
+	}
+	if frac, _ := c.Remaining("gh", "other"); frac != 1 {
+		t.Errorf("filtered installation has a rate: %v", frac)
+	}
+	if g, known := s.Grants(); !known || len(g) != 1 || g[0].Owner != "acme" || g[0].Permissions["contents"] != "read" ||
+		g[0].Permissions["issues"] != "" || !slices.Equal(g[0].Events, []string{"push"}) {
+		t.Errorf("grants = %+v, %v; want acme's only, as the installation listing says", g, known)
+	}
+	_, err = s.ListRepos(t.Context(), "missing")
+	var e *Error
+	if !errors.As(err, &e) || e.Code != "no_installation" || !e.Permanent() {
+		t.Errorf("uninstalled owner: err = %v, want no_installation", err)
+	}
+}
+
+// An App installed on an organisation with "Only select repositories" reads exactly those, not the organisation's other public
+// repositories; one with all repositories reads them all; GitHub's word that the App left an account is told apart from a failure.
+func TestAppFollowsTheSelection(t *testing.T) {
+	srv := githubtest.New(t)
+	srv.Install("acme")
+	srv.Install("Wide")
+	srv.Install("elsewhere") // installed, but not an account of the source
+	chosen := srv.AddRepo("acme", gh.Repository{Name: new("chosen"), Visibility: new("public")})
+	srv.AddRepo("acme", gh.Repository{Name: new("left-out"), Visibility: new("public")})
+	srv.AddRepo("wide", gh.Repository{Name: new("a")})
+	srv.AddRepo("wide", gh.Repository{Name: new("b")})
+	srv.Select("acme", chosen)
+	c, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme", "wide"},
+		App: &config.App{ID: srv.AppID, PrivateKey: config.NewSecret(srv.PrivateKeyPEM())},
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("gh")
+	repos, err := s.ListRepos(t.Context(), "acme")
+	if err != nil || len(repos) != 1 || repos[0].Name != "chosen" {
+		t.Fatalf("selected installation = %v, %v; want only chosen", repos, err)
+	}
+	if srv.Count("GET /orgs/acme/repos") != 0 {
+		t.Error("an App source listed the organisation's repositories, not the installation's")
+	}
+	if repos, err := s.ListRepos(t.Context(), "wide"); err != nil || len(repos) != 2 {
+		t.Errorf("installation with all repositories = %v, %v; want both", repos, err)
+	}
+	g, _ := s.Grants()
+	sel := map[string]string{}
+	for _, gr := range g {
+		sel[gr.Owner] = gr.Selection
+	}
+	if len(sel) != 2 || sel["acme"] != "selected" || sel["Wide"] != "all" {
+		t.Errorf("selections = %v, want acme selected and Wide all, as GitHub spells them, and no other account", sel)
+	}
+	srv.Uninstall("acme")
+	if err := s.RefreshInstallations(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ListRepos(t.Context(), "acme"); !NotInstalled(err) {
+		t.Errorf("after the App was removed: err = %v, want NotInstalled", err)
+	}
+	if NotInstalled(&Error{Kind: Transient, Code: "server_error"}) || NotInstalled(errors.New("x")) {
+		t.Error("NotInstalled holds for another failure")
+	}
+}
+
+func TestUserAccounts(t *testing.T) {
+	srv := githubtest.New(t)
+	for _, u := range []string{"me", "friend"} {
+		srv.AddUser(u)
+		srv.AddRepo(u, gh.Repository{Name: new(u + "-public"), Visibility: new("public")})
+		srv.AddRepo(u, gh.Repository{Name: new(u + "-private"), Visibility: new("private")})
+	}
+	srv.AddRepo("acme", gh.Repository{Name: new("org-repo")})
+	srv.AddUserToken("ghp_me", "me")
+	c, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"me", "friend", "acme"}, TokenFile: "x", Token: config.NewSecret([]byte("ghp_me")),
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := func(s *Source, owner string) []string {
+		t.Helper()
+		repos, err := s.ListRepos(t.Context(), owner)
+		if err != nil {
+			t.Fatalf("ListRepos(%s): %v", owner, err)
+		}
+		var out []string
+		for _, r := range repos {
+			out = append(out, r.Name)
+		}
+		slices.Sort(out)
+		return out
+	}
+	s := c.Source("gh")
+	if got := names(s, "me"); !slices.Equal(got, []string{"me-private", "me-public"}) {
+		t.Errorf("own account = %v, want its private and public repositories", got)
+	}
+	if got := names(s, "friend"); !slices.Equal(got, []string{"friend-public"}) {
+		t.Errorf("another user = %v, want the public repository", got)
+	}
+	if got := names(s, "acme"); !slices.Equal(got, []string{"org-repo"}) {
+		t.Errorf("organisation = %v", got)
+	}
+	names(s, "me")
+	if n := srv.Count("GET /users/me "); n != 1 {
+		t.Errorf("the account was looked up %d times, want once", n)
+	}
+
+	srv.Install("me")
+	app, err := New(config.GitHub{Sources: []config.Source{{
+		ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"me"},
+		App: &config.App{ID: srv.AppID, PrivateKey: config.NewSecret(srv.PrivateKeyPEM())},
+	}}}, nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(app.Source("gh"), "me"); !slices.Equal(got, []string{"me-private", "me-public"}) {
+		t.Errorf("App user installation = %v, want the installation's repositories", got)
+	}
+}
+
+func TestClassify(t *testing.T) {
+	tests := map[string]struct {
+		setup func(*githubtest.Server)
+		repo  string // default "present"
+		token string
+		kind  Kind
+		retry bool
+	}{
+		"not found":   {setup: func(*githubtest.Server) {}, repo: "absent", kind: NotFound},
+		"server":      {setup: func(s *githubtest.Server) { s.Fail("GET /repos/", http.StatusBadGateway, 1, 0) }, kind: Transient},
+		"bad token":   {setup: func(*githubtest.Server) {}, token: "wrong", kind: Auth},
+		"forbidden":   {setup: func(s *githubtest.Server) { s.Fail("GET /repos/", http.StatusForbidden, 1, 0) }, kind: Permanent},
+		"rate":        {setup: func(s *githubtest.Server) { s.Exhaust("ghp_test") }, kind: RateLimited, retry: true},
+		"secondary":   {setup: func(s *githubtest.Server) { s.Fail("GET /repos/", http.StatusForbidden, 1, time.Minute) }, kind: RateLimited, retry: true},
+		"too many":    {setup: func(s *githubtest.Server) { s.Fail("GET /repos/", http.StatusTooManyRequests, 1, time.Minute) }, kind: RateLimited, retry: true},
+		"conflicting": {setup: func(s *githubtest.Server) { s.Fail("GET /repos/", http.StatusConflict, 1, 0) }, kind: NotFound},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			srv := githubtest.New(t)
+			srv.AddToken("ghp_test")
+			srv.AddRepo("acme", gh.Repository{Name: new("present")})
+			tok := "ghp_test"
+			if tc.token != "" {
+				tok = tc.token
+			}
+			c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme"},
+				Token: config.NewSecret([]byte(tok))}}}, nil, slog.New(slog.DiscardHandler))
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.setup(srv)
+			name := "present"
+			if tc.repo != "" {
+				name = tc.repo
+			}
+			_, err = c.Source("gh").Repo(t.Context(), "acme", name)
+			var e *Error
+			if !errors.As(err, &e) || e.Kind != tc.kind {
+				t.Fatalf("err = %v, want kind %d", err, tc.kind)
+			}
+			if at, _ := e.RateLimitedUntil(); tc.retry && !at.After(time.Now()) {
+				t.Errorf("RetryAt = %v, want in the future", at)
+			}
+		})
+	}
+}
+
+func TestCanceledIsNotClassified(t *testing.T) {
+	srv := githubtest.New(t)
+	s := tokenSource(t, srv, "acme")
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err := s.ListRepos(ctx, "acme")
+	var e *Error
+	if !errors.Is(err, context.Canceled) || errors.As(err, &e) {
+		t.Errorf("err = %v, want context.Canceled unclassified", err)
+	}
+}
+
+func TestETagCacheEvicts(t *testing.T) {
+	c := newETagCache(2 * entryOverhead) // two empty entries
+	for _, k := range []string{"a", "b"} {
+		c.put(k, &cacheEntry{etag: k})
+	}
+	c.get("a") // a is now the most recent
+	c.put("c", &cacheEntry{etag: "c"})
+	if c.get("b") != nil || c.get("a") == nil || c.get("c") == nil {
+		t.Errorf("want b evicted and a, c kept")
+	}
+}
+
+// A response past the cache's cap is read whole, not cut at the cap: a page of commits with long messages is larger than 1 MiB.
+func TestLargeResponseIsReadWhole(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("big")})
+	long := strings.Repeat("a long commit message line\n", 1600) // about 43 KB, as in a real repository
+	var cs []githubtest.Commit
+	for i := range 40 {
+		cs = append(cs, githubtest.Commit{SHA: fmt.Sprintf("%040x", i+1), Message: long, AuthorName: "Bo", Date: time.Now()})
+	}
+	srv.SetCommits(id, cs...)
+	c, err := tokenSource(t, srv, "acme").REST(t.Context(), "acme", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 { // the second read is not served from a cut cache entry either
+		got, _, err := c.Repositories.ListCommits(t.Context(), "acme", "big", &gh.CommitsListOptions{ListOptions: gh.ListOptions{PerPage: 100}})
+		if err != nil || len(got) != 40 || got[39].GetCommit().GetMessage() != long {
+			t.Fatalf("commits = %d, %v", len(got), err)
+		}
+	}
+}
+
+func TestTreesAndBlobs(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("one")})
+	srv.SetCommits(id, githubtest.Commit{SHA: strings.Repeat("a", 40), Message: "first", AuthorName: "Bo", Date: time.Now()})
+	srv.SetFile(id, ".github/scp.yaml", "schema: 1\n")
+	srv.SetFile(id, "README.md", "# one\n")
+	s := tokenSource(t, srv, "acme")
+	ctx := t.Context()
+
+	root, err := s.Tree(ctx, "acme", "one", "HEAD", false)
+	if err != nil || len(root) != 2 || root[0].Path != ".github" || root[0].Type != "tree" || root[1].Path != "README.md" {
+		t.Fatalf("root = %+v, %v", root, err)
+	}
+	sub, err := s.Tree(ctx, "acme", "one", root[0].SHA, false)
+	if err != nil || len(sub) != 1 || sub[0].Path != "scp.yaml" || sub[0].Size != 10 {
+		t.Fatalf(".github = %+v, %v", sub, err)
+	}
+	b, err := s.Blob(ctx, "acme", "one", sub[0].SHA)
+	if err != nil || string(b) != "schema: 1\n" {
+		t.Errorf("blob = %q, %v", b, err)
+	}
+	all, err := s.Tree(ctx, "acme", "one", "HEAD", true)
+	if err != nil || len(all) != 3 || all[1].Path != ".github/scp.yaml" || all[1].SHA != sub[0].SHA {
+		t.Errorf("recursive = %+v, %v", all, err)
+	}
+}
+
+func TestWebURL(t *testing.T) {
+	for base, want := range map[string]string{
+		"https://api.github.com/":         "https://github.com/",
+		"https://ghe.example.com/api/v3/": "https://ghe.example.com/",
+	} {
+		c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: base, Orgs: []string{"acme"},
+			Token: config.NewSecret([]byte("t"))}}}, nil, slog.New(slog.DiscardHandler))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := c.Source("gh").WebURL(); got != want {
+			t.Errorf("WebURL(%s) = %s, want %s", base, got, want)
+		}
+	}
+}
+
+// TestEnterpriseAddresses: a source's configured addresses (enterprise.github) win over the ones derived from its REST base;
+// GitHub Enterprise Cloud's web host is not its API host, so it is configured, and GraphQL defaults beside the base.
+func TestEnterpriseAddresses(t *testing.T) {
+	for _, tc := range []struct{ base, web, graphql, wantWeb, wantGraphQL string }{
+		{"https://api.github.com/", "", "", "https://github.com/", "https://api.github.com/graphql"},
+		{"https://ghe.example/api/v3/", "", "", "https://ghe.example/", "https://ghe.example/api/graphql"},
+		{"https://api.octocorp.ghe.com/", "https://octocorp.ghe.com/", "", "https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql"},
+		{"https://api.octocorp.ghe.com/", "https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql",
+			"https://octocorp.ghe.com/", "https://api.octocorp.ghe.com/graphql"},
+		{"https://ghe.example/api/v3/", "https://ghe.example/", "https://ghe.example/api/graphql", "https://ghe.example/", "https://ghe.example/api/graphql"},
+	} {
+		c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: tc.base, Orgs: []string{"acme"}, WebURL: tc.web,
+			GraphQLURL: tc.graphql, Token: config.NewSecret([]byte("t"))}}}, nil, slog.New(slog.DiscardHandler))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s := c.Source("gh"); s.WebURL() != tc.wantWeb || s.GraphQLURL() != tc.wantGraphQL {
+			t.Errorf("%s (web %q): WebURL %s, GraphQLURL %s", tc.base, tc.web, s.WebURL(), s.GraphQLURL())
+		}
+	}
+}
+
+func TestRateBookResetInstant(t *testing.T) {
+	r := &rateBook{limit: 100, left: 1, reset: time.Now().Add(time.Hour), known: true}
+	if f, _ := r.remaining(); f != 0.01 {
+		t.Errorf("before the reset: %v", f)
+	}
+	r.reset = time.Now()
+	if f, _ := r.remaining(); f != 1 {
+		t.Errorf("at the reset: %v, want 1 (a fraction kept at the reset instant made the dispatcher spin)", f)
+	}
+}
+
+func TestFilesStreamsTheTreeAndWalksATruncatedOne(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("big")})
+	srv.SetCommits(id, githubtest.Commit{SHA: strings.Repeat("a", 40), Message: "first", AuthorName: "Bo", Date: time.Now()})
+	for _, p := range []string{"go.mod", "README.md", "api/go.mod", "web/package.json", "web/pnpm-lock.yaml", "vendor/x/go.mod",
+		"a/b/c/d/go.mod", "a/b/c/d/e/go.mod"} {
+		srv.SetFile(id, p, "content of "+p)
+	}
+	for i := range 50 {
+		srv.SetFile(id, fmt.Sprintf("vendor/lib%02d/file.go", i), "package lib")
+	}
+	s := tokenSource(t, srv, "acme")
+	keep := func(dir string) bool { return !strings.HasPrefix(dir, "vendor") && strings.Count(dir, "/") < 4 }
+	want := []string{"README.md", "a/b/c/d/go.mod", "api/go.mod", "go.mod", "web/package.json", "web/pnpm-lock.yaml"}
+	paths := func(es []TreeEntry) []string {
+		var out []string
+		for _, e := range es {
+			if e.Type != "blob" || e.SHA == "" || e.Size == 0 {
+				t.Errorf("entry %+v", e)
+			}
+			out = append(out, e.Path)
+		}
+		slices.Sort(out)
+		return out
+	}
+
+	got, err := s.Files(t.Context(), "acme", "big", keep)
+	if err != nil || !slices.Equal(paths(got), want) {
+		t.Errorf("files = %v, %v; want %v", paths(got), err, want)
+	}
+	srv.SetTreeLimit(10) // the vendored files push the tree past GitHub's limit: the walk finds the same files
+	got, err = s.Files(t.Context(), "acme", "big", keep)
+	if err != nil || !slices.Equal(paths(got), want) {
+		t.Errorf("files of a truncated tree = %v, %v; want %v", paths(got), err, want)
+	}
+}
+
+// TestPeopleSourceSendsNothingWithoutAToken: a source read with people's tokens (scp enterprise) has no credential of its own, so
+// until a person's token is given it never asks GitHub anything, not even anonymously.
+func TestPeopleSourceSendsNothingWithoutAToken(t *testing.T) {
+	srv := githubtest.New(t)
+	srv.AddRepo("acme", gh.Repository{Name: new("open")})
+	c, err := New(config.GitHub{Sources: []config.Source{{ID: "gh", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, People: true}}},
+		nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("gh")
+	var e *Error
+	if _, err := s.ListRepos(t.Context(), "acme"); !errors.As(err, &e) || e.Kind != Waiting || e.Code != "no_person" {
+		t.Errorf("listing: %v, want the Waiting error no_person", err)
+	}
+	if _, err := s.Blob(t.Context(), "acme", "open", "abc"); !errors.As(err, &e) || e.Code != "no_person" {
+		t.Errorf("blob: %v", err)
+	}
+	if got := srv.Ledger(); len(got) != 0 {
+		t.Errorf("requests sent: %v", got)
+	}
+	if r := c.RateRemaining()["gh"]; r != 1 {
+		t.Errorf("rate remaining %v", r)
+	}
+}
+
+// TestCheckToken: a person's token says whose it is and when it ends, and is refused when it reads nothing of the organisation or
+// GitHub does not know it.
+func TestCheckToken(t *testing.T) {
+	srv := githubtest.New(t)
+	id := srv.AddRepo("acme", gh.Repository{Name: new("inner"), Visibility: new("internal")})
+	srv.AddRepo("other", gh.Repository{Name: new("x"), Visibility: new("private")})
+	end := time.Date(2027, 2, 11, 12, 0, 0, 0, time.UTC)
+	srv.AddUserToken("github_pat_ann", "ann_oc")
+	srv.Expires("github_pat_ann", end)
+	srv.Reach("github_pat_ann", id)
+	c, err := New(config.GitHub{Sources: []config.Source{{ID: "ghe", BaseURL: srv.BaseURL(), Orgs: []string{"acme"}, People: true}}},
+		nil, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Source("ghe")
+	got, err := s.CheckToken(t.Context(), "acme", []byte("github_pat_ann"))
+	if err != nil || got.Login != "ann_oc" || !got.Expires.Equal(end) {
+		t.Errorf("check: %+v %v", got, err)
+	}
+	var e *Error
+	if _, err := s.CheckToken(t.Context(), "other", []byte("github_pat_ann")); !errors.As(err, &e) || e.Code != "reads_nothing" {
+		t.Errorf("another organisation: %v", err)
+	}
+	if _, err := s.CheckToken(t.Context(), "acme", []byte("github_pat_wrong")); !errors.As(err, &e) || e.Kind != Auth {
+		t.Errorf("an unknown token: %v", err)
+	}
+	if r := tokenEnd(&http.Response{Header: http.Header{"Github-Authentication-Token-Expiration": {"2024-01-31 06:25:19 -0800"}}}); !r.Equal(time.Date(2024, 1, 31, 14, 25, 19, 0, time.UTC)) {
+		t.Errorf("an end with an offset: %v", r)
+	}
+}

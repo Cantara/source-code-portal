@@ -26,12 +26,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/cantara/source-code-portal/internal/auth"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/ghlogin"
-	"github.com/cantara/source-code-portal/internal/setup"
-	"github.com/cantara/source-code-portal/internal/store"
-	"github.com/cantara/source-code-portal/internal/vault"
+	"github.com/cantara/source-code-portal/internal/platform/auth"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/ghlogin"
+	"github.com/cantara/source-code-portal/internal/platform/setup"
+	"github.com/cantara/source-code-portal/internal/platform/store"
+	"github.com/cantara/source-code-portal/internal/platform/vault"
 )
 
 // The personal edition (design/personal.md): one directory holding the store, personal.yaml and the local secrets; a terminal

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/setup"
+	"github.com/cantara/source-code-portal/internal/platform/setup"
 )
 
 // TestServeSetupForPlaywright serves the personal edition's setup page on E2E_SETUP_ADDR against a fake GitHub until it is

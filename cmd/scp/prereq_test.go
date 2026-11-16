@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/httpapi"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
-	"github.com/cantara/source-code-portal/internal/prereq"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/prereq"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // TestPrerequisites: an App installation without Issues and its events is told, the details to an administrator only; with every
@@ -95,7 +95,7 @@ func TestPrerequisitesOfAToken(t *testing.T) {
 	}
 }
 
-// TestPrerequisitesDocumented keeps what the documentation says each feature needs of GitHub equal to internal/prereq: the
+// TestPrerequisitesDocumented keeps what the documentation says each feature needs of GitHub equal to internal/platform/prereq: the
 // operator guide's table row by row, and every permission and event named where operators set them up.
 func TestPrerequisitesDocumented(t *testing.T) {
 	read := func(p string) string {
@@ -121,7 +121,7 @@ func TestPrerequisitesDocumented(t *testing.T) {
 		rows = append(rows, cells)
 	}
 	if len(rows) != len(prereq.Needs) {
-		t.Fatalf("the operator guide's table has %d rows, internal/prereq %d features", len(rows), len(prereq.Needs))
+		t.Fatalf("the operator guide's table has %d rows, internal/platform/prereq %d features", len(rows), len(prereq.Needs))
 	}
 	for i, n := range prereq.Needs {
 		perms, events := strings.Join(names(n.Permissions, prereq.PermissionName), ", "), strings.Join(names(n.Events, prereq.EventName), ", ")

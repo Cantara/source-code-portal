@@ -52,9 +52,9 @@ none of the operator duties below except the network layout.
   assistant's tool results have control and invisible characters removed, and are marked as data, never instructions.
 - **Read-only towards GitHub.** The portal asks for read permissions only and sends only reads: GET requests and GraphQL queries,
   never a write or a mutation. The fake GitHub every test runs against fails a test that sends anything else
-  (`internal/github/githubtest`).
+  (`internal/platform/github/githubtest`).
 - **Webhooks anyone can cause.** On a public repository anyone may open an issue or a pull request, or comment: such events re-read
-  that repository at most once a minute, so outsiders cannot spend the portal's GitHub rate limit (`internal/sync` `Settle`).
+  that repository at most once a minute, so outsiders cannot spend the portal's GitHub rate limit (`internal/platform/sync` `Settle`).
 - **Agents.** Every tool agents can call only reads. `/mcp` takes a bearer token or the authenticating proxy's identity, never a
   browser's session cookie, and refuses a request whose `Origin` is another site (the DNS rebinding guard MCP asks for); a tool call
   carrying a cookie must come from the portal's own pages. The pages' WebMCP tools are for the page's own origin only (the
@@ -65,7 +65,7 @@ none of the operator duties below except the network layout.
   reached only over https at public addresses, checked on the address dialled, so neither a redirect nor a DNS answer reaches your
   network. What a registry answers is cleaned like repository text, and its addresses are linked only when https.
 - **Registry credentials.** A configured package registry's credentials are sent only to URLs under its own `url`, never to a
-  registry a build file names and never across a redirect that leaves it (`internal/packages/private_test.go`). A private
+  registry a build file names and never across a redirect that leaves it (`internal/feature/packages/private_test.go`). A private
   repository's package names are asked only of those registries, never of a public one.
 
 ## What you provide

@@ -50,7 +50,7 @@ export const adminStatusQuery = (get: Get) =>
     refetchInterval: 15_000,
   })
 
-/** ProviderTest is the answer of `POST /api/v1/admin/assistant/test` (internal/assistant): one short completion. */
+/** ProviderTest is the answer of `POST /api/v1/admin/assistant/test` (internal/feature/assistant): one short completion. */
 export interface ProviderTest {
   ok: boolean
   provider: string

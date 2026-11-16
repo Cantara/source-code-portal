@@ -92,7 +92,7 @@ export function issue(n: number, over: Partial<S["Issue"]> = {}): S["Issue"] {
   }
 }
 
-/** rules are the server's rules (GET /rules), held equal to internal/health by cmd/scp's TestRulesFixture. */
+/** rules are the server's rules (GET /rules), held equal to internal/platform/health by cmd/scp's TestRulesFixture. */
 export const rules = serverRules as S["Rules"]
 
 export const healthy: S["Health"] = { score: 100, level: "good", findings: [] }

@@ -2,7 +2,7 @@
 Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
-`internal/catalog` discovers the repositories of the configured organisations, gives each a stable identity and its `{owner}/{name}`
+`internal/feature/catalog` discovers the repositories of the configured organisations, gives each a stable identity and its `{owner}/{name}`
 address, assigns them to config-defined groups, owns the `scp.yaml` descriptor (fetch and parse), and contributes repositories, groups and
 aliases to the snapshot. It owns the removal rule; the listing every `catalog.reconcile_interval` is also the `pushed_at` freshness sweep.
 
@@ -27,7 +27,7 @@ aliases to the snapshot. It owns the removal rule; the listing every `catalog.re
 
 ## Shapes
 ```go
-// internal/snapshot (core): the catalogue's value types; catalog builds them.
+// internal/platform/snapshot (core): the catalogue's value types; catalog builds them.
 type Repo struct {
     ID RepoID; Owner, Name string                    // Key() RepoKey = lower(owner/name)
     Description, HTMLURL, Homepage, DefaultBranch, License, Visibility string
@@ -36,7 +36,7 @@ type Repo struct {
 type Group struct{ ID, Name, Description string; DefaultRepo RepoKey; DefaultMissing bool; Members []RepoKey } // members sorted
 type Problem struct{ Pointer, Code, Message string } // a finding in a repository file, shared with manifests
 
-// internal/catalog
+// internal/feature/catalog
 type Descriptor struct {                             // the facet "descriptor"; DescriptorOf(e) reads it
     Present bool; File string                        // ".github/scp.yaml" etc.
     Title, Description, Lifecycle string             // Lifecycle: "" | experimental | production | deprecated

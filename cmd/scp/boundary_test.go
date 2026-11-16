@@ -13,15 +13,19 @@ import (
 	"testing"
 )
 
-// core are the shared packages under internal/. Every other package there is a feature: features never import each other and core
-// packages import none of them, so a new package is a feature unless it is added here.
-var core = []string{ //nolint:gochecknoglobals // test table
-	"actor", "analytics", "cluster", "config", "egress", "docstore", "ghlogin", "github", "health", "httpapi", "jsonstream", "llm", "lru", "prereq", "safehtml", "scope", "setup", "snapshot", "mcpserver", "store", "sync", "theme", "tools", "untrusted", "webui",
-}
-
 const internalPrefix = "github.com/cantara/source-code-portal/internal/"
 
-// boundaryViolations returns one entry per import of a feature from outside that feature, for the tree under root (an internal/ dir).
+// layers are internal/'s three layers and what each may import of internal/, by layer: a lib package (a pure helper) nothing; a
+// platform package (what the features stand on) the platform and lib; a feature (what users see) the platform, lib and its own
+// packages, never another feature. The wiring of features happens in cmd/scp.
+var layers = map[string][]string{ //nolint:gochecknoglobals // test table
+	"lib":      nil,
+	"platform": {"platform", "lib"},
+	"feature":  {"platform", "lib"},
+}
+
+// boundaryViolations returns one entry per import that breaks the layers, for the tree under root (an internal/ dir); a package
+// outside the three layers is one too.
 func boundaryViolations(t *testing.T, root string) []string {
 	t.Helper()
 	var out []string
@@ -30,21 +34,30 @@ func boundaryViolations(t *testing.T, root string) []string {
 			return err
 		}
 		rel, _ := filepath.Rel(root, p)
-		own, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
+		rel = filepath.ToSlash(rel)
+		layer, rest, _ := strings.Cut(rel, "/")
+		own, _, _ := strings.Cut(rest, "/")
+		allowed, known := layers[layer]
+		if !known {
+			out = append(out, rel+" is outside the layers feature/, platform/ and lib/")
+			return nil
+		}
 		f, err := parser.ParseFile(token.NewFileSet(), p, nil, parser.ImportsOnly)
 		if err != nil {
 			return err
 		}
 		for _, imp := range f.Imports {
 			path, _ := strconv.Unquote(imp.Path.Value)
-			rest, ok := strings.CutPrefix(path, internalPrefix)
+			target, ok := strings.CutPrefix(path, internalPrefix)
 			if !ok {
 				continue
 			}
-			target, _, _ := strings.Cut(rest, "/")
-			if target != own && !slices.Contains(core, target) {
-				out = append(out, filepath.ToSlash(rel)+" imports "+path)
+			tLayer, tRest, _ := strings.Cut(target, "/")
+			tOwn, _, _ := strings.Cut(tRest, "/")
+			if tLayer == layer && tOwn == own || slices.Contains(allowed, tLayer) {
+				continue
 			}
+			out = append(out, rel+" imports "+path)
 		}
 		return nil
 	})
@@ -54,9 +67,9 @@ func boundaryViolations(t *testing.T, root string) []string {
 	return out
 }
 
-// TestFeaturesDoNotImportFeatures enforces plan rule 2: features share data through the snapshot and consumer-side interfaces,
-// and the wiring happens here in cmd/scp.
-func TestFeaturesDoNotImportFeatures(t *testing.T) {
+// TestLayersHold enforces plan rule 2: features share data through the snapshot and consumer-side interfaces, the platform and
+// the helpers know no feature, and the wiring happens here in cmd/scp.
+func TestLayersHold(t *testing.T) {
 	for _, v := range boundaryViolations(t, filepath.Join("..", "..", "internal")) {
 		t.Error(v)
 	}
@@ -73,15 +86,26 @@ func TestBoundaryCheckFindsViolation(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("docs/docs.go", "package docs\nimport _ \""+internalPrefix+"catalog\"\n")
-	write("docs/render/r.go", "package render\nimport _ \""+internalPrefix+"docs\"\n")
-	write("sync/sync.go", "package sync\nimport _ \""+internalPrefix+"snapshot\"\n")
-	write("ci/ci.go", "package ci\nimport _ \""+internalPrefix+"sync\"\n")          // a new feature on core: fine
-	write("snapshot/s.go", "package snapshot\nimport _ \""+internalPrefix+"ci\"\n") // core on a new feature
+	imp := func(pkg, path string) string {
+		return "package " + pkg + "\nimport _ \"" + internalPrefix + path + "\"\n"
+	}
+	write("feature/docs/docs.go", imp("docs", "feature/catalog"))    // a feature on another feature
+	write("feature/docs/render/r.go", imp("render", "feature/docs")) // a feature's own package: fine
+	write("feature/ci/ci.go", imp("ci", "platform/sync"))            // a feature on the platform: fine
+	write("platform/sync/sync.go", imp("sync", "lib/lru"))           // the platform on a helper: fine
+	write("platform/snapshot/s.go", imp("snapshot", "feature/ci"))   // the platform on a feature
+	write("lib/lru/lru.go", imp("lru", "platform/sync"))             // a helper on the platform
+	write("stray/x.go", "package stray\n")                           // outside the layers
 	got := boundaryViolations(t, root)
 	slices.Sort(got)
-	if len(got) != 2 || !strings.HasPrefix(got[0], "docs/docs.go imports") || !strings.HasPrefix(got[1], "snapshot/s.go imports") {
-		t.Errorf("violations = %q, want docs/docs.go importing catalog and snapshot/s.go importing ci", got)
+	want := []string{"feature/docs/docs.go imports", "lib/lru/lru.go imports", "platform/snapshot/s.go imports", "stray/x.go is outside"}
+	if len(got) != len(want) {
+		t.Fatalf("violations = %q, want %d", got, len(want))
+	}
+	for i, w := range want {
+		if !strings.HasPrefix(got[i], w) {
+			t.Errorf("violation %d = %q, want %q", i, got[i], w)
+		}
 	}
 }
 
@@ -89,7 +113,7 @@ func TestBoundaryCheckFindsViolation(t *testing.T) {
 // personal edition, so the packages that only the personal edition uses (its setup page, signing in to GitHub, the vault) are imported
 // by its own files, personal*.go, and by no other file of the program.
 func TestSharedSiteDoesNotLinkThePersonalEdition(t *testing.T) {
-	personalOnly := []string{internalPrefix + "setup", internalPrefix + "ghlogin", internalPrefix + "vault"}
+	personalOnly := []string{internalPrefix + "platform/setup", internalPrefix + "platform/ghlogin", internalPrefix + "platform/vault"}
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +147,7 @@ func TestTheServerBuildHoldsNothingOfThePersonalEdition(t *testing.T) {
 		}
 		return strings.Fields(string(out))
 	}
-	onlyPersonal := []string{internalPrefix + "setup", internalPrefix + "ghlogin", internalPrefix + "vault", "github.com/zalando/go-keyring", "golang.org/x/term"}
+	onlyPersonal := []string{internalPrefix + "platform/setup", internalPrefix + "platform/ghlogin", internalPrefix + "platform/vault", "github.com/zalando/go-keyring", "golang.org/x/term"}
 	full, server := deps(), deps("-tags", "server")
 	for _, p := range onlyPersonal {
 		if !slices.Contains(full, p) {
@@ -136,7 +160,7 @@ func TestTheServerBuildHoldsNothingOfThePersonalEdition(t *testing.T) {
 }
 
 // TestTheProgramOpensTheStoreForAMode: store.Open claims no mode and is for tests; everything the program runs opens the store with
-// store.OpenAs, so a store of the other mode is always refused (internal/store/mode.go).
+// store.OpenAs, so a store of the other mode is always refused (internal/platform/store/mode.go).
 func TestTheProgramOpensTheStoreForAMode(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {

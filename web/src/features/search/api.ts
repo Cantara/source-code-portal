@@ -23,7 +23,7 @@ export const kinds: { kind: Kind; tab: string; one: string }[] = [
 /** searchSize is the hits on a page. */
 export const searchSize = 25
 
-/** maxQuery is the longest query the portal searches, in characters (internal/search.MaxQuery). */
+/** maxQuery is the longest query the portal searches, in characters (internal/feature/search.MaxQuery). */
 export const maxQuery = 256
 
 /** SearchState is the search page's URL: the query, the kind it shows and the page. */

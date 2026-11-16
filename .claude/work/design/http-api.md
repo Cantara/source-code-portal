@@ -8,12 +8,12 @@ the metrics. The web UI learns about new data from `/api/v1/events` (images-even
 
 ## Decisions
 - stdlib `net/http` `ServeMux` patterns: conflicting patterns panic at start, so routing errors surface at start-up.
-- One `http.Server` constructor in `internal/httpapi` with fixed timeouts; config sets the addresses.
+- One `http.Server` constructor in `internal/platform/httpapi` with fixed timeouts; config sets the addresses.
 - Public `:9090` serves the pages (proxied to the web UI server, web.md), `/api/v1`, badges, images, llms and the webhook; admin `:9091` serves `/livez`, `/readyz`, `/metrics`,
   `/debug/pprof` and `/api/v1/status`: each port has one audience.
 - Repository identity in URLs is `{owner}/{name}` (two segments, case-insensitive match, lowercase in links); an old address answers 308
   through the catalog alias map.
-- One contract file `api/openapi.yaml`; one generated Go package `internal/httpapi/oapi` (`oapi.gen.go`, committed). Features implement
+- One contract file `api/openapi.yaml`; one generated Go package `internal/platform/httpapi/oapi` (`oapi.gen.go`, committed). Features implement
   their methods of the one `StrictServerInterface`; `cmd/scp` composes them by embedding: one document, one generator run.
 - `/api/v1/status` is hand-written operator JSON on the admin listener: it evolves freely with operations.
 - Input checking: the strict server types the input, handlers check ranges, binding errors become problems.
@@ -181,14 +181,14 @@ gauges read live state at scrape). Labels use route patterns and kinds, never id
 Body caps (64 KiB, the webhook 25 MiB), the de-duplication window (15 min) and the llms sizes are constants in their packages.
 
 ## Tests
-- `internal/httpapi`: `TestSnapshotAndValidators` (weak ETag, 304), `TestAPINotFoundIsProblem`, `TestProbes`, `TestHeaders` (CSP and
+- `internal/platform/httpapi`: `TestSnapshotAndValidators` (weak ETag, 304), `TestAPINotFoundIsProblem`, `TestProbes`, `TestHeaders` (CSP and
   `nosniff` per response class), `TestAPIConventions` (problems, 405, binding errors), `TestMiddleware` (request id, recover, gzip,
   deadline), `TestClientIP`, `TestNegotiation`, `TestPrivateViewer`, `TestEvents`.
 - `TestPages` against a loopback upstream: headers out (token, viewer, origin, request id, nonce CSP; identity headers removed), the
   response CSP carries the same nonce, an upstream 404 page is replaced by the not-found page, reserved prefixes plain 404, no upstream
   or an unreachable one 503.
-- `internal/webhook`: `TestReceiver` (status mapping, valid, invalid and rotated secret), `TestDuplicateAndOversize`, `TestDedupeExpires`,
+- `internal/feature/webhook`: `TestReceiver` (status mapping, valid, invalid and rotated secret), `TestDuplicateAndOversize`, `TestDedupeExpires`,
   `TestSharedDedupe`, `TestNormalise`, `FuzzNormalise`.
-- `internal/llms`: `TestIndexAndFull` (golden files in `testdata/`, hostile text stays inside its block, size caps, absolute URLs),
+- `internal/feature/llms`: `TestIndexAndFull` (golden files in `testdata/`, hostile text stays inside its block, size caps, absolute URLs),
   `TestDocuments`, `TestRepoPage`, `FuzzDelimit`.
 - Contract: `make check` and CI fail on generated drift; the generated TS compiles in `web/`; `TestServeEndToEnd` exercises the routes.

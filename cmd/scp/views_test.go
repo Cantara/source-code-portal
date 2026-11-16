@@ -6,7 +6,7 @@ import (
 	gosync "sync"
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // Many requests at once for few views: each view is built once and shared, under the race detector.

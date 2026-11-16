@@ -1,0 +1,215 @@
+package catalog
+
+import (
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+)
+
+func TestMatchers(t *testing.T) {
+	repo := func(name string, topics ...string) *snapshot.Repo {
+		return &snapshot.Repo{Name: name, Topics: topics, ID: snapshot.RepoID{Source: "gh"}}
+	}
+	tests := []struct {
+		kind, value string
+		yes, no     []*snapshot.Repo
+	}{
+		{"exact", "Whydah-SSO", []*snapshot.Repo{repo("whydah-sso")}, []*snapshot.Repo{repo("Whydah-SSO-x")}},
+		{"prefix", "Whydah-", []*snapshot.Repo{repo("whydah-x"), repo("Whydah-")}, []*snapshot.Repo{repo("xWhydah-")}},
+		{"glob", "IoT*", []*snapshot.Repo{repo("iot-hub"), repo("IoT")}, []*snapshot.Repo{repo("my-IoT")}},
+		{"glob", "a?c", []*snapshot.Repo{repo("abc")}, []*snapshot.Repo{repo("ac"), repo("abbc")}},
+		{"glob", "a.b", []*snapshot.Repo{repo("a.b")}, []*snapshot.Repo{repo("axb")}},
+		{"regexp", "IoT.*", []*snapshot.Repo{repo("IoT-hub")}, []*snapshot.Repo{repo("iot-hub"), repo("my-IoT-hub")}},
+		{"regexp", "(?i)iot.*", []*snapshot.Repo{repo("IoT-hub")}, nil},
+		{"regexp", "a|b", []*snapshot.Repo{repo("a"), repo("b")}, []*snapshot.Repo{repo("ab"), repo("xa")}},
+		{"topic", "iam", []*snapshot.Repo{repo("x", "iam")}, []*snapshot.Repo{repo("iam")}},
+		{"catch_all", "", []*snapshot.Repo{repo("anything")}, nil},
+	}
+	for _, tc := range tests {
+		m, err := compileMatcher(tc.kind, tc.value)
+		if err != nil {
+			t.Fatalf("%s %q: %v", tc.kind, tc.value, err)
+		}
+		for _, r := range tc.yes {
+			if !m(r) {
+				t.Errorf("%s %q does not match %q", tc.kind, tc.value, r.Name)
+			}
+		}
+		for _, r := range tc.no {
+			if m(r) {
+				t.Errorf("%s %q matches %q", tc.kind, tc.value, r.Name)
+			}
+		}
+	}
+}
+
+func TestMatcherRefused(t *testing.T) {
+	for _, tc := range []struct{ kind, value string }{
+		{"glob", "*a*b*c*d*e*f*g"},
+		{"regexp", "a)|(b"}, // an unbalanced ) must not escape the anchors
+		{"regexp", "("},
+		{"regexp", strings.Repeat("a", 257)},
+		{"regexp", "(a{100}){100}"},
+		{"topic", "Not A Topic"},
+		{"unclaimed", ""}, // not a matcher of its own: Compile and Resolve handle it
+	} {
+		if _, err := compileMatcher(tc.kind, tc.value); err == nil {
+			t.Errorf("%s %q compiled", tc.kind, tc.value)
+		}
+	}
+}
+
+func TestCompileFindings(t *testing.T) {
+	g := func(id, def string, m ...config.Match) config.Group {
+		return config.Group{ID: id, Name: id, DefaultRepo: def, Match: m}
+	}
+	tests := map[string]struct {
+		groups []config.Group
+		err    bool
+		want   string
+	}{
+		"ok":                   {groups: []config.Group{g("a", "Whydah-x", config.Match{Prefix: "whydah-"})}},
+		"default not selected": {groups: []config.Group{g("a", "other", config.Match{Prefix: "whydah-"})}, err: true, want: "not selected"},
+		"default via topic":    {groups: []config.Group{g("a", "other", config.Match{Topic: "iam"})}, want: "not selected"},
+		"bad default name":     {groups: []config.Group{g("a", "a/b", config.Match{CatchAll: true})}, err: true, want: "not a repository name"},
+		"bad regexp":           {groups: []config.Group{g("a", "x", config.Match{Regexp: "("})}, err: true, want: "regexp"},
+		"empty-name glob":      {groups: []config.Group{g("a", "x", config.Match{Glob: "*"})}, want: "empty name"},
+		"two catch-alls": {groups: []config.Group{g("a", "x", config.Match{CatchAll: true}), g("b", "x", config.Match{CatchAll: true})},
+			want: "catch_all"},
+		"unclaimed default": {groups: []config.Group{g("a", "anything", config.Match{Unclaimed: true})}},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			gs, fs := Compile(tc.groups)
+			if (gs == nil) != tc.err {
+				t.Errorf("refused = %v, want %v (%v)", gs == nil, tc.err, fs)
+			}
+			found := tc.want == ""
+			for _, f := range fs {
+				found = found || strings.Contains(f.Message, tc.want)
+			}
+			if !found {
+				t.Errorf("findings %v do not mention %q", fs, tc.want)
+			}
+		})
+	}
+}
+
+func TestResolve(t *testing.T) {
+	gs, _ := Compile([]config.Group{
+		{ID: "w", Name: "W", DefaultRepo: "whydah-core", Match: []config.Match{{Prefix: "whydah-"}}},
+		{ID: "x", Name: "X", DefaultRepo: "missing", Sources: []string{"other"}, Match: []config.Match{{CatchAll: true}}},
+	})
+	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
+	for _, n := range []string{"Whydah-Core", "whydah-b", "other"} {
+		r := snapshot.Repo{ID: snapshot.RepoID{Source: "gh"}, Owner: "acme", Name: n}
+		repos[r.Key()] = &snapshot.RepoEntry{Repo: r}
+	}
+	got := gs.Resolve(repos)
+	if len(got) != 2 || strings.Join(keys(got[0].Members), ",") != "acme/whydah-b,acme/whydah-core" ||
+		got[0].DefaultRepo != "acme/whydah-core" || got[0].DefaultMissing {
+		t.Errorf("group w = %+v", got[0])
+	}
+	if len(got[1].Members) != 0 || !got[1].DefaultMissing {
+		t.Errorf("group x (another source only) = %+v", got[1])
+	}
+}
+
+func TestResolveUnclaimed(t *testing.T) {
+	gs, fs := Compile([]config.Group{
+		{ID: "w", Name: "W", DefaultRepo: "whydah-core", Match: []config.Match{{Prefix: "whydah-"}}},
+		{ID: "other", Name: "Other", DefaultRepo: "tools", Match: []config.Match{{Unclaimed: true}, {Exact: "whydah-b"}}},
+		{ID: "t", Name: "T", DefaultRepo: "tools", Match: []config.Match{{Topic: "tooling"}}},
+	})
+	if gs == nil {
+		t.Fatal(fs)
+	}
+	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
+	for _, r := range []snapshot.Repo{{Name: "whydah-core"}, {Name: "whydah-b"}, {Name: "tools", Topics: []string{"tooling"}}, {Name: "lone"}} {
+		r.ID, r.Owner = snapshot.RepoID{Source: "gh"}, "acme"
+		repos[r.Key()] = &snapshot.RepoEntry{Repo: r}
+	}
+	got := gs.Resolve(repos)
+	// A later group's claim counts too, and the group's own other matchers still select.
+	if m := strings.Join(keys(got[1].Members), ","); m != "acme/lone,acme/whydah-b" || !got[1].DefaultMissing {
+		t.Errorf("unclaimed group = %s (default missing %v)", m, got[1].DefaultMissing)
+	}
+}
+
+// A group with sources and no matchers takes every repository of those sources: an account's own group needs no names, and what
+// it takes is claimed, so the unclaimed group gets only the rest.
+func TestResolveWholeSource(t *testing.T) {
+	gs, fs := Compile([]config.Group{
+		{ID: "me", Name: "Ove Ranheim", DefaultRepo: "dossier", Sources: []string{"me"}},
+		{ID: "w", Name: "W", DefaultRepo: "whydah-core", Match: []config.Match{{Prefix: "whydah-"}}},
+		{ID: "other", Name: "Other", DefaultRepo: "tools", Match: []config.Match{{Unclaimed: true}}},
+	})
+	if gs == nil {
+		t.Fatal(fs)
+	}
+	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
+	for _, r := range []snapshot.Repo{
+		{ID: snapshot.RepoID{Source: "me"}, Owner: "me", Name: "dossier"}, {ID: snapshot.RepoID{Source: "me"}, Owner: "me", Name: "whydah-notes"},
+		{ID: snapshot.RepoID{Source: "gh"}, Owner: "acme", Name: "whydah-core"}, {ID: snapshot.RepoID{Source: "gh"}, Owner: "acme", Name: "lone"},
+	} {
+		repos[r.Key()] = &snapshot.RepoEntry{Repo: r}
+	}
+	got := gs.Resolve(repos)
+	for i, want := range []string{"me/dossier,me/whydah-notes", "acme/whydah-core,me/whydah-notes", "acme/lone"} {
+		if m := strings.Join(keys(got[i].Members), ","); m != want {
+			t.Errorf("%s = %s, want %s", got[i].ID, m, want)
+		}
+	}
+	if got[0].DefaultRepo != "me/dossier" {
+		t.Errorf("default = %q", got[0].DefaultRepo)
+	}
+}
+
+func keys(ks []snapshot.RepoKey) []string {
+	out := make([]string, len(ks))
+	for i, k := range ks {
+		out[i] = string(k)
+	}
+	return out
+}
+
+// A fork is hidden unless its source shows forks or a group names it: as its default repository or with an exact matcher.
+func TestHiddenForks(t *testing.T) {
+	gs, findings := Compile([]config.Group{
+		{ID: "libs", Name: "Libs", DefaultRepo: "LibSearch", Match: []config.Match{{Prefix: "Lib"}}},
+		{ID: "tools", Name: "Tools", DefaultRepo: "tool", Match: []config.Match{{Exact: "tool"}, {Exact: "Reporter"}}, Sources: []string{"gh"}},
+		{ID: "rest", Name: "Rest", DefaultRepo: "stray", Match: []config.Match{{CatchAll: true}}},
+	})
+	if gs == nil {
+		t.Fatal(findings)
+	}
+	repo := func(source, name string, fork bool) *snapshot.RepoEntry {
+		return &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: source, GitHubID: int64(len(name))}, Owner: "acme", Name: name, Fork: fork}}
+	}
+	repos := map[snapshot.RepoKey]*snapshot.RepoEntry{}
+	elsewhere := repo("other", "Reporter", true)
+	elsewhere.Repo.Owner = "beta" // the same name in another account: another address
+	for _, e := range []*snapshot.RepoEntry{
+		repo("gh", "LibSearch", true),     // the default repository of its group: pinned
+		repo("gh", "LibIndex", true),      // matched by a prefix only: hidden
+		repo("gh", "reporter", true),      // an exact matcher names it, whatever the case: pinned
+		elsewhere,                         // the exact matcher is for source gh only: hidden
+		repo("gh", "upstream-copy", true), // hidden
+		repo("shown", "mirror", true),     // its source shows forks
+		repo("gh", "LibBase", false),      // not a fork
+	} {
+		repos[e.Repo.Key()] = e
+	}
+	got := gs.Hidden(repos, map[string]bool{"shown": true})
+	var names []string
+	for k := range got {
+		names = append(names, repos[k].Repo.Name)
+	}
+	slices.Sort(names)
+	if want := []string{"LibIndex", "Reporter", "upstream-copy"}; !slices.Equal(names, want) {
+		t.Errorf("hidden = %v, want %v", names, want)
+	}
+}

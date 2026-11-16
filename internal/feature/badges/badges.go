@@ -1,0 +1,326 @@
+// Package badges serves local SVG badges for repositories and groups.
+package badges
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/cantara/source-code-portal/internal/platform/health"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+)
+
+const (
+	dataMaxAge    = 5 * time.Minute
+	unknownMaxAge = time.Minute
+	csp           = "default-src 'none'; sandbox"
+)
+
+// Release is a repository's latest published release.
+type Release struct {
+	Tag       string    `json:"tag"`
+	Name      string    `json:"name"`
+	URL       string    `json:"url"`
+	Published time.Time `json:"published"`
+}
+
+// Data is what the badges read from other features, wired in cmd/scp.
+type Data struct {
+	// Release is a repository's latest stable release (nil when there is none or it is not known yet) and the freshness of its releases;
+	// a repository read to have none is not found.
+	Release func(*snapshot.RepoEntry) (*Release, snapshot.Freshness)
+	// LastCommit is a repository's newest commit time (zero when there is none) and the freshness of its commits.
+	LastCommit func(*snapshot.RepoEntry) (time.Time, snapshot.Freshness)
+	// Health is a repository's health at now.
+	Health func(*snapshot.Snapshot, *snapshot.RepoEntry, time.Time) health.Repo
+	// Issues is a repository's open issues, its pull requests left out; nil: GitHub's count of both.
+	Issues func(*snapshot.RepoEntry) int
+	// Pulls is a repository's open pull requests and how many wait for a review (open -1: not read yet); nil: no pulls badge.
+	Pulls func(*snapshot.RepoEntry) (open, review int)
+	// Product is a group's weighed health at now.
+	Product func(*snapshot.Snapshot, snapshot.Group, time.Time) health.Product
+}
+
+// Handler serves GET /badges/repos/{owner}/{name}/{kind}.svg (last-commit, release, license, issues, pulls, health) and
+// GET /badges/groups/{group}/{kind}.svg (repos, health, last-commit, release, pulls) from the viewer's view of the current snapshot.
+func Handler(current func(context.Context) *snapshot.Snapshot, d Data) http.Handler {
+	h := handler{current: current, Data: d, now: time.Now}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /badges/repos/{owner}/{name}/{file}", h.repo)
+	mux.HandleFunc("GET /badges/groups/{group}/{file}", h.group)
+	mux.HandleFunc("/badges/", func(w http.ResponseWriter, r *http.Request) { h.write(w, r, unknown(""), http.StatusNotFound, false) })
+	return mux
+}
+
+type handler struct {
+	Data
+	current func(context.Context) *snapshot.Snapshot // the viewer's view
+	now     func() time.Time
+}
+
+func unknown(label string) badge {
+	if label == "" {
+		label = "badge"
+	}
+	return badge{label: label, message: "unknown", color: neutralColor}
+}
+
+func (h handler) repo(w http.ResponseWriter, r *http.Request) {
+	s := h.current(r.Context())
+	if !h.ready(w, r, s) {
+		return
+	}
+	kind, ok := strings.CutSuffix(r.PathValue("file"), ".svg")
+	e, _ := s.Repo(snapshot.KeyOf(r.PathValue("owner"), r.PathValue("name")))
+	if !ok || e == nil {
+		h.write(w, r, unknown(""), http.StatusNotFound, false)
+		return
+	}
+	var b badge
+	data := true
+	switch kind {
+	case "last-commit":
+		b.label = "last commit"
+		at, fresh := h.LastCommit(e)
+		b, data = h.age(at, read(fresh))
+	case "release":
+		rel, fresh := h.Release(e)
+		b, data = release(rel, fresh.State == snapshot.StateNotFound)
+	case "health":
+		r := h.Health(s, e, h.now())
+		b, data = score(r.Counted, r.Score, r.Level)
+	case "pulls":
+		if h.Pulls == nil { // switched off (design/features.md): the badge is not there
+			h.write(w, r, unknown(""), http.StatusNotFound, false)
+			return
+		}
+		b, data = h.pulls([]*snapshot.RepoEntry{e})
+	case "license":
+		b.label = "license"
+		switch l := e.Repo.License; l {
+		case "":
+			b.message, b.color, data = "none", neutralColor, false
+		case "NOASSERTION", "OTHER":
+			b.message, b.color = "other", infoColor
+		default:
+			b.message, b.color = l, infoColor
+		}
+	case "issues":
+		n := e.Repo.OpenIssues
+		if h.Issues != nil {
+			n = h.Issues(e)
+		}
+		b.label, b.message, b.color = "issues", formatCount(n)+" open", infoColor
+		if n == 0 {
+			b.color = successColor
+		}
+	default:
+		h.write(w, r, unknown(""), http.StatusNotFound, false)
+		return
+	}
+	h.write(w, r, b, http.StatusOK, data)
+}
+
+func (h handler) group(w http.ResponseWriter, r *http.Request) {
+	s := h.current(r.Context())
+	if !h.ready(w, r, s) {
+		return
+	}
+	g, ok := s.Group(r.PathValue("group"))
+	kind, svg := strings.CutSuffix(r.PathValue("file"), ".svg")
+	if !ok || !svg {
+		h.write(w, r, unknown(""), http.StatusNotFound, false)
+		return
+	}
+	b, data := badge{}, true
+	switch kind {
+	case "repos":
+		b = badge{label: "repos", message: formatCount(len(g.Members)), color: infoColor}
+	case "health":
+		p := h.Product(s, g, h.now())
+		b, data = score(p.Counted > 0, p.Score, p.Level)
+	case "last-commit":
+		var newest time.Time
+		known := true
+		for _, k := range g.Members {
+			if e := s.Repos[k]; e != nil {
+				at, fresh := h.LastCommit(e)
+				newest, known = maxTime(newest, at), known && read(fresh)
+			}
+		}
+		b, data = h.age(newest, known)
+		b.label = "last commit"
+	case "release":
+		b, data = release(h.groupRelease(s, g))
+	case "pulls":
+		if h.Pulls == nil {
+			h.write(w, r, unknown(""), http.StatusNotFound, false)
+			return
+		}
+		es := make([]*snapshot.RepoEntry, 0, len(g.Members))
+		for _, k := range g.Members {
+			if e := s.Repos[k]; e != nil {
+				es = append(es, e)
+			}
+		}
+		b, data = h.pulls(es)
+	default:
+		h.write(w, r, unknown(""), http.StatusNotFound, false)
+		return
+	}
+	h.write(w, r, b, http.StatusOK, data)
+}
+
+// pulls is the pull requests badge of the repositories es: "3 open, 1 to review", green with none, unknown until every one is read.
+func (h handler) pulls(es []*snapshot.RepoEntry) (badge, bool) {
+	b := badge{label: "pull requests", message: "unknown", color: neutralColor}
+	open, review := 0, 0
+	for _, e := range es {
+		o, r := h.Pulls(e)
+		if o < 0 {
+			return b, false
+		}
+		open, review = open+o, review+r
+	}
+	switch {
+	case open == 0:
+		b.message, b.color = "none open", successColor
+	case review > 0:
+		b.message, b.color = formatCount(open)+" open, "+formatCount(review)+" to review", infoColor
+	default:
+		b.message, b.color = formatCount(open)+" open", infoColor
+	}
+	return b, true
+}
+
+// read reports whether a fetch completed with an answer, content or none.
+func read(f snapshot.Freshness) bool {
+	return f.State == snapshot.StateOK || f.State == snapshot.StateNoContent || f.State == snapshot.StateNotFound
+}
+
+func maxTime(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
+}
+
+// age is the last-commit badge for at; with no commit it says none when the commits were read, else unknown.
+func (h handler) age(at time.Time, known bool) (badge, bool) {
+	switch {
+	case !at.IsZero():
+		msg, days := relativeDay(h.now(), at)
+		return badge{label: "last commit", message: msg, color: ageColor(days)}, true
+	case known:
+		return badge{label: "last commit", message: "none", color: neutralColor}, false
+	}
+	return unknown("last commit"), false
+}
+
+// release is the release badge; none says there is no release, else a missing one is unknown.
+func release(rel *Release, none bool) (badge, bool) {
+	switch {
+	case rel != nil:
+		return badge{label: "release", message: rel.Tag, color: infoColor}, true
+	case none:
+		return badge{label: "release", message: "none", color: neutralColor}, false
+	}
+	return unknown("release"), false
+}
+
+// groupRelease is the default repository's latest release, else the newest release among the members; none when every member is known
+// to have none.
+func (h handler) groupRelease(s *snapshot.Snapshot, g snapshot.Group) (*Release, bool) {
+	if e := s.Repos[g.DefaultRepo]; e != nil {
+		if rel, _ := h.Release(e); rel != nil {
+			return rel, false
+		}
+	}
+	var newest *Release
+	none := true
+	for _, k := range g.Members {
+		e := s.Repos[k]
+		if e == nil {
+			continue
+		}
+		rel, fresh := h.Release(e)
+		if rel != nil && (newest == nil || rel.Published.After(newest.Published)) {
+			newest = rel
+		}
+		none = none && fresh.State == snapshot.StateNotFound
+	}
+	return newest, newest == nil && none
+}
+
+// score is the health badge: the score coloured by its level; without a score it says none.
+func score(counted bool, n int, level health.Level) (badge, bool) {
+	if !counted {
+		return badge{label: "health", message: "none", color: neutralColor}, false
+	}
+	c := successColor
+	switch level {
+	case health.Watch:
+		c = warningColor
+	case health.Attention:
+		c = dangerColor
+	}
+	return badge{label: "health", message: strconv.Itoa(n), color: c}, true
+}
+
+// ready answers 503 "starting" until a catalogue is loaded.
+func (h handler) ready(w http.ResponseWriter, r *http.Request, s *snapshot.Snapshot) bool {
+	if s.Catalogued {
+		return true
+	}
+	w.Header().Set("Retry-After", "15")
+	h.write(w, r, badge{label: "badge", message: "starting", color: neutralColor}, http.StatusServiceUnavailable, false)
+	return false
+}
+
+// ageColor is green up to 90 days, blue up to a year, amber beyond.
+func ageColor(days int) color {
+	switch {
+	case days <= 90:
+		return successColor
+	case days <= 365:
+		return infoColor
+	}
+	return warningColor
+}
+
+// write sends the badge. Data badges carry a strong ETag of the body (an age message changes at midnight UTC without a data change)
+// and answer 304 on a match; unknown and none badges are cached for a minute and carry no ETag; "starting" is not stored.
+func (h handler) write(w http.ResponseWriter, r *http.Request, b badge, status int, data bool) {
+	body := render(b)
+	hd := w.Header()
+	hd.Set("Content-Type", "image/svg+xml")
+	hd.Set("Content-Security-Policy", csp)
+	hd.Set("Cross-Origin-Resource-Policy", "cross-origin")
+	switch {
+	case status == http.StatusServiceUnavailable:
+		hd.Set("Cache-Control", "no-store")
+	case data:
+		hd.Set("Cache-Control", "public, max-age="+strconv.Itoa(int(dataMaxAge.Seconds())))
+	default:
+		hd.Set("Cache-Control", "public, max-age="+strconv.Itoa(int(unknownMaxAge.Seconds())))
+	}
+	if data {
+		sum := sha256.Sum256(body)
+		etag := `"` + hex.EncodeToString(sum[:12]) + `"`
+		hd.Set("ETag", etag)
+		if httpapi.Matches(r.Header.Get("If-None-Match"), etag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+	hd.Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(status)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(body) //nolint:gosec // G705: an SVG marshalled by encoding/xml, served with a sandbox CSP
+	}
+}

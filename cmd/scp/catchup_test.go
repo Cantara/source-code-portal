@@ -15,8 +15,8 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
 )
 
 // TestCatchUpWithoutAReceiver: with webhook.catch_up and no webhook secret the portal has no receiver (GitHub cannot reach a

@@ -68,7 +68,7 @@ Each pull request gets one **state**, the first that holds, and the party it wai
 
 **Who opened it** is told as the commits tell it: a person, or automation (Dependabot, Renovate, any `[bot]` or bot-like login, or a
 dependency bot's branch: Snyk opens its pull requests under the account of the person who connected it, so on Cantara 195 of them
-named people until `snyk-fix-` and `snyk-upgrade-` told them). The tests live in the core package `internal/actor` (`Bot`,
+named people until `snyk-fix-` and `snyk-upgrade-` told them). The tests live in the core package `internal/lib/actor` (`Bot`,
 `Branch`), used by both features, and are applied again at every publish, so a change reaches the stored ones at a warm start. The
 reader's work lens (P-42) applies: bots' pull requests count only when automation is in the work that counts; a separate count says
 how many dependency updates wait either way.
@@ -78,7 +78,7 @@ people's pull requests that wait for reviewers first, then by idle time.
 
 ## Health
 
-`internal/health` (P-62: the rules live there and `Describe` tells them):
+`internal/platform/health` (P-62: the rules live there and `Describe` tells them):
 - `issues` counts issues only: GitHub's count minus the open pull requests once the facet is read.
 - `reviews` (new): a person's pull request waiting for review longer than 7 days, a small penalty; longer than 30 days, a larger one.
 - `updates` (new): automation's pull requests open longer than 30 days, a small penalty (dependency updates nobody takes).
@@ -119,13 +119,13 @@ and the badges.
 
 ## Shape
 
-- `internal/pulls` (feature, facet `pulls`, `Of`): `Pull` (the listing's fields; GraphQL's `Review`, `Approved`, `Changes`,
+- `internal/feature/pulls` (feature, facet `pulls`, `Of`): `Pull` (the listing's fields; GraphQL's `Review`, `Approved`, `Changes`,
   `Checks`, `Mergeable`, `Stats` and `Asked`), `StateOf(p)`, `Set` (`Total`, `Pulls`, `Full`, `Pending`, `PendingAt`); the job
   `pulls` (`merge` decides what to ask: new or changed by update time or head, all hourly, the unsettled ones by their step); an
   index per snapshot (`Feeds()`: per repository, group and fleet, whose turn first); `Counts`, `Issues` (GitHub's count less the
   pull requests), `Waiting` (for health), the hooks `Repo` and `Dashboard` (automation's only when the work that counts holds it).
   The REST listing gives every field but the reviews, checks, mergeability and stats, so a failed GraphQL query still lists them.
-- `internal/github`: `GraphQL(ctx, client, query, vars, out)` beside `REST`, the endpoint rule `graphQL(base)` moved from `commits`; D1's
+- `internal/platform/github`: `GraphQL(ctx, client, query, vars, out)` beside `REST`, the endpoint rule `graphQL(base)` moved from `commits`; D1's
   stats query uses it.
 - Contract: `GET /api/v1/pulls` (paged; `group`, `repo`, `state`, `by` (people, automation), `author`, `reviewer` (GitHub logins: PE2), `drafts`, `sort`), `PullRequest`;
   `RepoSummary.openPulls` beside `openIssues` (issues only); `DashboardGroup.pulls` (counts by state); `PullSummary` on the
@@ -134,7 +134,7 @@ and the badges.
 
 ## Milestones
 
-- **PR1, the data**: `internal/actor`, `github.GraphQL`, the `pulls` job and facet, the issue count split, the health findings, the
+- **PR1, the data**: `internal/lib/actor`, `github.GraphQL`, the `pulls` job and facet, the issue count split, the health findings, the
   contract and `/api/v1/pulls`, the fake, the leak test. Done when: an unchanged repository costs one 304 and no GraphQL; a review
   webhook re-reads one repository; pending checks are asked again; a private repository's pull requests never reach the public.
 - **PR2, the pages**: `/pulls` (the header's "Pull requests"), the telemetry tile and the strip's signal, the `pulls` element on the

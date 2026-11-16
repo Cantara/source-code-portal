@@ -49,13 +49,13 @@ a store reset or lost loses nothing.
 ## Acceptance
 
 1. The file's `visibility:` decides with nothing stored; a stored change wins; `null` returns an item to inheriting; a change equal to
-   the file is dropped at the start (`internal/visibility` `TestConfigurationIsTheBaseline`).
+   the file is dropped at the start (`internal/feature/visibility` `TestConfigurationIsTheBaseline`).
 2. The file's announcements can be changed and removed, kept as changes; a removal the file no longer needs is dropped
-   (`internal/announce` `TestAdminRoutes`).
-3. The file's layout renders a page; a change wins and is warned about; a reset returns to the file's (`internal/layout`
+   (`internal/feature/announce` `TestAdminRoutes`).
+3. The file's layout renders a page; a change wins and is warned about; a reset returns to the file's (`internal/feature/layout`
    `TestConfigurationIsTheBaseline`).
 4. The download keeps the operator's comments and keys and holds what is in force; loaded as the configuration, its base is that
-   (`cmd/scp` `TestConfigurationIsTheBaseline`, `TestConfigYAML`); the sections are read as written (`internal/config`
+   (`cmd/scp` `TestConfigurationIsTheBaseline`, `TestConfigYAML`); the sections are read as written (`internal/platform/config`
    `TestBaselineIsReadAsWritten`).
 5. Admin marks and resets changes against the file (`visibility.test.tsx`, `announcements.test.ts`, `design.test.tsx`); the overview
    offers the download, which only an admin gets (`signin.test.tsx`, `web/e2e/visibility.spec.ts`).

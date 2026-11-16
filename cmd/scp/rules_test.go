@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/platform/config"
 )
 
 // rulesFixture is the web tests' copy of GET /api/v1/rules; SCP_UPDATE_RULES=1 rewrites it.

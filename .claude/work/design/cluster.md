@@ -2,7 +2,7 @@
 Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
-- `internal/cluster`: two or more instances on one Hazelcast cluster (`cluster.addresses`). One instance leads and runs the sync jobs;
+- `internal/platform/cluster`: two or more instances on one Hazelcast cluster (`cluster.addresses`). One instance leads and runs the sync jobs;
   every instance serves the same data from its own snapshot and SQLite store.
 - Shared through Hazelcast: the leader lock, the last outcome of every job key, webhook delivery de-duplication and webhook events.
 - Without `cluster.addresses` nothing changes: the instance is alone and leads.
@@ -35,14 +35,14 @@ Status: as built. Binding order: ../plan.md > this note.
   The client reconnects forever; startup never waits for it.
 - Values are JSON. Hazelcast object names start with `cluster.namespace` (default `scp`), so several portals or test runs can share a
   cluster. Hazelcast OSS has no authentication or TLS: it belongs on a private network, like the admin listener.
-- `internal/cluster` holds the member logic over a small `Backend` interface; `Hazelcast` implements it with
+- `internal/platform/cluster` holds the member logic over a small `Backend` interface; `Hazelcast` implements it with
   `hazelcast-go-client` v1.6 (maps `<namespace>.state`, `.lock`, `.deliveries`, topic `<namespace>.events`); `clustertest` implements it in memory for tests. The sync engine knows nothing of Hazelcast: it shares
   outcomes through a hook and receives them through a method.
 - Followers report an empty queue; `/api/v1/status` has a `cluster` section; the gauge `scp_cluster_leader` is 1 on the leader.
 
 ## Shapes
 ```go
-// internal/sync
+// internal/platform/sync
 type Shared struct { // one recorded outcome as instances share it
     Rev       int64
     Source    string
@@ -56,7 +56,7 @@ func (e *Engine) Receive(ctx context.Context, r Shared)   // apply an outcome re
 func (e *Engine) Records() []Shared                       // every recorded outcome, listings first (for seeding the map)
 func (e *Engine) Warm() <-chan struct{}                   // closed after the warm start
 
-// internal/cluster
+// internal/platform/cluster
 type Backend interface {
     TryLead(ctx context.Context) (bool, error)
     Put(ctx context.Context, key string, value []byte) error

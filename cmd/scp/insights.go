@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 
-	"github.com/cantara/source-code-portal/internal/catalog"
-	"github.com/cantara/source-code-portal/internal/commits"
-	"github.com/cantara/source-code-portal/internal/insights"
-	"github.com/cantara/source-code-portal/internal/manifests"
-	"github.com/cantara/source-code-portal/internal/releases"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/catalog"
+	"github.com/cantara/source-code-portal/internal/feature/commits"
+	"github.com/cantara/source-code-portal/internal/feature/insights"
+	"github.com/cantara/source-code-portal/internal/feature/manifests"
+	"github.com/cantara/source-code-portal/internal/feature/releases"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // insightFacts hands the insights what the features hold of a repository (design/insights.md): its stable releases, the technology its

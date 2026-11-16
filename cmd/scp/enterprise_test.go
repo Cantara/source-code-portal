@@ -19,12 +19,12 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/auth/oidctest"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/people"
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/store"
+	"github.com/cantara/source-code-portal/internal/platform/auth/oidctest"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/people"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/store"
 )
 
 // enterpriseConfig is a configuration of the enterprise mode: one source read with people's tokens, sign-in through issuer, the

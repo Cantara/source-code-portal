@@ -16,7 +16,7 @@ audience, so a change shows at the next publish with everything that happened me
   `access.*` lets see private repositories) and `no-one` (no view holds it; the base snapshot keeps it). An item everyone sees has a
   search-engine switch (`search`); the others are never offered to search engines. GitHub's private and internal flags are a ceiling:
   such a repository is never shown to everyone (`Effective.Capped`).
-- **The document** `visibility` in the store (`internal/visibility`, through `docstore`):
+- **The document** `visibility` in the store (`internal/feature/visibility`, through `docstore`):
   `{"groups": {id: setting}, "repos": {"owner/name": setting}, "rules": [{"pattern", "audience", "search"}]}`, a setting being
   `{"audience", "search"}`; at most 4,000 products and repositories and 50 rules of 256 characters. Only the choices made are stored.
 - **Resolution** (`Doc.Repo`), most specific first: the repository's own choice; the first rule whose pattern (RE2, case-insensitive,
@@ -31,7 +31,7 @@ audience, so a change shows at the next publish with everything that happened me
   whose repositories a view leaves out is not in that view (P-112). The enterprise mode's per-person views start from A.
 - **The mark.** A repository's summary in the contract has `notPublic`: public on GitHub and restricted, so only a signed-in viewer
   reads it; the repository and product pages show it as the badge "Not public" (`VisibilityBadge`).
-- **Search engines.** The sitemap (`internal/llms`, the public view for every reader) lists a repository when everyone sees it and its
+- **Search engines.** The sitemap (`internal/feature/llms`, the public view for every reader) lists a repository when everyone sees it and its
   switch is on (`Set.Indexed`) and a product's page when the product's own result is (`Set.IndexedGroup`); it is built again when the
   document changes (`Set.Revision`). Pages of a repository or product not offered answer `X-Robots-Tag: noindex, nofollow`
   (`Set.NoIndex`, `httpapi.Options.NoIndex`). No `robots.txt` rule: a search engine must fetch a page to read its noindex.
@@ -68,8 +68,8 @@ audience, so a change shows at the next publish with everything that happened me
 2. A repository set to no one answers 404 to everyone and is named in no list, feed, search, llms answer or sitemap; set back it
    returns with its commits; the status counts it; only an admin reads or changes the choices (`TestNoOneSeesWhatIsSetToNoOne`).
 3. Search engines are offered only what everyone sees with its switch on: a repository, a product and a rule, the sitemap and noindex
-   (`TestSearchEnginesAreOnlyOfferedWhatEveryoneSeesWithSearchOn`, `internal/visibility` `TestAudiencesAndSearchEngines`).
-4. The snapshot's views follow the audiences; a restricted repository's change moves no public view (`internal/snapshot`
+   (`TestSearchEnginesAreOnlyOfferedWhatEveryoneSeesWithSearchOn`, `internal/feature/visibility` `TestAudiencesAndSearchEngines`).
+4. The snapshot's views follow the audiences; a restricted repository's change moves no public view (`internal/platform/snapshot`
    `TestSignedInRepositoriesAreInNoPublicView`, `TestParkedRepositoriesAreInNoView`).
 5. Resolution and the GitHub ceiling (`TestResolve`); taking over 2.2.19's documents once, leaving them unchanged (`TestImport`);
    preview, save, conflict and origin (`TestAdminReadsPreviewsAndSaves`).

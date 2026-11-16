@@ -18,10 +18,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/auth"
-	"github.com/cantara/source-code-portal/internal/setup"
-	"github.com/cantara/source-code-portal/internal/store"
-	"github.com/cantara/source-code-portal/internal/vault"
+	"github.com/cantara/source-code-portal/internal/platform/auth"
+	"github.com/cantara/source-code-portal/internal/platform/setup"
+	"github.com/cantara/source-code-portal/internal/platform/store"
+	"github.com/cantara/source-code-portal/internal/platform/vault"
 )
 
 // defaultClientID is the client id of the app people sign in with on github.com (the device flow needs no secret). Empty until the

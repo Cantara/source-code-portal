@@ -10,11 +10,11 @@ import (
 	gosync "sync"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/github"
-	"github.com/cantara/source-code-portal/internal/prereq"
-	"github.com/cantara/source-code-portal/internal/search"
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/webhook"
+	"github.com/cantara/source-code-portal/internal/feature/search"
+	"github.com/cantara/source-code-portal/internal/feature/webhook"
+	"github.com/cantara/source-code-portal/internal/platform/github"
+	"github.com/cantara/source-code-portal/internal/platform/prereq"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // lowRate is the rate-limit fraction below which the status warns.

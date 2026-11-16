@@ -8,7 +8,7 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
 )
 
 // TestServeForRehearsal serves a fake GitHub (the organisation acme with the repositories alpha and beta, the token rehearsal-token) until

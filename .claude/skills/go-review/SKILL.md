@@ -13,14 +13,14 @@ ranked, with the fix for each.
 
 | # | Area | Packages |
 |---|---|---|
-| 1 | Listing and GitHub | `internal/catalog`, `internal/github` (+ `githubtest`), `internal/prereq` |
-| 2 | Engine and data | `internal/sync`, `internal/store`, `internal/snapshot`, `internal/docstore`, `internal/cluster` |
-| 3 | Events | `internal/webhook`, `cmd/scp` `inbox.go`, the sink in `serve.go`, `catchup.go` |
-| 4 | HTTP, access, agents | `internal/httpapi`, `internal/auth`, `internal/mcpserver`, `internal/tools`, `internal/assistant`, `internal/llm` |
-| 5 | Repository reads | `internal/commits`, `internal/pulls`, `internal/issues`, `internal/releases`, `internal/jsonstream`, `internal/actor`, `internal/scope` |
-| 6 | Untrusted content | `internal/docs`, `internal/safehtml`, `internal/untrusted`, `internal/egress`, `internal/llms`, `internal/search` |
-| 7 | Packages and builds | `internal/packages`, `internal/manifests`, `internal/lru` |
-| 8 | Modes, config, wiring | `internal/config`, `internal/people`, `internal/vault`, `internal/setup`, `internal/ghlogin`, `internal/visibility`, `internal/layout`, `internal/announce`, the rest of `cmd/scp` |
+| 1 | Listing and GitHub | `internal/feature/catalog`, `internal/platform/github` (+ `githubtest`), `internal/platform/prereq` |
+| 2 | Engine and data | `internal/platform/sync`, `internal/platform/store`, `internal/platform/snapshot`, `internal/platform/docstore`, `internal/platform/cluster` |
+| 3 | Events | `internal/feature/webhook`, `cmd/scp` `inbox.go`, the sink in `serve.go`, `catchup.go` |
+| 4 | HTTP, access, agents | `internal/platform/httpapi`, `internal/platform/auth`, `internal/platform/mcpserver`, `internal/platform/tools`, `internal/feature/assistant`, `internal/platform/llm` |
+| 5 | Repository reads | `internal/feature/commits`, `internal/feature/pulls`, `internal/feature/issues`, `internal/feature/releases`, `internal/lib/jsonstream`, `internal/lib/actor`, `internal/platform/scope` |
+| 6 | Untrusted content | `internal/feature/docs`, `internal/lib/safehtml`, `internal/lib/untrusted`, `internal/lib/egress`, `internal/feature/llms`, `internal/feature/search` |
+| 7 | Packages and builds | `internal/feature/packages`, `internal/feature/manifests`, `internal/lib/lru` |
+| 8 | Modes, config, wiring | `internal/platform/config`, `internal/platform/people`, `internal/platform/vault`, `internal/platform/setup`, `internal/platform/ghlogin`, `internal/feature/visibility`, `internal/feature/layout`, `internal/feature/announce`, the rest of `cmd/scp` |
 
 The owner may name one area, a package, or "all" (then the next area not reviewed yet, by the dates of the earlier reports).
 

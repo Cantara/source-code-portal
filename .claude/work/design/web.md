@@ -125,7 +125,7 @@ contrast in both themes. The header shows whether the live stream is open (`Live
     a catch-all encoded per segment (`lib/paths.ts`).
 13. Commit graph: where the commits share one history (the repository page's "Latest commits" and the navigator) they
     draw as a git graph, like `git log --graph`; the merged feeds (dashboard, group, all repositories) stay a plain list, since their
-    commits are unrelated. The server lays the rows out (`internal/commits/graph.go`) over the whole history, newest first, so a
+    commits are unrelated. The server lays the rows out (`internal/feature/commits/graph.go`) over the whole history, newest first, so a
     numbered page starts with the lanes the pages before it left open: a commit takes the
     lane that expects it (else the first free one), every other lane expecting it converges into it, its first parent continues the
     lane and each further parent opens a lane (or joins the one already expecting it); freed lanes are reused, lanes never shift. Each

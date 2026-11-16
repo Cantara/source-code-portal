@@ -141,7 +141,7 @@ kept (`GET /user` answers; its login is bound to the identity claim by `login`; 
 (migration `0002`), never shown again. The page builds GitHub's pre-filled creation link from the web address, the organisation and
 the read permissions. Token health: its expiry from GitHub's answer header; a refused token marks the person's list unknown.
 
-Built as `internal/people` (`People`: `Seen`, `Link`, `Unlink`, `Tokens`, `Overview`, `Routes`), the store's `person`, `person_token`
+Built as `internal/platform/people` (`People`: `Seen`, `Link`, `Unlink`, `Tokens`, `Overview`, `Routes`), the store's `person`, `person_token`
 and `person_access` (migration `0002_people.sql`) and `github.Source.CheckToken` (`GET /user`, then one repository of
 `GET /orgs/{owner}/repos`). Only a token beginning `github_pat_` is taken: a classic token carries write scopes. A refusal is a 422
 problem with its code: `unknown-owner`, `not-fine-grained`, `not-yours`, `unauthorized` (wrong, expired, revoked, or the enterprise's

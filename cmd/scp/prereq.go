@@ -7,14 +7,14 @@ import (
 	"strings"
 	gosync "sync"
 
-	"github.com/cantara/source-code-portal/internal/commits"
-	"github.com/cantara/source-code-portal/internal/github"
-	"github.com/cantara/source-code-portal/internal/httpapi"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
-	"github.com/cantara/source-code-portal/internal/issues"
-	"github.com/cantara/source-code-portal/internal/prereq"
-	"github.com/cantara/source-code-portal/internal/pulls"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/commits"
+	"github.com/cantara/source-code-portal/internal/feature/issues"
+	"github.com/cantara/source-code-portal/internal/feature/pulls"
+	"github.com/cantara/source-code-portal/internal/platform/github"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/prereq"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // prereqs checks what each feature needs of GitHub (design/prerequisites.md, P-71): an App's grants from its installations, a
