@@ -212,6 +212,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `ops.pprof` | `false` | serve `/debug/pprof/` on the admin listener |
 | `features.pulls` | `true` | the open pull requests (section 2.4.2); `false`: switched off, as if the portal had none (section 1) |
 | `features.issues` | `true` | the open issues (section 2.4.3); `false`: switched off (section 1) |
+| `commits.assistants[]` | `[]` | your own AI assistants beside the built-in ones: `name`, `authors` (logins or names: the agent's own commits), `co_authors` (a `Co-authored-by` name, address or local part: a person's commit with AI) (section 2.4.7) |
 | `enterprise.enabled` | `false` | the settings GitHub Enterprise and Entra ID need (section 2.8); while `false` every other `enterprise` key is refused |
 | `enterprise.github[]` | `[]` | per source: `source` (a `github.sources[].id`), `web_url` (its web address, ending in `/`), `graphql_url` (optional; default beside `base_url`), `people` (`false`; `true`: read with its viewers' own tokens, `scp enterprise`), `login` (`managed`; with `people`: how a token's login is tied to the identity claim, `managed` or `exact`) |
 | `enterprise.token_key_file` | | with `people`: the key (at least 32 bytes) that seals the people's tokens in the store |
@@ -374,7 +375,8 @@ commit by a bot or a release plugin is automation; a commit whose subject landed
 Neither counts as a person's work. A person's commit with an AI `Co-authored-by` trailer (as Claude Code, Copilot and Cursor write
 them) or an AI tool's footer, and a coding agent's own commit, are people's work "with AI": the cards and the telemetry count them and
 name the assistants, the sparklines draw them at the foot of each week, and the commit lists mark them. A tool that leaves no trace
-(inline completion) is not counted, so the share is a lower bound. Each card says once what most of its repositories share (the licence, the language) and shows only
+(inline completion) is not counted, so the share is a lower bound. An assistant of your own that the built-in rules do not know is
+added with `commits.assistants` (section 2.4.7). Each card says once what most of its repositories share (the licence, the language) and shows only
 the exceptions; the members are on the product's page. A reader's choice of cards or table is kept in a cookie.
 
 People and agents work together, so the cards rank neither: each leads with the team's commits and says how many were by hand and how
@@ -532,6 +534,31 @@ still used. *Where does knowledge sit with one person?* lists the repositories w
 people's commits (at least 20 held; automation and sweeps do not count): it names repositories and never the person. *What has gone
 quiet?* counts the repositories by how long ago they changed and lists the dormant ones, the candidates for retirement. Retired
 repositories are left out of all of them but the libraries. A private repository counts only for those who may see it.
+
+### 2.4.7 Your own assistants
+
+The portal knows the public assistants by the traces they leave: their own accounts as authors, their `Co-authored-by` trailers and
+their footers. An assistant of your own (an internal agent, an assistant committing through your GitHub Enterprise) is added to the
+same rules with `commits.assistants`, and is then counted with AI and named on the cards, the telemetry and the commit lists:
+
+```yaml
+commits:
+  assistants:
+    - name: Helper                      # the name the pages show
+      authors: [Helper]                 # an author's login or name: the commit is the agent's own
+      co_authors: [helper@example.com]  # a Co-authored-by name, address or local part: a person's commit with AI
+    - name: Helper Cloud
+      co_authors: ["helper-cloud[bot]", Helper Cloud]
+```
+
+- Entries are matched without regard to case. A co-author matches by the trailer's name (`Helper Cloud`), its whole address
+  (`helper@example.com`) or the address's local part, which on a GitHub noreply address is the part after `<id>+` on any host
+  (`7+helper-cloud[bot]@users.noreply.<your host>` is `helper-cloud[bot]`).
+- A configured co-author wins over the reading of a bot: `helper-cloud[bot]` above counts as AI work, not as automation, while other
+  bots (`renovate[bot]`) stay automation. A configured author is an agent even when its name looks like a bot's.
+- Quote an entry with `[` in a list written in brackets (`["helper-cloud[bot]"]`); YAML reads it as a list otherwise.
+- The change counts at the next start for every commit the portal holds; nothing is read again from GitHub. `scp config check`
+  refuses an assistant without a name or entries, an entry with `<`, `>` or a line break, and an entry named twice.
 
 ### 2.5 Published packages
 

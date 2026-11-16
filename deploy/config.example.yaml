@@ -148,5 +148,12 @@ announcements: []
 features:
   pulls: true # the open pull requests (/pulls)
   issues: true # the open issues (/issues)
+# Your own AI assistants beside the built-in ones (operator guide 2.4.7): their commits count as work with AI, not as a person's
+# alone or as automation. Entries match without regard to case; quote one with [ in a bracketed list.
+commits:
+  assistants: []
+#  - name: Helper # the name the pages show
+#    authors: [Helper] # an author's login or name: the agent's own commits
+#    co_authors: [helper@example.com, "helper-cloud[bot]"] # a Co-authored-by name, address or local part
 ops:
   pprof: false # /debug/pprof/ on the admin listener

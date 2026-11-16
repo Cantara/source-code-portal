@@ -45,7 +45,7 @@ func TestClassify(t *testing.T) {
 		{"an AI beats a bot co-author", Commit{AuthorLogin: "totto",
 			Body: "Co-authored-by: snyk-bot <snyk-bot@snyk.io>\nCo-authored-by: Claude <noreply@anthropic.com>"}, OriginAssisted, "Claude", "Claude"},
 	} {
-		origin, assistant := Classify(&tc.c)
+		origin, assistant := (*Rules)(nil).Classify(&tc.c)
 		if origin != tc.origin || assistant != tc.assistant || Assistant(assistant) != tc.family {
 			t.Errorf("%s: %s %q (%q), want %s %q (%q)", tc.name, origin, assistant, Assistant(assistant), tc.origin, tc.assistant, tc.family)
 		}
@@ -60,11 +60,48 @@ func TestBodyKeepsTrailers(t *testing.T) {
 		!strings.Contains(b, "…\n\n") {
 		t.Errorf("cut body (%d runes) ends %q", n, b[len(b)-80:])
 	}
-	if k, _ := Classify(&Commit{AuthorLogin: "ada", Body: b}); k != OriginAssisted {
+	if k, _ := (*Rules)(nil).Classify(&Commit{AuthorLogin: "ada", Body: b}); k != OriginAssisted {
 		t.Errorf("the cut body is %s", k)
 	}
 	plain := body("Subject\n\n" + strings.Repeat("word ", 2000))
 	if n := len([]rune(plain)); n != maxBody || !strings.HasSuffix(plain, "…") {
 		t.Errorf("a body without trailers: %d runes", n)
+	}
+}
+
+// TestConfiguredAssistants: a deployment's own assistant (commits.assistants) is an agent as an author, by login or name, and an AI as
+// a co-author, by name, address or the local part of a noreply address on any host; a configured "[bot]" co-author is an AI, not
+// automation. The built-in rules still apply beside it.
+func TestConfiguredAssistants(t *testing.T) {
+	r := NewRules([]AssistantRule{
+		{Name: "Helper", Authors: []string{"Helper"}, CoAuthors: []string{"helper@example.com"}},
+		{Name: "Helper Cloud", CoAuthors: []string{"helper-cloud[bot]", "Helper Cloud"}},
+	})
+	for _, tc := range []struct {
+		name      string
+		c         Commit
+		origin    Origin
+		assistant string
+	}{
+		{"the agent as the author, by name", Commit{AuthorName: "Helper"}, OriginAgent, "Helper"},
+		{"the agent as the author, by login, any case", Commit{AuthorName: "Some Name", AuthorLogin: "HELPER"}, OriginAgent, "Helper"},
+		{"the agent as a co-author by address", Commit{AuthorLogin: "ada", Body: "Co-authored-by: Helper <helper@example.com>"},
+			OriginAssisted, "Helper"},
+		{"a bot co-author on an Enterprise noreply address", Commit{AuthorLogin: "ada",
+			Body: "Co-authored-by: helper-cloud[bot] <7+helper-cloud[bot]@users.noreply.ghe.com>"}, OriginAssisted, "Helper Cloud"},
+		{"the same by its display name", Commit{AuthorLogin: "ada",
+			Body: "Co-authored-by: Helper Cloud <9+someone@users.noreply.ghe.com>"}, OriginAssisted, "Helper Cloud"},
+		{"another bot co-author is still automation", Commit{AuthorLogin: "ada",
+			Body: "Co-authored-by: renovate[bot] <2+renovate[bot]@users.noreply.ghe.com>"}, OriginAutomation, ""},
+		{"a built-in rule beside them", Commit{AuthorLogin: "ada", Body: "Co-authored-by: Claude <noreply@anthropic.com>"},
+			OriginAssisted, "Claude"},
+		{"a person", Commit{AuthorLogin: "ada", AuthorName: "Ada"}, OriginPerson, ""},
+	} {
+		if origin, assistant := r.Classify(&tc.c); origin != tc.origin || assistant != tc.assistant {
+			t.Errorf("%s: %s %q, want %s %q", tc.name, origin, assistant, tc.origin, tc.assistant)
+		}
+	}
+	if NewRules(nil) != nil {
+		t.Error("no assistants added: not the built-in rules")
 	}
 }

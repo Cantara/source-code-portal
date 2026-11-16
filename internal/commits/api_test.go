@@ -13,7 +13,7 @@ import (
 
 func feedSnapshot(t *testing.T) *snapshot.Snapshot {
 	t.Helper()
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds(nil))
 	at := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	fresh := snapshot.Freshness{State: snapshot.StateOK, FetchedAt: time.Now(), CheckedAt: time.Now(), TTL: time.Hour}
 	entry := func(id int64, name string, n int, f snapshot.Freshness) *snapshot.RepoEntry {

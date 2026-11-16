@@ -17,7 +17,7 @@ type API struct {
 	Dashboard    []func(*snapshot.Snapshot, *oapi.Dashboard)
 	Group        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group)
 	Repo         []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo)
-	Detail       []func(*snapshot.RepoEntry, *oapi.RepoDetail)
+	Detail       []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.RepoDetail)
 	ArchiveEntry []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.ArchiveEntry) // complete a retired repository's row (design/archive.md)
 }
 
@@ -131,7 +131,7 @@ func (a API) detail(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) 
 		out.Descriptor.Problems = append(out.Descriptor.Problems, oapi.FileProblem{Pointer: p.Pointer, Code: p.Code, Message: p.Message})
 	}
 	for _, fn := range a.Detail {
-		fn(e, &out)
+		fn(s, e, &out)
 	}
 	return out
 }

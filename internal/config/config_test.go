@@ -74,6 +74,17 @@ func TestFeatures(t *testing.T) {
 	}
 }
 
+func TestCommitAssistants(t *testing.T) {
+	cfg, _, err := Load(file(t, "commits:\n  assistants:\n    - name: Helper\n      authors: [Helper]\n      co_authors: [helper@example.com, \"helper-cloud[bot]\"]\n"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []CommitAssistant{{Name: "Helper", Authors: []string{"Helper"}, CoAuthors: []string{"helper@example.com", "helper-cloud[bot]"}}}
+	if diff := cmp.Diff(want, cfg.Commits.Assistants); diff != "" {
+		t.Errorf("assistants (-want +got):\n%s", diff)
+	}
+}
+
 func TestPrecedence(t *testing.T) {
 	path := file(t, "server:\n  public_addr: \":8000\"\n  admin_addr: \":8001\"\nlog:\n  level: warn\n")
 	t.Setenv("SCP_SERVER_ADMIN_ADDR", ":8002")
@@ -182,6 +193,11 @@ func TestRefused(t *testing.T) {
 		"user without password":                         {file: "packages:\n  registries: [{id: x, ecosystem: npm, url: 'https://npm.example/', auth: {user: ci}}]\n", want: "go together"},
 		"bad network":                                   {file: "packages:\n  registries: [{id: x, ecosystem: npm, url: 'https://npm.example/', network: lan}]\n", want: "neither public nor private"},
 		"registry id twice":                             {file: "packages:\n  registries: [{id: x, ecosystem: maven, url: 'https://a.example/'}, {id: x, ecosystem: npm, url: 'https://b.example/'}]\n", want: "used twice"},
+		"assistant without a name":                      {file: "commits:\n  assistants:\n    - {authors: [helper]}\n", want: "commits.assistants[0].name: required"},
+		"assistant matching nothing":                    {file: "commits:\n  assistants:\n    - {name: Helper}\n", want: "needs authors or co_authors"},
+		"assistant entry with <":                        {file: "commits:\n  assistants:\n    - {name: Helper, co_authors: [\"Helper <h@example.com>\"]}\n", want: "is not a login, name or address"},
+		"assistant entry twice":                         {file: "commits:\n  assistants:\n    - {name: A, authors: [helper]}\n    - {name: B, authors: [Helper]}\n", want: "is also in commits.assistants[0]"},
+		"unknown assistant key":                         {file: "commits:\n  assistants:\n    - {name: A, authors: [a], emails: [x]}\n", want: "emails"},
 		"unknown group source":                          {file: "catalog:\n  groups:\n    - {id: core, name: Core, default_repo: x, sources: [nope], match: [{catch_all: true}]}\n", want: "unknown source"},
 	}
 	for name, tc := range tests {

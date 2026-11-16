@@ -169,7 +169,7 @@ func searchWork(s *snapshot.Snapshot, e *snapshot.RepoEntry, item int) string {
 		return ""
 	}
 	c := &cs[item]
-	switch o, _ := commits.Classify(c); {
+	switch o, _ := commits.Classify(s, c); {
 	case o == commits.OriginAutomation || commits.Sweep(s, c):
 		return "automation"
 	case o.AI():

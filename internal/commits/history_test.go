@@ -18,7 +18,7 @@ import (
 // historyAPI serves one repository acme/x holding h.
 func historyAPI(t *testing.T, h *History) API {
 	t.Helper()
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds(nil))
 	e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x", DefaultBranch: "main"}}
 	facet.Set(e, h, snapshot.Freshness{State: snapshot.StateOK, FetchedAt: time.Now(), CheckedAt: time.Now(), TTL: time.Hour})
 	p.Update(func(b *snapshot.Builder) {

@@ -48,12 +48,16 @@ The rule every element keeps, and the test for any new one:
 
 1. **Show the exception, not the default.** A value most repositories share is said once in the product's summary; a chip appears only
    where it differs: no licence, a release with unreleased changes, more than 20 open issues, failing to read.
-2. **People, not automation.** Activity counts commits by people. Automation (`commits.Automated`) is counted beside it, in grey, never
+2. **People, not automation.** Activity counts commits by people. Automation (`Rules.Automated`) is counted beside it, in grey, never
    added to it; a product kept alive only by dependency updates reads as quiet. Agents are co-workers (P-40): `commits.Classify` tells
    each commit's origin, a person, a person with an AI (`assisted`: an AI `Co-authored-by` trailer, or an AI tool's footer), a coding
    agent as the author (`agent`), or automation (CI, dependency and release bots, by `[bot]` or a bot-like name, and a bot's pull
    request merged by a person). Assisted and agent commits are people's work and counted within it as "with AI", the assistant's
    family named (Claude, Copilot); inline completion leaves no trace, so the count is a lower bound. A cut body keeps its trailers.
+   The rules are `commits.Rules` (`kind.go`): the built-in tables, and a deployment's own assistants from `commits.assistants`
+   (P-127: `authors` by login or name are agents, `co_authors` by name, address or local part mark a person's commit with AI and win
+   over the bot reading), passed to `commits.Feeds`, which classifies each commit once per snapshot; every reader asks the view's
+   feeds (`commits.Classify(s, c)`).
 3. **A sweep is not activity.** A commit whose subject lands in more than 10 repositories on the same day (UTC) is one change to the
    fleet, not activity in each repository: it counts neither as people nor for the activity levels.
 4. **Rank by what changes.** While every product scores good, the score does not tell products apart: the card leads with people's
