@@ -36,6 +36,7 @@ type Config struct {
 	Packages  Packages  `mapstructure:"packages"`
 	Ops       Ops       `mapstructure:"ops"`
 	Features  Features  `mapstructure:"features"`
+	Commits   Commits   `mapstructure:"commits"`
 	// Enterprise holds what GitHub Enterprise and Entra ID need (design/enterprise.md), off by default.
 	Enterprise Enterprise `mapstructure:"enterprise"`
 	// Announcements are the deployment's announcements (design/announcements.md); an admin's change is kept in the store as an
@@ -282,6 +283,7 @@ func (c Config) validate() []string {
 	p = append(p, c.Web.validate()...)
 	p = append(p, c.Layout.validate()...)
 	p = append(p, c.Packages.validate()...)
+	p = append(p, c.Commits.validate()...)
 	p = append(p, CheckAnnouncements("announcements", c.Announcements)...)
 	slices.Sort(p)
 	return p

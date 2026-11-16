@@ -169,6 +169,7 @@ type Ref struct {
 	Person bool    // a person's work in the view (not automation, not a sweep), an agent's included; set in the feeds index only
 	Origin Origin  // set in the feeds index only
 	AI     string  // the assistant's family (Assistant) when Origin.AI
+	Named  string  // the assistant's full name when Origin.AI
 }
 
 // feeds are the merged commits of every repository, of every group and of each repository, newest first (committedAt desc, repo asc,
@@ -178,6 +179,7 @@ type feeds struct {
 	byGroup map[string][]Ref
 	byRepo  map[snapshot.RepoKey][]Ref
 	sweeps  map[sweep]bool
+	rules   *Rules // what classified them (nil: the built-in rules)
 }
 
 // sweep is a commit subject on a day (UTC). One that lands in more than sweepRepos repositories is a change to the fleet, not work in
@@ -233,13 +235,14 @@ func Of(e *snapshot.RepoEntry) ([]Commit, snapshot.Freshness) {
 // HistoryOf returns the history of e (nil when there is none) with its freshness.
 func HistoryOf(e *snapshot.RepoEntry) (*History, snapshot.Freshness) { return facet.Get(e) }
 
-// Feeds is the indexer of the merged commit feeds, for snapshot.NewPublisher.
-func Feeds() snapshot.Indexer {
+// Feeds is the indexer of the merged commit feeds, for snapshot.NewPublisher, classifying with r (nil: the built-in rules).
+func Feeds(r *Rules) snapshot.Indexer {
 	return feedIndex.Build(func(s *snapshot.Snapshot) feeds {
 		sweeps := sweepsOf(s)
-		f := feeds{byGroup: make(map[string][]Ref, len(s.Groups)), byRepo: make(map[snapshot.RepoKey][]Ref, len(s.Repos)), sweeps: sweeps}
+		f := feeds{byGroup: make(map[string][]Ref, len(s.Groups)), byRepo: make(map[snapshot.RepoKey][]Ref, len(s.Repos)), sweeps: sweeps,
+			rules: r}
 		for k, e := range s.Repos {
-			f.byRepo[k] = refsOf(k, e, sweeps)
+			f.byRepo[k] = refsOf(r, k, e, sweeps)
 		}
 		f.all = merge(f.byRepo, slices.Collect(maps.Keys(s.Repos)))
 		for _, g := range s.Groups {
@@ -247,6 +250,11 @@ func Feeds() snapshot.Indexer {
 		}
 		return f
 	})
+}
+
+// Classify is the origin of c and the assistant it names in the view s, by the rules its feeds were built with.
+func Classify(s *snapshot.Snapshot, c *Commit) (Origin, string) {
+	return feedIndex.Get(s).rules.Classify(c)
 }
 
 // feed returns the merged commits of the group with id, or of every repository when id is empty.
@@ -260,12 +268,12 @@ func feed(s *snapshot.Snapshot, id string) ([]Ref, bool) {
 }
 
 // refsOf classifies the default-branch commits of the repository k, newest first, marking a person's work.
-func refsOf(k snapshot.RepoKey, e *snapshot.RepoEntry, sweeps map[sweep]bool) []Ref {
+func refsOf(r *Rules, k snapshot.RepoKey, e *snapshot.RepoEntry, sweeps map[sweep]bool) []Ref {
 	cs, _ := Of(e)
 	out := make([]Ref, 0, len(cs))
 	for i := range cs {
-		kind, ai := Classify(&cs[i])
-		out = append(out, Ref{Repo: k, Commit: &cs[i], Origin: kind, AI: Assistant(ai),
+		kind, ai := r.Classify(&cs[i])
+		out = append(out, Ref{Repo: k, Commit: &cs[i], Origin: kind, AI: Assistant(ai), Named: ai,
 			Person: kind != OriginAutomation && !sweeps[sweepOf(&cs[i])]})
 	}
 	slices.SortFunc(out, compareRefs)
@@ -293,15 +301,8 @@ func compareRefs(a, b Ref) int {
 	return strings.Compare(b.Commit.SHA, a.Commit.SHA)
 }
 
-// commitOf converts a classified commit to its API form; only a commit with an AI is classified again, for the assistant's full name
-// (the Ref holds its family).
-func commitOf(r Ref) oapi.Commit {
-	kind, ai := r.Origin, ""
-	if kind.AI() {
-		_, ai = Classify(r.Commit)
-	}
-	return apiCommit(r.Repo, r.Commit, kind, ai)
-}
+// commitOf converts a classified commit to its API form.
+func commitOf(r Ref) oapi.Commit { return apiCommit(r.Repo, r.Commit, r.Origin, r.Named) }
 
 // apiCommit is the API form of the commit c of the repository at repo, of origin kind, naming the assistant ai.
 func apiCommit(repo snapshot.RepoKey, c *Commit, kind Origin, ai string) oapi.Commit {
@@ -318,12 +319,6 @@ func LastCommit(e *snapshot.RepoEntry) (time.Time, snapshot.Freshness) {
 		return time.Time{}, fresh
 	}
 	return cs[0].CommittedAt, fresh
-}
-
-// Automated reports whether a commit was made by automation (Classify): CI, dependency and release bots, not coding agents.
-func Automated(c *Commit) bool {
-	k, _ := Classify(c)
-	return k == OriginAutomation
 }
 
 // Sweep reports whether c is part of a sweep in the view s: its subject landed in more than 10 repositories on its day.
@@ -497,7 +492,7 @@ const archiveAuthors = 100
 
 // ArchiveEntry completes a retired repository's row: when it was last active (its newest commit, when one is held) and how many authors
 // its newest commits have, people's work only, counted and never named (design/archive.md).
-func ArchiveEntry(_ *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.ArchiveEntry) {
+func ArchiveEntry(s *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.ArchiveEntry) {
 	cs, _ := Of(e)
 	if len(cs) == 0 {
 		return
@@ -505,7 +500,7 @@ func ArchiveEntry(_ *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.ArchiveEn
 	a.LastActive = cs[0].CommittedAt.UTC()
 	authors := map[string]struct{}{}
 	for i := range cs[:min(len(cs), archiveAuthors)] {
-		if k, _ := Classify(&cs[i]); k == OriginAutomation {
+		if k, _ := Classify(s, &cs[i]); k == OriginAutomation {
 			continue
 		}
 		authors[strings.ToLower(cmp.Or(cs[i].AuthorLogin, cs[i].AuthorName))] = struct{}{}
@@ -517,12 +512,12 @@ func ArchiveEntry(_ *snapshot.Snapshot, e *snapshot.RepoEntry, a *oapi.ArchiveEn
 const detailCommits = 30
 
 // Detail adds the newest commits and their freshness to a repository's detail.
-func Detail(e *snapshot.RepoEntry, d *oapi.RepoDetail) {
+func Detail(s *snapshot.Snapshot, e *snapshot.RepoEntry, d *oapi.RepoDetail) {
 	cs, fresh := Of(e)
 	d.CommitsFreshness = oapi.FreshnessOf(fresh, time.Now())
 	key := e.Repo.Key()
 	for i := range cs[:min(len(cs), detailCommits)] {
-		kind, ai := Classify(&cs[i])
+		kind, ai := Classify(s, &cs[i])
 		d.Commits = append(d.Commits, apiCommit(key, &cs[i], kind, ai))
 	}
 }
@@ -553,7 +548,7 @@ func Authorship(s *snapshot.Snapshot, e *snapshot.RepoEntry) (people, top int) {
 	cs, _ := Of(e)
 	by := map[string]int{}
 	for i := range cs[:min(len(cs), archiveAuthors)] {
-		if k, _ := Classify(&cs[i]); k == OriginAutomation || Sweep(s, &cs[i]) {
+		if k, _ := Classify(s, &cs[i]); k == OriginAutomation || Sweep(s, &cs[i]) {
 			continue
 		}
 		people++

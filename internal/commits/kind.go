@@ -74,25 +74,71 @@ func footer(body string) string {
 	return ""
 }
 
-// Classify returns the origin of c and the assistant it names: the AI co-author's or agent's name ("Claude Opus 5", "Copilot"), "" for
-// none. The order: a release plugin or a bot author is automation; a known agent is an agent; an AI co-author or footer is assisted;
-// a bot co-author (a bot's pull request merged by a person) is automation.
-func Classify(c *Commit) (Origin, string) {
-	if strings.HasPrefix(c.Subject, "[maven-release-plugin]") {
-		return OriginAutomation, ""
+// AssistantRule is an assistant a deployment names (commits.assistants, design/layout.md, P-127): the authors that are it as a coding
+// agent, and the co-authors that mark a person's commit as made with it. Every entry is matched case-insensitively; a co-author
+// entry matches a trailer's name, its address, or its address's local part (after a noreply address's "<id>+", on any host).
+type AssistantRule struct {
+	Name      string
+	Authors   []string // an author's login or name
+	CoAuthors []string // a Co-authored-by trailer's name, address or local part
+}
+
+// Rules classify commits: the built-in tables and the assistants a deployment adds. The nil Rules are the built-in ones.
+type Rules struct {
+	byAuthor   map[string]string // author login or name -> assistant
+	byCoAuthor map[string]string // co-author name, address or local part -> assistant
+}
+
+// NewRules returns the built-in rules with the assistants added; an added entry wins over the built-in reading of the same author
+// or co-author (a configured "[bot]" co-author is an AI, not automation).
+func NewRules(added []AssistantRule) *Rules {
+	if len(added) == 0 {
+		return nil
+	}
+	r := &Rules{byAuthor: map[string]string{}, byCoAuthor: map[string]string{}}
+	for _, a := range added {
+		for _, m := range a.Authors {
+			r.byAuthor[strings.ToLower(strings.TrimSpace(m))] = a.Name
+		}
+		for _, m := range a.CoAuthors {
+			r.byCoAuthor[strings.ToLower(strings.TrimSpace(m))] = a.Name
+		}
+	}
+	return r
+}
+
+// agent is the assistant the author of c is as a coding agent, "" for none: a configured login or name first, then the built-in table
+// by login (else name).
+func (r *Rules) agent(c *Commit) string {
+	if r != nil {
+		for _, who := range []string{c.AuthorLogin, c.AuthorName} {
+			if a, ok := r.byAuthor[strings.ToLower(strings.TrimSpace(who))]; ok && who != "" {
+				return a
+			}
+		}
 	}
 	who := strings.ToLower(c.AuthorLogin)
 	if who == "" {
 		who = strings.ToLower(c.AuthorName)
 	}
-	if a, ok := agents[who]; ok {
-		ai, _ := coAuthors(c.Body)
+	return agents[who]
+}
+
+// Classify returns the origin of c and the assistant it names: the AI co-author's or agent's name ("Claude Opus 5", "Copilot"), "" for
+// none. The order: a release plugin is automation; a known agent is an agent; a bot author is automation; an AI co-author or footer
+// is assisted; a bot co-author (a bot's pull request merged by a person) is automation.
+func (r *Rules) Classify(c *Commit) (Origin, string) {
+	if strings.HasPrefix(c.Subject, "[maven-release-plugin]") {
+		return OriginAutomation, ""
+	}
+	if a := r.agent(c); a != "" {
+		ai, _ := r.coAuthors(c.Body)
 		return OriginAgent, cmp.Or(ai, a)
 	}
 	if actor.Bot(c.AuthorLogin) || actor.Bot(c.AuthorName) {
 		return OriginAutomation, ""
 	}
-	ai, bot := coAuthors(c.Body)
+	ai, bot := r.coAuthors(c.Body)
 	if ai != "" {
 		return OriginAssisted, ai
 	}
@@ -105,9 +151,15 @@ func Classify(c *Commit) (Origin, string) {
 	return OriginPerson, ""
 }
 
+// Automated reports whether a commit was made by automation (Classify): CI, dependency and release bots, not coding agents.
+func (r *Rules) Automated(c *Commit) bool {
+	k, _ := r.Classify(c)
+	return k == OriginAutomation
+}
+
 // coAuthors reads the Co-authored-by trailers of a body: the first AI co-author's name (its context note dropped:
-// "Claude Opus 5 (1M context)" is "Claude Opus 5") and whether a bot co-authored.
-func coAuthors(body string) (ai string, bot bool) {
+// "Claude Opus 5 (1M context)" is "Claude Opus 5"; a configured one is its assistant's name) and whether a bot co-authored.
+func (r *Rules) coAuthors(body string) (ai string, bot bool) {
 	if !strings.Contains(strings.ToLower(body), "co-authored-by:") {
 		return "", false
 	}
@@ -118,6 +170,10 @@ func coAuthors(body string) (ai string, bot bool) {
 			local = after
 		}
 		switch {
+		case r.added(name, mail, local) != "":
+			if ai == "" {
+				ai = r.added(name, mail, local)
+			}
 		case aiLocals[local] || aiDomains[domain] && (local == "noreply" || local == "no-reply"):
 			if ai == "" {
 				ai = cmp.Or(strings.TrimSpace(note.ReplaceAllString(name, "")), local)
@@ -127,6 +183,19 @@ func coAuthors(body string) (ai string, bot bool) {
 		}
 	}
 	return ai, bot
+}
+
+// added is the configured assistant a co-author is, by its name, address or local part; "" for none.
+func (r *Rules) added(name, mail, local string) string {
+	if r == nil {
+		return ""
+	}
+	for _, k := range []string{strings.ToLower(strings.TrimSpace(name)), mail, local} {
+		if a, ok := r.byCoAuthor[k]; ok && k != "" {
+			return a
+		}
+	}
+	return ""
 }
 
 // Assistant is the family of an assistant's name, its first word: "Claude Opus 5" is "Claude".

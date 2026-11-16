@@ -85,7 +85,7 @@ func TestFromGitHubReadsLongMessages(t *testing.T) {
 	if got[99].AuthorLogin != "ann" || len(got[99].Parents) != 0 || len(got[0].Parents) != 1 || !got[0].Date.Equal(at) {
 		t.Errorf("fields = %+v", got[99])
 	}
-	if origin, ai := Classify(&Commit{Subject: "Squash", Body: body(m), AuthorName: "Ann", AuthorLogin: "ann"}); origin != OriginAssisted || ai != "Claude" {
+	if origin, ai := (*Rules)(nil).Classify(&Commit{Subject: "Squash", Body: body(m), AuthorName: "Ann", AuthorLogin: "ann"}); origin != OriginAssisted || ai != "Claude" {
 		t.Errorf("classified %v %q, want assisted by Claude", origin, ai)
 	}
 }

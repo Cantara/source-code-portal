@@ -49,6 +49,7 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 		return bad("validation-failed", "at is a SHA or a prefix of 4 to 40 hex digits")
 	}
 	automation := p.Automation == nil || *p.Automation
+	rules := feedIndex.Get(s).rules
 	h, fresh := HistoryOf(e)
 	if h == nil {
 		h = newHistory(nil, nil, nil, "")
@@ -62,7 +63,7 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 		switch {
 		case reach != nil && !reach[c.SHA]:
 			return false
-		case !automation && Automated(c):
+		case !automation && rules.Automated(c):
 			return false
 		case author != "" && strings.ToLower(c.AuthorLogin) != author && strings.ToLower(c.AuthorName) != author:
 			return false
@@ -92,7 +93,7 @@ func (a API) GetHistory(ctx context.Context, req oapi.GetHistoryRequestObject) (
 	}
 	key := e.Repo.Key()
 	for i, c := range list[start:end] {
-		hc := h.commitOf(key, c)
+		hc := h.commitOf(rules, key, c)
 		if rows != nil {
 			hc.Graph = rowOf(rows[start+i])
 		}
@@ -148,11 +149,11 @@ func (h *History) reachable(ref string) (map[string]bool, bool) {
 	return seen, true
 }
 
-func (h *History) commitOf(key snapshot.RepoKey, c *Commit) oapi.HistoryCommit {
+func (h *History) commitOf(rules *Rules, key snapshot.RepoKey, c *Commit) oapi.HistoryCommit {
 	out := oapi.HistoryCommit{Repo: string(key), Sha: c.SHA, Subject: c.Subject, Body: c.Body, AuthorName: c.AuthorName,
 		AuthorLogin: c.AuthorLogin, CommitterName: c.CommitterName, Url: c.URL, CommittedAt: c.CommittedAt.UTC(), Parents: c.Parents,
 		Labels: []oapi.Label{}, Beyond: []string{}, Stats: statsOf(c.Stats)}
-	kind, ai := Classify(c)
+	kind, ai := rules.Classify(c)
 	out.Kind, out.Assistant, out.Automated = oapi.HistoryCommitKind(kind.String()), ai, kind == OriginAutomation
 	for _, p := range c.Parents {
 		if !h.held(p) {

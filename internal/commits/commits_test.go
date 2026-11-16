@@ -174,7 +174,7 @@ func TestRunStates(t *testing.T) {
 }
 
 func TestPublish(t *testing.T) {
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds(nil))
 	r := snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x"}
 	b, _ := json.Marshal(payload{Schema: payloadSchema, Main: []Commit{{SHA: sha('a'), CommittedAt: time.Now()}}})
 	p.Update(func(bd *snapshot.Builder) {
@@ -206,7 +206,7 @@ func TestLastAuthored(t *testing.T) {
 	} {
 		e := &snapshot.RepoEntry{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "x"}}
 		facet.Set(e, newHistory(tc.cs, nil, nil, "main"), snapshot.Freshness{State: snapshot.StateOK})
-		p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
+		p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds(nil))
 		p.Update(func(b *snapshot.Builder) {
 			b.ReplaceSource("gh", []*snapshot.RepoEntry{e}, nil, snapshot.SourceStatus{ID: "gh"})
 		})
@@ -227,7 +227,7 @@ func TestSweepsAndActivity(t *testing.T) {
 		n++
 		return Commit{SHA: sha(byte(n)), AuthorName: author, AuthorLogin: strings.ToLower(author), Subject: subject, CommittedAt: at}
 	}
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds())
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler), Feeds(nil))
 	var entries []*snapshot.RepoEntry
 	var members []snapshot.RepoKey
 	for i := range 11 {

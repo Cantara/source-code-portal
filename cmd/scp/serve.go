@@ -259,7 +259,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 
 	f := cfg.Features // a switched-off feature is absent: no job, index, route, tool or page (design/features.md)
-	indexers := []snapshot.Indexer{commits.Feeds(), manifests.Graph(), search.Indexer(searchOptions())}
+	indexers := []snapshot.Indexer{commits.Feeds(commitRules(cfg.Commits)), manifests.Graph(), search.Indexer(searchOptions())}
 	if f.Pulls {
 		indexers = append(indexers, pulls.Feeds())
 	}
@@ -426,7 +426,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		Dashboard:    []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
 		Group:        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
 		Repo:         repoHooks,
-		Detail:       []func(*snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
+		Detail:       []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
 		ArchiveEntry: []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.ArchiveEntry){manifests.ArchiveEntry, commits.ArchiveEntry}}
 	if f.Pulls {
 		catalogAPI.Dashboard = append(catalogAPI.Dashboard, pulls.Dashboard)
@@ -856,4 +856,13 @@ func timed(h http.Handler, took func(time.Duration)) http.Handler {
 		h.ServeHTTP(w, r)
 		took(time.Since(start))
 	})
+}
+
+// commitRules are the built-in rules of a commit's origin with the deployment's assistants added (commits.assistants, P-127).
+func commitRules(c config.Commits) *commits.Rules {
+	added := make([]commits.AssistantRule, 0, len(c.Assistants))
+	for _, a := range c.Assistants {
+		added = append(added, commits.AssistantRule{Name: a.Name, Authors: a.Authors, CoAuthors: a.CoAuthors})
+	}
+	return commits.NewRules(added)
 }
