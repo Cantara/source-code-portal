@@ -15,7 +15,7 @@ ranked, with the fix for each.
 |---|---|---|
 | 1 | Listing and GitHub | `internal/feature/catalog`, `internal/platform/github` (+ `githubtest`), `internal/platform/prereq` |
 | 2 | Engine and data | `internal/platform/sync`, `internal/platform/store`, `internal/platform/snapshot`, `internal/platform/docstore`, `internal/platform/cluster` |
-| 3 | Events | `internal/feature/webhook`, `cmd/scp` `inbox.go`, the sink in `serve.go`, `catchup.go` |
+| 3 | Events | `internal/feature/webhook`, `cmd/scp` `inbox.go`, `events.go` (the sink, discovery and the event routes), `internal/feature/webhook/catchup.go` |
 | 4 | HTTP, access, agents | `internal/platform/httpapi`, `internal/platform/auth`, `internal/platform/mcpserver`, `internal/platform/tools`, `internal/feature/assistant`, `internal/platform/llm` |
 | 5 | Repository reads | `internal/feature/commits`, `internal/feature/pulls`, `internal/feature/issues`, `internal/feature/releases`, `internal/lib/jsonstream`, `internal/lib/actor`, `internal/platform/scope` |
 | 6 | Untrusted content | `internal/feature/docs`, `internal/lib/safehtml`, `internal/lib/untrusted`, `internal/lib/egress`, `internal/feature/llms`, `internal/feature/search` |
