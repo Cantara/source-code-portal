@@ -75,11 +75,14 @@ func nameOf(m map[string]string, k string) string {
 // Source is what the check knows of one configured source: its grants when it is an App that told them, and for a token the jobs
 // whose items GitHub refused (403) for most repositories.
 type Source struct {
-	ID      string
-	App     bool
-	Grants  []github.Grant // App mode, from the last installation listing
-	Known   bool           // the grants were read
-	Refused map[string]bool
+	ID     string
+	App    bool
+	Grants []github.Grant // App mode, from the last installation listing
+	Known  bool           // the grants were read
+	// Webhooks is whether GitHub tells the portal of this source's changes (its receiver, or the App's delivery log): only then do
+	// the installations need the features' webhook events.
+	Webhooks bool
+	Refused  map[string]bool
 }
 
 // Unmet is a feature whose prerequisite does not hold in a source: the accounts, the missing permissions (GitHub's names) and
@@ -130,14 +133,14 @@ func names(xs []string, name func(string) string) string {
 	return strings.Join(out[:len(out)-1], ", ") + " and " + out[len(out)-1]
 }
 
-// Check is the unmet prerequisites of needs (Needs, less the features switched off) across sources; events count only when
-// webhooks reach the portal. An App's installations that lack the same things are told together.
-func Check(needs []Need, sources []Source, webhooks bool) []Unmet {
+// Check is the unmet prerequisites of needs (Needs, less the features switched off) across sources; events count only for a
+// source GitHub tells of its changes (Source.Webhooks). An App's installations that lack the same things are told together.
+func Check(needs []Need, sources []Source) []Unmet {
 	var out []Unmet
 	for _, n := range needs {
 		for _, s := range sources {
 			if s.App {
-				out = append(out, checkApp(n, s, webhooks)...)
+				out = append(out, checkApp(n, s)...)
 				continue
 			}
 			if slices.ContainsFunc(n.Jobs, func(j string) bool { return s.Refused[j] }) {
@@ -148,7 +151,7 @@ func Check(needs []Need, sources []Source, webhooks bool) []Unmet {
 	return out
 }
 
-func checkApp(n Need, s Source, webhooks bool) []Unmet {
+func checkApp(n Need, s Source) []Unmet {
 	if !s.Known {
 		return nil
 	}
@@ -161,7 +164,7 @@ func checkApp(n Need, s Source, webhooks bool) []Unmet {
 				perms = append(perms, p)
 			}
 		}
-		if webhooks {
+		if s.Webhooks {
 			for _, e := range n.Events {
 				if !slices.Contains(g.Events, e) {
 					events = append(events, e)

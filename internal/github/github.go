@@ -225,7 +225,9 @@ func (s *Source) RefreshInstallations(ctx context.Context) error {
 		if login == "" || in.SuspendedAt != nil || len(allowed) > 0 && !allowed[login] {
 			continue
 		}
-		grants = append(grants, grantOf(login, in))
+		if slices.ContainsFunc(s.cfg.Orgs, func(o string) bool { return strings.EqualFold(o, login) }) {
+			grants = append(grants, grantOf(in.GetAccount().GetLogin(), in)) // only the accounts the source reads, as GitHub spells them
+		}
 		if prev := s.owners[login]; prev != nil {
 			owners[login] = prev // keep the token and rate state
 			continue

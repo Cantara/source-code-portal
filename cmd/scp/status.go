@@ -36,8 +36,9 @@ type status struct {
 	layouts      func() []string                              // why stored layouts are not served
 	config       func() statusConfig                          // what the store holds that scp.yaml does not (design/config-baseline.md)
 	prereqs      func() []prereq.Unmet
-	accounts     func(source string) []statusAccount // an App source's installations and what each was given; nil for a token source
-	cluster      interface {
+	// accounts is an App source's installations and what each was given, and whether they were read yet; nothing for a token source
+	accounts func(source string) (accounts []statusAccount, app, read bool)
+	cluster  interface {
 		Leader() bool
 		Connected() bool
 	} // nil when the instance is alone
@@ -134,6 +135,8 @@ type statusSource struct {
 	Cadence map[string]float64 `json:"cadenceSeconds"`
 	// Accounts are an App source's installations: what each reads, the repositories selected on GitHub or all of them.
 	Accounts []statusAccount `json:"accounts,omitempty"`
+	// AccountsUnread is an App source whose installations were not read since the start: its accounts are not known yet.
+	AccountsUnread bool `json:"accountsUnread,omitempty"`
 }
 
 type statusAccount struct {
@@ -169,18 +172,18 @@ type statusCatchUp struct {
 }
 
 // appAccounts gives, per source, an App's installations and what each was given (the selected repositories or all); none for a token.
-func appAccounts(gh *github.Client) func(source string) []statusAccount {
-	return func(id string) []statusAccount {
+func appAccounts(gh *github.Client) func(source string) ([]statusAccount, bool, bool) {
+	return func(id string) ([]statusAccount, bool, bool) {
 		src := gh.Source(id)
-		if src == nil {
-			return nil
+		if src == nil || !src.App() {
+			return nil, false, false
 		}
-		grants, _ := src.Grants()
+		grants, read := src.Grants()
 		out := make([]statusAccount, 0, len(grants))
 		for _, g := range grants {
 			out = append(out, statusAccount{Account: g.Owner, Selection: g.Selection})
 		}
-		return out
+		return out, true, read
 	}
 }
 
@@ -245,7 +248,8 @@ func (st *status) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 			ss.Mode = "poll"
 		}
 		if st.accounts != nil {
-			ss.Accounts = st.accounts(src.ID)
+			accounts, app, read := st.accounts(src.ID)
+			ss.Accounts, ss.AccountsUnread = accounts, app && !read
 		}
 		for kind, d := range st.cadence(src.ID) {
 			ss.Cadence[kind] = d.Seconds()

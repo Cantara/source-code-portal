@@ -63,11 +63,15 @@ func ParseDescriptor(b []byte) Descriptor                                  // pu
 ## Behaviour
 1. Reconcile (sync job `catalog.reconcile/<source>`, TTL `catalog.reconcile_interval`, and on `EventSourceChanged`): refresh the App
    installations, then list every org of the source, all pages, with ETags. An account GitHub says the App is not installed on
-   (`github.NotInstalled`) lists nothing: its repositories leave as any the listing misses. An account that fails to list (any page
-   failure, or more than 100 pages) keeps its last repositories while the others are listed, and the run asks to run again in a
-   minute (`retryAccount`); only when every account fails does the run fail and the last good catalogue stay published (AS1, P-128).
-   An event of a repository the portal does not know (`cmd/scp` `webhookSink`) lists its source, at most once every 15 s per source
-   (`discoverEvery`), so a stream of them from repositories the source leaves out costs one listing; the App's own events
+   (`github.NotInstalled`) or does not have (404) lists nothing: its repositories leave as any the listing misses. A rate limit or a
+   refused credential fails the run (`sourceWide`), so the engine pauses the source. An account that fails otherwise (any page
+   failure, or more than 100 pages) keeps its last entries as they were (`listing.kept`: misses neither counted nor reset) while the
+   others are listed, and the run asks to run again in a minute (`retryAccount`), doubling with each listing in a row the account
+   fails in (`state.Failing`) up to the interval; only when every account fails does the run fail and the last good catalogue stay
+   published (AS1, P-128). An event of a repository the portal does not know (`cmd/scp` `webhookSink`) is kept in the inbox and
+   lists its source (`discovery`): at once, at most once every 15 s per source (`discoverEvery`) with a trailing listing when the
+   window closes, and each address at most once an hour (`declinedFor`), so a repository the source leaves out costs one listing an
+   hour; the App's own events
    (`installation`, `installation_repositories`, `repository`) list at once.
 2. Normalise each item: zero id, owner/name outside `[A-Za-z0-9._-]{1,100}`, `.`/`..` are invalid; the description is cleaned with
    `untrusted.Text` (1,000 runes), at most 20 topics matching `^[a-z0-9][a-z0-9-]{0,49}$` are kept, `html_url` and `homepage` only as

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -354,7 +355,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	s.visibility = visibility.Open(ctx, s.store, baseVisibility, func() { s.pub.Update(func(*snapshot.Builder) {}) }, log)
 	s.pub.Audience(s.visibility.Audience)
 	feed := cfg.Receiver() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
-	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
+	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, told: toldSources(cfg),
 		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{mode: string(mode), ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
 		config: func() statusConfig {
@@ -637,16 +638,19 @@ func (s *server) webhookSink(sources []config.Source) webhook.Sink {
 }
 
 // discoverEvery is the least time between two listings of a source that events of repositories the portal does not know cause: a
-// stream of pushes from repositories the source leaves out (excluded, private without include_private) costs one listing in it.
+// burst of them costs one listing at once and one when the window closes.
 const discoverEvery = 15 * time.Second
 
+// declinedFor is how long an address that asked for a listing does not ask again: a repository the source leaves out (excluded,
+// private without include_private) stays unknown after the listing, and its pushes would otherwise list the source every window.
+const declinedFor = time.Hour
+
 // webhookSink hands webhook events on: repository events to the repository's jobs, owner-wide events to the listing of the source
-// that has the owner among its organisations. An event of a repository the portal does not know yet (known is false: added to the
-// App's selection, created, or never listed) lists its source at once, at most once every discoverEvery, so it appears without
-// waiting for the scheduled listing. Owners no source lists are ignored.
+// that has the owner among its organisations. An event of a repository the portal does not know (known is false: added to the App's
+// selection, created, or not published yet after a start) is passed on as well, so the inbox keeps it until the repository is known,
+// and lists its source (discovery). Owners no source lists are ignored.
 func webhookSink(take func(sync.Event, snapshot.RepoKey, string) error, known func(snapshot.RepoKey) bool, sources []config.Source) webhook.Sink {
-	var mu gosync.Mutex
-	discovered := map[string]time.Time{} // by source: the last listing an unknown repository's event asked for
+	d := &discovery{take: take, last: map[string]time.Time{}, armed: map[string]bool{}, asked: map[snapshot.RepoKey]time.Time{}}
 	sourceOf := map[string]string{}
 	for _, s := range sources {
 		for _, org := range s.Orgs {
@@ -661,20 +665,54 @@ func webhookSink(take func(sync.Event, snapshot.RepoKey, string) error, known fu
 		case name == "" || ev == sync.EventSourceChanged:
 			return take(ev, "", id)
 		case !known(snapshot.KeyOf(owner, name)):
-			mu.Lock()
-			now, last := time.Now(), discovered[id]
-			due := now.Sub(last) >= discoverEvery
-			if due {
-				discovered[id] = now
-			}
-			mu.Unlock()
-			if !due {
-				return nil
-			}
-			return take(sync.EventSourceChanged, "", id)
+			key := snapshot.KeyOf(owner, name)
+			err := take(ev, key, "")
+			d.ask(id, key)
+			return err
 		default:
 			return take(ev, snapshot.KeyOf(owner, name), "")
 		}
+	}
+}
+
+// discovery lists a source for the events of repositories the portal does not know: at once, then at most once every discoverEvery
+// (a trailing listing when the window closes catches what came in it), each address at most once every declinedFor.
+type discovery struct {
+	take  func(sync.Event, snapshot.RepoKey, string) error
+	mu    gosync.Mutex
+	last  map[string]time.Time           // by source: the last listing discovery asked for
+	armed map[string]bool                // by source: a trailing listing is waiting for the window to close
+	asked map[snapshot.RepoKey]time.Time // by address: when it last asked
+}
+
+func (d *discovery) ask(source string, key snapshot.RepoKey) {
+	d.mu.Lock()
+	now := time.Now()
+	if at, ok := d.asked[key]; ok && now.Sub(at) < declinedFor {
+		d.mu.Unlock()
+		return
+	}
+	d.asked[key] = now
+	if len(d.asked) > 4096 {
+		maps.DeleteFunc(d.asked, func(_ snapshot.RepoKey, at time.Time) bool { return now.Sub(at) >= declinedFor })
+	}
+	since := now.Sub(d.last[source])
+	due := since >= discoverEvery
+	switch {
+	case due:
+		d.last[source] = now
+	case !d.armed[source]:
+		d.armed[source] = true
+		time.AfterFunc(discoverEvery-since, func() {
+			d.mu.Lock()
+			d.armed[source], d.last[source] = false, time.Now()
+			d.mu.Unlock()
+			_ = d.take(sync.EventSourceChanged, "", source) // passed on whatever came of parking
+		})
+	}
+	d.mu.Unlock()
+	if due {
+		_ = d.take(sync.EventSourceChanged, "", source)
 	}
 }
 
@@ -862,6 +900,18 @@ func polledSources(cfg config.Config) []string {
 		}
 	}
 	return out
+}
+
+// toldSources are the sources GitHub tells of their changes: every one not polled.
+func toldSources(cfg config.Config) map[string]bool {
+	told := map[string]bool{}
+	for _, src := range cfg.GitHub.Sources {
+		told[src.ID] = true
+	}
+	for _, id := range polledSources(cfg) {
+		delete(told, id)
+	}
+	return told
 }
 
 // themed loads the deployment's look (design/theme.md) and the route that serves its files, which exists only with web.theme_dir.

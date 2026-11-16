@@ -46,12 +46,14 @@ type source struct {
 	orgs   []string
 	filter Filter
 	gh     GitHub
+	app    bool // reads through a GitHub App: an empty listing is GitHub's word, not a credential problem
 }
 
-// state is the payload of a source's listing item: its tracked repositories.
+// state is the payload of a source's listing item: its tracked repositories and the accounts that failed to list in a row.
 type state struct {
-	Schema int       `json:"schema"`
-	Repos  []Tracked `json:"repos"`
+	Schema  int            `json:"schema"`
+	Repos   []Tracked      `json:"repos"`
+	Failing map[string]int `json:"failing,omitempty"` // account (lower case) to the listings in a row it failed in
 }
 
 // New builds the catalogue for the configured sources, reading GitHub through one GitHub per source id. notify (may be nil) receives
@@ -80,7 +82,8 @@ func New(cfg config.Catalog, configured []config.Source, sources map[string]GitH
 		if err != nil {
 			return nil, err
 		}
-		c.sources[s.ID] = source{orgs: s.Orgs, gh: g, filter: f}
+		a, _ := g.(app)
+		c.sources[s.ID] = source{orgs: s.Orgs, gh: g, filter: f, app: a != nil && a.App()}
 	}
 	return c, nil
 }
@@ -105,7 +108,8 @@ func (c *Catalog) Spec() sync.Spec {
 // listing is GitHub's own word on what the installation was given (none selected, or the App removed), so it may be empty.
 var errEmpty = errors.New("the listing returned no repositories; keeping the last catalogue")
 
-// retryAccount is how soon a listing runs again after an account of the source failed to list (its last repositories were kept).
+// retryAccount is how soon a listing runs again after an account of the source failed to list once (its last repositories were
+// kept); it doubles with each listing in a row the account fails in, up to the listing's interval.
 const retryAccount = time.Minute
 
 // app is implemented by a GitHub source that reports whether it reads through a GitHub App (*github.Source does).
@@ -121,21 +125,18 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 		return sync.Result{}, fmt.Errorf("installations: %w", err)
 	}
 	prev := decode(j.Prev.Payload)
-	listed, failed, err := c.list(ctx, j.Source, src, prev)
+	got, err := c.list(ctx, j.Source, src, prev)
 	if err != nil {
 		return sync.Result{}, err
 	}
-	viaApp := false
-	if a, ok := src.gh.(app); ok {
-		viaApp = a.App()
-	}
-	if len(listed) == 0 && len(prev.Repos) > 0 && !viaApp {
+	listed := got.repos
+	if len(listed) == 0 && len(got.kept) == 0 && len(prev.Repos) > 0 && !src.app {
 		return sync.Result{}, errEmpty
 	}
 	for i := range listed {
 		listed[i].ID.Source = j.Source
 	}
-	next := state{Schema: schema, Repos: Plan(listed, prev.Repos, src.filter)}
+	next := state{Schema: schema, Repos: keep(Plan(listed, without(prev.Repos, got.kept), src.filter), got.kept), Failing: got.failing}
 	before := map[int64]snapshot.Repo{}
 	for _, t := range prev.Repos {
 		before[t.Repo.ID.GitHubID] = t.Repo
@@ -165,42 +166,115 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if slices.ContainsFunc(next.Repos, func(t Tracked) bool { return t.Misses > 0 }) {
 		res.Again = confirmAfter // a repository the listing missed (deleted, transferred) leaves at the confirming listing
 	}
-	if failed && (res.Again == 0 || res.Again > retryAccount) {
-		res.Again = retryAccount
+	if again := c.retry(got.failing); again > 0 && (res.Again == 0 || res.Again > again) {
+		res.Again = again
 	}
 	return res, nil
 }
 
-// list reads every account of the source. An account GitHub says the App is not installed on lists nothing: its repositories leave
-// as any the listing misses. An account that fails to list keeps its last repositories, so one account does not stop the others;
-// failed reports it, and the error is returned only when no account listed at all.
-func (c *Catalog) list(ctx context.Context, id string, src source, prev state) (listed []snapshot.Repo, failed bool, err error) {
+// retry is how soon the listing runs again for the accounts that failed: retryAccount doubled for each listing in a row the most
+// failing one failed in, at most the listing's interval; zero when none failed.
+func (c *Catalog) retry(failing map[string]int) time.Duration {
+	n := 0
+	for _, f := range failing {
+		n = max(n, f)
+	}
+	if n == 0 {
+		return 0
+	}
+	d := retryAccount << min(n-1, 16)
+	if c.interval > 0 && d > c.interval {
+		d = c.interval
+	}
+	return d
+}
+
+// without is current less the entries kept as they were.
+func without(current, kept []Tracked) []Tracked {
+	if len(kept) == 0 {
+		return current
+	}
+	ids := map[int64]bool{}
+	for _, t := range kept {
+		ids[t.Repo.ID.GitHubID] = true
+	}
+	return slices.DeleteFunc(slices.Clone(current), func(t Tracked) bool { return ids[t.Repo.ID.GitHubID] })
+}
+
+// keep adds the entries of the accounts that failed to list, unchanged (their misses neither counted nor reset), unless the listing
+// found the repository or its address elsewhere.
+func keep(planned, kept []Tracked) []Tracked {
+	if len(kept) == 0 {
+		return planned
+	}
+	ids, keys := map[int64]bool{}, map[snapshot.RepoKey]bool{}
+	for _, t := range planned {
+		ids[t.Repo.ID.GitHubID], keys[t.Repo.Key()] = true, true
+	}
+	for _, t := range kept {
+		if !ids[t.Repo.ID.GitHubID] && !keys[t.Repo.Key()] {
+			planned = append(planned, t)
+		}
+	}
+	slices.SortFunc(planned, func(a, b Tracked) int { return strings.Compare(string(a.Repo.Key()), string(b.Repo.Key())) })
+	return planned
+}
+
+// listing is what one run read of a source's accounts.
+type listing struct {
+	repos   []snapshot.Repo
+	kept    []Tracked      // the last entries of the accounts that failed to list, kept as they were
+	failing map[string]int // the accounts that failed, with the listings in a row they failed in
+}
+
+// list reads every account of the source.
+//   - An account GitHub says the App is not installed on, or does not have (deleted, renamed), lists nothing: its repositories leave as
+//     any the listing misses.
+//   - A rate limit or a refused credential is the source's, not the account's: it is returned, so the engine pauses the source.
+//   - Any other failure keeps the account's last entries as they were, so one account does not stop the others; failing counts the
+//     listings in a row it failed in, for the back-off. The error is returned only when no account listed at all.
+func (c *Catalog) list(ctx context.Context, id string, src source, prev state) (listing, error) {
+	var out listing
 	var errs []error
 	for _, org := range src.orgs {
 		rs, err := src.gh.ListRepos(ctx, org)
 		switch {
 		case err == nil:
-			listed = append(listed, rs...)
+			out.repos = append(out.repos, rs...)
 		case github.NotInstalled(err):
 			c.log.Info("the GitHub App is not installed on the account; its repositories leave the catalogue", "source", id, "account", org)
+		case github.IsNotFound(err):
+			c.log.Warn("GitHub does not know the account (deleted or renamed?); its repositories leave the catalogue", "source", id, "account", org)
 		case ctx.Err() != nil:
-			return nil, false, ctx.Err()
+			return listing{}, ctx.Err()
+		case sourceWide(err):
+			return listing{}, fmt.Errorf("list %s: %w", org, err)
 		default:
 			errs = append(errs, fmt.Errorf("list %s: %w", org, err))
+			if out.failing == nil {
+				out.failing = map[string]int{}
+			}
+			out.failing[strings.ToLower(org)] = prev.Failing[strings.ToLower(org)] + 1
 			for _, t := range prev.Repos {
 				if strings.EqualFold(t.Repo.Owner, org) {
-					listed = append(listed, t.Repo)
+					out.kept = append(out.kept, t)
 				}
 			}
 		}
 	}
-	if len(errs) == len(src.orgs) {
-		return nil, false, errs[0]
+	if len(errs) > 0 && len(errs) == len(src.orgs) {
+		return listing{}, errs[0]
 	}
 	if len(errs) > 0 {
 		c.log.Warn("an account of the source failed to list; its last repositories are kept", "source", id, "err", errors.Join(errs...))
 	}
-	return listed, len(errs) > 0, nil
+	return out, nil
+}
+
+// sourceWide reports whether err stops every read of the source (a rate limit, a refused credential), not just one account's.
+func sourceWide(err error) bool {
+	var e *github.Error
+	return errors.As(err, &e) && (e.Kind == github.RateLimited || e.Kind == github.Auth)
 }
 
 func decode(payload []byte) state {

@@ -265,10 +265,10 @@ func TestOneAccountFailingKeepsItsRepositories(t *testing.T) {
 	}
 	l.repos["acme"] = append(l.repos["acme"], pub(3, "new"))
 	l.errs = map[string]error{"beta": &github.Error{Kind: github.Transient, Code: "transient", Err: errors.New("502")}}
-	for range 3 { // more than the misses that remove a repository
+	for _, want := range []time.Duration{retryAccount, 2 * retryAccount, 4 * retryAccount, 5 * time.Minute} { // backs off to the interval
 		var res sync.Result
-		if it, res, err = runAndPublish(t, c, p, it); err != nil || res.Again != retryAccount {
-			t.Fatalf("one account failing: again %v, err %v", res.Again, err)
+		if it, res, err = runAndPublish(t, c, p, it); err != nil || res.Again != want {
+			t.Fatalf("one account failing: again %v, err %v; want again %v", res.Again, err, want)
 		}
 	}
 	s := p.Current()
@@ -281,5 +281,81 @@ func TestOneAccountFailingKeepsItsRepositories(t *testing.T) {
 	l.errs["acme"] = l.errs["beta"]
 	if _, _, err := runAndPublish(t, c, p, it); err == nil {
 		t.Error("every account failing did not fail the run")
+	}
+}
+
+// A rate limit or a refused credential is the source's: the run fails, so the engine pauses the source until the reset.
+func TestSourceWideFailureFailsTheRun(t *testing.T) {
+	for _, kind := range []github.Kind{github.RateLimited, github.Auth} {
+		l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a")}, "beta": {beta(2, "b")}}}
+		c := newCatalog(t, l)
+		p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+		it, _, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+		if err != nil {
+			t.Fatal(err)
+		}
+		at := time.Now().Add(time.Hour)
+		l.errs = map[string]error{"beta": &github.Error{Kind: kind, RetryAt: at, Code: "limited", Err: errors.New("403")}}
+		_, _, err = runAndPublish(t, c, p, it)
+		var ge *github.Error
+		if !errors.As(err, &ge) || ge.Kind != kind || !ge.RetryAt.Equal(at) {
+			t.Errorf("kind %d: err %v, want the GitHub error passed on", kind, err)
+		}
+	}
+}
+
+// An account GitHub does not have (deleted, renamed) lists nothing: its repositories leave at the confirming listing.
+func TestAccountGoneLeaves(t *testing.T) {
+	l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a")}, "beta": {beta(2, "b")}}}
+	c := newCatalog(t, l)
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	it, _, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.errs = map[string]error{"beta": &github.Error{Kind: github.NotFound, Code: "not_found", Err: errors.New("404")}}
+	for range missesToRemove {
+		var res sync.Result
+		if it, res, err = runAndPublish(t, c, p, it); err != nil || res.Again == retryAccount {
+			t.Fatalf("gone account: again %v, err %v; want no account retry", res.Again, err)
+		}
+	}
+	if e, _ := p.Current().Repo("beta/b"); e != nil {
+		t.Error("the gone account's repository stayed")
+	}
+}
+
+// An account's failure keeps its entries as they were: a repository the last listing missed is not seen again, and leaves at the
+// next listing that misses it.
+func TestFailureKeepsTheMisses(t *testing.T) {
+	l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a")}, "beta": {beta(2, "b"), beta(3, "deleted")}}}
+	c := newCatalog(t, l)
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	it, _, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.repos["beta"] = []snapshot.Repo{beta(2, "b")} // deleted: one miss
+	if it, _, err = runAndPublish(t, c, p, it); err != nil {
+		t.Fatal(err)
+	}
+	l.errs = map[string]error{"beta": &github.Error{Kind: github.Transient, Code: "transient", Err: errors.New("502")}}
+	for range 3 {
+		if it, _, err = runAndPublish(t, c, p, it); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if e, _ := p.Current().Repo("beta/deleted"); e == nil {
+		t.Fatal("the failing account's missed repository left while the account failed")
+	}
+	l.errs = nil
+	if _, _, err = runAndPublish(t, c, p, it); err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := p.Current().Repo("beta/deleted"); e != nil {
+		t.Error("the missed repository was not removed at the next listing that missed it: its count was reset")
+	}
+	if e, _ := p.Current().Repo("beta/b"); e == nil {
+		t.Error("beta/b left")
 	}
 }

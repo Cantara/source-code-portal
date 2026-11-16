@@ -241,6 +241,7 @@ export function GitHub({ s }: { s: AdminStatus }) {
                 <tr key={src.id} className="border-t border-border align-top">
                   <td className={cell}>
                     <span className="font-mono">{src.id}</span>
+                    {src.accountsUnread && <span className="block text-xs text-muted-foreground">accounts: not read yet</span>}
                     {src.accounts?.map((a) => (
                       <span key={a.account} className="block text-xs text-muted-foreground">
                         {a.account}: {a.selection === "selected" ? "the repositories selected on the App" : "all repositories"}
