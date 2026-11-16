@@ -4,6 +4,27 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.24
+
+With a GitHub App, the repositories selected on the App's installation are what the portal reads: selecting or removing one on
+GitHub is the whole configuration. Nothing new is asked of GitHub, and the store's schema does not change. New keys are optional.
+
+- **The App's selection is what the portal reads** (operator guide 1): an App installed on an organisation now lists the
+  installation's repositories, as one on a user account already did. *Only select repositories* gives exactly those, *All
+  repositories* all of them; the organisation's other public repositories no longer come in, so `exclude` lists that kept them out
+  can go. An App on *All repositories* reads what it read before.
+- **New repositories appear at once**: adding one to the installation lists that account straight away, and so does a push from a
+  repository the portal does not know yet (at most once every 15 seconds per source). Uninstalling or suspending the App on an
+  account, or deselecting every repository, empties that account after the confirming listing; a token's empty listing still keeps
+  the last catalogue.
+- **One account failing does not stop the others**: an account of a source that fails to list keeps its repositories while the
+  others are listed, and the listing runs again in a minute.
+- **A whole account as a group**: a group with `sources` and no `match` takes every repository of those sources.
+- **An App's own webhook secret**: `github.sources[].app.webhook_secret_file`, for Apps that do not share `webhook.secret_file`; a
+  delivery signed with any configured secret is accepted.
+- **Admin, GitHub, Sources** says per account whether the App reads the selected repositories or all of them.
+- **The operator plugin** (`run-scp` 1.15.0) names every scp.yaml key with its default.
+
 ## 2.2.23
 
 A deployment can name its own AI assistants, so their commits count as work with AI. The new key `commits.assistants` is optional;
