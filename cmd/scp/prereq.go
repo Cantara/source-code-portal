@@ -20,12 +20,12 @@ import (
 // prereqs checks what each feature needs of GitHub (design/prerequisites.md, P-71): an App's grants from its installations, a
 // token's refusals from the jobs' items, and logs when the unmet ones change.
 type prereqs struct {
-	sources  []string
-	source   func(id string) *github.Source
-	current  func() *snapshot.Snapshot // the full snapshot, private repositories included
-	webhooks bool
-	needs    []prereq.Need // of the features switched on
-	log      *slog.Logger
+	sources []string
+	source  func(id string) *github.Source
+	current func() *snapshot.Snapshot // the full snapshot, private repositories included
+	told    map[string]bool           // the sources GitHub tells of changes (not polled): their installations need the webhook events
+	needs   []prereq.Need             // of the features switched on
+	log     *slog.Logger
 
 	mu   gosync.Mutex
 	last string // the unmet ones last logged
@@ -51,7 +51,7 @@ func (p *prereqs) check() []prereq.Unmet {
 		if src == nil {
 			continue
 		}
-		ps := prereq.Source{ID: id, App: src.App()}
+		ps := prereq.Source{ID: id, App: src.App(), Webhooks: p.told[id]}
 		if ps.App {
 			ps.Grants, ps.Known = src.Grants()
 		} else {
@@ -59,7 +59,7 @@ func (p *prereqs) check() []prereq.Unmet {
 		}
 		in = append(in, ps)
 	}
-	unmet := prereq.Check(p.needs, in, p.webhooks)
+	unmet := prereq.Check(p.needs, in)
 	p.logChange(unmet)
 	return unmet
 }

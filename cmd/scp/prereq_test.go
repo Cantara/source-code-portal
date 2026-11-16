@@ -36,7 +36,7 @@ func TestPrerequisites(t *testing.T) {
 		t.Fatal(err)
 	}
 	empty := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler)).Current()
-	p := &prereqs{sources: []string{"gh"}, source: c.Source, current: func() *snapshot.Snapshot { return empty }, webhooks: true,
+	p := &prereqs{sources: []string{"gh"}, source: c.Source, current: func() *snapshot.Snapshot { return empty }, told: map[string]bool{"gh": true},
 		needs: prereq.Needs, log: slog.New(slog.DiscardHandler)}
 	get := func(admin bool) oapi.PrerequisiteList {
 		t.Helper()

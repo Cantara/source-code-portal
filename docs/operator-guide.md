@@ -97,7 +97,8 @@ been read for 10 minutes. `webhook.answers` says how long the portal took to ans
 A webhook on an organisation or a repository has no such log: there a delivery sent while the portal is down is lost, and the
 polls below are the net (releases every 30 minutes for such a source, as for one nothing tells). A push to another branch, and a
 deleted tag or branch, make the portal read that repository's history or tags again; an event of a repository the portal does not
-know yet (a new one, or one just given to the App) lists its account at once, at most once every 15 seconds. Issues and pull
+know yet (a new one, or one just given to the App) lists its account at once (at most once every 15 seconds, and once
+more when those 15 seconds end). Issues and pull
 requests are also read every 15 minutes whatever arrives (a 304 costs no rate limit), and the listing every five minutes asks for a
 read when a repository's count of open issues and pull requests moved.
 

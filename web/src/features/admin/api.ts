@@ -28,6 +28,7 @@ export interface AdminStatus {
     cadenceSeconds: Record<string, number>
     /** a GitHub App source's installations: what each reads, the repositories selected on GitHub or all of them. */
     accounts?: { account: string; selection: "selected" | "all" | string }[]
+    accountsUnread?: boolean
   }[]
   webhook: {
     enabled: boolean

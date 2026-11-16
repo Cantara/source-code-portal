@@ -116,7 +116,8 @@ func TestAppMode(t *testing.T) {
 func TestAppFollowsTheSelection(t *testing.T) {
 	srv := githubtest.New(t)
 	srv.Install("acme")
-	srv.Install("wide")
+	srv.Install("Wide")
+	srv.Install("elsewhere") // installed, but not an account of the source
 	chosen := srv.AddRepo("acme", gh.Repository{Name: new("chosen"), Visibility: new("public")})
 	srv.AddRepo("acme", gh.Repository{Name: new("left-out"), Visibility: new("public")})
 	srv.AddRepo("wide", gh.Repository{Name: new("a")})
@@ -145,8 +146,8 @@ func TestAppFollowsTheSelection(t *testing.T) {
 	for _, gr := range g {
 		sel[gr.Owner] = gr.Selection
 	}
-	if sel["acme"] != "selected" || sel["wide"] != "all" {
-		t.Errorf("selections = %v, want acme selected and wide all", sel)
+	if len(sel) != 2 || sel["acme"] != "selected" || sel["Wide"] != "all" {
+		t.Errorf("selections = %v, want acme selected and Wide all, as GitHub spells them, and no other account", sel)
 	}
 	srv.Uninstall("acme")
 	if err := s.RefreshInstallations(t.Context()); err != nil {

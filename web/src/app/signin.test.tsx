@@ -35,6 +35,16 @@ const status: AdminStatus = {
         { account: "beta", selection: "all" },
       ],
     },
+    {
+      id: "fresh",
+      repos: 3,
+      freshness: "fresh",
+      checkedAt: "2026-10-13T10:00:00Z",
+      rateRemaining: 1,
+      mode: "poll",
+      cadenceSeconds: {},
+      accountsUnread: true,
+    },
   ],
   webhook: { enabled: false, receiver: false, catchUp: false, deliveries: {}, lastDelivery: null },
   cluster: { enabled: false, connected: false, leader: true },
@@ -186,6 +196,9 @@ describe("admin", () => {
     // An App source says, per account, what it reads: the repositories selected on GitHub or all of them.
     expect(within(row).getByText("acme: the repositories selected on the App")).toBeInTheDocument()
     expect(within(row).getByText("beta: all repositories")).toBeInTheDocument()
+    // An App source whose installations were not read since the start says so.
+    const unread = screen.getByRole("row", { name: /^fresh/ })
+    expect(within(unread).getByText("accounts: not read yet")).toBeInTheDocument()
 
     fireEvent.click(within(nav).getByRole("link", { name: /^Overview/ }))
     expect(await screen.findByRole("heading", { name: "Snapshot" })).toBeInTheDocument()
