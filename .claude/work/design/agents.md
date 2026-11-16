@@ -16,7 +16,7 @@ agents the portal's own tools, the ones its assistant (A1) already uses, as the 
 - **WebMCP** (`document.modelContext`): an agent in the reader's browser (Chrome, Edge) calls the same tools through the page, with
   the reader's session: a signed-in reader's agent sees the private repositories the reader sees, and needs no token.
 
-A tool is written once, in Go, over the contract's methods and the llms Markdown pages (`cmd/scp/tools.go`), so it sees exactly
+A tool is written once, in Go, over the contract's methods and the llms Markdown pages (`internal/app/toolset`), so it sees exactly
 the viewer's view (`Current(ctx)`): the leak test covers every way to call it. The browser never reimplements a tool: the page
 registers what `GET /api/v1/tools` lists and runs a call with `POST /api/v1/tools/{name}`.
 
@@ -112,6 +112,6 @@ feature `tools` (default `'self'`).
 
 | M | Delivers | Done when |
 |---|---|---|
-| W1 | `internal/platform/tools`, the catalogue in `cmd/scp/tools.go` used by the assistant, `GET`/`POST /api/v1/tools` in the contract | the assistant's tests pass on the catalogue; the leak test calls every tool as the public |
+| W1 | `internal/platform/tools`, the catalogue in `internal/app/toolset` used by the assistant, `GET`/`POST /api/v1/tools` in the contract | the assistant's tests pass on the catalogue; the leak test calls every tool as the public |
 | W2 | `/mcp` over the catalogue | an MCP client lists and calls the tools, sees the private repository with a token and not without; another origin is refused |
 | W3 | WebMCP in the web UI, the docs, the Guide's section, the plugin | Playwright with a fake `document.modelContext` registers and runs the tools, page-aware |

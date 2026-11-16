@@ -26,7 +26,7 @@ const (
 // Options configures the assistant; a nil Chat turns it off.
 type Options struct {
 	Chat   llm.Chat
-	Tools  *tools.Catalogue // the read-only tools over the viewer's view (cmd/scp/tools.go); nil: none
+	Tools  *tools.Catalogue // the read-only tools over the viewer's view (internal/app/toolset); nil: none
 	Access string           // signed-in, admin or everyone
 	Budget Budget
 	// PublicURL is the portal's origin for the CSRF rule and the system prompt.

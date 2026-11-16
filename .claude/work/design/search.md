@@ -57,7 +57,7 @@ Not indexed: other branches' commits (they rotate, and the default branch is whe
 
 ## Q1: the index (`internal/feature/search`)
 
-A feature, as `llms`: it never imports another feature; `cmd/scp/search.go` hands it each repository's documents through
+A feature, as `llms`: it never imports another feature; `internal/app/searchfeed` hands it each repository's documents through
 `search.Options` (functions, as `llms.Options`), mapping the facets of `catalog`, `docs`, `manifests`, `packages`, `commits` and
 `badges` to `search.Document{Kind, Ref, Title, Fields, At}`. The commits' sweeps (fleet-wide) and kinds come through an option too,
 read at query time, so a segment depends only on its repository.

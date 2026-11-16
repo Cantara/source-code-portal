@@ -23,6 +23,9 @@ import (
 	"github.com/spf13/cobra"
 
 	contract "github.com/cantara/source-code-portal/api"
+	"github.com/cantara/source-code-portal/internal/app/fleethealth"
+	"github.com/cantara/source-code-portal/internal/app/searchfeed"
+	"github.com/cantara/source-code-portal/internal/app/toolset"
 	"github.com/cantara/source-code-portal/internal/feature/announce"
 	"github.com/cantara/source-code-portal/internal/feature/assistant"
 	"github.com/cantara/source-code-portal/internal/feature/badges"
@@ -124,7 +127,7 @@ type (
 		*assistant.Assistant
 		toolsAPI
 		searchAPI
-		rulesAPI
+		fleethealth.RulesAPI
 		*prereqs
 	}
 )
@@ -261,7 +264,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	}
 
 	f := cfg.Features // a switched-off feature is absent: no job, index, route, tool or page (design/features.md)
-	indexers := []snapshot.Indexer{commits.Feeds(commitRules(cfg.Commits)), manifests.Graph(), search.Indexer(searchOptions())}
+	indexers := []snapshot.Indexer{commits.Feeds(commitRules(cfg.Commits)), manifests.Graph(), search.Indexer(searchfeed.Options())}
 	if f.Pulls {
 		indexers = append(indexers, pulls.Feeds())
 	}
@@ -424,10 +427,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if f.Pulls {
 		repoHooks = append(repoHooks, pulls.Repo)
 	}
-	repoHooks = append(repoHooks, repoIssuesAPI, repoHealthAPI)
+	repoHooks = append(repoHooks, fleethealth.RepoIssuesAPI, fleethealth.RepoAPI)
 	catalogAPI := catalog.API{Current: view,
-		Dashboard:    []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, dashboardHealthAPI, dashboardSummaryAPI},
-		Group:        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){groupHealthAPI},
+		Dashboard:    []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, fleethealth.DashboardAPI, fleethealth.DashboardSummary},
+		Group:        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){fleethealth.GroupAPI},
 		Repo:         repoHooks,
 		Detail:       []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
 		ArchiveEntry: []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.ArchiveEntry){manifests.ArchiveEntry, commits.ArchiveEntry}}
@@ -444,7 +447,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		return names
 	}
 	searchAPI := search.API{Current: view, Observe: m.search}
-	catalogue, err := toolReads{find: searchAPI, catalog: catalogAPI, commits: commitsAPI, pulls: pullsAPI, issues: issuesAPI, releases: newReleases(view, documents), insights: newInsights(view), repo: md.Repo(), doc: md.Doc(), group: md.Group(), features: f}.catalogue()
+	catalogue, err := toolset.Reads{Find: searchAPI, Catalog: catalogAPI, Commits: commitsAPI, Pulls: pullsAPI, Issues: issuesAPI, Releases: newReleases(view, documents), Insights: newInsights(view), Repo: md.Repo(), Doc: md.Doc(), Group: md.Group(), Features: f}.Catalogue()
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +467,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	routes = append(routes, httpapi.Route{Pattern: "GET " + configPath, Handler: configHandler(cfg.Baseline.File, s.visibility, s.notices, s.layouts)})
 	features := api{catalogAPI, commitsAPI, pullsAPI, issuesAPI, newReleases(view, documents), newInsights(view), docs.API{Current: view}, manifests.API{Current: view},
 		layout.API{Current: view, Store: s.layouts, Notices: s.notices.For, Off: offElements(f)},
-		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, rulesAPI{f, s.people != nil}, s.prereqs}
+		httpapi.SnapshotAPI{Current: view}, me, ask, agents, searchAPI, fleethealth.RulesAPI{Features: f, People: s.people != nil}, s.prereqs}
 	if s.web != nil {
 		opts.Build = s.web.Build
 	}
@@ -579,7 +582,7 @@ func latestRelease(e *snapshot.RepoEntry) (*badges.Release, snapshot.Freshness) 
 }
 
 func badgeData(f config.Features) badges.Data {
-	d := badges.Data{LastCommit: commits.LastCommit, Release: latestRelease, Health: assess, Product: groupHealth, Issues: issueCount}
+	d := badges.Data{LastCommit: commits.LastCommit, Release: latestRelease, Health: fleethealth.Assess, Product: fleethealth.Group, Issues: fleethealth.IssueCount}
 	if f.Pulls {
 		d.Pulls = pulls.Badge
 	}

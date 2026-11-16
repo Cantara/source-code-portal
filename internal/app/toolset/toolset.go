@@ -1,4 +1,4 @@
-package main
+package toolset
 
 import (
 	"context"
@@ -11,6 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cantara/source-code-portal/internal/feature/catalog"
+	"github.com/cantara/source-code-portal/internal/feature/commits"
+	"github.com/cantara/source-code-portal/internal/feature/insights"
+	"github.com/cantara/source-code-portal/internal/feature/issues"
+	"github.com/cantara/source-code-portal/internal/feature/pulls"
+	"github.com/cantara/source-code-portal/internal/feature/releases"
+	"github.com/cantara/source-code-portal/internal/feature/search"
 	"github.com/cantara/source-code-portal/internal/platform/config"
 	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/platform/snapshot"
@@ -19,16 +26,16 @@ import (
 
 // The handlers the tools read through: the contract's methods and the llms Markdown pages, called in process with the request's
 // context, so a tool sees exactly what the viewer may see.
-type toolReads struct {
-	find             searchAPI
-	catalog          catalogAPI
-	commits          commitsAPI
-	pulls            pullsAPI
-	issues           issuesAPI
-	releases         releasesAPI
-	insights         insightsAPI
-	repo, doc, group http.Handler
-	features         config.Features // a switched-off feature has no tool and no search kind (design/features.md)
+type Reads struct {
+	Find             search.API
+	Catalog          catalog.API
+	Commits          commits.API
+	Pulls            pulls.API
+	Issues           issues.API
+	Releases         releases.API
+	Insights         insights.API
+	Repo, Doc, Group http.Handler
+	Features         config.Features // a switched-off feature has no tool and no search kind (design/features.md)
 }
 
 func schema(required []string, props map[string]any) map[string]any {
@@ -62,8 +69,8 @@ func intArg(in map[string]any, key string, def, maxN int) int {
 	return min(int(f), maxN)
 }
 
-// catalogue is the tools agents call (design/agents.md): the assistant, MCP and WebMCP.
-func (r toolReads) catalogue() (*tools.Catalogue, error) {
+// Catalogue is the tools agents call (design/agents.md): the assistant, MCP and WebMCP.
+func (r Reads) Catalogue() (*tools.Catalogue, error) {
 	limit := map[string]any{"type": "integer", "minimum": 1, "maximum": 50, "description": "At most this many, up to 50 (default 20)"}
 	work := map[string]any{"type": "array", "description": "The work that counts: hand (people without an AI), ai (with an AI co-author or a coding agent), automation (bots and sweeps); default every kind but automation",
 		"items": map[string]any{"type": "string", "enum": []string{"hand", "ai", "automation"}}}
@@ -80,11 +87,11 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 	}
 	holds, kinds := "published packages, default-branch commits and releases", []string{"repo", "group", "doc", "dep", "package", "commit", "release"}
 	switch {
-	case r.features.Pulls && r.features.Issues:
+	case r.Features.Pulls && r.Features.Issues:
 		holds, kinds = "published packages, default-branch commits, releases, open pull requests and open issues", append(kinds, "pull", "issue")
-	case r.features.Pulls:
+	case r.Features.Pulls:
 		holds, kinds = "published packages, default-branch commits, releases and open pull requests", append(kinds, "pull")
-	case r.features.Issues:
+	case r.Features.Issues:
 		holds, kinds = "published packages, default-branch commits, releases and open issues", append(kinds, "issue")
 	}
 	all := []tools.Tool{
@@ -191,14 +198,14 @@ func (r toolReads) catalogue() (*tools.Catalogue, error) {
 		repoTool("repository_packages", "Repository packages", "Lists what a repository publishes to package registries (Maven, npm, PyPI, crates.io, Go, NuGet, ...) with the newest release of each.", "Reading the packages of", r.packages),
 	}
 	return tools.New(slices.DeleteFunc(all, func(t tools.Tool) bool {
-		return t.Name == "open_pull_requests" && !r.features.Pulls || t.Name == "open_issues" && !r.features.Issues
+		return t.Name == "open_pull_requests" && !r.Features.Pulls || t.Name == "open_issues" && !r.Features.Issues
 	})...)
 }
 
 var errNotFound = errors.New("not found in the catalogue")
 
 // openIssues lists open issues what waits first (design/issues.md) with the counts by state and kind.
-func (r toolReads) openIssues(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) openIssues(ctx context.Context, in map[string]any) (tools.Result, error) {
 	limit := intArg(in, "limit", 20, 50)
 	params := oapi.ListIssuesParams{Limit: &limit}
 	if g := arg(in, "group"); g != "" {
@@ -219,7 +226,7 @@ func (r toolReads) openIssues(ctx context.Context, in map[string]any) (tools.Res
 		v := oapi.ListIssuesParamsBy(by)
 		params.By = &v
 	}
-	res, err := r.issues.ListIssues(ctx, oapi.ListIssuesRequestObject{Params: params})
+	res, err := r.Issues.ListIssues(ctx, oapi.ListIssuesRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -250,7 +257,7 @@ func (r toolReads) openIssues(ctx context.Context, in map[string]any) (tools.Res
 }
 
 // openPulls lists open pull requests whose turn first (design/pulls.md) with the counts by state.
-func (r toolReads) openPulls(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) openPulls(ctx context.Context, in map[string]any) (tools.Result, error) {
 	limit := intArg(in, "limit", 20, 50)
 	params := oapi.ListPullsParams{Limit: &limit}
 	if g := arg(in, "group"); g != "" {
@@ -267,7 +274,7 @@ func (r toolReads) openPulls(ctx context.Context, in map[string]any) (tools.Resu
 		v := oapi.ListPullsParamsBy(by)
 		params.By = &v
 	}
-	res, err := r.pulls.ListPulls(ctx, oapi.ListPullsRequestObject{Params: params})
+	res, err := r.Pulls.ListPulls(ctx, oapi.ListPullsRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -295,7 +302,7 @@ func (r toolReads) openPulls(ctx context.Context, in map[string]any) (tools.Resu
 }
 
 // recentReleases lists the recent releases (design/releases.md) with the counts by variant.
-func (r toolReads) recentReleases(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) recentReleases(ctx context.Context, in map[string]any) (tools.Result, error) {
 	limit := intArg(in, "limit", 20, 50)
 	params := oapi.ListReleasesParams{Limit: &limit}
 	if g := arg(in, "group"); g != "" {
@@ -319,7 +326,7 @@ func (r toolReads) recentReleases(ctx context.Context, in map[string]any) (tools
 		x := oapi.ReleaseSort(v)
 		params.Sort = &x
 	}
-	res, err := r.releases.ListReleases(ctx, oapi.ListReleasesRequestObject{Params: params})
+	res, err := r.Releases.ListReleases(ctx, oapi.ListReleasesRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -358,7 +365,7 @@ func (r toolReads) recentReleases(ctx context.Context, in map[string]any) (tools
 }
 
 // retired lists the retired repositories (design/archive.md) with the counts by reason.
-func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) retired(ctx context.Context, in map[string]any) (tools.Result, error) {
 	limit := intArg(in, "limit", 20, 50)
 	params := oapi.ListArchiveParams{Limit: &limit}
 	if g := arg(in, "group"); g != "" {
@@ -378,7 +385,7 @@ func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result
 		x := oapi.ArchiveSort(v)
 		params.Sort = &x
 	}
-	res, err := r.catalog.ListArchive(ctx, oapi.ListArchiveRequestObject{Params: params})
+	res, err := r.Catalog.ListArchive(ctx, oapi.ListArchiveRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -404,7 +411,7 @@ func (r toolReads) retired(ctx context.Context, in map[string]any) (tools.Result
 }
 
 // fleetInsights tells the five insights (design/insights.md) in words and lists.
-func (r toolReads) fleetInsights(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) fleetInsights(ctx context.Context, in map[string]any) (tools.Result, error) {
 	params := oapi.GetInsightsParams{}
 	if g := arg(in, "group"); g != "" {
 		params.Group = &g
@@ -412,7 +419,7 @@ func (r toolReads) fleetInsights(ctx context.Context, in map[string]any) (tools.
 	if p := strings.ToLower(arg(in, "repo")); p != "" {
 		params.Repo = &p
 	}
-	res, err := r.insights.GetInsights(ctx, oapi.GetInsightsRequestObject{Params: params})
+	res, err := r.Insights.GetInsights(ctx, oapi.GetInsightsRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -469,14 +476,14 @@ func day(t *time.Time) string {
 }
 
 // search runs the portal's search (design/search.md) and lists the best hits with their snippets.
-func (r toolReads) search(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) search(ctx context.Context, in map[string]any) (tools.Result, error) {
 	limit := intArg(in, "limit", 20, 50)
 	params := oapi.SearchParams{Q: arg(in, "query"), Limit: &limit}
 	if k := arg(in, "in"); k != "" {
 		kind := oapi.SearchKind(k)
 		params.In = &kind
 	}
-	res, err := r.find.Search(ctx, oapi.SearchRequestObject{Params: params})
+	res, err := r.Find.Search(ctx, oapi.SearchRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -529,8 +536,8 @@ func plainParts(ps []oapi.TextPart) string {
 	return b.String()
 }
 
-func (r toolReads) listGroups(ctx context.Context, _ map[string]any) (tools.Result, error) {
-	res, err := r.catalog.ListGroups(ctx, oapi.ListGroupsRequestObject{})
+func (r Reads) listGroups(ctx context.Context, _ map[string]any) (tools.Result, error) {
+	res, err := r.Catalog.ListGroups(ctx, oapi.ListGroupsRequestObject{})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -564,9 +571,9 @@ func page(ctx context.Context, h http.Handler, target string, values map[string]
 	return w.Body.String(), nil
 }
 
-func (r toolReads) getGroup(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) getGroup(ctx context.Context, in map[string]any) (tools.Result, error) {
 	g := arg(in, "group")
-	text, err := page(ctx, r.group, snapshot.GroupPage(g), map[string]string{"group": g})
+	text, err := page(ctx, r.Group, snapshot.GroupPage(g), map[string]string{"group": g})
 	if err != nil {
 		return tools.Result{}, fmt.Errorf("the group %q is %w; list_groups names them", g, err)
 	}
@@ -574,10 +581,10 @@ func (r toolReads) getGroup(ctx context.Context, in map[string]any) (tools.Resul
 }
 
 // resolve finds a repository the viewer may see, following a rename.
-func (r toolReads) resolve(ctx context.Context, in map[string]any) (oapi.RepoDetail, error) {
+func (r Reads) resolve(ctx context.Context, in map[string]any) (oapi.RepoDetail, error) {
 	owner, name := arg(in, "owner"), arg(in, "name")
 	for range 2 {
-		res, err := r.catalog.GetRepo(ctx, oapi.GetRepoRequestObject{Owner: owner, Name: name})
+		res, err := r.Catalog.GetRepo(ctx, oapi.GetRepoRequestObject{Owner: owner, Name: name})
 		if err != nil {
 			return oapi.RepoDetail{}, err
 		}
@@ -593,34 +600,34 @@ func (r toolReads) resolve(ctx context.Context, in map[string]any) (oapi.RepoDet
 	return oapi.RepoDetail{}, fmt.Errorf("the repository %s/%s is %w; search finds them", arg(in, "owner"), arg(in, "name"), errNotFound)
 }
 
-func (r toolReads) getRepository(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) getRepository(ctx context.Context, in map[string]any) (tools.Result, error) {
 	d, err := r.resolve(ctx, in)
 	if err != nil {
 		return tools.Result{}, err
 	}
 	owner, name, _ := strings.Cut(d.Repo.Address, "/")
-	text, err := page(ctx, r.repo, "/", map[string]string{"owner": owner, "name": name})
+	text, err := page(ctx, r.Repo, "/", map[string]string{"owner": owner, "name": name})
 	if err != nil {
 		return tools.Result{}, err
 	}
 	return tools.Result{Source: snapshot.RepoPage(snapshot.RepoKey(d.Repo.Address)), Text: text}, nil
 }
 
-func (r toolReads) getDocument(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) getDocument(ctx context.Context, in map[string]any) (tools.Result, error) {
 	d, err := r.resolve(ctx, in)
 	if err != nil {
 		return tools.Result{}, err
 	}
 	owner, name, _ := strings.Cut(d.Repo.Address, "/")
 	p := strings.TrimPrefix(arg(in, "path"), "/")
-	text, err := page(ctx, r.doc, "/", map[string]string{"owner": owner, "name": name, "path": p})
+	text, err := page(ctx, r.Doc, "/", map[string]string{"owner": owner, "name": name, "path": p})
 	if err != nil {
 		return tools.Result{}, fmt.Errorf("the document %s of %s is %w", p, d.Repo.Address, err)
 	}
 	return tools.Result{Source: snapshot.DocPage(snapshot.RepoKey(d.Repo.Address), p), Text: text}, nil
 }
 
-func (r toolReads) recentCommits(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) recentCommits(ctx context.Context, in map[string]any) (tools.Result, error) {
 	limit, no := intArg(in, "limit", 20, 50), false
 	params := oapi.ListCommitsParams{Automation: &no, Limit: &limit}
 	if kinds, _ := in["work"].([]any); len(kinds) > 0 {
@@ -637,7 +644,7 @@ func (r toolReads) recentCommits(ctx context.Context, in map[string]any) (tools.
 	if p := strings.ToLower(arg(in, "repo")); p != "" {
 		params.Repo = &p
 	}
-	res, err := r.commits.ListCommits(ctx, oapi.ListCommitsRequestObject{Params: params})
+	res, err := r.Commits.ListCommits(ctx, oapi.ListCommitsRequestObject{Params: params})
 	if err != nil {
 		return tools.Result{}, err
 	}
@@ -656,7 +663,7 @@ func (r toolReads) recentCommits(ctx context.Context, in map[string]any) (tools.
 	return tools.Result{Source: "/commits", Text: b.String()}, nil
 }
 
-func (r toolReads) health(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) health(ctx context.Context, in map[string]any) (tools.Result, error) {
 	d, err := r.resolve(ctx, in)
 	if err != nil {
 		return tools.Result{}, err
@@ -691,7 +698,7 @@ func (r toolReads) health(ctx context.Context, in map[string]any) (tools.Result,
 	return tools.Result{Source: snapshot.RepoPage(snapshot.RepoKey(p.Address)), Text: b.String()}, nil
 }
 
-func (r toolReads) packages(ctx context.Context, in map[string]any) (tools.Result, error) {
+func (r Reads) packages(ctx context.Context, in map[string]any) (tools.Result, error) {
 	d, err := r.resolve(ctx, in)
 	if err != nil {
 		return tools.Result{}, err

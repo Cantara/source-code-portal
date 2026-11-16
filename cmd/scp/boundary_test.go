@@ -15,13 +15,15 @@ import (
 
 const internalPrefix = "github.com/cantara/source-code-portal/internal/"
 
-// layers are internal/'s three layers and what each may import of internal/, by layer: a lib package (a pure helper) nothing; a
+// layers are internal/'s four layers and what each may import of internal/, by layer: a lib package (a pure helper) nothing; a
 // platform package (what the features stand on) the platform and lib; a feature (what users see) the platform, lib and its own
-// packages, never another feature. The wiring of features happens in cmd/scp.
+// packages, never another feature; an app package (what joins features: the tools, what search reads, the fleet's health) the
+// features, the platform, lib and its own packages, never another app package. Nothing in internal/ imports app; cmd/scp wires.
 var layers = map[string][]string{ //nolint:gochecknoglobals // test table
 	"lib":      nil,
 	"platform": {"platform", "lib"},
 	"feature":  {"platform", "lib"},
+	"app":      {"feature", "platform", "lib"},
 }
 
 // boundaryViolations returns one entry per import that breaks the layers, for the tree under root (an internal/ dir); a package
@@ -39,7 +41,7 @@ func boundaryViolations(t *testing.T, root string) []string {
 		own, _, _ := strings.Cut(rest, "/")
 		allowed, known := layers[layer]
 		if !known {
-			out = append(out, rel+" is outside the layers feature/, platform/ and lib/")
+			out = append(out, rel+" is outside the layers app/, feature/, platform/ and lib/")
 			return nil
 		}
 		f, err := parser.ParseFile(token.NewFileSet(), p, nil, parser.ImportsOnly)
@@ -95,10 +97,13 @@ func TestBoundaryCheckFindsViolation(t *testing.T) {
 	write("platform/sync/sync.go", imp("sync", "lib/lru"))           // the platform on a helper: fine
 	write("platform/snapshot/s.go", imp("snapshot", "feature/ci"))   // the platform on a feature
 	write("lib/lru/lru.go", imp("lru", "platform/sync"))             // a helper on the platform
+	write("app/tools/t.go", imp("tools", "feature/docs"))            // app on a feature: fine
+	write("app/feed/f.go", imp("feed", "app/tools"))                 // app on another app package
+	write("feature/ci/app.go", imp("ci", "app/tools"))               // a feature on app
 	write("stray/x.go", "package stray\n")                           // outside the layers
 	got := boundaryViolations(t, root)
 	slices.Sort(got)
-	want := []string{"feature/docs/docs.go imports", "lib/lru/lru.go imports", "platform/snapshot/s.go imports", "stray/x.go is outside"}
+	want := []string{"app/feed/f.go imports", "feature/ci/app.go imports", "feature/docs/docs.go imports", "lib/lru/lru.go imports", "platform/snapshot/s.go imports", "stray/x.go is outside"}
 	if len(got) != len(want) {
 		t.Fatalf("violations = %q, want %d", got, len(want))
 	}

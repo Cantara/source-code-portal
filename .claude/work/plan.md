@@ -46,7 +46,7 @@ Rules (checked as described in `design/principles.md`):
    proxy (document images, cached) are the only code that talks to GitHub, and only to read: read permissions, GET requests and
    GraphQL queries, never a write or a mutation (P-71).
 2. Features do not import features. Each feature owns its data on the snapshot (typed facets on the repository entries, indexes over
-   all of them), its jobs and its feature-only GitHub calls; a consumer declares the small function it needs and `cmd/scp` wires it. `internal/` is in three layers, `feature/`, `platform/` and `lib/`: a feature imports the platform, lib and its own packages, the platform imports the platform and lib, lib nothing of `internal/`; `cmd/scp/boundary_test.go` (`TestLayersHold`) enforces the imports. The web UI keeps the same rule for `web/src/features`.
+   all of them), its jobs and its feature-only GitHub calls; a consumer declares the small function it needs and `cmd/scp` wires it. `internal/` is in four layers, `app/`, `feature/`, `platform/` and `lib/`: an app package (what joins features) imports features, the platform and lib, never another app package; a feature imports the platform, lib and its own packages, the platform imports the platform and lib, lib nothing of `internal/`; `cmd/scp/boundary_test.go` (`TestLayersHold`) enforces the imports. The web UI keeps the same rule for `web/src/features`.
 3. Failure is data: each item carries its freshness; the last good state is served.
 4. Untrusted input (README, descriptor, manifests, webhook bodies) goes through bounded parsers and one sanitiser producing `SafeHTML`.
 5. SQLite is the one place data lives and memory only loads it (P-97): the catalogue part can be read again from GitHub, but the documents administrators save and the sealed credentials are data, so the file is backed up, and every acknowledged write is synced to disk (an instance that dies must survive).
@@ -176,6 +176,6 @@ Each milestone starts with its design note and lands as small commits on `main`,
 `.golangci.yml` holds `gocyclo` at 45 and `gocognit` at 65 (tests excepted): the worst functions today, so none gets harder to read. These are the ones past
 a sensible limit (cyclomatic 25, cognitive 40), to split when their code is next changed, worst first, then the ceilings come down:
 `search.(*Index).run` (cognitive 106, suppressed), `pulls.readPulls` (62), `issues.readIssues` (58), `packages.PyPI.project` (55),
-`cmd/scp.newServer` (53), `commits.sides` (50), `cmd/scp.searchRead` (48), `httpapi.Options.wrap` (44), `commits.layout` (43), `docs.rewrite` (42);
+`cmd/scp.newServer` (53), `commits.sides` (50), `searchfeed.Read` (51), `httpapi.Options.wrap` (44), `commits.layout` (43), `docs.rewrite` (42);
 cyclomatic: `search.(*Index).run` (43), `cmd/scp.newServer` (42), `config.Announcement.check` (35), `commits.API.GetHistory` (31), `packages.Client.Get` (31), `manifests.parsePOM` (30), `search.Parse` (30),
 `layout.check` (28), `config.Packages.validate` (27), `config.GitHub.validate` (27), `packages.parseVersion` (26), `catalog.ParseDescriptor` (26).
