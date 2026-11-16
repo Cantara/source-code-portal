@@ -3,20 +3,15 @@ package main
 import (
 	"cmp"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"maps"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"net/url"
 	"slices"
 	"strings"
-	gosync "sync"
 	"sync/atomic"
 	"time"
 
@@ -42,7 +37,6 @@ import (
 	"github.com/cantara/source-code-portal/internal/feature/releases"
 	"github.com/cantara/source-code-portal/internal/feature/search"
 	"github.com/cantara/source-code-portal/internal/feature/visibility"
-	"github.com/cantara/source-code-portal/internal/feature/webhook"
 	"github.com/cantara/source-code-portal/internal/lib/egress"
 	"github.com/cantara/source-code-portal/internal/lib/safehtml"
 	"github.com/cantara/source-code-portal/internal/platform/analytics"
@@ -58,7 +52,6 @@ import (
 	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 	"github.com/cantara/source-code-portal/internal/platform/store"
 	"github.com/cantara/source-code-portal/internal/platform/sync"
-	"github.com/cantara/source-code-portal/internal/platform/theme"
 	"github.com/cantara/source-code-portal/internal/platform/tools"
 	"github.com/cantara/source-code-portal/internal/platform/webui"
 )
@@ -497,228 +490,6 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	return s, nil
 }
 
-// newAuth builds sign-in from the config. A session keeps only the provider's groups the access lists name, so it fits a cookie;
-// a group added to a list applies at the next sign-in, one removed at once.
-func newAuth(cfg config.Config, log *slog.Logger, launch *auth.Launch) (*auth.Auth, error) {
-	a := cfg.Auth
-	named := slices.Concat(cfg.Access.PrivateGroups, a.AdminGroups)
-	o := auth.Options{SessionTTL: a.SessionTTL, PublicURL: cfg.Server.PublicURL, Log: log, Launch: launch,
-		Keep: func(groups []string) []string {
-			return slices.DeleteFunc(slices.Clone(groups), func(g string) bool { return !slices.Contains(named, g) })
-		}}
-	if a.SignIn() {
-		o.SessionKey = a.SessionKey.Reveal()
-	}
-	for _, t := range a.Tokens {
-		o.Tokens = append(o.Tokens, auth.Token{Name: t.Name, Secret: t.Secret.Reveal(), Groups: t.Groups, Admin: t.Admin, Login: t.Login})
-	}
-	if a.OIDC.Issuer != "" {
-		o.OIDC = &auth.OIDC{Issuer: a.OIDC.Issuer, ClientID: a.OIDC.ClientID, ClientSecret: string(a.OIDC.ClientSecret.Reveal()),
-			Scopes: a.OIDC.Scopes, GroupsClaim: a.OIDC.GroupsClaim, RequireVerifiedEmail: a.OIDC.RequireVerifiedEmail,
-			IdentityClaim: a.OIDC.IdentityClaim, NoUserInfo: !a.OIDC.UserInfo}
-	}
-	return auth.New(o)
-}
-
-// llmsOptions is what the Markdown surface shows of the other features: documents, the descriptor, the manifests' summary and the
-// commits' freshness.
-func llmsOptions(origin func(*http.Request) string, f config.Features, vis *visibility.Set) llms.Options {
-	o := llms.Options{
-		Docs: func(e *snapshot.RepoEntry) ([]llms.Doc, snapshot.Freshness) {
-			ds, fresh := docs.Of(e)
-			out := make([]llms.Doc, 0, len(ds))
-			for _, d := range ds {
-				out = append(out, llms.Doc{Path: d.Path, BlobSHA: d.BlobSHA, README: d.README, Truncated: d.Truncated, Hidden: d.Hidden,
-					Source: d.Source})
-			}
-			return out, fresh
-		},
-		About: func(e *snapshot.RepoEntry) llms.About {
-			d, _ := catalog.DescriptorOf(e)
-			return llms.About{Description: d.Description, Lifecycle: d.Lifecycle, Owners: d.Owners}
-		},
-		Technology: func(s *snapshot.Snapshot, e *snapshot.RepoEntry) llms.Technology {
-			sum := manifests.Summarise(s, e)
-			t := llms.Technology{Languages: sum.Technology.Languages, BuildTools: sum.Technology.BuildTools, Uses: sum.Uses, UsedBy: sum.UsedBy}
-			for _, tc := range sum.Technology.Toolchains {
-				for _, v := range tc.Versions {
-					t.Toolchains = append(t.Toolchains, string(tc.Name)+" "+v)
-				}
-			}
-			return t
-		},
-		Freshness:     func(e *snapshot.RepoEntry) snapshot.Freshness { _, f := commits.Of(e); return f },
-		Indexed:       vis.Indexed,
-		IndexedGroup:  vis.IndexedGroup,
-		IndexRevision: vis.Revision,
-		LastCommit:    func(e *snapshot.RepoEntry) time.Time { t, _ := commits.LastCommit(e); return t },
-		Origin:        origin,
-		Release: func(e *snapshot.RepoEntry) (llms.Release, bool) {
-			rel, _ := releases.Latest(e)
-			if rel == nil {
-				return llms.Release{}, false
-			}
-			return llms.Release{Tag: rel.Tag, URL: rel.URL, Published: rel.Published}, true
-		},
-		Retired: func(e *snapshot.RepoEntry) string { return string(catalog.Retired(e)) },
-	}
-	if f.Pulls {
-		o.Pulls = pulls.Badge
-	}
-	if f.Issues {
-		o.Issues = issues.Summary
-	}
-	return o
-}
-
-// badgeData is what the badges show of the other features; without pull requests there is no pulls badge.
-// latestRelease hands the badges a repository's latest stable release from the releases feature.
-func latestRelease(e *snapshot.RepoEntry) (*badges.Release, snapshot.Freshness) {
-	rel, fresh := releases.Latest(e)
-	if rel == nil {
-		return nil, fresh
-	}
-	return &badges.Release{Tag: rel.Tag, Name: rel.Name, URL: rel.URL, Published: rel.Published}, fresh
-}
-
-func badgeData(f config.Features) badges.Data {
-	d := badges.Data{LastCommit: commits.LastCommit, Release: latestRelease, Health: fleethealth.Assess, Product: fleethealth.Group, Issues: fleethealth.IssueCount}
-	if f.Pulls {
-		d.Pulls = pulls.Badge
-	}
-	return d
-}
-
-// newToken is the secret of this process the web UI server shows on its API calls (httpapi.Options.WebToken).
-func newToken() string {
-	var b [32]byte
-	_, _ = rand.Read(b[:])
-	return hex.EncodeToString(b[:])
-}
-
-// loopback is the address the web UI server reaches the public listener at: its own IP, or loopback when it listens on all.
-func loopback(addr net.Addr) string {
-	host, port, _ := net.SplitHostPort(addr.String())
-	if ip := net.ParseIP(host); ip == nil || ip.IsUnspecified() {
-		host = "127.0.0.1"
-	}
-	return "http://" + net.JoinHostPort(host, port)
-}
-
-// watchPrereqs checks the prerequisites at every publish (the App's installations are listed again with each source's listing),
-// so a change is logged when it happens, not when a page asks.
-func (s *server) watchPrereqs(ctx context.Context) {
-	for {
-		s.prereqs.check()
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.pub.Published():
-		}
-	}
-}
-
-// deliver hands a webhook event to the engine of every instance (through the cluster when there is one, else or when it fails to
-// this one's): per repository when repo is set, else per source.
-func (s *server) deliver(ev sync.Event, repo snapshot.RepoKey, source string) {
-	if s.member != nil {
-		err := s.member.Event(context.Background(), ev, repo, source)
-		if err == nil {
-			return
-		}
-		s.log.Warn("webhook event not sent to the cluster; handled here", "err", err)
-	}
-	if repo == "" {
-		s.engine.NotifySource(ev, source)
-	} else {
-		s.engine.Notify(ev, repo)
-	}
-}
-
-// webhookSink is webhookSink over the server's inbox, knowing a repository by the current snapshot (an old address included).
-func (s *server) webhookSink(sources []config.Source) webhook.Sink {
-	return webhookSink(s.inbox.take, func(k snapshot.RepoKey) bool { e, moved := s.pub.Current().Repo(k); return e != nil || moved }, sources)
-}
-
-// discoverEvery is the least time between two listings of a source that events of repositories the portal does not know cause: a
-// burst of them costs one listing at once and one when the window closes.
-const discoverEvery = 15 * time.Second
-
-// declinedFor is how long an address that asked for a listing does not ask again: a repository the source leaves out (excluded,
-// private without include_private) stays unknown after the listing, and its pushes would otherwise list the source every window.
-const declinedFor = time.Hour
-
-// webhookSink hands webhook events on: repository events to the repository's jobs, owner-wide events to the listing of the source
-// that has the owner among its organisations. An event of a repository the portal does not know (known is false: added to the App's
-// selection, created, or not published yet after a start) is passed on as well, so the inbox keeps it until the repository is known,
-// and lists its source (discovery). Owners no source lists are ignored.
-func webhookSink(take func(sync.Event, snapshot.RepoKey, string) error, known func(snapshot.RepoKey) bool, sources []config.Source) webhook.Sink {
-	d := &discovery{take: take, last: map[string]time.Time{}, armed: map[string]bool{}, asked: map[snapshot.RepoKey]time.Time{}}
-	sourceOf := map[string]string{}
-	for _, s := range sources {
-		for _, org := range s.Orgs {
-			sourceOf[strings.ToLower(org)] = s.ID
-		}
-	}
-	return func(ev sync.Event, owner, name string) error {
-		id, ok := sourceOf[strings.ToLower(owner)]
-		switch {
-		case !ok:
-			return nil
-		case name == "" || ev == sync.EventSourceChanged:
-			return take(ev, "", id)
-		case !known(snapshot.KeyOf(owner, name)):
-			key := snapshot.KeyOf(owner, name)
-			err := take(ev, key, "")
-			d.ask(id, key)
-			return err
-		default:
-			return take(ev, snapshot.KeyOf(owner, name), "")
-		}
-	}
-}
-
-// discovery lists a source for the events of repositories the portal does not know: at once, then at most once every discoverEvery
-// (a trailing listing when the window closes catches what came in it), each address at most once every declinedFor.
-type discovery struct {
-	take  func(sync.Event, snapshot.RepoKey, string) error
-	mu    gosync.Mutex
-	last  map[string]time.Time           // by source: the last listing discovery asked for
-	armed map[string]bool                // by source: a trailing listing is waiting for the window to close
-	asked map[snapshot.RepoKey]time.Time // by address: when it last asked
-}
-
-func (d *discovery) ask(source string, key snapshot.RepoKey) {
-	d.mu.Lock()
-	now := time.Now()
-	if at, ok := d.asked[key]; ok && now.Sub(at) < declinedFor {
-		d.mu.Unlock()
-		return
-	}
-	d.asked[key] = now
-	if len(d.asked) > 4096 {
-		maps.DeleteFunc(d.asked, func(_ snapshot.RepoKey, at time.Time) bool { return now.Sub(at) >= declinedFor })
-	}
-	since := now.Sub(d.last[source])
-	due := since >= discoverEvery
-	switch {
-	case due:
-		d.last[source] = now
-	case !d.armed[source]:
-		d.armed[source] = true
-		time.AfterFunc(discoverEvery-since, func() {
-			d.mu.Lock()
-			d.armed[source], d.last[source] = false, time.Now()
-			d.mu.Unlock()
-			_ = d.take(sync.EventSourceChanged, "", source) // passed on whatever came of parking
-		})
-	}
-	d.mu.Unlock()
-	if due {
-		_ = d.take(sync.EventSourceChanged, "", source)
-	}
-}
-
 // run serves until ctx is cancelled, then shuts down within the grace period: readiness drops, the servers drain, the web UI server
 // stops, the instance leaves the cluster (another takes the lead), the engine stops (jobs in flight are cancelled and run again after a restart), pending
 // snapshot updates are dropped and the store closes.
@@ -806,143 +577,4 @@ func (s *server) run(ctx context.Context) error {
 	<-peopleDone
 	s.pub.Close()
 	return errors.Join(err, s.store.Close())
-}
-
-// robots is robots.txt: the one llms builds, or, when the portal answers signed-in viewers only, one that keeps every crawler out.
-func robots(closed bool, open http.Handler) http.Handler {
-	if !closed {
-		return open
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = io.WriteString(w, "User-agent: *\nDisallow: /\n")
-	})
-}
-
-// newPackages is the packages feature with its providers, in the order a repository's packages are read.
-func newPackages(cfg config.Packages, trees map[string]packages.GitHub, d deps, repo func(snapshot.RepoKey) (snapshot.Repo, bool)) *packages.Packages {
-	public, private := d.registries, d.registries
-	if public == nil {
-		public, private = egress.Guarded(10*time.Second), http.DefaultTransport
-	}
-	providers := []packages.Provider{packages.Maven{Central: d.public["maven"]}, packages.NPM{Registry: d.public["npm"]},
-		packages.PyPI{Simple: d.public["pypi"]}, packages.Cargo{API: d.public["cargo"]}, packages.Go{Proxy: d.public["go"]},
-		packages.Swift{}, packages.CocoaPods{Trunk: d.public["cocoapods"]}, packages.NuGet{Flat: d.public["nuget"]},
-		packages.RubyGems{Server: d.public["rubygems"]}, packages.Packagist{Repository: d.public["packagist"]}}
-	registries := make([]packages.Registry, 0, len(cfg.Registries))
-	for _, r := range cfg.Registries {
-		u := r.URL
-		if !strings.HasSuffix(u, "/") {
-			u += "/"
-		}
-		reg := packages.Registry{ID: r.ID, Ecosystem: r.Ecosystem, URL: u, Private: r.Network == "private"}
-		switch a := r.Auth; {
-		case a.User != "":
-			reg.Credential = &packages.Credential{User: a.User, Secret: a.Password.Reveal()}
-		case a.TokenFile != "":
-			reg.Credential = &packages.Credential{Secret: a.Token.Reveal(), Header: a.Header}
-		}
-		registries = append(registries, reg)
-	}
-	return packages.New(trees, packages.Options{Providers: providers, Client: packages.NewClient(public, private, registries), Registries: registries,
-		Public: cfg.Public, Repo: repo})
-}
-
-// eventRoutes wires what tells the portal about changes: the inbox that makes events survive a restart, the catch-up of each App's
-// delivery log, and with a webhook secret the receiver (the returned route).
-func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, st *status, feed bool, log *slog.Logger) []httpapi.Route {
-	if !feed {
-		return nil
-	}
-	s.inbox = &inbox{park: s.store, deliver: s.deliver, handled: s.engine.Handled, log: log, now: time.Now}
-	observe := func(event, result string) { m.delivery(event, result); st.delivery(event, result) }
-	for _, src := range cfg.GitHub.Sources {
-		if g := gh.Source(src.ID); g.App() {
-			s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, s.webhookSink(cfg.GitHub.Sources), observe, log))
-		}
-	}
-	st.catchUps = func() []webhook.CatchUpState {
-		out := make([]webhook.CatchUpState, 0, len(s.inbox.catchUps))
-		for _, c := range s.inbox.catchUps {
-			out = append(out, c.State())
-		}
-		return out
-	}
-	if !cfg.Receiver() { // GitHub cannot reach the portal: the delivery logs are the only way events arrive
-		return nil
-	}
-	rc := webhook.New(cfg.WebhookSecrets(), s.webhookSink(cfg.GitHub.Sources), log)
-	if s.member != nil {
-		rc.Dedupe(s.member.First)
-	}
-	rc.Observe(observe)
-	return []httpapi.Route{{Pattern: webhook.Pattern, MaxBody: webhook.MaxBody, Handler: timed(rc, st.answered)}}
-}
-
-// unloggedSources are the sources a receiver tells about changes but whose missed deliveries nothing can recover: no App, so no
-// delivery log to read (EV4, EV5). They are in "events" mode, but a delivery sent while the portal was down is lost, so the jobs
-// with a faster poll under events (sync.Spec.PollTTL: the releases) run at it as for a polled source.
-func unloggedSources(cfg config.Config) []string {
-	var out []string
-	for _, src := range cfg.GitHub.Sources {
-		if cfg.Receives(src) && src.App == nil {
-			out = append(out, src.ID)
-		}
-	}
-	return out
-}
-
-// polledSources are the sources GitHub does not tell about changes: with a webhook receiver every source is told (the operator set the
-// webhooks), without one only an App whose delivery log is read (webhook.catch_up) is; the others are polled, and the jobs whose TTL is
-// only a net under events (sync.Spec.PollTTL) run at their poll cadence.
-func polledSources(cfg config.Config) []string {
-	var out []string
-	for _, src := range cfg.GitHub.Sources {
-		if !cfg.Receives(src) && (!cfg.Webhook.CatchUp || src.App == nil) {
-			out = append(out, src.ID)
-		}
-	}
-	return out
-}
-
-// toldSources are the sources GitHub tells of their changes: every one not polled.
-func toldSources(cfg config.Config) map[string]bool {
-	told := map[string]bool{}
-	for _, src := range cfg.GitHub.Sources {
-		told[src.ID] = true
-	}
-	for _, id := range polledSources(cfg) {
-		delete(told, id)
-	}
-	return told
-}
-
-// themed loads the deployment's look (design/theme.md) and the route that serves its files, which exists only with web.theme_dir.
-func themed(w config.Web) (*theme.Theme, []httpapi.Route, error) {
-	look, err := theme.Load(w.ThemeDir, w.ProductName)
-	if err != nil {
-		return nil, nil, fmt.Errorf("web: %w", err)
-	}
-	if w.ThemeDir == "" {
-		return look, nil, nil
-	}
-	return look, []httpapi.Route{{Pattern: "GET " + theme.Prefix + "{file...}", Handler: look.Handler()}}, nil
-}
-
-// timed passes h on and tells took how long each answer took: the webhook receiver's, against GitHub's 10 seconds.
-func timed(h http.Handler, took func(time.Duration)) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		h.ServeHTTP(w, r)
-		took(time.Since(start))
-	})
-}
-
-// commitRules are the built-in rules of a commit's origin with the deployment's assistants added (commits.assistants, P-127).
-func commitRules(c config.Commits) *commits.Rules {
-	added := make([]commits.AssistantRule, 0, len(c.Assistants))
-	for _, a := range c.Assistants {
-		added = append(added, commits.AssistantRule{Name: a.Name, Authors: a.Authors, CoAuthors: a.CoAuthors})
-	}
-	return commits.NewRules(added)
 }

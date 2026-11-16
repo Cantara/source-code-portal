@@ -16,7 +16,7 @@ events, the others by polling, decided per account and per subject. Deployed ins
 
 ## The three steps
 
-- **EV1: catch-up without a receiver** (`webhook.catch_up`, default off; needs a source with an App). `cmd/scp/serve.go` builds the
+- **EV1: catch-up without a receiver** (`webhook.catch_up`, default off; needs a source with an App). `cmd/scp/events.go` (`eventRoutes`) builds the
   inbox and the catch-ups when there is a secret or `catch_up`, the receiver route only with a secret. Status says which run.
 - **EV2: a mode per source and a cadence per subject.** A source is in *events* mode when it is an App and the portal has a
   receiver or catch-up, else *poll*. Specs may carry `PollTTL`, the poll of a subject that is only a net when events flow; the
