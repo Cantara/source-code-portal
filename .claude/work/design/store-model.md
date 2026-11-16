@@ -6,7 +6,7 @@ Status: design, verified by prototypes; SM-a built (the migration `0002`, the co
 
 The owner wants a personal edition (one person signs in to GitHub, the portal reads the repositories that person can read; several
 GitHub hosts) and, later, several people on one instance sharing what is safe to share while the rest stays private to each. The store
-(`internal/store`) knows neither people nor credentials nor more than one audience. This note says how to model it, what stays, and how
+(`internal/platform/store`) knows neither people nor credentials nor more than one audience. This note says how to model it, what stays, and how
 the existing Cantara database is kept.
 
 ## The constraint: the security model does not weaken (owner, 2026-11-07)

@@ -6,10 +6,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/catalog"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/setup"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/catalog"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/setup"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // TestSetupRulesSelectWhatThePortalSelects holds the setup page's idea of a rule to the catalogue's: what the page counts and shows is

@@ -10,7 +10,7 @@ same prerequisites.
 
 ## What each feature needs
 
-One table in the core package `internal/prereq`, the single source the code, the status and the documentation follow:
+One table in the core package `internal/platform/prereq`, the single source the code, the status and the documentation follow:
 
 | Feature | Read permissions | Webhook events |
 |---|---|---|
@@ -44,8 +44,8 @@ webhooks every feature still refreshes on its schedule (15 minutes for pull requ
 
 ## Shape
 
-- `internal/github`: `Grant{Owner, Permissions, Events}`, `Source.Grants() (grants, known)`: known false in token mode.
-- `internal/prereq` (core): `Need`, `Needs` (the table), `Unmet`, `Check` (over the needs of the features switched on, `design/features.md`).
+- `internal/platform/github`: `Grant{Owner, Permissions, Events}`, `Source.Grants() (grants, known)`: known false in token mode.
+- `internal/platform/prereq` (core): `Need`, `Needs` (the table), `Unmet`, `Check` (over the needs of the features switched on, `design/features.md`).
 - `cmd/scp/prereq.go`: reads the grants and the jobs' failures from the snapshot, serves the contract's method, adds the status
   warnings, logs changes.
 - The fake GitHub: `SetGrants(login, permissions, events)` for an installation; by default every permission and event.

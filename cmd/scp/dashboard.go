@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
-	"github.com/cantara/source-code-portal/internal/manifests"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/manifests"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // sharedBy is the share of a group's members a value must have to be said once for the group instead of on every repository.

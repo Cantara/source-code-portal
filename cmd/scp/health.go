@@ -4,15 +4,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/catalog"
-	"github.com/cantara/source-code-portal/internal/commits"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/health"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
-	"github.com/cantara/source-code-portal/internal/packages"
-	"github.com/cantara/source-code-portal/internal/pulls"
-	"github.com/cantara/source-code-portal/internal/releases"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/catalog"
+	"github.com/cantara/source-code-portal/internal/feature/commits"
+	"github.com/cantara/source-code-portal/internal/feature/packages"
+	"github.com/cantara/source-code-portal/internal/feature/pulls"
+	"github.com/cantara/source-code-portal/internal/feature/releases"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/health"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // dashboardFindings is how many findings the dashboard carries per product.

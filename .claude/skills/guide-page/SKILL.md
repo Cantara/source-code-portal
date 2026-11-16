@@ -28,13 +28,13 @@ newcomer reads. The design note is `.claude/work/design/guide.md`.
 Never write a number or rule from memory. Read it where the pages take it, and keep the guide's words the portal's words:
 
 - Health levels, severities, the findings with what they cost and their next step, the activity ages and the window of the counts:
-  the server's rules (`internal/health/rules.go`, `Describe`, served as `GET /api/v1/rules`). The guide's route reads them
+  the server's rules (`internal/platform/health/rules.go`, `Describe`, served as `GET /api/v1/rules`). The guide's route reads them
   (`features/guide/route.tsx`, `rulesQuery`) and the page draws its tables from them; it holds no number of its own. A new
   threshold or kind needs no text change; a new kind needs an icon in `entities/health/kinds.tsx` (it shows a flag until then).
 - The fleet's signals and their words: `web/src/features/dashboard/telemetry.tsx` (`signals`, one list for the dashboard and the
   presentation page); the commit kinds' icons in `components/ui/icons.tsx` (`CommitIcon`).
 - The kinds of work and their texts: `web/src/lib/preferences.ts` (`kinds`, imported); what is AI or automation:
-  `internal/commits/kind.go` (`Classify`, the agents, the trailers, `botLike`) and sweeps in `internal/commits/model.go`.
+  `internal/feature/commits/kind.go` (`Classify`, the agents, the trailers, `botLike`) and sweeps in `internal/feature/commits/model.go`.
 - The card's rows: `web/src/features/dashboard/products.tsx` (`ProductCard`); a finding's mark and where it leads:
   `entities/health/findings.tsx` (`FindingMark`). The latest commits' choice of kinds: `features/dashboard/show.tsx`.
 - The presentation page's profiles and screens: `web/src/lib/preferences.ts` (`profileOf`, `columnDefaults`) and

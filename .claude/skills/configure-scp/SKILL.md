@@ -129,7 +129,7 @@ Run `config groups` on the result and compare with what the old portal showed; l
   `token_file`; GitHub Enterprise sets `base_url`. Filters: `include_forks` (default false), `include_archived` (default true),
   `include_private` (default false; needs `access.private_groups` and `server.trusted_proxies`, operator guide 2.1).
 - **What GitHub must grant**: the App's (or token's) read permissions decide which features have data: *Contents* and *Metadata* the
-  catalogue, *Issues* the open issues, *Pull requests*, *Checks* and *Commit statuses* the open pull requests (`internal/prereq`,
+  catalogue, *Issues* the open issues, *Pull requests*, *Checks* and *Commit statuses* the open pull requests (`internal/platform/prereq`,
   the operator guide section 1, the comment above `github:` in `deploy/config.example.yaml`). `scp config check` cannot see them;
   the running portal warns on the feature's page and in *Admin*. Say so whenever a source is added or its credential changes.
 - **Webhook**: `webhook.secret_file`; the GitHub side (the events each feature needs) is in the operator guide section 1.

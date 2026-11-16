@@ -31,7 +31,7 @@ viewer's view: Cadence, Technology, Shared libraries, Single-author repositories
 ## API
 
 `GET /api/v1/insights` (contract): `group`, `repo` (as `scope.Params`). One answer with the five insights and the scope's freshness;
-the thresholds (90%, 20 commits, 12 months, 5 releases, 10 libraries) are constants of `internal/insights` told in the answer's
+the thresholds (90%, 20 commits, 12 months, 5 releases, 10 libraries) are constants of `internal/feature/insights` told in the answer's
 `thresholds` (not in `/api/v1/rules`: they are not health rules; the page reads them from the answer, so none is written in the page).
 The feature gets what it reads of the others as `Facts` wired in `cmd/scp/insights.go` (releases, manifests, `commits.Authorship`). Per request, the viewer's view, the leak test lists the route.
 

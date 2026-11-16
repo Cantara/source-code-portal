@@ -48,7 +48,7 @@ mark=$(od -An -tx1 -j68 -N4 "$db" | tr -d ' \n')
 
 # The schema version is four bytes (big-endian) at offset 60; this tree's is the number of its migrations.
 have=$((16#$(od -An -tx1 -j60 -N4 "$db" | tr -d ' \n')))
-want=$(ls "$root"/internal/store/migrations/*.sql | wc -l | tr -d ' ')
+want=$(ls "$root"/internal/platform/store/migrations/*.sql | wc -l | tr -d ' ')
 
 if [ "$mark" = "53435031" ] && [ "$have" -eq "$want" ]; then
 	stop_github # GitHub is gone from here on: only the store can answer

@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 
-	"github.com/cantara/source-code-portal/internal/catalog"
-	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/feature/catalog"
+	"github.com/cantara/source-code-portal/internal/platform/config"
 )
 
 // Exit codes, one table for every command.

@@ -2,8 +2,8 @@
 Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
-`internal/sync` (scheduler, keyed jobs, retry, rate budget, pauses), `internal/snapshot` (immutable serving state, shared value types,
-freshness), `internal/store` (SQLite last-good cache). One instance runs the jobs; several share its outcomes as `cluster.md` describes.
+`internal/platform/sync` (scheduler, keyed jobs, retry, rate budget, pauses), `internal/platform/snapshot` (immutable serving state, shared value types,
+freshness), `internal/platform/store` (SQLite last-good cache). One instance runs the jobs; several share its outcomes as `cluster.md` describes.
 Features register jobs and contribute snapshot parts; handlers read only the snapshot. This note is the one description of the rate
 budget, retries and pauses.
 
@@ -14,7 +14,7 @@ budget, retries and pauses.
   settle a minute, since anyone may comment on a public repository, so a stream of events costs one run a minute.
 - `sync` is the SQLite writer: a job returns a `Result` and `sync` writes the item row and schedule in one transaction, giving one write path.
 - One `Publish` function per job kind serves both warm start (from rows) and live results: the snapshot is built the same way in both cases.
-- Shared value types (`Repo`, `Group`, `Descriptor`, `Commit`, `Doc`, `Release`, `Manifest`, `Freshness`) live in `internal/snapshot`:
+- Shared value types (`Repo`, `Group`, `Descriptor`, `Commit`, `Doc`, `Release`, `Manifest`, `Freshness`) live in `internal/platform/snapshot`:
   every feature reads and writes them through one core package, and fresh/stale has one derivation for API, pages, badges and `llms`.
 - Commit freshness: webhooks give seconds; the `catalog.reconcile` listing sorted by `pushed_at` calls `Notify(EventPush, repo)` for every
   repository whose `pushed_at` changed; the 2 h commits TTL is the safety net.
@@ -154,17 +154,17 @@ CREATE TABLE item (key TEXT PRIMARY KEY, kind TEXT NOT NULL,
 | `store.path` | `/data/scp.db` |
 
 Pace (100 ms), TTL jitter (10%), retry and backoff bounds, budget reserves and the publisher's debounce (200 ms) and maximum delay (1 s)
-are constants in `internal/sync` and `cmd/scp`.
+are constants in `internal/platform/sync` and `cmd/scp`.
 
 ## Tests (what proves it)
-- `internal/sync` in `synctest` bubbles with a real store in a temp dir: `TestRunsAndReschedules`, `TestTransientKeepsPayloadAndBacksOff`,
+- `internal/platform/sync` in `synctest` bubbles with a real store in a temp dir: `TestRunsAndReschedules`, `TestTransientKeepsPayloadAndBacksOff`,
   `TestRateLimitPausesWithoutAttempt`, `TestPermanentRetriesAfterADay`, `TestNewReleaseRunsFailedJobsAgain`, `TestPanicIsPermanent`, `TestCatalogueAddsAndRemovesRepoJobs`,
   `TestNotifyCoalesces`, `TestConcurrencyLimit`, `TestBudgetHoldsBackfill`, `TestWarmStartPublishesAndKeepsSchedule`,
   `TestWarmStartHonoursAShorterTTL`, `TestBackoffBounds`, `TestRegisterRefuses`, `TestNotifySource`, `TestObserveDepthAlive`; the
   cluster side in `share_test.go`; `goleak`.
-- `internal/snapshot`: `TestDerive` (including the 1.5 x TTL boundary), `TestDebounce`, `TestVersionFollowsTheItems`,
+- `internal/platform/snapshot`: `TestDerive` (including the 1.5 x TTL boundary), `TestDebounce`, `TestVersionFollowsTheItems`,
   `TestSnapshotsAreImmutable`, `TestPanickingUpdateIsDroppedAlone`, `TestPanickingIndexKeepsSnapshot`, `TestFacetsAndIndexes`, `TestPublicView`,
   `TestConcurrentPublishesKeepEveryUpdate`.
-- `internal/store`: `TestRoundTrip`, `TestCatalogueReplace` (rename and cascade), `TestRetainSources`, `TestQuarantine`.
+- `internal/platform/store`: `TestRoundTrip`, `TestCatalogueReplace` (rename and cascade), `TestRetainSources`, `TestQuarantine`.
 - `cmd/scp` `TestLoad1000`: cold start of 1,000 repositories, warm start, p99 per page; `TestServeEndToEnd`: warm start, outage served
   stale, readiness.

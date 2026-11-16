@@ -55,7 +55,7 @@ time as written (18:00 in Oslo's winter offset is 18:00 on every screen), never 
   them as *from scp.yaml*; an admin may change or remove one, the change kept in the store (`config-baseline.md`).
 - **Admins**: `/admin` has an Announcements card: new, edit, publish or hold, remove, and a preview drawn by the same component the
   pages use. Saved as the store's document `announcements` (`{"announcements": [...]}`) through the same document store as the layouts
-  (`internal/docstore`: synced to disk, a content-digest revision refusing a stale save, a document that no longer parses served as
+  (`internal/platform/docstore`: synced to disk, a content-digest revision refusing a stale save, a document that no longer parses served as
   empty with its problem). Without a store (tests) the card shows the configured ones and cannot save.
 - `GET /api/v1/admin/announcements` answers the stored ones with the revision, the configured ones, whether it can save and the
   file's problem; `PUT` takes `{announcements, revision}`. Admin only, same origin, JSON, 64 KiB, out of the contract like the

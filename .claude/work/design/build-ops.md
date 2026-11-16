@@ -24,7 +24,7 @@ updates and the test strategy, for one instance serving up to 1,000 repositories
   `go test ./...` run with Go alone and one bundle serves every platform.
 - Renovate updates every pin (Go, Node, pnpm, golangci-lint, GoReleaser, images by digest, actions by SHA) after a 7-day cooldown;
   patch and minor updates merge themselves when CI is green, major ones wait for review.
-- Generated code is committed and drift-checked by `make check` and CI: Go server code in `internal/httpapi/oapi`, `web/src/styles/chroma.css`,
+- Generated code is committed and drift-checked by `make check` and CI: Go server code in `internal/platform/httpapi/oapi`, `web/src/styles/chroma.css`,
   web client types in `web/src/lib/api/schema.d.ts`.
 
 ## Layout
@@ -37,7 +37,7 @@ Root files: `go.mod` (`module github.com/cantara/source-code-portal`, `go 1.27.2
 | `.github/workflows/` | `ci.yml`, `release.yml` |
 | `api/` | `openapi.yaml`, the OpenAPI 3.1 contract for `/api/v1` |
 | `cmd/scp/` | `main.go`, the Cobra tree, wiring (including the webhook sink that calls `Notify`), metrics, status, the boundary test |
-| `internal/` | the server packages, each created with its first code; `testdata/` beside a package's tests |
+| `internal/` | the server packages in three layers, `feature/`, `platform/` and `lib/` (`TestLayersHold`), each created with its first code; `testdata/` beside a package's tests |
 | `web/` | the Next.js web UI (pnpm); `pnpm build` assembles `web/bundle` |
 | `deploy/` | `Dockerfile`, `Dockerfile.release`, `config.example.yaml` |
 | `docs/` | user documentation (operator guide, repository guide, API guide) |
@@ -55,7 +55,7 @@ Root files: `go.mod` (`module github.com/cantara/source-code-portal`, `go 1.27.2
 Cobra settings: `SilenceUsage`, `SilenceErrors`; `main` calls `run(ctx, args, stdout, stderr) int`, which prints an error once to stderr
 as `scp: <error>`.
 
-Loading (`internal/config.Load(path string, flags *pflag.FlagSet) (Config, map[string]any, error)`), in order:
+Loading (`internal/platform/config.Load(path string, flags *pflag.FlagSet) (Config, map[string]any, error)`), in order:
 1. `v := viper.New()`; `SetDefault` for every key of `defaults()`, so env lookup knows every key.
 2. `SetConfigFile(path)` and `ReadInConfig` when `--config` is given; an unreadable file is exit 1, a YAML parse error exit 2.
 3. `SetEnvPrefix("SCP")`, `SetEnvKeyReplacer(strings.NewReplacer(".", "_"))`, `AutomaticEnv()`: `server.public_url` is `SCP_SERVER_PUBLIC_URL`.
@@ -91,7 +91,7 @@ Startup order (`serve`): 1 load and validate config (exit 2); 2 build the logger
 sync-snapshot-store.md); 4 build the GitHub client, the engine, the cluster member (when `cluster.addresses` is set), the features, the
 metrics, the web UI supervisor, the webhook sink and the HTTP handlers; 5 bind both listeners (bind error: exit 1); 6 run the engine
 (warm start from the store, then the first listing; GitHub traffic begins here) and the member, serve both listeners and start the web UI
-server (`internal/webui`, when `web.dir` is set) with `SCP_API` pointing at the public listener on loopback.
+server (`internal/platform/webui`, when `web.dir` is set) with `SCP_API` pointing at the public listener on loopback.
 
 Shutdown on the first SIGINT or SIGTERM (`signal.NotifyContext`), within `server.shutdown_grace` (default 20 s, inside Kubernetes'
 30 s): 1 `/readyz` answers 503; 2 `http.Server.Shutdown` on both listeners lets in-flight requests finish; 3 the web UI server gets
@@ -113,7 +113,7 @@ Makefile (each target is one command that CI also runs; `PNPM`, `VERSION`, `CONF
 | `help` | lists targets (default goal) |
 | `web` | `pnpm -C web install --frozen-lockfile`, `pnpm -C web build` -> `web/bundle` |
 | `build` | `CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version -X main.build"` -> `bin/scp` |
-| `gen` | `go generate ./...` (oapi-codegen into `internal/httpapi/oapi`, `chroma.css`) and `pnpm -C web gen` (`schema.d.ts`) |
+| `gen` | `go generate ./...` (oapi-codegen into `internal/platform/httpapi/oapi`, `chroma.css`) and `pnpm -C web gen` (`schema.d.ts`) |
 | `lint` | `go vet`, `golangci-lint run` (version-checked), `go tool govulncheck ./...`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check` |
 | `test` | `CGO_ENABLED=1 go test -race -count=1 -timeout 10m ./...` and `pnpm test` (`vitest`) |
 | `e2e` | `web`, then `pnpm -C web e2e`: Playwright against `cmd/scp/e2e_test.go` (Go supervising the bundle, the fake GitHub) |
@@ -154,18 +154,18 @@ is not used); major updates are PRs labelled `major-update` that a person review
 
 ## Tests (strategy)
 - Unit and table tests with stdlib `testing` and `go-cmp`; hand-written fakes in `_test.go`, named after the behaviour they provide.
-- Golden files beside the test: `internal/badges/testdata/last-commit.golden.svg`, `internal/llms/testdata/` (`llms.txt`, `llms-full.txt`,
+- Golden files beside the test: `internal/feature/badges/testdata/last-commit.golden.svg`, `internal/feature/llms/testdata/` (`llms.txt`, `llms-full.txt`,
   `readme.md`, refreshed with `UPDATE_GOLDEN=1`).
 - Native fuzzing for the parsers of untrusted input: `FuzzParseDescriptor`, `FuzzRender`, `FuzzSanitizeFixpoint`, `FuzzParsers`
   (manifests), `FuzzNormalise` (webhook), `FuzzDelimit` (llms). Seed corpora run in every `go test`.
 - `testing/synctest` for everything with time: scheduler, coalescing, retry, rate limiting, debounce.
-- `internal/github/githubtest`: an `httptest` fake GitHub with fault injection (rate limits, 5xx, ETag 304); it drives the client, sync
+- `internal/platform/github/githubtest`: an `httptest` fake GitHub with fault injection (rate limits, 5xx, ETag 304); it drives the client, sync
   and the `cmd/scp` end-to-end tests (`TestServeEndToEnd`, `TestExitCodes`, `TestConfigCheckPrintsEffectiveSettings`).
 - Offline: tests dial only loopback listeners they create; `forbidigo` flags `http.DefaultClient` and `http.Get`/`Head`/`Post`/`PostForm`.
 - `goleak.VerifyTestMain` in every package that starts goroutines; `-race` with cgo for tests, releases built with `CGO_ENABLED=0`.
 - SQLite tests use real files in `t.TempDir()`.
 - Web: `vitest` with MSW for components and hooks; Playwright against Go supervising the built bundle and the fake GitHub.
-- Boundary test `cmd/scp/boundary_test.go`: a `features` slice (`catalog commits docs badges webhook llms manifests`); walk each
-  `internal/<dir>`, read imports with `parser.ImportsOnly`, report an import of a feature other than the file's own
-  (`TestFeaturesDoNotImportFeatures`; this covers core directories too). `TestBoundaryCheckFindsViolation` runs the same check on a
-  temporary tree holding one violation and expects exactly one error.
+- Boundary test `cmd/scp/boundary_test.go`: `layers` says what each layer may import of `internal/` (lib nothing, platform the platform
+  and lib, a feature the platform, lib and its own packages); walk `internal/<layer>/<pkg>`, read imports with `parser.ImportsOnly`,
+  and report every other import and every package outside the layers (`TestLayersHold`). `TestBoundaryCheckFindsViolation` runs the
+  same check on a temporary tree holding allowed imports and four violations and expects exactly those.

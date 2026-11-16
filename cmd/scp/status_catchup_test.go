@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/webhook"
+	"github.com/cantara/source-code-portal/internal/feature/webhook"
 )
 
 // A delivery log that is not being read is a warning on the status, not only a line in the log; one that is read is none.

@@ -2,9 +2,9 @@
 Status: as built. Binding order: ../plan.md > this note.
 
 ## Scope
-`internal/github` reads repositories of one or more GitHub organisations for the sync jobs: App auth or a token, REST reads through
+`internal/platform/github` reads repositories of one or more GitHub organisations for the sync jobs: App auth or a token, REST reads through
 `google/go-github` v93, a small conditional-request and rate-observer transport, error classes, and the fake server
-`internal/github/githubtest`. It returns `internal/snapshot` value types. Admission and the removal rule are in `catalog.md`; the rate
+`internal/platform/github/githubtest`. It returns `internal/platform/snapshot` value types. Admission and the removal rule are in `catalog.md`; the rate
 budget, retries and pauses in `sync-snapshot-store.md`; webhook verification and dedupe in `http-api.md` behaviour 4. This note lists the
 webhook events the portal reacts to and the `sync` event each becomes.
 
@@ -25,7 +25,7 @@ webhook events the portal reacts to and the `sync` event each becomes.
 - Blob SHAs from the tree are the persisted validators: a blob is fetched only when its SHA changed.
 - ETags live in memory, keyed by the hashed `Authorization` value: within one token lifetime an authorised 304 costs no rate limit.
   A response of at most 1 MiB is kept for its ETag; a larger one passes through whole, read as it streams, and is not kept.
-- No repository's content fails a read by its size. The commits list is read as a stream (`internal/jsonstream`), not decoded
+- No repository's content fails a read by its size. The commits list is read as a stream (`internal/lib/jsonstream`), not decoded
   whole: each commit keeps bounded fields (16 KiB of a message's start and 8 KiB of its end, where the trailers are; 1 KiB of a
   name, login, address, date or SHA; 64 parents), and everything else is skipped as it is read, so a page costs a few megabytes
   of memory whatever its size. A body that breaks off mid-page is transient; one that is not JSON is `malformed`. Trees stream the
@@ -152,7 +152,7 @@ API version header, conditional cache, rate observer), then `http.Transport`. `s
 repositories, commits, files (trees and blobs) and releases (`AddRepo`, `Update`, `Remove`, `SetCommits`, `SetFile`, `SetRelease`). It
 checks the App JWT, mints installation tokens, sends `x-ratelimit-*` per credential, answers ETags with 304 and records every request in a
 ledger (`Ledger`, `Count`). Faults: `Fail` (status, times, `Retry-After`), `Exhaust` (rate limit), `Heal`.
-- `internal/github`: `TestListReposPaginatesAndConverts`, `TestConditionalRequestsAreFree`, `TestAppMode`, `TestClassify`,
+- `internal/platform/github`: `TestListReposPaginatesAndConverts`, `TestConditionalRequestsAreFree`, `TestAppMode`, `TestClassify`,
   `TestCanceledIsNotClassified`, `TestETagCacheEvicts`, `TestTreesAndBlobs`, `TestWebURL`,
   `TestRateBookResetInstant`.
 - `cmd/scp` `TestLoad1000`: the cold start of 1,000 repositories through an in-memory transport; `TestServeEndToEnd`: pushes, outage and

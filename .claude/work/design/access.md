@@ -30,17 +30,17 @@ Status: as built. Binding order: ../plan.md > this note.
 
 ## Shapes
 ```go
-// internal/snapshot
+// internal/platform/snapshot
 func (s *Snapshot) Public() *Snapshot // the public view; s itself when nothing is private
 
-// internal/config
+// internal/platform/config
 type Access struct {
     UserHeader, GroupsHeader string   // defaults X-Forwarded-User, X-Forwarded-Groups
     PrivateGroups            []string // "*" = every authenticated user
 }
 // Source gains IncludePrivate bool (include_private)
 
-// internal/httpapi
+// internal/platform/httpapi
 type Access struct{ UserHeader, GroupsHeader string; PrivateGroups []string; Vary bool }
 func Private(ctx context.Context) bool // set by the middleware
 // Options gains Access

@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/sync"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/sync"
 )
 
 type memPark struct {

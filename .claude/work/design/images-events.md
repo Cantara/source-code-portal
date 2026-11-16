@@ -47,18 +47,18 @@ Status: as built. Binding order: ../plan.md > this note.
 
 ## Shapes
 ```go
-// internal/docs
+// internal/feature/docs
 type Image struct{ ID, Path, URL, BlobSHA string } // Doc.Images; Path for repository files, URL for external images
-// internal/snapshot
+// internal/platform/snapshot
 func (b *Builder) Mark(key string, repo RepoKey, digest uint64) // the item's digest; 0 drops it. The public view sums only the items of
                                                                 // public repositories and of the sources
-// internal/sync: digest(store.Item) uint64 over the item fields, marked at every publish
+// internal/platform/sync: digest(store.Item) uint64 over the item fields, marked at every publish
 
-// internal/docs
+// internal/feature/docs
 func (d *Docs) Images(current func(context.Context) *snapshot.Snapshot, external http.RoundTripper) http.Handler
-// the external transport is egress.Guarded (internal/egress, shared with the package registries)
+// the external transport is egress.Guarded (internal/lib/egress, shared with the package registries)
 
-// internal/httpapi
+// internal/platform/httpapi
 type Events struct{ ... }
 func NewEvents(current func(context.Context) *snapshot.Snapshot, published func() <-chan struct{}) *Events
 func (e *Events) Route() Route // GET /api/v1/events, Stream

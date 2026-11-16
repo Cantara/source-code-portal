@@ -10,7 +10,7 @@ events, the others by polling, decided per account and per subject. Deployed ins
 - Every job is events plus a safety-net poll: `Spec.On` names the events that run it at once, `Spec.TTL` is the poll (pull requests
   and issues 15 minutes, commits 2 hours, releases 6 hours, the listing 5 minutes, which turns a changed `pushed_at` into a push).
 - An account belongs to one source; a source has one credential (App or token). Mixed per-account credentials are two sources.
-- `internal/webhook.CatchUp` reads an App's delivery log (`GET /app/hook/deliveries`, a read with the App's JWT) and passes on what
+- `internal/feature/webhook.CatchUp` reads an App's delivery log (`GET /app/hook/deliveries`, a read with the App's JWT) and passes on what
   was not answered with a success. GitHub logs a delivery whatever happens to it, so an App whose webhook URL nobody can reach still
   gives events, two minutes late. This is what makes events possible for a portal at home.
 
@@ -48,7 +48,7 @@ events, the others by polling, decided per account and per subject. Deployed ins
 
 - No change for a configuration that sets neither `webhook.secret_file` nor `webhook.catch_up` except EV2's faster release poll
   (conditional requests: a 304 is free); a receiver's behaviour is untouched.
-- The App is read-only: its permissions and events come from `internal/prereq.Needs`.
+- The App is read-only: its permissions and events come from `internal/platform/prereq.Needs`.
 - Not verified against a real GitHub (needs an App to be created): whether GitHub accepts a loopback webhook URL on a new App and
   keeps logging deliveries to it; GitHub Enterprise Server's manifest flow and `/app/hook/deliveries` by version.
 

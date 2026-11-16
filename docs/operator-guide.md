@@ -16,7 +16,7 @@ requests an hour per installation) or a personal access token (5,000 an hour).
 whose permissions are missing stays empty; the events give updates within seconds (without them, or without a webhook, each feature
 refreshes on its schedule).
 
-<!-- prerequisites: kept equal to internal/prereq by cmd/scp's TestPrerequisitesDocumented -->
+<!-- prerequisites: kept equal to internal/platform/prereq by cmd/scp's TestPrerequisitesDocumented -->
 | Feature | Read permissions | Webhook events |
 |---|---|---|
 | The catalogue: repositories, README and documents, manifests, commits, releases, packages | Contents, Metadata | Push, Release, Repository |

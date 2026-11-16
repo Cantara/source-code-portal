@@ -1,0 +1,212 @@
+package llms
+
+import (
+	"bytes"
+	"encoding/xml"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+)
+
+// maxURLs is the most a sitemap file may list (sitemaps.org); beyond it /sitemap.xml is an index of /sitemaps/{n}.xml.
+const maxURLs = 50_000
+
+// machineCache is the caching of the files crawlers read: an hour in shared caches, served stale for a day while it revalidates.
+const machineCache = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+
+type entry struct {
+	loc     string
+	lastmod time.Time
+}
+
+// sitemap is the files of one view of a snapshot (the URL set, or an index and its parts), built once with a placeholder where the
+// origin goes (raw), and filled in for the last origin asked (origin, files): a request naming another Host fills in again, and never
+// builds again.
+type sitemap struct {
+	view   *snapshot.Snapshot
+	rev    string   // Options.IndexRevision when it was built
+	raw    [][]byte // [0] is /sitemap.xml
+	origin string
+	files  [][]byte // raw with origin filled in
+}
+
+// originMark stands for the origin in a built sitemap; it is never a real address.
+const originMark = "https://origin.scp.invalid"
+
+func fill(raw [][]byte, origin string) [][]byte {
+	out := make([][]byte, len(raw))
+	for i, f := range raw {
+		out[i] = bytes.ReplaceAll(f, []byte(originMark), []byte(escape(origin)))
+	}
+	return out
+}
+
+// Sitemap serves /sitemap.xml, and /sitemaps/{n}.xml (the pattern's {file}) when the pages pass maxURLs.
+// sitemapCSP is the portal's CSP for an answer that is not a page (no script, no fetch, sandboxed) with what the browser's own XML viewer
+// needs to draw the tree: its inline styles and its disclosure triangles (data: images). Without them Chrome shows the bare text.
+const sitemapCSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'; sandbox"
+
+func (l *LLMs) Sitemap() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", sitemapCSP)
+		files := l.sitemaps(r)
+		i := 0
+		if file := r.PathValue("file"); file != "" {
+			n, ok := strings.CutSuffix(file, ".xml")
+			var err error
+			if i, err = strconv.Atoi(n); !ok || err != nil || i < 1 || i >= len(files) || n != strconv.Itoa(i) {
+				notFound(w)
+				return
+			}
+		}
+		serveAs(w, r, "application/xml; charset=utf-8", l.cacheFor(), files[i])
+	})
+}
+
+// Robots serves /robots.txt: every page may be crawled but the API, and the sitemap is named.
+func (l *LLMs) Robots() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := fmt.Sprintf("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /search\n\nSitemap: %s/sitemap.xml\n", l.originOf(r))
+		serveAs(w, r, "text/plain; charset=utf-8", l.cacheFor(), []byte(body))
+	})
+}
+
+// OpenSearch serves /opensearch.xml: the portal's search for a browser to add as a search engine (design/search.md), the page and
+// its JSON.
+func (l *LLMs) OpenSearch() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := escape(l.originOf(r))
+		body := xml.Header + `<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">` + "\n" +
+			"<ShortName>Source Code Portal</ShortName>\n<Description>Repositories, documents, dependencies, packages and commits</Description>\n" +
+			"<InputEncoding>UTF-8</InputEncoding>\n" +
+			`<Url type="text/html" method="get" template="` + origin + `/search?q={searchTerms}"/>` + "\n" +
+			`<Url type="application/json" method="get" template="` + origin + `/api/v1/search?q={searchTerms}"/>` + "\n" +
+			"</OpenSearchDescription>\n"
+		serveAs(w, r, "application/opensearchdescription+xml", l.cacheFor(), []byte(body))
+	})
+}
+
+// cacheFor is how these files are cached: shared caches keep them only when the portal says its own address (server.public_url);
+// built from the Host header a request names, they must not be kept for the next reader.
+func (l *LLMs) cacheFor() string {
+	if l.base == "" {
+		return "no-store"
+	}
+	return machineCache
+}
+
+func (l *LLMs) originOf(r *http.Request) string {
+	if l.base != "" || l.opts.Origin == nil {
+		return l.base
+	}
+	return l.opts.Origin(r)
+}
+
+func (l *LLMs) sitemaps(r *http.Request) [][]byte {
+	// The sitemap is what search engines are offered, and they never sign in: it is the public view for every reader, a signed-in one
+	// included (a private repository is not offered, nor shown to someone who asks for the list).
+	s, origin := l.current(r.Context()).Public(), l.originOf(r)
+	l.mu.Lock()
+	m := l.maps
+	rev := ""
+	if l.opts.IndexRevision != nil {
+		rev = l.opts.IndexRevision()
+	}
+	if m.view != s || m.rev != rev {
+		m = sitemap{view: s, rev: rev, raw: l.buildSitemap(s, originMark, maxURLs)}
+	}
+	if m.origin != origin || m.files == nil { // the portal's own address: once per view; a request's: until another host asks
+		m.origin, m.files = origin, fill(m.raw, origin)
+	}
+	l.maps = m
+	l.mu.Unlock()
+	return m.files
+}
+
+// pages are what a view offers search engines (P-118): the home page, the groups and the repositories, each with the time of its
+// newest commit. The listing pages (commits, releases, archive, insights, pulls, issues) change with every push and say nothing a
+// search should land on, and a repository's documents are reached from its page; neither is listed.
+func (l *LLMs) pages(s *snapshot.Snapshot) []entry {
+	last := map[snapshot.RepoKey]time.Time{}
+	var newest time.Time
+	keys := sortedKeys(s)
+	for _, k := range keys {
+		t := l.opts.LastCommit(s.Repos[k])
+		last[k] = t
+		if t.After(newest) {
+			newest = t
+		}
+	}
+	out := []entry{{"/", newest}}
+	for _, g := range s.Groups {
+		if l.opts.IndexedGroup != nil && !l.opts.IndexedGroup(g.ID) {
+			continue
+		}
+		var t time.Time
+		for _, k := range g.Members {
+			if last[k].After(t) {
+				t = last[k]
+			}
+		}
+		out = append(out, entry{snapshot.GroupPage(g.ID), t})
+	}
+	for _, k := range keys {
+		if l.opts.Indexed != nil && !l.opts.Indexed(s, k) {
+			continue
+		}
+		out = append(out, entry{snapshot.RepoPage(k), last[k]})
+	}
+	return out
+}
+
+// buildSitemap is the URL set of s, or when it holds more than limit pages an index and its parts.
+func (l *LLMs) buildSitemap(s *snapshot.Snapshot, origin string, limit int) [][]byte {
+	pages := l.pages(s)
+	if len(pages) <= limit {
+		return [][]byte{urlset(origin, pages)}
+	}
+	var index bytes.Buffer
+	files := [][]byte{nil}
+	index.WriteString(xml.Header + `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+	for i := 0; i < len(pages); i += limit {
+		part := pages[i:min(i+limit, len(pages))]
+		files = append(files, urlset(origin, part))
+		var t time.Time
+		for _, p := range part {
+			if p.lastmod.After(t) {
+				t = p.lastmod
+			}
+		}
+		fmt.Fprintf(&index, "<sitemap><loc>%s</loc>%s</sitemap>\n", escape(fmt.Sprintf("%s/sitemaps/%d.xml", origin, len(files)-1)), lastmod(t))
+	}
+	index.WriteString("</sitemapindex>\n")
+	files[0] = index.Bytes()
+	return files
+}
+
+func urlset(origin string, pages []entry) []byte {
+	var b bytes.Buffer
+	b.WriteString(xml.Header + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+	for _, p := range pages {
+		fmt.Fprintf(&b, "<url><loc>%s</loc>%s</url>\n", escape(origin+p.loc), lastmod(p.lastmod))
+	}
+	b.WriteString("</urlset>\n")
+	return b.Bytes()
+}
+
+func lastmod(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return "<lastmod>" + t.UTC().Format(time.RFC3339) + "</lastmod>"
+}
+
+func escape(s string) string {
+	var b bytes.Buffer
+	_ = xml.EscapeText(&b, []byte(s))
+	return b.String()
+}

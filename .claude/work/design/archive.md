@@ -31,7 +31,7 @@ no job, no GitHub call and no permission.
 
 ## As built
 
-The selection and the API live in `internal/catalog/archive.go` (`Retired`, `API.ListArchive`): the catalogue already owns `archived`,
+The selection and the API live in `internal/feature/catalog/archive.go` (`Retired`, `API.ListArchive`): the catalogue already owns `archived`,
 the descriptor's `lifecycle` and the repository summary, so Archive is a view of it, not a package. What the other features know is
 added by hooks on `catalog.API.ArchiveEntry`, wired in `cmd/scp` as the repository hooks are: `manifests.ArchiveEntry` (`usedBy`, archived
 dependants not counted) and `commits.ArchiveEntry` (`lastActive` from the newest commit; `authors`, the distinct people among the newest

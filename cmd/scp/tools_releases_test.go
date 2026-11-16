@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/insights"
-	"github.com/cantara/source-code-portal/internal/releases"
-	"github.com/cantara/source-code-portal/internal/search"
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/store"
+	"github.com/cantara/source-code-portal/internal/feature/insights"
+	"github.com/cantara/source-code-portal/internal/feature/releases"
+	"github.com/cantara/source-code-portal/internal/feature/search"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/store"
 )
 
 // TestRecentReleasesTool: the tool reads the releases API as the viewer's view has it and says what a failed check means.

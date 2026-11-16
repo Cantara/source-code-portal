@@ -21,7 +21,7 @@ cherry-pick: the portal reads), diffs and changed files (one GitHub call per com
 GitHub's diff), compare. A graph across repositories is not drawn: commits of different repositories share no parents, so a product
 is a timeline, and a repository is a graph.
 
-## Data (`internal/commits`)
+## Data (`internal/feature/commits`)
 Today: the latest 30 default-branch commits, subject only. The `commits` job grows into the history a navigator needs, still read
 only from the snapshot by the handlers:
 1. Default branch: up to 500 commits (`per_page=100`). A cold run reads 5 pages; a later run reads page 1 (ETag, a 304 is free) and
@@ -99,8 +99,8 @@ only from the snapshot by the handlers:
 10. The product timeline merges only the product's repositories, grouped by day in UTC, with no graph across repositories.
 
 ## Where the criteria are proved
-1. `internal/commits/github_test.go` (`TestHistory`: ledger of the cold, warm and push runs); `cmd/scp/run_test.go` (warm start).
-2. `internal/commits/history_test.go` (`TestHistoryPages`, `TestHistoryPush`, `TestHistoryFilters`), `commits_test.go` (`TestGraphOrder`).
+1. `internal/feature/commits/github_test.go` (`TestHistory`: ledger of the cold, warm and push runs); `cmd/scp/run_test.go` (warm start).
+2. `internal/feature/commits/history_test.go` (`TestHistoryPages`, `TestHistoryPush`, `TestHistoryFilters`), `commits_test.go` (`TestGraphOrder`).
 3. `web/src/entities/commit/graph.test.ts` (random histories).
 4, 6, 7, 10. `web/e2e/navigator.spec.ts`.
 5. `web/e2e/navigator.spec.ts` (rows and long tasks), `cmd/scp/load_test.go` (the history p99 under 50 ms), the bundle budget.

@@ -1,7 +1,7 @@
 import type { Schemas } from "./api/client"
 
 /**
- * The rules the portal judges by, as the server applies them (`GET /api/v1/rules`, internal/health rules.go): the window of the
+ * The rules the portal judges by, as the server applies them (`GET /api/v1/rules`, internal/platform/health rules.go): the window of the
  * activity counts, the levels, the severities, the activities and every kind of finding. The pages say what these say and hold no
  * thresholds of their own, so the words follow the server (P-62). Pure: a server page passes them in, the client reads them from
  * the provider (rules-context.tsx).

@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/commits"
-	"github.com/cantara/source-code-portal/internal/config"
+	"github.com/cantara/source-code-portal/internal/feature/commits"
+	"github.com/cantara/source-code-portal/internal/platform/config"
 )
 
 // The deployment's assistants (commits.assistants) reach the rules the feeds classify with; without them the rules are the built-in.

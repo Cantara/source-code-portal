@@ -9,10 +9,10 @@ are read without credentials; a private registry is read with the credentials th
 
 ## The choice
 
-**Package providers**, one per package manager, behind one interface, the way `internal/llm` keeps its language model providers:
+**Package providers**, one per package manager, behind one interface, the way `internal/platform/llm` keeps its language model providers:
 
 ```go
-// internal/packages: the feature. A Provider knows one package manager.
+// internal/feature/packages: the feature. A Provider knows one package manager.
 type Provider interface {
 	Ecosystem() string // "maven", "npm", "pypi", "cargo", "go", "swift", "nuget", "rubygems", "packagist", ...
 	// Coordinates reads what a repository publishes from its build files (bounded parsers, no network).
@@ -93,7 +93,7 @@ packages:
 - Credentials are files, as every secret (`config.Secret`, redacted). A registry's credentials are sent only to its own `url`
   (scheme, host, port and path prefix), never to a registry a build file named, never across a redirect to another origin.
 - A registry named by a build file and not configured is read without credentials, through the guarded transport (https to public
-  addresses only, `internal/egress`, moved there from `docs`), so a repository cannot make the portal reach its network. A
+  addresses only, `internal/lib/egress`, moved there from `docs`), so a repository cannot make the portal reach its network. A
   configured registry with `network: private` may be on the operator's network.
 - `config check` validates every registry: an ecosystem with a provider, https (http only with `network: private`), one auth kind.
 

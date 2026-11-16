@@ -14,7 +14,7 @@
   prototype files under `.claude/work/reference/`). ~10.0k code LOC, ~4.1k test LOC,
   102 `Test*` + 5 `Fuzz*`, 3.0k LOC React SPA.
 - M0..M6 and v2.0.0 were done on 2026-10-14. CI `gate` green on `main`.
-- Local run: build and vet clean; 14/15 packages pass. `internal/docs
+- Local run: build and vet clean; 14/15 packages pass. `internal/feature/docs
   TestRenderBounds` failed on a wall-clock bound (2.095 s vs 2 s,
   `render_test.go:121`) under load.
 - Nothing has run against real GitHub: all tests use the fake GitHub.
@@ -56,10 +56,10 @@
 
 | Java | Go | Status |
 |---|---|---|
-| Groups: regex `find()`, one `branch` per group (`RepoConfig.java:106`, `RepositoryConfigLoader.java:68-70`) | typed matchers, default branch only (`internal/catalog/match.go:102-120`) | Changed; no converter; branch-per-group dropped without a row |
+| Groups: regex `find()`, one `branch` per group (`RepoConfig.java:106`, `RepositoryConfigLoader.java:68-70`) | typed matchers, default branch only (`internal/feature/catalog/match.go:102-120`) | Changed; no converter; branch-per-group dropped without a row |
 | Pages `/dashboard`, `/group/{id}`, `/contents/{org}/{repo}/{branch}`, `/commits[/{id}]` | SPA routes + `/api/v1` (`web/src/app/router.tsx:33-62`, `api/openapi.yaml`) | Re-shaped; old URLs not redirected |
-| README via API, commonmark + asciidoctorj | goldmark + chroma + bluemonday (`internal/docs/docs.go`) | Markdown present; AsciiDoc missing (P-2) |
-| Webhook `POST /github/webhook`, HMAC-SHA1 | `POST /webhooks/github`, HMAC-SHA256 (`internal/webhook/webhook.go`) | Changed; hook must be re-pointed and re-keyed |
+| README via API, commonmark + asciidoctorj | goldmark + chroma + bluemonday (`internal/feature/docs/docs.go`) | Markdown present; AsciiDoc missing (P-2) |
+| Webhook `POST /github/webhook`, HMAC-SHA1 | `POST /webhooks/github`, HMAC-SHA256 (`internal/feature/webhook/webhook.go`) | Changed; hook must be re-pointed and re-keyed |
 | PAT, Selenium OAuth helper | GitHub App or token file, `Secret` redaction | Improved |
 | Caffeine in-memory cache | SQLite last-good cache + immutable snapshot | Changed (survives restarts) |
 | Confluence wiki (`FetchCantaraWikiTask.java:36`) | none | Missing, undocumented |

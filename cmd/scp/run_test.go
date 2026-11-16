@@ -22,9 +22,9 @@ import (
 	gogh "github.com/google/go-github/v93/github"
 	"go.uber.org/goleak"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 )
 
 func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/tools"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/tools"
 )
 
 // The handlers the tools read through: the contract's methods and the llms Markdown pages, called in process with the request's

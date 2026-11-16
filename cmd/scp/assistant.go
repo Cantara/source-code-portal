@@ -4,10 +4,10 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/cantara/source-code-portal/internal/assistant"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/llm"
-	"github.com/cantara/source-code-portal/internal/tools"
+	"github.com/cantara/source-code-portal/internal/feature/assistant"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/llm"
+	"github.com/cantara/source-code-portal/internal/platform/tools"
 )
 
 // newAssistant wires the assistant from the config; without a provider it is off and answers only its status.

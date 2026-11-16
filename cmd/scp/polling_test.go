@@ -5,9 +5,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/sync"
-	"github.com/cantara/source-code-portal/internal/webhook"
+	"github.com/cantara/source-code-portal/internal/feature/webhook"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/sync"
 )
 
 // Which sources are polled, which are told by a receiver that nothing can catch up for, and which are told with a delivery log behind.

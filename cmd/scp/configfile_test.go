@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/httpapi"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi"
 )
 
 // TestConfigurationIsTheBaseline (design/config-baseline.md): scp.yaml's `visibility:` and `layouts:` decide with nothing stored; an

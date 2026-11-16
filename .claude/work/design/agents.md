@@ -31,7 +31,7 @@ Rejected:
 
 ## W1: the catalogue
 
-`internal/tools` (core, no feature):
+`internal/platform/tools` (core, no feature):
 
 - `Tool`: `Name` (`[a-z_]`, as WebMCP's 1 to 128 characters of `[A-Za-z0-9_.-]` allows), `Title`, `Description`, `Schema` (a JSON
   Schema object: `type`, `properties` of `string`, `integer` and `boolean` with `description`, `required`,
@@ -101,7 +101,7 @@ feature `tools` (default `'self'`).
 
 ## Tests
 
-- `internal/tools`: `Check` (table), `Frame` (a text cannot close its frame), `Call` (truncation, unknown tool).
+- `internal/platform/tools`: `Check` (table), `Frame` (a text cannot close its frame), `Call` (truncation, unknown tool).
 - `cmd/scp`: the tools API and `/mcp` (through the SDK's client on a loopback listener) as the public and with a token; the leak
   test calls every tool as the public for the private repository; an `Origin` of another site is refused.
 - `web`: Vitest for the registration (a fake `modelContext`: registered, unregistered when the shell goes, nothing without it); Playwright
@@ -112,6 +112,6 @@ feature `tools` (default `'self'`).
 
 | M | Delivers | Done when |
 |---|---|---|
-| W1 | `internal/tools`, the catalogue in `cmd/scp/tools.go` used by the assistant, `GET`/`POST /api/v1/tools` in the contract | the assistant's tests pass on the catalogue; the leak test calls every tool as the public |
+| W1 | `internal/platform/tools`, the catalogue in `cmd/scp/tools.go` used by the assistant, `GET`/`POST /api/v1/tools` in the contract | the assistant's tests pass on the catalogue; the leak test calls every tool as the public |
 | W2 | `/mcp` over the catalogue | an MCP client lists and calls the tools, sees the private repository with a token and not without; another origin is refused |
 | W3 | WebMCP in the web UI, the docs, the Guide's section, the plugin | Playwright with a fake `document.modelContext` registers and runs the tools, page-aware |

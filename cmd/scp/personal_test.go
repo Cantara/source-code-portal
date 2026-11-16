@@ -24,12 +24,12 @@ import (
 
 	gogh "github.com/google/go-github/v93/github"
 
-	"github.com/cantara/source-code-portal/internal/auth"
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/ghlogin"
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/store"
-	"github.com/cantara/source-code-portal/internal/vault"
+	"github.com/cantara/source-code-portal/internal/platform/auth"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/ghlogin"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/store"
+	"github.com/cantara/source-code-portal/internal/platform/vault"
 )
 
 // fakeHost is a GitHub host for the wizard: the sign-in and the three calls it makes. The token is "ghp_personal".

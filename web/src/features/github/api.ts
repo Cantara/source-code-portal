@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query"
 import type { Get } from "@/lib/api/client"
 
-/** Token is what the portal shows of a person's linked GitHub token (internal/people): never the token itself. */
+/** Token is what the portal shows of a person's linked GitHub token (internal/platform/people): never the token itself. */
 export interface Token {
   source: string
   owner: string

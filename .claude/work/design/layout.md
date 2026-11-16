@@ -130,11 +130,11 @@ flat object per element whose kind reads only its own fields):
 ]}
 ```
 
-- **Validated in Go** (`internal/layout`, a feature): one JSON value of at most 64 KiB, unknown fields refused, 1..50 elements, a known
+- **Validated in Go** (`internal/feature/layout`, a feature): one JSON value of at most 64 KiB, unknown fields refused, 1..50 elements, a known
   kind with only its own options (`groups` 1..100 unique group ids for `fleet-map` and `products`, `view` for `products`, `count` 1..50
   for `latest-commits`, `text` (required) and `note` for `heading`, cleaned to one plain line with `untrusted.Text`). No HTML, no
   scripts, no URLs. The web UI renders only known kinds. Absent `groups` means every group.
-- **Store**: `layout.Store` over `internal/docstore`: one document per page in the store (SQLite), loaded into memory and written
+- **Store**: `layout.Store` over `internal/platform/docstore`: one document per page in the store (SQLite), loaded into memory and written
   through (synced to disk) on a save. The revision is the content digest (SHA-256, 128 bits), empty when nothing is stored; a save or
   reset on another revision is refused (412), so two admins never overwrite each other. A document that no longer parses is served as the
   built-in layout and reports why; its revision is the stored content's, so an admin can save over it. Without a store (tests) the

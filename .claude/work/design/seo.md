@@ -8,7 +8,7 @@ for a private viewer; a 404 status for unknown pages; `/llms.txt`, `/llms-full.t
 
 ## Scope
 1. One route of truth (built, P-29). A repository's page is its lower-case address. `web/src/lib/paths.ts` and Go's
-   `internal/snapshot/pages.go` (`RepoPage`, `GroupPage`, `DocPage`, `Segment` as `encodeURIComponent`) are the only builders of
+   `internal/platform/snapshot/pages.go` (`RepoPage`, `GroupPage`, `DocPage`, `Segment` as `encodeURIComponent`) are the only builders of
    page paths, held to the same cases (`web/src/lib/paths.cases.json`); links, canonicals, the sitemap, the documents' rewritten
    links, llms, the assistant's sources, JSON-LD `@id`s and breadcrumbs use them.
 2. Structured data (built): one JSON-LD `@graph` per page (`lib/seo.tsx`: `JsonLd` with `<` escaped and the page's CSP nonce,

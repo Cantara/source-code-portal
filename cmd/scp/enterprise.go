@@ -9,14 +9,14 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/github"
-	"github.com/cantara/source-code-portal/internal/httpapi"
-	"github.com/cantara/source-code-portal/internal/lru"
-	"github.com/cantara/source-code-portal/internal/people"
-	"github.com/cantara/source-code-portal/internal/snapshot"
-	"github.com/cantara/source-code-portal/internal/store"
-	"github.com/cantara/source-code-portal/internal/sync"
+	"github.com/cantara/source-code-portal/internal/lib/lru"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/github"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi"
+	"github.com/cantara/source-code-portal/internal/platform/people"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/store"
+	"github.com/cantara/source-code-portal/internal/platform/sync"
 )
 
 // newEnterpriseCmd is scp enterprise (design/enterprise.md, EN3): a portal of GitHub Enterprise sources read with the tokens of the

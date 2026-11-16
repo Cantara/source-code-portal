@@ -33,7 +33,7 @@ options, the documents and the plugin).
   where the product card's rows are; `publish.mjs` writes WebP (`cwebp -q 90`) to `web/public/guide/` and the sizes and callouts to
   `web/src/features/guide/shots.json`. The skill `guide-page` holds the procedure and the design rules.
 - **The facts are imported where they can be** (the fleet map's ranges from `entities/repo/health`, the kinds from
-  `lib/preferences`, the level names from `entities/health/health`); the findings' kinds, icons and severities from `entities/health/kinds` (drawn without client JavaScript, as the cards draw them); when each is found and its points copy `internal/health/health.go`.
+  `lib/preferences`, the level names from `entities/health/health`); the findings' kinds, icons and severities from `entities/health/kinds` (drawn without client JavaScript, as the cards draw them); when each is found and its points copy `internal/platform/health/health.go`.
 - A server component without data or client JavaScript; each picture is two `<img>` (`dark:hidden`, `hidden dark:block`, lazy, sized
   from `shots.json`). The numbered card is one SVG holding both pictures and the numbers in a gutter, since the CSP forbids inline
   styles. The run commands name the running release (`SCP_VERSION`), `<version>` on a development build.

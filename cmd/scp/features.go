@@ -3,13 +3,13 @@ package main
 import (
 	"slices"
 
-	"github.com/cantara/source-code-portal/internal/config"
-	"github.com/cantara/source-code-portal/internal/health"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
-	"github.com/cantara/source-code-portal/internal/issues"
-	"github.com/cantara/source-code-portal/internal/prereq"
-	"github.com/cantara/source-code-portal/internal/pulls"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/feature/issues"
+	"github.com/cantara/source-code-portal/internal/feature/pulls"
+	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/health"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/prereq"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // openIssues is a repository's open issues, the best count held (design/features.md, P-77), and whether it counts the open pull

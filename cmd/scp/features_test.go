@@ -10,8 +10,8 @@ import (
 	gogh "github.com/google/go-github/v93/github"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/cantara/source-code-portal/internal/github/githubtest"
-	"github.com/cantara/source-code-portal/internal/httpapi/oapi"
+	"github.com/cantara/source-code-portal/internal/platform/github/githubtest"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 )
 
 // busy gives the public repository 60 open issues and pull requests on GitHub's listing, past the Backlog's thresholds.

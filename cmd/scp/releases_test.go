@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/cantara/source-code-portal/internal/safehtml"
-	"github.com/cantara/source-code-portal/internal/snapshot"
+	"github.com/cantara/source-code-portal/internal/lib/safehtml"
+	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
 // TestMemoNotes: the notes of a release are rendered once per repository and text, not at every request.

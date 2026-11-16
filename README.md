@@ -147,8 +147,9 @@ GitHub ──webhooks──┐
   listing tell it what changed; ETags keep unchanged data free.
 - **Snapshot.** Jobs write SQLite and publish an immutable snapshot behind an atomic pointer. Request handlers read only the snapshot,
   so a page never waits for GitHub.
-- **Features.** Each part is a package under `internal/`: `catalog`, `commits`, `docs`, `badges`, `manifests`, `llms` and `webhook`.
-  Features never import each other (a test enforces it); `cmd/scp` wires them together.
+- **Features.** Each part users see is a package under `internal/feature/` (`catalog`, `commits`, `docs`, `pulls`, `search`, ...),
+  standing on `internal/platform/` (snapshot, sync engine, store, GitHub client, HTTP) and `internal/lib/` (pure helpers). Features
+  never import each other and the platform imports no feature (a test enforces it); `cmd/scp` wires them together.
 - **Untrusted input.** Everything from repositories passes bounded parsers and one HTML sanitiser.
 - **Web UI.** A Next.js App Router application, rendered on the server for every request and hydrated in the browser. Go starts and
   supervises it on loopback and proxies every page through itself, adding a per-request nonce Content Security Policy.
@@ -166,10 +167,10 @@ make dev          # the Go server (scp.yaml) on :9090 and the web UI with hot re
 make build web    # bin/scp and the web UI bundle in web/bundle
 make image        # the container image scp:dev
 make gen          # regenerate the API code from api/openapi.yaml
-go test -race -run TestName ./internal/catalog/
+go test -race -run TestName ./internal/feature/catalog/
 ```
 
-Tests never touch the network: GitHub is a fake in `internal/github/githubtest`. The Playwright tests need
+Tests never touch the network: GitHub is a fake in `internal/platform/github/githubtest`. The Playwright tests need
 `pnpm -C web exec playwright install chromium`.
 
 ## Documentation
