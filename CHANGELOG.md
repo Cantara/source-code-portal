@@ -4,6 +4,23 @@ Notable changes, newest first. Versions follow [Semantic Versioning](https://sem
 version unless a minor or major bump is decided for it. The GitHub release of each tag lists every change from its Conventional Commit
 subjects.
 
+## 2.2.25
+
+Fixes from the review of 2.2.24. Nothing new is asked of GitHub, no key changes, and the store's schema does not change.
+
+- **A rate limit pauses the source again**: since 2.2.24 a rate limit or a refused credential on one account of a source was taken for
+  that account's failure, and the source listed again every minute while the limit lasted. Now the source pauses until GitHub's reset.
+- **An account GitHub no longer has** (deleted or renamed) lists nothing, and its repositories leave after the confirming listing,
+  instead of the source listing every minute and keeping them for ever.
+- **A failing account backs off**: the listing runs again in a minute, then two, four, up to `catalog.reconcile_interval`. Its
+  repositories are kept as they were, so a repository deleted just before still leaves.
+- **No webhook event is lost to discovery**: an event of a repository the portal does not know yet is kept like any other, so one
+  that arrives right after a restart is acted on. A repository created within 15 seconds of another gets a listing when those 15
+  seconds end, and a repository the source leaves out (`exclude`, private) causes at most one listing an hour.
+- **Admin, GitHub, Sources** shows only the accounts the source reads, spelled as on GitHub, and "accounts: not read yet" for an App
+  source not listed since the start. A source that is polled no longer gets warnings about webhook events.
+- **Contributors**: `.claude/skills/go-review/`, a review of the Go code as it is, one area at a time.
+
 ## 2.2.24
 
 With a GitHub App, the repositories selected on the App's installation are what the portal reads: selecting or removing one on
