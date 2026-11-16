@@ -49,7 +49,7 @@ const pushMain = `{"ref":"refs/heads/main","repository":{"name":"core","default_
 
 func TestReceiver(t *testing.T) {
 	var calls []call
-	rc := New([]byte("new"), []byte("old"), func(ev sync.Event, owner, name string) error {
+	rc := New([][]byte{[]byte("new"), []byte("old")}, func(ev sync.Event, owner, name string) error {
 		calls = append(calls, call{ev, owner, name})
 		return nil
 	},
@@ -87,7 +87,7 @@ func TestReceiver(t *testing.T) {
 
 func TestDuplicateAndOversize(t *testing.T) {
 	calls := 0
-	rc := New([]byte("s"), nil, func(sync.Event, string, string) error { calls++; return nil }, slog.New(slog.DiscardHandler))
+	rc := New([][]byte{[]byte("s")}, func(sync.Event, string, string) error { calls++; return nil }, slog.New(slog.DiscardHandler))
 	var observed []string
 	rc.Observe(func(event, result string) { observed = append(observed, event+":"+result) })
 	defer func() {
@@ -182,7 +182,7 @@ func FuzzNormalise(f *testing.F) {
 
 func TestSharedDedupe(t *testing.T) {
 	calls := 0
-	rc := New([]byte("s"), nil, func(sync.Event, string, string) error { calls++; return nil }, slog.New(slog.DiscardHandler))
+	rc := New([][]byte{[]byte("s")}, func(sync.Event, string, string) error { calls++; return nil }, slog.New(slog.DiscardHandler))
 	shared := map[string]bool{"elsewhere": true}
 	down := false
 	rc.Dedupe(func(_ context.Context, id string) (bool, error) {
@@ -212,7 +212,7 @@ func TestSharedDedupe(t *testing.T) {
 // one is not held up by them.
 func TestBusyReceiverTurnsDeliveriesAway(t *testing.T) {
 	var results []string
-	rc := New([]byte("s"), nil, func(sync.Event, string, string) error { return nil }, slog.New(slog.DiscardHandler))
+	rc := New([][]byte{[]byte("s")}, func(sync.Event, string, string) error { return nil }, slog.New(slog.DiscardHandler))
 	rc.Observe(func(_, result string) { results = append(results, result) })
 	for range cap(rc.reading) {
 		rc.reading <- struct{}{}
@@ -241,7 +241,7 @@ func TestBusyReceiverTurnsDeliveriesAway(t *testing.T) {
 func TestUnkeptEventIsNotAcknowledged(t *testing.T) {
 	fail := true
 	var kept []sync.Event
-	rc := New([]byte("s"), nil, func(ev sync.Event, _, _ string) error {
+	rc := New([][]byte{[]byte("s")}, func(ev sync.Event, _, _ string) error {
 		if fail {
 			return errors.New("disk full")
 		}

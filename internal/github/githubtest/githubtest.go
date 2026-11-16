@@ -48,6 +48,7 @@ type Server struct {
 	users    map[string]bool           // lower-case logins of user accounts; every other owner is an organisation
 	installs map[int64]string          // installation id -> account login
 	grants   map[string]grant          // by account login (lower case); absent: every permission and event
+	selected map[string]map[int64]bool // by account login (lower case): the repositories its installation was given (Select); absent: all
 	t        testing.TB
 	issued   map[string]string // installation token -> account login
 	orgs     map[string][]*gh.Repository
@@ -80,7 +81,7 @@ func New(t testing.TB) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, reach: map[string]map[int64]bool{}, expiry: map[string]time.Time{}, asked: map[string][]string{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, t: t, issued: map[string]string{},
+	s := &Server{AppID: 42, key: key, tokens: map[string]string{}, reach: map[string]map[int64]bool{}, expiry: map[string]time.Time{}, asked: map[string][]string{}, users: map[string]bool{}, installs: map[int64]string{}, grants: map[string]grant{}, selected: map[string]map[int64]bool{}, t: t, issued: map[string]string{},
 		orgs: map[string][]*gh.Repository{}, commits: map[int64][]Commit{}, branches: map[int64]map[string][]Commit{},
 		tags: map[int64]map[string]string{}, files: map[int64]map[string]string{},
 		releases: map[int64][]*gh.RepositoryRelease{}, pulls: map[int64][]Pull{}, issues: map[int64][]Issue{}, nextID: 1000, used: map[string]int{}}
@@ -168,6 +169,34 @@ func (s *Server) Install(login string) int64 {
 	s.nextID++
 	s.installs[s.nextID] = login
 	return s.nextID
+}
+
+// Uninstall removes the App's installation on login: it is no longer listed and its tokens read nothing.
+func (s *Server) Uninstall(login string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, l := range s.installs {
+		if strings.EqualFold(l, login) {
+			delete(s.installs, id)
+		}
+	}
+	for tok, l := range s.issued {
+		if strings.EqualFold(l, login) {
+			delete(s.issued, tok)
+		}
+	}
+}
+
+// Select gives the App's installation on login only the repositories ids ("Only select repositories"; none at all with no ids):
+// /installation/repositories lists only them and the installation listing says "selected". Without it, an installation has all.
+func (s *Server) Select(login string, ids ...int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sel := map[int64]bool{}
+	for _, id := range ids {
+		sel[id] = true
+	}
+	s.selected[strings.ToLower(login)] = sel
 }
 
 // AddRepo adds a repository to org and returns its id. Fields left empty get defaults.
@@ -455,8 +484,12 @@ func (s *Server) listInstallations(w http.ResponseWriter, req *http.Request) {
 		var perms gh.InstallationPermissions
 		b, _ := json.Marshal(g.permissions)
 		_ = json.Unmarshal(b, &perms)
+		selection := "all"
+		if _, ok := s.selected[strings.ToLower(s.installs[id])]; ok {
+			selection = "selected"
+		}
 		out = append(out, &gh.Installation{ID: new(id), Account: &gh.User{Login: new(s.installs[id]), Type: new(kind)}, Permissions: &perms,
-			Events: slices.Clone(g.events)})
+			Events: slices.Clone(g.events), RepositorySelection: new(selection)})
 	}
 	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, out)
@@ -512,8 +545,12 @@ func (s *Server) listRepos(w http.ResponseWriter, req *http.Request) {
 	}
 	repos, ok := s.orgs[owner]
 	reach := s.reach[bearer(req)]
+	var sel map[int64]bool
+	if req.URL.Path == "/installation/repositories" {
+		sel = s.selected[owner]
+	}
 	repos = slices.DeleteFunc(slices.Clone(repos), func(r *gh.Repository) bool {
-		return public && r.GetVisibility() == "private" || reach != nil && !reach[r.GetID()]
+		return public && r.GetVisibility() == "private" || reach != nil && !reach[r.GetID()] || sel != nil && !sel[r.GetID()]
 	})
 	s.mu.Unlock()
 	if !ok && req.URL.Path != "/user/repos" && req.URL.Path != "/installation/repositories" {

@@ -152,6 +152,7 @@ func TestRefused(t *testing.T) {
 		"bad user header":         {env: map[string]string{"SCP_ACCESS_USER_HEADER": "X User"}, want: "access.user_header"},
 		"exclude catch_all":       {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, exclude: [{catch_all: true}]}\n", want: "exclude[0]"},
 		"exclude unclaimed":       {file: "!github:\n  sources:\n    - {id: gh, orgs: [a], token_file: TOKEN, exclude: [{unclaimed: true}]}\n", want: "exclude[0]"},
+		"group without match":     {file: "catalog:\n  groups:\n    - {id: a, name: A, default_repo: x}\n", want: "or sources:"},
 		"two unclaimed":           {file: "catalog:\n  groups:\n    - {id: a, name: A, default_repo: x, match: [{unclaimed: true}]}\n    - {id: b, name: B, default_repo: x, match: [{unclaimed: true}]}\n", want: "at most one group"},
 		"closed without identity": {env: map[string]string{"SCP_ACCESS_REQUIRE_AUTH": "true"}, want: "access.require_auth"},
 		"same headers":            {env: map[string]string{"SCP_ACCESS_GROUPS_HEADER": "x-forwarded-user"}, want: "must differ"},
@@ -366,5 +367,30 @@ layouts:
 	}
 	if !strings.Contains(string(cfg.Baseline.File), "Acme/MixedCase") {
 		t.Error("the file is not kept as written")
+	}
+}
+
+// Each App may have its own webhook secret: the receiver is served with any secret set, a source is told by events when its
+// deliveries can be verified, and a delivery may be signed with the shared, the previous or an App's own secret.
+func TestWebhookSecretsPerApp(t *testing.T) {
+	own := Source{ID: "own", App: &App{ID: 1, WebhookSecretFile: "/own", WebhookSecret: NewSecret([]byte("own-secret"))}}
+	plain := Source{ID: "plain", App: &App{ID: 2}}
+	token := Source{ID: "token", TokenFile: "/t"}
+	c := Config{GitHub: GitHub{Sources: []Source{own, plain, token}}}
+	if !c.Receiver() || !c.Receives(own) || c.Receives(plain) || c.Receives(token) {
+		t.Errorf("an App's own secret: receiver %v, receives own %v plain %v token %v", c.Receiver(), c.Receives(own), c.Receives(plain), c.Receives(token))
+	}
+	if got := c.WebhookSecrets(); len(got) != 1 || string(got[0]) != "own-secret" {
+		t.Errorf("secrets = %q", got)
+	}
+	c.Webhook = Webhook{SecretFile: "/s", Secret: NewSecret([]byte("shared")), PreviousSecret: NewSecret([]byte("old"))}
+	if !c.Receives(plain) || !c.Receives(token) {
+		t.Error("the shared secret does not reach every source")
+	}
+	if got := c.WebhookSecrets(); len(got) != 3 || string(got[0]) != "shared" || string(got[1]) != "old" || string(got[2]) != "own-secret" {
+		t.Errorf("secrets = %q", got)
+	}
+	if (Config{GitHub: GitHub{Sources: []Source{plain}}}).Receiver() {
+		t.Error("a receiver without any secret")
 	}
 }

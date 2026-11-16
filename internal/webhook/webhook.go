@@ -50,7 +50,7 @@ type Sink func(ev sync.Event, owner, name string) error
 
 // Receiver is the webhook handler.
 type Receiver struct {
-	secrets [][]byte // current first, then the previous one during a rotation
+	secrets [][]byte // the shared one first, then the previous one during a rotation, then each App's own
 	sink    Sink
 	log     *slog.Logger
 	seen    *dedupe
@@ -59,12 +59,10 @@ type Receiver struct {
 	reading chan struct{} // a slot per body being read
 }
 
-// New returns a receiver verifying with secret, then previous (may be empty).
-func New(secret, previous []byte, sink Sink, log *slog.Logger) *Receiver {
-	secrets := [][]byte{secret}
-	if len(previous) > 0 {
-		secrets = append(secrets, previous)
-	}
+// New returns a receiver accepting a delivery signed with any of secrets (the shared one, the previous one during a rotation, each
+// App's own); empty ones are skipped.
+func New(secrets [][]byte, sink Sink, log *slog.Logger) *Receiver {
+	secrets = slices.DeleteFunc(slices.Clone(secrets), func(s []byte) bool { return len(s) == 0 })
 	return &Receiver{secrets: secrets, sink: sink, log: log, seen: &dedupe{at: map[string]time.Time{}}, observe: func(string, string) {},
 		reading: make(chan struct{}, bodies)}
 }

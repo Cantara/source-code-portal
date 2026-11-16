@@ -29,6 +29,8 @@ const (
 	inFlight       = 4        // requests at once per source
 	etagBytes      = 64 << 20 // of answers kept for conditional requests, per source
 	userAgent      = "source-code-portal"
+
+	codeNoInstallation = "no_installation"
 )
 
 // Client holds one Source per configured source.
@@ -252,10 +254,11 @@ type Grant struct {
 	Owner       string
 	Permissions map[string]string
 	Events      []string
+	Selection   string // the repositories it was given: "selected" (those picked on GitHub) or "all"
 }
 
 func grantOf(login string, in *gh.Installation) Grant {
-	g := Grant{Owner: login, Permissions: map[string]string{}, Events: slices.Clone(in.Events)}
+	g := Grant{Owner: login, Permissions: map[string]string{}, Events: slices.Clone(in.Events), Selection: in.GetRepositorySelection()}
 	if in.Permissions != nil {
 		var m map[string]*string
 		if b, err := json.Marshal(in.Permissions); err == nil && json.Unmarshal(b, &m) == nil {
@@ -304,11 +307,11 @@ func (s *Source) client(ctx context.Context, owner, name string) (*gh.Client, er
 	if c := s.credentialFor(owner); c != nil {
 		return c.client, nil
 	}
-	return nil, &Error{Kind: Permanent, Code: "no_installation", Err: fmt.Errorf("the GitHub App is not installed on %s", owner)}
+	return nil, &Error{Kind: Permanent, Code: codeNoInstallation, Err: fmt.Errorf("the GitHub App is not installed on %s", owner)}
 }
 
-// ListRepos returns every repository of owner, an organisation or a user account, most recently pushed first (an App's user
-// installation lists in GitHub's order). Any failed page fails the listing.
+// ListRepos returns every repository of owner, an organisation or a user account, most recently pushed first; with an App, what the
+// installation on owner was given (the selected repositories or all), in GitHub's order. Any failed page fails the listing.
 func (s *Source) ListRepos(ctx context.Context, owner string) ([]snapshot.Repo, error) {
 	if s.cfg.People {
 		return s.listed(owner)
@@ -351,18 +354,19 @@ func (s *Source) listAll(ctx context.Context, owner string, list listPage) ([]sn
 
 type listPage func(ctx context.Context, page gh.ListOptions) ([]*gh.Repository, *gh.Response, error)
 
-// lister picks the listing for owner: the organisation's repositories, the repositories of an App's user installation, every
-// repository the token's own account owns, or another user's public repositories.
+// lister picks the listing for owner: an App installation's repositories (what the installation was given: the selected ones, or
+// all; on an organisation and a user account alike), the organisation's repositories, every repository the token's own account owns,
+// or another user's public repositories.
 func lister(c *gh.Client, owner string, acct account, app bool) listPage {
 	switch {
-	case !acct.user:
-		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
-			return c.Repositories.ListByOrg(ctx, owner, &gh.RepositoryListByOrgOptions{Type: "all", Sort: "pushed", Direction: "desc", ListOptions: p})
-		}
 	case app:
 		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
 			got, resp, err := c.Apps.ListRepos(ctx, &p)
 			return got.GetRepositories(), resp, err
+		}
+	case !acct.user:
+		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
+			return c.Repositories.ListByOrg(ctx, owner, &gh.RepositoryListByOrgOptions{Type: "all", Sort: "pushed", Direction: "desc", ListOptions: p})
 		}
 	case acct.self:
 		return func(ctx context.Context, p gh.ListOptions) ([]*gh.Repository, *gh.Response, error) {
@@ -540,6 +544,13 @@ func (e *Error) Permanent() bool                     { return e.Kind == Permanen
 func (e *Error) Waiting() bool                       { return e.Kind == Waiting }
 func (e *Error) IsNotFound() bool                    { return e.Kind == NotFound }
 func (e *Error) ErrorCode() string                   { return e.Code }
+
+// NotInstalled reports whether err says the source's GitHub App is not installed on the account (removed or suspended): GitHub's own
+// answer that the App reads nothing there, not a failure to ask.
+func NotInstalled(err error) bool {
+	var e *Error
+	return errors.As(err, &e) && e.Code == codeNoInstallation
+}
 
 // IsNotFound reports whether err is a NotFound classification.
 func IsNotFound(err error) bool {

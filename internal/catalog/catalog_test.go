@@ -18,6 +18,7 @@ import (
 type lister struct {
 	repos map[string][]snapshot.Repo
 	err   error
+	errs  map[string]error  // by owner, before err
 	files map[string]string // path -> content, for the descriptor job
 }
 
@@ -52,8 +53,16 @@ func (l *lister) Blob(_ context.Context, _, _, sha string) ([]byte, error) {
 }
 
 func (l *lister) ListRepos(_ context.Context, owner string) ([]snapshot.Repo, error) {
+	if err := l.errs[owner]; err != nil {
+		return nil, err
+	}
 	return l.repos[owner], l.err
 }
+
+// appLister reads through a GitHub App: its listing is GitHub's word on what the installation was given.
+type appLister struct{ *lister }
+
+func (appLister) App() bool { return true }
 
 func newCatalog(t *testing.T, l GitHub) *Catalog {
 	t.Helper()
@@ -218,5 +227,59 @@ func TestMissConfirmedSoon(t *testing.T) {
 	}
 	if _, res, err = runAndPublish(t, c, p, it); err != nil || res.Again != 0 || len(p.Current().Repos) != 1 {
 		t.Errorf("confirmed: again %v, repos %d, err %v", res.Again, len(p.Current().Repos), err)
+	}
+}
+
+func beta(id int64, name string) snapshot.Repo { r := pub(id, name); r.Owner = "beta"; return r }
+
+// An App's empty answer is GitHub's word: nothing selected, or the App removed from the account. Its repositories leave (at the
+// confirming listing, as any miss) instead of the last catalogue being kept forever, as a token's empty listing still is.
+func TestAppSelectionEmptiesTheAccount(t *testing.T) {
+	l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a")}, "beta": {beta(2, "b")}}}
+	c := newCatalog(t, appLister{l})
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	it, _, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+	if err != nil || len(p.Current().Repos) != 2 {
+		t.Fatalf("first listing: %d repos, %v", len(p.Current().Repos), err)
+	}
+	l.repos = map[string][]snapshot.Repo{} // acme: nothing selected
+	l.errs = map[string]error{"beta": &github.Error{Kind: github.Permanent, Code: "no_installation", Err: errors.New("not installed")}}
+	for range 2 {
+		if it, _, err = runAndPublish(t, c, p, it); err != nil {
+			t.Fatalf("an App's empty listing failed: %v", err)
+		}
+	}
+	if n := len(p.Current().Repos); n != 0 {
+		t.Errorf("after the confirming listing: %d repos, want none", n)
+	}
+}
+
+// One account that fails to list keeps its repositories; the others are still listed, and the listing runs again soon.
+func TestOneAccountFailingKeepsItsRepositories(t *testing.T) {
+	l := &lister{repos: map[string][]snapshot.Repo{"acme": {pub(1, "a")}, "beta": {beta(2, "b")}}}
+	c := newCatalog(t, l)
+	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
+	it, _, err := runAndPublish(t, c, p, store.Item{State: snapshot.StateNever})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.repos["acme"] = append(l.repos["acme"], pub(3, "new"))
+	l.errs = map[string]error{"beta": &github.Error{Kind: github.Transient, Code: "transient", Err: errors.New("502")}}
+	for range 3 { // more than the misses that remove a repository
+		var res sync.Result
+		if it, res, err = runAndPublish(t, c, p, it); err != nil || res.Again != retryAccount {
+			t.Fatalf("one account failing: again %v, err %v", res.Again, err)
+		}
+	}
+	s := p.Current()
+	if e, _ := s.Repo("acme/new"); e == nil || len(s.Repos) != 3 {
+		t.Errorf("repos = %d (acme/new %v), want acme's new one and beta's kept", len(s.Repos), e)
+	}
+	if e, _ := s.Repo("beta/b"); e == nil {
+		t.Error("the failing account's repository left")
+	}
+	l.errs["acme"] = l.errs["beta"]
+	if _, _, err := runAndPublish(t, c, p, it); err == nil {
+		t.Error("every account failing did not fail the run")
 	}
 }

@@ -52,8 +52,19 @@ it with `gh api /orgs/<org>/installations --jq '.installations[] | {app_slug, pe
    and *Status*: they fire on every comment and every CI update, and the portal does not need them. Installation events
    are sent to Apps without subscribing.
 3. Generate a private key (a `.pem` file) and note the App ID.
-4. Install the App on each organisation or user account, on all repositories (or the ones to show). An App that may be installed only on
-   its own account ("Only on this account") needs one App per account: give each its own source, with the same webhook URL and secret.
+4. Install the App on each organisation or user account, on all repositories or only the ones to show. An App that may be installed only on
+   its own account ("Only on this account") needs one App per account: give each its own source, with the same webhook URL, and the
+   same secret or each its own (`app.webhook_secret_file`).
+
+**The App's selection is what the portal reads.** With an App the portal lists the repositories the installation was given, on an
+organisation and on a user account alike: with *Only select repositories*, exactly those (the organisation's other public repositories
+stay out), with *All repositories*, all of them. There is nothing to configure for it, and no `exclude` is needed. Adding a repository
+to the installation on GitHub sends the App an *installation repositories* event (Apps receive it without subscribing), and the portal
+lists that account again at once: the repository appears within seconds, in its group or else in the group with `unclaimed: true`.
+Removing one takes it out after the confirming listing, 30 seconds later; so does uninstalling or suspending the App on an account.
+A push from a repository the portal does not know yet also lists its account at once. The *Admin* page's *GitHub* section says per
+account whether the source reads the selected repositories or all of them. Private repositories still need `include_private` on the
+source (section 2.1): selecting one on GitHub does not by itself publish it.
 
 **Token.** A fine-grained token with public repository read access, or a classic token without scopes, in a file. Listed with a token, a
 user account shows its public repositories, or all of them, private ones included, when it is the token's own account (the token needs
@@ -85,8 +96,8 @@ been read for 10 minutes. `webhook.answers` says how long the portal took to ans
 5 seconds, `late` over GitHub's 10, which GitHub shows failed although the portal took them; a warning when any was late).
 A webhook on an organisation or a repository has no such log: there a delivery sent while the portal is down is lost, and the
 polls below are the net (releases every 30 minutes for such a source, as for one nothing tells). A push to another branch, and a
-deleted tag or branch, make the portal read that repository's history or tags again; a new repository's own event reaches the portal
-as the listing, within five minutes. Issues and pull
+deleted tag or branch, make the portal read that repository's history or tags again; an event of a repository the portal does not
+know yet (a new one, or one just given to the App) lists its account at once, at most once every 15 seconds. Issues and pull
 requests are also read every 15 minutes whatever arrives (a 304 costs no rate limit), and the listing every five minutes asks for a
 read when a repository's count of open issues and pull requests moved.
 
@@ -146,12 +157,13 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `github.sources[].app.id` | | GitHub App ID |
 | `github.sources[].app.private_key_file` | | the App's private key (PEM) |
 | `github.sources[].app.installations` | all | account logins whose installations are used |
+| `github.sources[].app.webhook_secret_file` | empty | the App's own webhook secret, when it is not `webhook.secret_file` (one App per account, each with its own secret); a delivery signed with any configured secret is accepted, and a source with its own secret is kept fresh by events without `webhook.secret_file` |
 | `github.sources[].token_file` | | a token file, instead of `app` |
 | `github.sources[].credential` | `false` | `true`: the token is in the vault of [`scp personal`](personal-edition.md) (experimental); `scp serve` refuses it |
 | `github.sources[].app.credential` | `false` | `true`: the App's private key is in the vault of `scp personal` (instead of `app.private_key_file`); `scp serve` refuses it |
 | `github.sources[].include_forks` | `false` | show forks by default. Forks are always read; unless this is set a fork is left out of the pages and the API until the reader asks for it (`Show forks` on the dashboard and the group page, in Settings; `?forks=show` in the API), except a fork a group names: its `default_repo`, or an `exact` matcher |
 | `github.sources[].include_archived` | `true` | list archived repositories |
-| `github.sources[].exclude` | `[]` | repositories kept out of the catalogue even where the credential reads them: matchers as in the groups (`exact`, `prefix`, `glob`, `regexp`, `topic`) |
+| `github.sources[].exclude` | `[]` | repositories kept out of the catalogue even where the credential reads them: matchers as in the groups (`exact`, `prefix`, `glob`, `regexp`, `topic`). With an App, select the repositories on the installation instead |
 | `github.sources[].include_private` | `false` | list private and internal repositories too (section 2.1) |
 | `catalog.reconcile_interval` | `5m` | how often every account is listed (1m to 24h) |
 | `catalog.groups[]` | none | groups in dashboard order (at most 500) |
@@ -160,7 +172,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `catalog.groups[].description` | empty | at most 500 characters |
 | `catalog.groups[].default_repo` | required | the group's main repository name; a missing one is shown on the group, the group stays |
 | `catalog.groups[].sources` | all | source ids the group draws from |
-| `catalog.groups[].match[]` | required | 1 to 64 matchers; a repository in any matcher is a member |
+| `catalog.groups[].match[]` | required | 1 to 64 matchers; a repository in any matcher is a member. Without `match`, a group with `sources` takes every repository of those sources (an account's own group: `{id: oranheim, name: Ove Ranheim, default_repo: dossier, sources: [oranheim]}`) |
 | `access.proxy_identity` | `true` | `false`: the trusted proxies' identity headers (`access.user_header`, `access.groups_header`) are never believed, and `server.trusted_proxies` then only tells the client's address; a viewer is who signs in or shows a token. Set it when viewers sign in and a proxy in front passes a client's headers on (a container platform's proxy, say), or anyone could claim a user and groups |
 | `access.user_header` | `X-Forwarded-User` | header in which the authenticating proxy names the user |
 | `access.groups_header` | `X-Forwarded-Groups` | header with the user's groups, comma-separated |
@@ -189,7 +201,7 @@ settings with secrets redacted. It exits 0 when the configuration is valid and 2
 | `assistant.max_history` | `40` | messages of a conversation (1 to 200) |
 | `assistant.max_input_chars` | `60000` | characters of a conversation (1,000 to 1,000,000) |
 | `assistant.tool_result_chars` | `12000` | characters of one tool result given to the model (1,000 to 200,000) |
-| `webhook.secret_file` | empty | webhook secret; the receiver is served only when set |
+| `webhook.secret_file` | empty | webhook secret; the receiver is served when it or an App's `app.webhook_secret_file` is set |
 | `webhook.previous_secret_file` | empty | the old secret, accepted too while you rotate |
 | `webhook.catch_up` | `false` | read each GitHub App's webhook delivery log every two minutes and act on what the portal did not answer with a success: events without a receiver, for a portal GitHub cannot reach (a computer at home, behind a firewall). It needs a source with `app`; with a receiver it is the net that runs anyway. The App still has to subscribe to the events and have a webhook URL (it need not be reachable) |
 | `cluster.addresses` | `[]` | Hazelcast members `host:port`; set to run as one of several instances (section 3.1) |
@@ -1127,7 +1139,7 @@ steps, and job failures. Secrets are never logged.
 | `config check` exits 2 | every problem is listed with its key; unknown keys and `SCP_*` variables are errors |
 | `/pulls` or `/issues` says the feature is off, or stays empty | the *Admin* page's *GitHub* section names the missing permissions and events; grant them in the App's *Permissions & events* and accept them on the installation, or switch the feature off with `features.pulls` or `features.issues` (section 1) |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for `401`/`403` (credential, App not installed, missing permission) |
-| A repository is missing | it must be public, not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it); a fork is hidden unless `include_forks` is set or a group names it (the dashboard says how many are hidden; `scp config groups` lists them) |
+| A repository is missing | with an App it must be selected on the installation (the *Admin* page's *GitHub* section says per account whether the App has the selected repositories or all); it must be public (or the source has `include_private`), not matched by the source's `exclude`, and in a configured account; a private repository disappears at the next listing, a deleted one after two (the second runs 30 seconds after the first misses it); a fork is hidden unless `include_forks` is set or a group names it (the dashboard says how many are hidden; `scp config groups` lists them) |
 | Pushes, issues or pull requests show only after minutes | the webhook: GitHub's delivery log for the App, organisation or repository (a delivery shown as failed is read from that log within minutes: `scp_webhook_deliveries_total{result="caught_up"}`), `scp_webhook_deliveries_total` by result; the App must subscribe to *Issues*, *Pull request* and *Pull request review* (the *GitHub prerequisites* card) |
 | The assistant answers with an error | *Test the provider* in the *Admin* page's *Assistant* section; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines carry the provider's message |
 | Pages show *Delayed* | `scp_github_rate_remaining_ratio`; with a token, consider a GitHub App |

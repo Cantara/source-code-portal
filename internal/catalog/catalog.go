@@ -101,8 +101,15 @@ func (c *Catalog) Spec() sync.Spec {
 		Run: c.run, Publish: c.publish}
 }
 
-// errEmpty marks a complete listing without repositories for a source that had some: usually a token or scope problem.
+// errEmpty marks a complete listing without repositories for a token source that had some: usually a token or scope problem. An App's
+// listing is GitHub's own word on what the installation was given (none selected, or the App removed), so it may be empty.
 var errEmpty = errors.New("the listing returned no repositories; keeping the last catalogue")
+
+// retryAccount is how soon a listing runs again after an account of the source failed to list (its last repositories were kept).
+const retryAccount = time.Minute
+
+// app is implemented by a GitHub source that reports whether it reads through a GitHub App (*github.Source does).
+type app interface{ App() bool }
 
 func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	src, ok := c.sources[j.Source]
@@ -113,16 +120,16 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if err := src.gh.RefreshInstallations(ctx); err != nil {
 		return sync.Result{}, fmt.Errorf("installations: %w", err)
 	}
-	var listed []snapshot.Repo
-	for _, org := range src.orgs {
-		rs, err := src.gh.ListRepos(ctx, org)
-		if err != nil {
-			return sync.Result{}, fmt.Errorf("list %s: %w", org, err)
-		}
-		listed = append(listed, rs...)
-	}
 	prev := decode(j.Prev.Payload)
-	if len(listed) == 0 && len(prev.Repos) > 0 {
+	listed, failed, err := c.list(ctx, j.Source, src, prev)
+	if err != nil {
+		return sync.Result{}, err
+	}
+	viaApp := false
+	if a, ok := src.gh.(app); ok {
+		viaApp = a.App()
+	}
+	if len(listed) == 0 && len(prev.Repos) > 0 && !viaApp {
 		return sync.Result{}, errEmpty
 	}
 	for i := range listed {
@@ -158,7 +165,42 @@ func (c *Catalog) run(ctx context.Context, j sync.Job) (sync.Result, error) {
 	if slices.ContainsFunc(next.Repos, func(t Tracked) bool { return t.Misses > 0 }) {
 		res.Again = confirmAfter // a repository the listing missed (deleted, transferred) leaves at the confirming listing
 	}
+	if failed && (res.Again == 0 || res.Again > retryAccount) {
+		res.Again = retryAccount
+	}
 	return res, nil
+}
+
+// list reads every account of the source. An account GitHub says the App is not installed on lists nothing: its repositories leave
+// as any the listing misses. An account that fails to list keeps its last repositories, so one account does not stop the others;
+// failed reports it, and the error is returned only when no account listed at all.
+func (c *Catalog) list(ctx context.Context, id string, src source, prev state) (listed []snapshot.Repo, failed bool, err error) {
+	var errs []error
+	for _, org := range src.orgs {
+		rs, err := src.gh.ListRepos(ctx, org)
+		switch {
+		case err == nil:
+			listed = append(listed, rs...)
+		case github.NotInstalled(err):
+			c.log.Info("the GitHub App is not installed on the account; its repositories leave the catalogue", "source", id, "account", org)
+		case ctx.Err() != nil:
+			return nil, false, ctx.Err()
+		default:
+			errs = append(errs, fmt.Errorf("list %s: %w", org, err))
+			for _, t := range prev.Repos {
+				if strings.EqualFold(t.Repo.Owner, org) {
+					listed = append(listed, t.Repo)
+				}
+			}
+		}
+	}
+	if len(errs) == len(src.orgs) {
+		return nil, false, errs[0]
+	}
+	if len(errs) > 0 {
+		c.log.Warn("an account of the source failed to list; its last repositories are kept", "source", id, "err", errors.Join(errs...))
+	}
+	return listed, len(errs) > 0, nil
 }
 
 func decode(payload []byte) state {

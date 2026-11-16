@@ -33,6 +33,7 @@ type group struct {
 	match     []matcher
 	exact     []string // the names the exact matchers give
 	unclaimed bool     // also selects what no other group selects
+	whole     bool     // no matchers: every repository of its sources
 }
 
 // Groups are the compiled group definitions, in config order.
@@ -61,7 +62,7 @@ func Compile(cfg []config.Group) (*Groups, []Finding) {
 	catchAlls := 0
 	for i, gc := range cfg {
 		at := fmt.Sprintf("catalog.groups[%d] (%s)", i, gc.ID)
-		g := group{cfg: gc, sources: map[string]bool{}}
+		g := group{cfg: gc, sources: map[string]bool{}, whole: len(gc.Match) == 0 && len(gc.Sources) > 0}
 		for _, s := range gc.Sources {
 			g.sources[s] = true
 		}
@@ -92,8 +93,8 @@ func Compile(cfg []config.Group) (*Groups, []Finding) {
 		switch {
 		case !namePattern.MatchString(gc.DefaultRepo):
 			add(true, "%s.default_repo: %q is not a repository name", at, gc.DefaultRepo)
-		case g.unclaimed:
-			// The default is whatever no other group claims: known only from a listing.
+		case g.unclaimed, g.whole:
+			// The default is whatever no other group claims, or any repository of the sources: known only from a listing.
 		case len(g.match) == len(gc.Match) && !g.matches(&snapshot.Repo{Name: gc.DefaultRepo}):
 			add(!hasTopic, "%s.default_repo: %q is not selected by the group's matchers", at, gc.DefaultRepo)
 		}
@@ -173,7 +174,7 @@ func (g *group) inSources(r *snapshot.Repo) bool {
 }
 
 func (g *group) matches(r *snapshot.Repo) bool {
-	return slices.ContainsFunc(g.match, func(m matcher) bool { return m(r) })
+	return g.whole || slices.ContainsFunc(g.match, func(m matcher) bool { return m(r) })
 }
 
 // Pinned reports whether a group names r on purpose: its default repository, by name, or an exact matcher, within the group's

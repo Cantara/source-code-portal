@@ -26,6 +26,8 @@ export interface AdminStatus {
     mode: "events" | "poll"
     /** each subject's refresh in seconds: the safety net under events, the cadence under poll. */
     cadenceSeconds: Record<string, number>
+    /** a GitHub App source's installations: what each reads, the repositories selected on GitHub or all of them. */
+    accounts?: { account: string; selection: "selected" | "all" | string }[]
   }[]
   webhook: {
     enabled: boolean

@@ -37,14 +37,16 @@ github:
   sources:
     - id: github
       orgs: [Cantara] # organisations and user accounts
-      # A GitHub App (preferred) or a token file; not both.
+      # A GitHub App (preferred) or a token file; not both. With an App the portal reads what each installation was given: the
+      # repositories selected on GitHub ("Only select repositories") or all of them; adding one on GitHub makes it appear at once.
       app:
         id: 123456
         private_key_file: /run/secrets/scp-app.pem
+        # webhook_secret_file: /run/secrets/app-webhook-secret # this App's own secret, when it is not webhook.secret_file
       # token_file: /run/secrets/github-token
       include_forks: false # forks are read always; true shows them by default, else a group names the ones to show (default_repo, exact)
       include_archived: true
-      exclude: [] # e.g. [{glob: 'client-*'}, {topic: confidential}]: never catalogued
+      exclude: [] # e.g. [{glob: 'client-*'}, {topic: confidential}]: never catalogued; with an App, select on the installation instead
       include_private: false # true needs access.private_groups and a way to know the viewer: the proxy or auth
 catalog:
   reconcile_interval: 5m
@@ -55,13 +57,18 @@ catalog:
       default_repo: source-code-portal
       match:
         - prefix: source-code-
+    # A group with sources and no match takes every repository of those sources: an account's own group, with no names.
+    # - id: oranheim
+    #   name: Ove Ranheim
+    #   default_repo: dossier
+    #   sources: [oranheim]
     - id: other
       name: Other
       default_repo: whydah
       match:
         - unclaimed: true   # what no other group selects; catch_all: true selects every repository
 # GitHub webhook (content type application/json; events push, release, repository, installation, installation_repositories) at
-# POST /webhooks/github. The receiver is registered only when secret_file is set; previous_secret_file keeps deliveries signed with
+# POST /webhooks/github. The receiver is registered only when secret_file (or an App's app.webhook_secret_file) is set; previous_secret_file keeps deliveries signed with
 # the old secret valid during a rotation.
 # catch_up: true reads the App's webhook delivery log every two minutes instead (or as well): events for a portal GitHub cannot
 # reach. It needs a source with an app, and needs no secret.

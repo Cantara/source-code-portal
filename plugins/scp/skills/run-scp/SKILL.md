@@ -1,6 +1,6 @@
 ---
 name: run-scp
-description: Set up, configure, deploy, upgrade and troubleshoot a Source Code Portal (SCP) from its released binary or container image (ghcr.io/cantara/source-code-portal) - the scp.yaml (GitHub App or token, organisations, product groups with prefix, glob, regexp, exact and topic matchers, webhooks, private repositories, OpenID Connect sign-in, access tokens, the assistant, a theme with the owner's colours, logo and name, several instances), the secrets, Docker Compose with a reverse proxy, Kubernetes or a plain binary, and checking it works. Use when someone wants to run their own SCP, change its configuration or groups, upgrade it, or find out why it misbehaves.
+description: Set up, configure, deploy, upgrade and troubleshoot a Source Code Portal (SCP) from its released binary or container image (ghcr.io/cantara/source-code-portal) - the scp.yaml (GitHub App or token, organisations, the repositories selected on the App, product groups with prefix, glob, regexp, exact and topic matchers or a whole account, webhooks, private repositories, OpenID Connect sign-in, access tokens, the assistant, a theme with the owner's colours, logo and name, several instances), the secrets, Docker Compose with a reverse proxy, Kubernetes or a plain binary, and checking it works. Use when someone wants to run their own SCP, change its configuration or groups, upgrade it, or find out why it misbehaves.
 ---
 
 # Run Source Code Portal
@@ -21,8 +21,9 @@ listener `:9091` (`/readyz`, `/livez`, `/metrics`, `/api/v1/status`).
   (every key and its default, running, monitoring, troubleshooting), `docs/production.md` (one host from nothing),
   `docs/security-model.md` and `docs/repository-guide.md`. The portal refuses unknown keys, so a key from another release fails.
   [references/essentials.md](references/essentials.md) summarises them for when you cannot fetch them; the documents win.
-- **Secrets are files.** The configuration names files (`token_file`, `app.private_key_file`, `webhook.secret_file`,
-  `auth.session_key_file`, `auth.oidc.client_secret_file`, `llm.api_key_file`, token `secret_file`s). Make them with the commands
+- **Secrets are files.** The configuration names files (`token_file`, `app.private_key_file`, `app.webhook_secret_file`,
+  `webhook.secret_file`, `webhook.previous_secret_file`, `auth.session_key_file`, `auth.oidc.client_secret_file`, `llm.api_key_file`,
+  token `secret_file`s, a registry's `password_file` or `token_file`, `enterprise.token_key_file`). Make them with the commands
   below, owned by the container user (UID 65532) with mode 0640; never read, print, paste or commit their contents, and never put a
   secret in the YAML or an environment variable.
 - **Read-only on GitHub.** The portal needs *Contents* and *Metadata* read. Never ask for more, never change repositories. Listing
@@ -62,7 +63,9 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    *Metadata*, *Issues*, *Pull requests*, *Checks* and *Commit statuses* read-only, webhook URL `<public_url>/webhooks/github` with a
    random secret, events *Push*, *Release*, *Repository*, *Issues*, *Pull request*, *Pull request review* (not *Issue comment*,
    *Check suite* or *Status*: every comment and CI update, not needed), installed on the
-   accounts. Each permission serves a feature, and a missing one leaves it empty (the table is the operator guide's section 1):
+   accounts with *Only select repositories* (the portal reads exactly those; adding one on GitHub makes it appear at once) or
+   *All repositories*. One App per account (an App only for its own account) gets one source each, with the same webhook secret or
+   each its own (`app.webhook_secret_file`). Each permission serves a feature, and a missing one leaves it empty (the table is the operator guide's section 1):
    *Contents* and *Metadata* the catalogue, *Issues* `/issues`, *Pull requests*, *Checks* and *Commit statuses* `/pulls`. Tell
    them that the portal only reads (every permission *Read-only*) and that a later change must be accepted on each installation by an
    organisation owner (Organization settings, GitHub Apps, *Review request*). If they do without pull requests or issues, leave
@@ -82,13 +85,15 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
    `prefix: payments-`, `glob: "*-service"`, `regexp: "^(api|web)-.*$"` (RE2, whole name, case-sensitive unless `(?i)`),
    `exact: handbook`, `topic: payments`, `catch_all: true`, `unclaimed: true` (what no other group took: give the last group this
    so nothing is homeless). Each group needs an `id` (`[a-z0-9-]`), a `name`, a `default_repo` (its main repository) and 1 to 64
-   matchers; keep their own names and descriptions. Keep repositories out with the source's `exclude` (same matchers); forks are hidden
+   matchers, or only `sources: [<source id>]` for every repository of that source (an account's own group); keep their own names and
+   descriptions. With a GitHub App, choose the repositories on the App's installation (*Only select repositories*): the portal reads
+   exactly what it was given, and one added on GitHub appears at once. Otherwise keep repositories out with the source's `exclude` (same matchers); forks are hidden
    unless `include_forks`, a group names one (as its `default_repo` or with `exact`) or the reader asks. Run `scp config groups` and show the landing in a small table; iterate until it matches their picture.
 5. **The configuration.** Start from the release's `deploy/config.example.yaml` or the starter in
    [references/essentials.md](references/essentials.md). Set `server.public_url` (absolute links, HSTS on https) and
    `server.trusted_proxies` (only the reverse proxy's network). Add only the sections they asked for: `webhook`, `access` and
    `include_private`, `auth` (OIDC: redirect URI `<public_url>/auth/callback`, sign-out redirect `<public_url>/`), `llm` and
-   `assistant`, `announcements[]` and `visibility:` (the base of what admins change in Admin; download it back from Admin with their changes,
+   `assistant`, `features`, `commits.assistants`, `packages.registries`, `announcements[]`, `visibility:` and `layouts:` (the base of what admins change in Admin; download it back from Admin with their changes,
    [references/deploy.md](references/deploy.md)), `web.theme_dir` and `web.product_name` (their colours, logo and
    name: [references/theme.md](references/theme.md), for a release after v2.2.10), `cluster` (several instances through
    Hazelcast). `config check` until it passes.
@@ -123,8 +128,8 @@ them with `sha256sum -c scp_<version>_checksums.txt --ignore-missing`, unpack.
 | `/pulls` or `/issues` says the feature is off, or stays empty | *Admin*, *GitHub prerequisites* (or `/api/v1/status` warnings, the log's `prerequisites unmet`): the missing permissions and events and the installation; grant them in the App's *Permissions & events*, accept them on the installation, then check with `gh api /orgs/<org>/installations --jq '.installations[] \| {app_slug, permissions, events}'` |
 | `/readyz` stays 503 | `/api/v1/status` sources and warnings; the log for 401/403 (credential, App not installed, missing permission) |
 | GitHub's *Recent Deliveries* show failed deliveries or redeliveries | `/api/v1/status` `webhook.catchUps[].failed` by answer (`401`: the webhook secret differs, set `webhook.previous_secret_file` to the old one before rotating; `502`: a restart; `0`: no answer in time) and `webhook.answers` (`late`: answered after GitHub's 10 s); the catch-up passes every failed delivery on within about two minutes, so no hand redelivery is needed |
-| A repository is missing | public (or `include_private` with access), not a fork, not in `exclude`, in a listed account; `scp config groups`; not set to *No one* (or *Signed in*, for the public) in *Admin*, *Who sees what* |
-| Pushes show only after minutes | the webhook: GitHub's delivery log, `scp_webhook_deliveries_total` by result; without one the portal lists every 5 minutes (releases every 30 minutes); a portal GitHub cannot reach can set `webhook.catch_up: true` with an App source to read the App's delivery log |
+| A repository is missing | with an App: selected on the installation (*Admin*, *GitHub*, *Sources* says per account whether the App has the selected repositories or all); public (or `include_private` with access), not a fork, not in `exclude`, in a listed account; `scp config groups`; not set to *No one* (or *Signed in*, for the public) in *Admin*, *Who sees what* |
+| Pushes show only after minutes | the webhook: GitHub's delivery log (`401`: the secret differs: the App's own `app.webhook_secret_file` or `webhook.secret_file`), `scp_webhook_deliveries_total` by result; without one the portal lists every 5 minutes (releases every 30 minutes); a portal GitHub cannot reach can set `webhook.catch_up: true` with an App source to read the App's delivery log |
 | Pages say *Delayed* | `scp_github_rate_remaining_ratio`; with a token, move to a GitHub App |
 | Sign-in fails | `/signin?error=`, the provider's redirect URI, `auth.oidc.groups_claim`, the session key the same on every instance |
 | The assistant errs | *Test the provider* on *Admin*; `scp_assistant_requests_total` by outcome; the log's `assistant provider` lines |

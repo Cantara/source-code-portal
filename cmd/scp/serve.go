@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	gosync "sync"
 	"sync/atomic"
 	"time"
 
@@ -352,7 +353,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	// A save of who sees what publishes again: the views are rebuilt with the new audiences (design/visibility.md).
 	s.visibility = visibility.Open(ctx, s.store, baseVisibility, func() { s.pub.Update(func(*snapshot.Builder) {}) }, log)
 	s.pub.Audience(s.visibility.Audience)
-	feed := cfg.Webhook.Secret.IsSet() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
+	feed := cfg.Receiver() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, webhooks: feed,
 		needs: needs(f), log: log.With("component", "prerequisites")}
 	st := &status{mode: string(mode), ready: ready, prereqs: s.prereqs.check, alive: s.engine.Alive, current: s.pub.Current, depth: s.engine.Depth, rate: gh.RateRemaining,
@@ -360,7 +361,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 			return statusConfig{File: cfg.Baseline.File != nil, Changes: configChanges{Visibility: s.visibility.Changes(),
 				Announcements: s.notices.Changes(), Layouts: s.layouts.Changes()}}
 		},
-		cadence: s.engine.Cadence, webhook: feed, receiver: cfg.Webhook.Secret.IsSet(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string {
+		accounts: appAccounts(gh),
+		cadence:  s.engine.Cadence, webhook: feed, receiver: cfg.Receiver(), catchUp: cfg.Webhook.CatchUp, layouts: func() []string {
 			return slices.Concat(s.layouts.Problems(), s.notices.Problems(), s.visibility.Problems())
 		},
 		deliveries: map[string]int{}}
@@ -629,9 +631,22 @@ func (s *server) deliver(ev sync.Event, repo snapshot.RepoKey, source string) {
 	}
 }
 
+// webhookSink is webhookSink over the server's inbox, knowing a repository by the current snapshot (an old address included).
+func (s *server) webhookSink(sources []config.Source) webhook.Sink {
+	return webhookSink(s.inbox.take, func(k snapshot.RepoKey) bool { e, moved := s.pub.Current().Repo(k); return e != nil || moved }, sources)
+}
+
+// discoverEvery is the least time between two listings of a source that events of repositories the portal does not know cause: a
+// stream of pushes from repositories the source leaves out (excluded, private without include_private) costs one listing in it.
+const discoverEvery = 15 * time.Second
+
 // webhookSink hands webhook events on: repository events to the repository's jobs, owner-wide events to the listing of the source
-// that has the owner among its organisations. Owners no source lists are ignored.
-func webhookSink(take func(sync.Event, snapshot.RepoKey, string) error, sources []config.Source) webhook.Sink {
+// that has the owner among its organisations. An event of a repository the portal does not know yet (known is false: added to the
+// App's selection, created, or never listed) lists its source at once, at most once every discoverEvery, so it appears without
+// waiting for the scheduled listing. Owners no source lists are ignored.
+func webhookSink(take func(sync.Event, snapshot.RepoKey, string) error, known func(snapshot.RepoKey) bool, sources []config.Source) webhook.Sink {
+	var mu gosync.Mutex
+	discovered := map[string]time.Time{} // by source: the last listing an unknown repository's event asked for
 	sourceOf := map[string]string{}
 	for _, s := range sources {
 		for _, org := range s.Orgs {
@@ -645,6 +660,18 @@ func webhookSink(take func(sync.Event, snapshot.RepoKey, string) error, sources 
 			return nil
 		case name == "" || ev == sync.EventSourceChanged:
 			return take(ev, "", id)
+		case !known(snapshot.KeyOf(owner, name)):
+			mu.Lock()
+			now, last := time.Now(), discovered[id]
+			due := now.Sub(last) >= discoverEvery
+			if due {
+				discovered[id] = now
+			}
+			mu.Unlock()
+			if !due {
+				return nil
+			}
+			return take(sync.EventSourceChanged, "", id)
 		default:
 			return take(ev, snapshot.KeyOf(owner, name), "")
 		}
@@ -790,7 +817,7 @@ func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, s
 	observe := func(event, result string) { m.delivery(event, result); st.delivery(event, result) }
 	for _, src := range cfg.GitHub.Sources {
 		if g := gh.Source(src.ID); g.App() {
-			s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, webhookSink(s.inbox.take, cfg.GitHub.Sources), observe, log))
+			s.inbox.catchUps = append(s.inbox.catchUps, catchUp(g, src.ID, s.store, s.pub.Current, s.webhookSink(cfg.GitHub.Sources), observe, log))
 		}
 	}
 	st.catchUps = func() []webhook.CatchUpState {
@@ -800,10 +827,10 @@ func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, s
 		}
 		return out
 	}
-	if !cfg.Webhook.Secret.IsSet() { // GitHub cannot reach the portal: the delivery logs are the only way events arrive
+	if !cfg.Receiver() { // GitHub cannot reach the portal: the delivery logs are the only way events arrive
 		return nil
 	}
-	rc := webhook.New(cfg.Webhook.Secret.Reveal(), cfg.Webhook.PreviousSecret.Reveal(), webhookSink(s.inbox.take, cfg.GitHub.Sources), log)
+	rc := webhook.New(cfg.WebhookSecrets(), s.webhookSink(cfg.GitHub.Sources), log)
 	if s.member != nil {
 		rc.Dedupe(s.member.First)
 	}
@@ -817,7 +844,7 @@ func (s *server) eventRoutes(cfg config.Config, gh *github.Client, m *metrics, s
 func unloggedSources(cfg config.Config) []string {
 	var out []string
 	for _, src := range cfg.GitHub.Sources {
-		if cfg.Webhook.Secret.IsSet() && src.App == nil {
+		if cfg.Receives(src) && src.App == nil {
 			out = append(out, src.ID)
 		}
 	}
@@ -830,7 +857,7 @@ func unloggedSources(cfg config.Config) []string {
 func polledSources(cfg config.Config) []string {
 	var out []string
 	for _, src := range cfg.GitHub.Sources {
-		if !cfg.Webhook.Secret.IsSet() && (!cfg.Webhook.CatchUp || src.App == nil) {
+		if !cfg.Receives(src) && (!cfg.Webhook.CatchUp || src.App == nil) {
 			out = append(out, src.ID)
 		}
 	}
