@@ -55,7 +55,7 @@ saying why it is retired and since when it was last active.
 
 ## Agents and the rest (AL2)
 
-The tool `retired_repositories` (the catalogue of `cmd/scp/tools.go`: same parameters as the API), the search kind `archive`
+The tool `retired_repositories` (the catalogue of `internal/app/toolset`: same parameters as the API), the search kind `archive`
 filter is not needed (a retired repository is already found by name; its row says *Archived*), `llms.txt` marks a retired repository with
 its reason (`archived`; `deprecated` is its lifecycle already) and links the JSON list, the badges are unchanged. Docs, the Guide's section on the Archive, the plugin's reference.
 

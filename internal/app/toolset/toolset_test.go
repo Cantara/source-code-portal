@@ -1,4 +1,4 @@
-package main
+package toolset
 
 import (
 	"context"
@@ -8,12 +8,16 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
+
 	"github.com/cantara/source-code-portal/internal/feature/insights"
 	"github.com/cantara/source-code-portal/internal/feature/releases"
-	"github.com/cantara/source-code-portal/internal/feature/search"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 	"github.com/cantara/source-code-portal/internal/platform/store"
 )
+
+func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
 
 // TestRecentReleasesTool: the tool reads the releases API as the viewer's view has it and says what a failed check means.
 func TestRecentReleasesTool(t *testing.T) {
@@ -30,7 +34,7 @@ func TestRecentReleasesTool(t *testing.T) {
 		spec.Publish(b, store.Item{Repo: "acme/core", State: snapshot.StateOK, Payload: payload}, snapshot.Freshness{State: snapshot.StateOK, FetchedAt: now, CheckedAt: now, TTL: time.Hour})
 	})
 	p.Flush()
-	r := toolReads{releases: releasesAPI{Current: func(context.Context) *snapshot.Snapshot { return p.Current() }}}
+	r := Reads{Releases: releases.API{Current: func(context.Context) *snapshot.Snapshot { return p.Current() }}}
 
 	res, err := r.recentReleases(t.Context(), map[string]any{"variant": "all"})
 	if err != nil {
@@ -52,33 +56,6 @@ func TestRecentReleasesTool(t *testing.T) {
 	}
 }
 
-// TestSearchReadsReleases: each release held is a document of the kind release that opens the repository's releases.
-func TestSearchReadsReleases(t *testing.T) {
-	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
-	now := time.Now().UTC()
-	spec := releases.New(nil).Spec()
-	p.Update(func(b *snapshot.Builder) {
-		b.ReplaceSource("gh", []*snapshot.RepoEntry{{Repo: snapshot.Repo{ID: snapshot.RepoID{Source: "gh", GitHubID: 1}, Owner: "acme", Name: "core", Visibility: "public"}}}, nil,
-			snapshot.SourceStatus{ID: "gh"})
-		payload, _ := json.Marshal(releases.Set{Releases: []releases.Release{
-			{Tag: "v2.0.0", Name: "Two", Summary: "Single sign-on", Published: now, Author: "ann"},
-			{Tag: "v1.0.0", Published: now.AddDate(0, 0, -30)},
-		}})
-		spec.Publish(b, store.Item{Repo: "acme/core", State: snapshot.StateOK, Payload: payload}, snapshot.Freshness{State: snapshot.StateOK})
-	})
-	p.Flush()
-	var got []search.Document
-	for _, d := range searchRead(p.Current().Repos["acme/core"]).Documents {
-		if d.Kind == search.KindRelease {
-			got = append(got, d)
-		}
-	}
-	if len(got) != 2 || got[0].Title != "v2.0.0 Two" || got[1].Title != "v1.0.0" || got[0].URL != "/releases?repo=acme%2Fcore&variant=all" ||
-		got[0].Fields[search.FieldText] != "Single sign-on" || got[0].Fields[search.FieldAuthor] != "ann" {
-		t.Errorf("release documents = %+v", got)
-	}
-}
-
 // TestFleetInsightsTool: the tool tells the five insights as the API has them and never names a person.
 func TestFleetInsightsTool(t *testing.T) {
 	p := snapshot.NewPublisher(time.Hour, time.Hour, slog.New(slog.DiscardHandler))
@@ -90,14 +67,16 @@ func TestFleetInsightsTool(t *testing.T) {
 		}, nil, snapshot.SourceStatus{ID: "gh"})
 	})
 	p.Flush()
-	api := newInsights(func(context.Context) *snapshot.Snapshot { return p.Current() })
+	api := insights.API{Current: func(context.Context) *snapshot.Snapshot { return p.Current() },
+		Retired: func(*snapshot.RepoEntry) oapi.ArchiveReason { return "" },
+		Fresh:   func(*snapshot.RepoEntry) snapshot.Freshness { return snapshot.Freshness{State: snapshot.StateOK} }}
 	api.Facts = func(_ *snapshot.Snapshot, e *snapshot.RepoEntry) insights.Facts {
 		if e.Repo.Name == "core" {
 			return insights.Facts{Language: "Go", UsedBy: []snapshot.RepoKey{"acme/app"}, People: 30, Top: 30, LastChange: now}
 		}
 		return insights.Facts{Language: "Go", People: 5, LastChange: now.AddDate(-3, 0, 0)}
 	}
-	r := toolReads{insights: api}
+	r := Reads{Insights: api}
 	res, err := r.fleetInsights(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)

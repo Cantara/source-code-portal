@@ -1,4 +1,4 @@
-package main
+package fleethealth
 
 import (
 	"bytes"
@@ -10,12 +10,12 @@ import (
 )
 
 // rulesFixture is the web tests' copy of GET /api/v1/rules; SCP_UPDATE_RULES=1 rewrites it.
-const rulesFixture = "../../web/src/test/rules.json"
+const rulesFixture = "../../../web/src/test/rules.json"
 
 // TestRulesFixture holds the web tests to the rules the server tells, so a change of a threshold or a word fails here until the
 // fixture is rewritten and the web tests pass with it.
 func TestRulesFixture(t *testing.T) {
-	want, err := json.MarshalIndent(rulesFor(config.Features{Pulls: true, Issues: true}), "", "  ")
+	want, err := json.MarshalIndent(RulesFor(config.Features{Pulls: true, Issues: true}), "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +30,6 @@ func TestRulesFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Fatalf("%s differs from the server's rules: run SCP_UPDATE_RULES=1 go test -run TestRulesFixture ./cmd/scp", rulesFixture)
+		t.Fatalf("%s differs from the server's rules: run SCP_UPDATE_RULES=1 go test -run TestRulesFixture ./internal/app/fleethealth", rulesFixture)
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package fleethealth
 
 import (
 	"context"
@@ -23,15 +23,15 @@ func failing(f snapshot.Freshness) bool {
 	return f.Attempts >= 3 || (f.CheckedAt.IsZero() && f.State == snapshot.StateError)
 }
 
-// assess is a repository's health in the view s from the facets of the catalogue, its commits and its release.
-func assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.Repo {
+// Assess is a repository's health in the view s from the facets of the catalogue, its commits and its release.
+func Assess(s *snapshot.Snapshot, e *snapshot.RepoEntry, now time.Time) health.Repo {
 	r := e.Repo
 	d, _ := catalog.DescriptorOf(e)
 	last, commitsFresh := commits.LastCommit(e)
 	sig := health.Signals{Archived: r.Archived, Deprecated: d.Lifecycle == "deprecated", Public: r.Visibility == "public",
 		LastChange: r.PushedAt, LastCommit: last, License: r.License,
 		Failing: failing(e.Fresh) || failing(commitsFresh)}
-	sig.OpenIssues, sig.WithPulls = openIssues(e)
+	sig.OpenIssues, sig.WithPulls = OpenIssues(e)
 	sig.ReviewIdle, sig.OldUpdates = pulls.Waiting(e, health.UpdatesAfter, now)
 	if at, before := commits.LastAuthored(s, r.Key(), commits.WorkTeam); !at.IsZero() {
 		sig.LastChange, sig.Automated, sig.Before = at, before || last.After(at), before
@@ -61,18 +61,18 @@ func weigh(s *snapshot.Snapshot, keys []snapshot.RepoKey, def snapshot.RepoKey, 
 	members := make([]health.Member, 0, len(keys))
 	for _, k := range keys {
 		if e := s.Repos[k]; e != nil {
-			members = append(members, health.Member{Address: string(k), Default: def != "" && k == def, Health: assess(s, e, now)})
+			members = append(members, health.Member{Address: string(k), Default: def != "" && k == def, Health: Assess(s, e, now)})
 		}
 	}
 	return health.Weigh(members)
 }
 
-func groupHealth(s *snapshot.Snapshot, g snapshot.Group, now time.Time) health.Product {
+func Group(s *snapshot.Snapshot, g snapshot.Group, now time.Time) health.Product {
 	return weigh(s, g.Members, g.DefaultRepo, now)
 }
 
-func repoHealthAPI(s *snapshot.Snapshot, e *snapshot.RepoEntry, out *oapi.Repo) {
-	r := assess(s, e, time.Now())
+func RepoAPI(s *snapshot.Snapshot, e *snapshot.RepoEntry, out *oapi.Repo) {
+	r := Assess(s, e, time.Now())
 	if !r.Counted {
 		return
 	}
@@ -101,12 +101,12 @@ func productAPI(p health.Product, limit int) *oapi.ProductHealth {
 	return out
 }
 
-// dashboardHealthAPI adds the health of the products, their members and the fleet, each member's activity (by the last change of
+// DashboardAPI adds the health of the products, their members and the fleet, each member's activity (by the last change of
 // the work that counts, which the commits hook filled).
-func dashboardHealthAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
+func DashboardAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
 	now := time.Now()
 	for i, g := range s.Groups {
-		out.Groups[i].Health = productAPI(groupHealth(s, g, now), dashboardFindings)
+		out.Groups[i].Health = productAPI(Group(s, g, now), dashboardFindings)
 		for j := range out.Groups[i].Members {
 			m := &out.Groups[i].Members[j]
 			var last time.Time
@@ -115,7 +115,7 @@ func dashboardHealthAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
 			}
 			m.Activity = oapi.ActivityLevel(health.ActivityOf(last, m.Archived, now))
 			if e := s.Repos[snapshot.RepoKey(m.Address)]; e != nil {
-				if r := assess(s, e, now); r.Counted {
+				if r := Assess(s, e, now); r.Counted {
 					m.Level = new(oapi.HealthLevel(r.Level))
 				}
 			}
@@ -128,25 +128,25 @@ func dashboardHealthAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
 	out.Health = productAPI(weigh(s, keys, "", now), dashboardFindings)
 }
 
-func groupHealthAPI(s *snapshot.Snapshot, g snapshot.Group, out *oapi.Group) {
-	out.Health = productAPI(groupHealth(s, g, time.Now()), 0)
+func GroupAPI(s *snapshot.Snapshot, g snapshot.Group, out *oapi.Group) {
+	out.Health = productAPI(Group(s, g, time.Now()), 0)
 }
 
-// rulesAPI serves the rules the portal judges by (health.Describe, less a switched-off feature's) and the switches, so every page
+// RulesAPI serves the rules the portal judges by (health.Describe, less a switched-off feature's) and the switches, so every page
 // explains the signals in the server's terms and shows only the parts switched on.
-type rulesAPI struct {
-	features config.Features
-	people   bool // the enterprise mode: each viewer links their own GitHub tokens
+type RulesAPI struct {
+	Features config.Features
+	People   bool // the enterprise mode: each viewer links their own GitHub tokens
 }
 
-func (a rulesAPI) GetRules(context.Context, oapi.GetRulesRequestObject) (oapi.GetRulesResponseObject, error) {
-	r := rulesFor(a.features)
-	r.Features.People = a.people
+func (a RulesAPI) GetRules(context.Context, oapi.GetRulesRequestObject) (oapi.GetRulesResponseObject, error) {
+	r := RulesFor(a.Features)
+	r.Features.People = a.People
 	return oapi.GetRules200JSONResponse{Body: r}, nil
 }
 
-// rulesFor is the rules and the switches as /rules tells them.
-func rulesFor(f config.Features) oapi.Rules {
+// RulesFor is the rules and the switches as /rules tells them.
+func RulesFor(f config.Features) oapi.Rules {
 	r := rulesOf(judged(f))
 	r.Features.Pulls, r.Features.Issues = f.Pulls, f.Issues
 	return r

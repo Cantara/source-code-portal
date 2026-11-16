@@ -14,7 +14,7 @@ import (
 	"github.com/cantara/source-code-portal/internal/platform/snapshot"
 )
 
-// Options are what the index reads of the other features, as functions (cmd/scp/search.go).
+// Options are what the index reads of the other features, as functions (internal/app/searchfeed).
 type Options struct {
 	// Read returns what the index holds of the repository e: deterministic for equal content (the segment is reused while
 	// Snapshot.Digest and the listing's fields are unchanged).

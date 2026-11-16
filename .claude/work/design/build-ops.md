@@ -37,7 +37,7 @@ Root files: `go.mod` (`module github.com/cantara/source-code-portal`, `go 1.27.2
 | `.github/workflows/` | `ci.yml`, `release.yml` |
 | `api/` | `openapi.yaml`, the OpenAPI 3.1 contract for `/api/v1` |
 | `cmd/scp/` | `main.go`, the Cobra tree, wiring (including the webhook sink that calls `Notify`), metrics, status, the boundary test |
-| `internal/` | the server packages in three layers, `feature/`, `platform/` and `lib/` (`TestLayersHold`), each created with its first code; `testdata/` beside a package's tests |
+| `internal/` | the server packages in four layers, `app/`, `feature/`, `platform/` and `lib/` (`TestLayersHold`), each created with its first code; `testdata/` beside a package's tests |
 | `web/` | the Next.js web UI (pnpm); `pnpm build` assembles `web/bundle` |
 | `deploy/` | `Dockerfile`, `Dockerfile.release`, `config.example.yaml` |
 | `docs/` | user documentation (operator guide, repository guide, API guide) |
@@ -166,6 +166,6 @@ is not used); major updates are PRs labelled `major-update` that a person review
 - SQLite tests use real files in `t.TempDir()`.
 - Web: `vitest` with MSW for components and hooks; Playwright against Go supervising the built bundle and the fake GitHub.
 - Boundary test `cmd/scp/boundary_test.go`: `layers` says what each layer may import of `internal/` (lib nothing, platform the platform
-  and lib, a feature the platform, lib and its own packages); walk `internal/<layer>/<pkg>`, read imports with `parser.ImportsOnly`,
+  and lib, a feature the platform, lib and its own packages, app the features, the platform, lib and its own packages); walk `internal/<layer>/<pkg>`, read imports with `parser.ImportsOnly`,
   and report every other import and every package outside the layers (`TestLayersHold`). `TestBoundaryCheckFindsViolation` runs the
-  same check on a temporary tree holding allowed imports and four violations and expects exactly those.
+  same check on a temporary tree holding allowed imports and six violations and expects exactly those.

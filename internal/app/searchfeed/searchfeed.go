@@ -1,4 +1,4 @@
-package main
+package searchfeed
 
 import (
 	"net/url"
@@ -19,13 +19,13 @@ import (
 
 const commitBody = 4 << 10 // bytes of a commit's body the index reads
 
-// searchOptions is what the search index reads of the other features (design/search.md): the repository and its descriptor, its
+// Options is what the search index reads of the other features (design/search.md): the repository and its descriptor, its
 // documents cut at their headings, its manifests, its packages and its default branch's commits.
-func searchOptions() search.Options {
-	return search.Options{Read: searchRead, Work: searchWork}
+func Options() search.Options {
+	return search.Options{Read: Read, Work: work}
 }
 
-func searchRead(e *snapshot.RepoEntry) search.Repository {
+func Read(e *snapshot.RepoEntry) search.Repository {
 	r, k := e.Repo, e.Repo.Key()
 	page := snapshot.RepoPage(k)
 	d, _ := catalog.DescriptorOf(e)
@@ -161,9 +161,9 @@ func searchRead(e *snapshot.RepoEntry) search.Repository {
 	return out
 }
 
-// searchWork is the kind of work of the commit item of e in the view s, as the lens counts it: automation (a bot or a sweep), with
+// work is the kind of work of the commit item of e in the view s, as the lens counts it: automation (a bot or a sweep), with
 // an AI, or by hand.
-func searchWork(s *snapshot.Snapshot, e *snapshot.RepoEntry, item int) string {
+func work(s *snapshot.Snapshot, e *snapshot.RepoEntry, item int) string {
 	cs, _ := commits.Of(e)
 	if item < 0 || item >= len(cs) {
 		return ""

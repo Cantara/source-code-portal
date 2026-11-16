@@ -1,4 +1,4 @@
-package main
+package fleethealth
 
 import (
 	"github.com/cantara/source-code-portal/internal/feature/manifests"
@@ -9,9 +9,9 @@ import (
 // sharedBy is the share of a group's members a value must have to be said once for the group instead of on every repository.
 const sharedBy = 0.8
 
-// dashboardSummaryAPI says once per group what most of its members share: the licence and the language (from the catalogue and the
+// DashboardSummary says once per group what most of its members share: the licence and the language (from the catalogue and the
 // manifests), and how many members have a release.
-func dashboardSummaryAPI(s *snapshot.Snapshot, out *oapi.Dashboard) {
+func DashboardSummary(s *snapshot.Snapshot, out *oapi.Dashboard) {
 	for i := range out.Groups {
 		g := &out.Groups[i]
 		licences, languages := map[string]int{}, map[string]int{}
