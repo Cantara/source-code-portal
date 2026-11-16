@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"net/url"
 	"slices"
 	"strings"
@@ -19,7 +18,6 @@ import (
 
 	contract "github.com/cantara/source-code-portal/api"
 	"github.com/cantara/source-code-portal/internal/app/fleethealth"
-	"github.com/cantara/source-code-portal/internal/app/searchfeed"
 	"github.com/cantara/source-code-portal/internal/app/toolset"
 	"github.com/cantara/source-code-portal/internal/feature/announce"
 	"github.com/cantara/source-code-portal/internal/feature/assistant"
@@ -32,7 +30,6 @@ import (
 	"github.com/cantara/source-code-portal/internal/feature/layout"
 	"github.com/cantara/source-code-portal/internal/feature/llms"
 	"github.com/cantara/source-code-portal/internal/feature/manifests"
-	"github.com/cantara/source-code-portal/internal/feature/packages"
 	"github.com/cantara/source-code-portal/internal/feature/pulls"
 	"github.com/cantara/source-code-portal/internal/feature/releases"
 	"github.com/cantara/source-code-portal/internal/feature/search"
@@ -43,10 +40,8 @@ import (
 	"github.com/cantara/source-code-portal/internal/platform/auth"
 	"github.com/cantara/source-code-portal/internal/platform/cluster"
 	"github.com/cantara/source-code-portal/internal/platform/config"
-	"github.com/cantara/source-code-portal/internal/platform/docstore"
 	"github.com/cantara/source-code-portal/internal/platform/github"
 	"github.com/cantara/source-code-portal/internal/platform/httpapi"
-	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/platform/mcpserver"
 	"github.com/cantara/source-code-portal/internal/platform/people"
 	"github.com/cantara/source-code-portal/internal/platform/snapshot"
@@ -239,32 +234,10 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	if err != nil {
 		return nil, err
 	}
-	sources := map[string]catalog.GitHub{}
-	fetchers := map[string]commits.Fetcher{}
-	trees := map[string]docs.GitHub{}
-	manifestTrees := map[string]manifests.GitHub{}
-	packageTrees := map[string]packages.GitHub{}
-	releaseFetchers := map[string]releases.Fetcher{}
-	openPulls := map[string]pulls.Fetcher{}
-	issueFetchers := map[string]issues.Fetcher{}
-	ids := make([]string, 0, len(cfg.GitHub.Sources))
-	for _, s := range cfg.GitHub.Sources {
-		src := gh.Source(s.ID)
-		sources[s.ID], trees[s.ID], manifestTrees[s.ID], packageTrees[s.ID] = src, src, src, src
-		fetchers[s.ID], releaseFetchers[s.ID], openPulls[s.ID] = commits.FromGitHub(src), releases.FromGitHub(src), pulls.FromGitHub(src)
-		issueFetchers[s.ID] = issues.FromGitHub(src)
-		ids = append(ids, s.ID)
-	}
-
+	rd := readersOf(cfg, gh)
+	ids := rd.ids
 	f := cfg.Features // a switched-off feature is absent: no job, index, route, tool or page (design/features.md)
-	indexers := []snapshot.Indexer{commits.Feeds(commitRules(cfg.Commits)), manifests.Graph(), search.Indexer(searchfeed.Options())}
-	if f.Pulls {
-		indexers = append(indexers, pulls.Feeds())
-	}
-	if f.Issues {
-		indexers = append(indexers, issues.Feeds())
-	}
-	s := &server{mode: mode, log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log, indexers...)}
+	s := &server{mode: mode, log: log, grace: cfg.Server.ShutdownGrace, pub: snapshot.NewPublisher(publishDebounce, publishMaxDelay, log, indexersOf(cfg)...)}
 	s.pub.Retire(func(e *snapshot.RepoEntry) bool { return catalog.Retired(e) != "" }) // a retired repository is in the Archive, not its group
 	if err := s.open(ctx, cfg, gh); err != nil {
 		return nil, err
@@ -278,38 +251,14 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	s.engine.SetPolling(append(polledSources(cfg), unloggedSources(cfg)...)...)
 	bi := readBuildInfo()
 	s.engine.Release(bi.Version + "+" + bi.Build) // a new build runs failed jobs again
-	if len(cfg.Cluster.Addresses) > 0 {
-		dial := d.cluster
-		if dial == nil {
-			dial = cluster.DialHazelcast(cfg.Cluster.Addresses, cfg.Cluster.Name, cfg.Cluster.Namespace, log)
-		}
-		s.member = cluster.New(dial, log)
-		s.engine.Share(s.member.Share)
-	}
-	cat, err := catalog.New(cfg.Catalog, cfg.GitHub.Sources, sources, s.engine.Notify, log)
+	s.joinCluster(cfg.Cluster, d, log)
+	cat, err := catalog.New(cfg.Catalog, cfg.GitHub.Sources, rd.sources, s.engine.Notify, log)
 	if err != nil {
 		return nil, err
 	}
-	documents := docs.New(trees, safehtml.New())
-	// Registration order is publish order at the warm start: the catalogue first, then what hangs off its repositories.
-	catalogued := func(k snapshot.RepoKey) (snapshot.Repo, bool) {
-		if e := s.pub.Current().Repos[k]; e != nil {
-			return e.Repo, true
-		}
-		return snapshot.Repo{}, false
-	}
-	specs := []sync.Spec{cat.Spec(), commits.New(fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
-		releases.New(releaseFetchers).Spec(), manifests.New(manifestTrees).Spec(), newPackages(cfg.Packages, packageTrees, d, catalogued).Spec()}
-	if f.Pulls {
-		specs = append(specs, pulls.New(openPulls, pulls.Options{Repo: catalogued}).Spec())
-	}
-	if f.Issues {
-		specs = append(specs, issues.New(issueFetchers, issues.Options{Repo: catalogued}).Spec())
-	}
-	for _, spec := range specs {
-		if err := s.engine.Register(spec); err != nil {
-			return nil, err
-		}
+	documents := docs.New(rd.trees, safehtml.New())
+	if err := s.registerJobs(cfg, d, rd, cat, documents); err != nil {
+		return nil, err
 	}
 
 	view, assets := s.views(log)
@@ -333,23 +282,9 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		upstream = s.web.URL()
 	}
 	ready := s.ready
-	imported, err := docstore.Import(ctx, s.store, cfg.Layout.Dir, append(layout.Names(), announce.Name))
-	if err != nil {
-		return nil, fmt.Errorf("layout.dir: %w", err)
+	if err := s.openDocuments(ctx, cfg, log); err != nil {
+		return nil, err
 	}
-	if len(imported) > 0 {
-		log.Info("layouts and announcements from layout.dir are now kept in the store; the files are no longer read", "imported", imported)
-	}
-	// The configuration is the base of what admins edit in the pages; the store keeps their changes (design/config-baseline.md).
-	baseVisibility, baseLayouts, problems := baseline(cfg.Baseline)
-	if len(problems) > 0 {
-		return nil, &config.Invalid{Problems: problems}
-	}
-	s.layouts = layout.Open(ctx, s.store, baseLayouts, log)
-	s.notices = announce.Open(ctx, cfg.Announcements, s.store, time.Now, log)
-	// A save of who sees what publishes again: the views are rebuilt with the new audiences (design/visibility.md).
-	s.visibility = visibility.Open(ctx, s.store, baseVisibility, func() { s.pub.Update(func(*snapshot.Builder) {}) }, log)
-	s.pub.Audience(s.visibility.Audience)
 	feed := cfg.Receiver() || cfg.Webhook.CatchUp // GitHub tells the portal what changed: through its receiver, or from the App's delivery log
 	s.prereqs = &prereqs{sources: ids, source: gh.Source, current: s.pub.Current, told: toldSources(cfg),
 		needs: needs(f), log: log.With("component", "prerequisites")}
@@ -363,10 +298,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 			return slices.Concat(s.layouts.Problems(), s.notices.Problems(), s.visibility.Problems())
 		},
 		deliveries: map[string]int{}}
-	st.polled = map[string]bool{}
-	for _, id := range polledSources(cfg) {
-		st.polled[id] = true
-	}
+	st.polled = polledSet(cfg)
 	if s.member != nil {
 		st.cluster = s.member
 	}
@@ -415,21 +347,7 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 		}
 		routes = append(routes, a.Routes()...)
 	}
-	// The hooks that add to a repository's summary, in the order of its fields; the pull requests' only when the feature is on.
-	repoHooks := []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, releases.Repo, manifests.Repo, packages.Repo}
-	if f.Pulls {
-		repoHooks = append(repoHooks, pulls.Repo)
-	}
-	repoHooks = append(repoHooks, fleethealth.RepoIssuesAPI, fleethealth.RepoAPI)
-	catalogAPI := catalog.API{Current: view,
-		Dashboard:    []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, fleethealth.DashboardAPI, fleethealth.DashboardSummary},
-		Group:        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){fleethealth.GroupAPI},
-		Repo:         repoHooks,
-		Detail:       []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
-		ArchiveEntry: []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.ArchiveEntry){manifests.ArchiveEntry, commits.ArchiveEntry}}
-	if f.Pulls {
-		catalogAPI.Dashboard = append(catalogAPI.Dashboard, pulls.Dashboard)
-	}
+	catalogAPI := catalogWith(view, f)
 	commitsAPI := commits.API{Current: view}
 	pullsAPI, issuesAPI := pulls.API{Current: view, Off: !f.Pulls}, issues.API{Current: view, Off: !f.Issues}
 	groupNames := func(ctx context.Context) []string {
@@ -470,21 +388,8 @@ func newServer(ctx context.Context, cfg config.Config, d deps, log *slog.Logger)
 	slices.Sort(s.routes)
 	s.public = httpapi.Server(httpapi.Public(opts, opts.Pages(upstream), contract.OpenAPI, features, routes...), log)
 	s.public.RegisterOnShutdown(events.Close)
-	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
-	if cfg.Ops.Pprof {
-		admin = append(admin, httpapi.Route{Pattern: "GET /debug/pprof/", Handler: http.HandlerFunc(pprof.Index)},
-			httpapi.Route{Pattern: "GET /debug/pprof/cmdline", Handler: http.HandlerFunc(pprof.Cmdline)},
-			httpapi.Route{Pattern: "GET /debug/pprof/profile", Handler: http.HandlerFunc(pprof.Profile)},
-			httpapi.Route{Pattern: "GET /debug/pprof/symbol", Handler: http.HandlerFunc(pprof.Symbol)},
-			httpapi.Route{Pattern: "GET /debug/pprof/trace", Handler: http.HandlerFunc(pprof.Trace)})
-	}
-	s.admin = httpapi.Server(httpapi.Admin(opts, s.engine.Alive, ready, admin...), log)
-	var lc net.ListenConfig
-	if s.publicLn, err = lc.Listen(ctx, "tcp", cfg.Server.PublicAddr); err != nil {
-		return nil, err
-	}
-	if s.adminLn, err = lc.Listen(ctx, "tcp", cfg.Server.AdminAddr); err != nil {
-		_ = s.publicLn.Close()
+	s.admin = httpapi.Server(httpapi.Admin(opts, s.engine.Alive, ready, adminRoutes(cfg.Ops, m, st)...), log)
+	if err := s.listen(ctx, cfg.Server); err != nil {
 		return nil, err
 	}
 	return s, nil

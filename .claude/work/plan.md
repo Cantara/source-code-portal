@@ -173,9 +173,9 @@ Each milestone starts with its design note and lands as small commits on `main`,
 
 ## Complexity backlog
 
-`.golangci.yml` holds `gocyclo` at 45 and `gocognit` at 65 (tests excepted): the worst functions today, so none gets harder to read. These are the ones past
+`.golangci.yml` holds `gocyclo` at 35 and `gocognit` at 62 (tests excepted; `search.(*Index).run` suppressed for both): the worst functions today, so none gets harder to read. These are the ones past
 a sensible limit (cyclomatic 25, cognitive 40), to split when their code is next changed, worst first, then the ceilings come down:
-`search.(*Index).run` (cognitive 106, suppressed), `pulls.readPulls` (62), `issues.readIssues` (58), `packages.PyPI.project` (55),
-`cmd/scp.newServer` (53), `commits.sides` (50), `searchfeed.Read` (51), `httpapi.Options.wrap` (44), `commits.layout` (43), `docs.rewrite` (42);
-cyclomatic: `search.(*Index).run` (43), `cmd/scp.newServer` (42), `config.Announcement.check` (35), `commits.API.GetHistory` (31), `packages.Client.Get` (31), `manifests.parsePOM` (30), `search.Parse` (30),
+`search.(*Index).run` (cognitive 106, suppressed), `pulls.readPulls` (62), `issues.readIssues` (58), `setup.deriveOne` (57), `packages.PyPI.project` (55),
+`docs.rewrite` (53), `searchfeed.Read` (51), `httpapi.Options.wrap` (51), `commits.sides` (50), `commits.layout` (43), `cmd/scp.newServer` (32);
+cyclomatic: `search.(*Index).run` (43, suppressed), `config.Announcement.check` (35), `commits.API.GetHistory` (31), `packages.Client.Get` (31), `manifests.parsePOM` (30), `search.Parse` (30),
 `layout.check` (28), `config.Packages.validate` (27), `config.GitHub.validate` (27), `packages.parseVersion` (26), `catalog.ParseDescriptor` (26).

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -8,27 +9,37 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/cantara/source-code-portal/internal/app/fleethealth"
+	"github.com/cantara/source-code-portal/internal/app/searchfeed"
+	"github.com/cantara/source-code-portal/internal/feature/announce"
 	"github.com/cantara/source-code-portal/internal/feature/badges"
 	"github.com/cantara/source-code-portal/internal/feature/catalog"
 	"github.com/cantara/source-code-portal/internal/feature/commits"
 	"github.com/cantara/source-code-portal/internal/feature/docs"
 	"github.com/cantara/source-code-portal/internal/feature/issues"
+	"github.com/cantara/source-code-portal/internal/feature/layout"
 	"github.com/cantara/source-code-portal/internal/feature/llms"
 	"github.com/cantara/source-code-portal/internal/feature/manifests"
 	"github.com/cantara/source-code-portal/internal/feature/packages"
 	"github.com/cantara/source-code-portal/internal/feature/pulls"
 	"github.com/cantara/source-code-portal/internal/feature/releases"
+	"github.com/cantara/source-code-portal/internal/feature/search"
 	"github.com/cantara/source-code-portal/internal/feature/visibility"
 	"github.com/cantara/source-code-portal/internal/lib/egress"
 	"github.com/cantara/source-code-portal/internal/platform/auth"
+	"github.com/cantara/source-code-portal/internal/platform/cluster"
 	"github.com/cantara/source-code-portal/internal/platform/config"
+	"github.com/cantara/source-code-portal/internal/platform/docstore"
+	"github.com/cantara/source-code-portal/internal/platform/github"
 	"github.com/cantara/source-code-portal/internal/platform/httpapi"
+	"github.com/cantara/source-code-portal/internal/platform/httpapi/oapi"
 	"github.com/cantara/source-code-portal/internal/platform/snapshot"
+	"github.com/cantara/source-code-portal/internal/platform/sync"
 	"github.com/cantara/source-code-portal/internal/platform/theme"
 )
 
@@ -208,4 +219,159 @@ func commitRules(c config.Commits) *commits.Rules {
 		added = append(added, commits.AssistantRule{Name: a.Name, Authors: a.Authors, CoAuthors: a.CoAuthors})
 	}
 	return commits.NewRules(added)
+}
+
+// readers is what each feature reads GitHub through, per source id.
+type readers struct {
+	ids             []string
+	sources         map[string]catalog.GitHub
+	fetchers        map[string]commits.Fetcher
+	trees           map[string]docs.GitHub
+	manifestTrees   map[string]manifests.GitHub
+	packageTrees    map[string]packages.GitHub
+	releaseFetchers map[string]releases.Fetcher
+	openPulls       map[string]pulls.Fetcher
+	issueFetchers   map[string]issues.Fetcher
+}
+
+func readersOf(cfg config.Config, gh *github.Client) readers {
+	r := readers{sources: map[string]catalog.GitHub{}, fetchers: map[string]commits.Fetcher{}, trees: map[string]docs.GitHub{},
+		manifestTrees: map[string]manifests.GitHub{}, packageTrees: map[string]packages.GitHub{}, releaseFetchers: map[string]releases.Fetcher{},
+		openPulls: map[string]pulls.Fetcher{}, issueFetchers: map[string]issues.Fetcher{}, ids: make([]string, 0, len(cfg.GitHub.Sources))}
+	for _, s := range cfg.GitHub.Sources {
+		src := gh.Source(s.ID)
+		r.sources[s.ID], r.trees[s.ID], r.manifestTrees[s.ID], r.packageTrees[s.ID] = src, src, src, src
+		r.fetchers[s.ID], r.releaseFetchers[s.ID], r.openPulls[s.ID] = commits.FromGitHub(src), releases.FromGitHub(src), pulls.FromGitHub(src)
+		r.issueFetchers[s.ID] = issues.FromGitHub(src)
+		r.ids = append(r.ids, s.ID)
+	}
+	return r
+}
+
+// indexersOf is the snapshot's indexes of the features switched on.
+func indexersOf(cfg config.Config) []snapshot.Indexer {
+	indexers := []snapshot.Indexer{commits.Feeds(commitRules(cfg.Commits)), manifests.Graph(), search.Indexer(searchfeed.Options())}
+	if cfg.Features.Pulls {
+		indexers = append(indexers, pulls.Feeds())
+	}
+	if cfg.Features.Issues {
+		indexers = append(indexers, issues.Feeds())
+	}
+	return indexers
+}
+
+// joinCluster makes the engine one of several instances when cluster addresses are configured.
+func (s *server) joinCluster(c config.Cluster, d deps, log *slog.Logger) {
+	if len(c.Addresses) == 0 {
+		return
+	}
+	dial := d.cluster
+	if dial == nil {
+		dial = cluster.DialHazelcast(c.Addresses, c.Name, c.Namespace, log)
+	}
+	s.member = cluster.New(dial, log)
+	s.engine.Share(s.member.Share)
+}
+
+// registerJobs registers the jobs of the features switched on. Registration order is publish order at the warm start: the catalogue
+// first, then what hangs off its repositories.
+func (s *server) registerJobs(cfg config.Config, d deps, rd readers, cat *catalog.Catalog, documents *docs.Docs) error {
+	catalogued := func(k snapshot.RepoKey) (snapshot.Repo, bool) {
+		if e := s.pub.Current().Repos[k]; e != nil {
+			return e.Repo, true
+		}
+		return snapshot.Repo{}, false
+	}
+	specs := []sync.Spec{cat.Spec(), commits.New(rd.fetchers).Spec(), documents.Spec(), cat.DescriptorSpec(),
+		releases.New(rd.releaseFetchers).Spec(), manifests.New(rd.manifestTrees).Spec(), newPackages(cfg.Packages, rd.packageTrees, d, catalogued).Spec()}
+	if cfg.Features.Pulls {
+		specs = append(specs, pulls.New(rd.openPulls, pulls.Options{Repo: catalogued}).Spec())
+	}
+	if cfg.Features.Issues {
+		specs = append(specs, issues.New(rd.issueFetchers, issues.Options{Repo: catalogued}).Spec())
+	}
+	for _, spec := range specs {
+		if err := s.engine.Register(spec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// openDocuments opens what admins edit in the pages: the layouts, the announcements and who sees what, each over its base in the
+// configuration (design/config-baseline.md), after taking over what layout.dir held.
+func (s *server) openDocuments(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+	imported, err := docstore.Import(ctx, s.store, cfg.Layout.Dir, append(layout.Names(), announce.Name))
+	if err != nil {
+		return fmt.Errorf("layout.dir: %w", err)
+	}
+	if len(imported) > 0 {
+		log.Info("layouts and announcements from layout.dir are now kept in the store; the files are no longer read", "imported", imported)
+	}
+	baseVisibility, baseLayouts, problems := baseline(cfg.Baseline)
+	if len(problems) > 0 {
+		return &config.Invalid{Problems: problems}
+	}
+	s.layouts = layout.Open(ctx, s.store, baseLayouts, log)
+	s.notices = announce.Open(ctx, cfg.Announcements, s.store, time.Now, log)
+	// A save of who sees what publishes again: the views are rebuilt with the new audiences (design/visibility.md).
+	s.visibility = visibility.Open(ctx, s.store, baseVisibility, func() { s.pub.Update(func(*snapshot.Builder) {}) }, log)
+	s.pub.Audience(s.visibility.Audience)
+	return nil
+}
+
+// polledSet is polledSources as a set.
+func polledSet(cfg config.Config) map[string]bool {
+	out := map[string]bool{}
+	for _, id := range polledSources(cfg) {
+		out[id] = true
+	}
+	return out
+}
+
+// catalogWith is the catalog API with the hooks other features add to its answers; the hooks that add to a repository's summary
+// come in the order of its fields, the pull requests' only when the feature is on.
+func catalogWith(view func(context.Context) *snapshot.Snapshot, f config.Features) catalog.API {
+	repoHooks := []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.Repo){commits.Repo, releases.Repo, manifests.Repo, packages.Repo}
+	if f.Pulls {
+		repoHooks = append(repoHooks, pulls.Repo)
+	}
+	repoHooks = append(repoHooks, fleethealth.RepoIssuesAPI, fleethealth.RepoAPI)
+	a := catalog.API{Current: view,
+		Dashboard:    []func(*snapshot.Snapshot, *oapi.Dashboard){commits.Dashboard, fleethealth.DashboardAPI, fleethealth.DashboardSummary},
+		Group:        []func(*snapshot.Snapshot, snapshot.Group, *oapi.Group){fleethealth.GroupAPI},
+		Repo:         repoHooks,
+		Detail:       []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.RepoDetail){commits.Detail},
+		ArchiveEntry: []func(*snapshot.Snapshot, *snapshot.RepoEntry, *oapi.ArchiveEntry){manifests.ArchiveEntry, commits.ArchiveEntry}}
+	if f.Pulls {
+		a.Dashboard = append(a.Dashboard, pulls.Dashboard)
+	}
+	return a
+}
+
+// adminRoutes are the admin port's routes: the metrics, the status and, with ops.pprof, the profiler.
+func adminRoutes(o config.Ops, m *metrics, st *status) []httpapi.Route {
+	admin := []httpapi.Route{{Pattern: "GET /metrics", Handler: m.handler()}, {Pattern: "GET /api/v1/status", Handler: st}}
+	if o.Pprof {
+		admin = append(admin, httpapi.Route{Pattern: "GET /debug/pprof/", Handler: http.HandlerFunc(pprof.Index)},
+			httpapi.Route{Pattern: "GET /debug/pprof/cmdline", Handler: http.HandlerFunc(pprof.Cmdline)},
+			httpapi.Route{Pattern: "GET /debug/pprof/profile", Handler: http.HandlerFunc(pprof.Profile)},
+			httpapi.Route{Pattern: "GET /debug/pprof/symbol", Handler: http.HandlerFunc(pprof.Symbol)},
+			httpapi.Route{Pattern: "GET /debug/pprof/trace", Handler: http.HandlerFunc(pprof.Trace)})
+	}
+	return admin
+}
+
+// listen opens the public and the admin listeners.
+func (s *server) listen(ctx context.Context, c config.Server) error {
+	var lc net.ListenConfig
+	var err error
+	if s.publicLn, err = lc.Listen(ctx, "tcp", c.PublicAddr); err != nil {
+		return err
+	}
+	if s.adminLn, err = lc.Listen(ctx, "tcp", c.AdminAddr); err != nil {
+		_ = s.publicLn.Close()
+		return err
+	}
+	return nil
 }

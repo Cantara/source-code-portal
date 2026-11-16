@@ -25,9 +25,9 @@ linters:
     # A ceiling at today's worst, so no function gets harder to read than the worst ones are; the list to bring down is in
     # .claude/work/plan.md (complexity backlog).
     gocyclo:
-      min-complexity: 45
+      min-complexity: 35
     gocognit:
-      min-complexity: 65
+      min-complexity: 62
     forbidigo:
       forbid:
         - pattern: ^http\.(Get|Head|Post|PostForm)$
