@@ -18,6 +18,8 @@ the root `AGENTS.md` (imported above).
   `capture.js`, `publish.mjs`) and the design rules.
 - `plugins/scp/` (in the marketplace `.claude-plugin/marketplace.json`): the external Claude Code plugin for operators of a released
   portal, its skill `run-scp` with `references/`; it follows `docs/` in the same commit.
+- `.claude/skills/go-review/`: the skill that reviews the Go code as it is, one area per run (eight areas make a full pass): the
+  measurements, SCP's rules, correctness and structure, each finding verified by a failing test, the report outside the repository.
 - `.claude/skills/configure-scp/`: the skill that turns the owner's wishes (groups, regexps, the legacy Java `config.json`) into
   `scp.yaml`, proved with `scp config check` and `scp config groups`.
 - `.claude/work/history/`: finished work (the M0..M11 plan and decision log, the earlier detailed design, the UI brief). Not kept in
